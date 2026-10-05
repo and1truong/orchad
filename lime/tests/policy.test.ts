@@ -129,6 +129,7 @@ test("oversized output rejected at boundary", async () => {
   fixture.getContext = async () => ({
     appId: "demo-counter",
     documentId: "demo-document",
+    sessionEpoch: null,
     revision: 0,
     selectionIds: [],
     summary: "x".repeat(70000),

@@ -91,6 +91,7 @@ function host(approve: (a: Approval, s: AbortSignal) => Promise<boolean>) {
       clientId: "e2e",
       sessionId: "s1",
       target: { ...fixture.target },
+      sessionEpoch: null,
       reads: new Set(["demo_read"]),
     },
     approve,
