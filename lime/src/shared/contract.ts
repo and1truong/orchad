@@ -97,7 +97,10 @@ export const failure = (
   ok: false,
   revision: null,
   data: null,
-  error: { code, message, retryable },
+  // Clamp: an unbounded message (e.g. a large Zod error) would produce a
+  // Result that itself fails ResultSchema's 8192-char cap at the next
+  // bounded() boundary.
+  error: { code, message: message.slice(0, 8000), retryable },
 });
 export const success = (
   data: unknown,
