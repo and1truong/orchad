@@ -12,8 +12,8 @@
     "gateway:mock": "node --import tsx fixtures/gateway.ts"
   },
   "dependencies": {
+    "@cfworker/json-schema": "4.1.1",
     "@modelcontextprotocol/sdk": "1.32.0",
-    "ajv": "8.17.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "ws": "8.18.3",
@@ -26,8 +26,8 @@
     "@types/react-dom": "19.2.3",
     "@types/ws": "8.18.1",
     "esbuild": "0.27.2",
+    "playwright": "1.58.2",
     "tsx": "4.21.0",
-    "typescript": "5.9.3",
-    "playwright": "1.58.2"
+    "typescript": "5.9.3"
   }
 }

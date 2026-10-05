@@ -9,3 +9,5 @@ That exact file has SHA-256 `137db8eb8557bdad656a48337c9020227fc7a1ca1d3b537469c
 Potential future clarification: the fixture says data contains value and revision; Lime includes both in data and the envelope revision, which is compatible with arbitrary JSON data.
 
 Logout detection requires application cooperation: the contract has no authentication-state notification method. A host can invalidate runtime navigation/document changes and fail on unauthorized page calls; it cannot prove a server session remains logged in without the application's methods enforcing that boundary.
+
+Tool-argument validation interprets page-supplied JSON Schema (draft 7 subset via `@cfworker/json-schema`) instead of compiling it, because MV3 `script-src 'self'` forbids `new Function`. `format` assertions are now honored when the format is known (previously ignored); unknown formats still pass. No wire fields, methods or enums change.
