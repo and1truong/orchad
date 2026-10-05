@@ -24,8 +24,6 @@
     "pretest": "npm run vendor:contract"
   },
   "dependencies": {
-    "@cfworker/json-schema": "4.1.1",
-    "ajv": "8.20.0",
     "fastify": "5.12.5",
     "@orchard/bridge-contract": "file:../packages/bridge-contract"
   },
@@ -34,6 +32,7 @@
     "esbuild": "0.25.12",
     "prettier": "3.6.2",
     "tsx": "4.20.6",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "ajv": "8.20.0"
   }
 }

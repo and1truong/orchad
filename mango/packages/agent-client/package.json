@@ -22,7 +22,6 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@cfworker/json-schema": "4.1.1",
     "@orchard/bridge-contract": "file:../../../packages/bridge-contract"
   }
 }

@@ -10,7 +10,7 @@ import {
   type Message,
   type ToolCall,
 } from "../packages/agent-client/src/protocol.js";
-import AjvModule from "ajv";
+import { hostSafeSchema } from "@orchard/bridge-contract";
 import { StateCodec } from "./state.js";
 import type { Storage, Principal } from "./store.js";
 import {
@@ -21,24 +21,7 @@ import {
   type ModelConfig,
   type Usage,
 } from "./providers/types.js";
-const Ajv = AjvModule as unknown as typeof AjvModule.default;
 const checkCall = schemaValidator.compile(callSchema);
-// Client-supplied tool schemas are untrusted: compile them in a per-request
-// registry and bound their complexity so no request can poison another.
-const TOOL_SCHEMA_MAX_BYTES = 64 * 1024;
-const TOOL_SCHEMA_MAX_NODES = 512;
-const toolSchemaTooComplex = (schema: unknown): boolean => {
-  if (Buffer.byteLength(JSON.stringify(schema)) > TOOL_SCHEMA_MAX_BYTES)
-    return true;
-  let nodes = 0;
-  const stack = [schema];
-  while (stack.length) {
-    const v = stack.pop();
-    if (++nodes > TOOL_SCHEMA_MAX_NODES) return true;
-    if (v && typeof v === "object") stack.push(...Object.values(v));
-  }
-  return false;
-};
 export type GatewayOptions = {
   store: Storage;
   models: ModelConfig[];
@@ -225,18 +208,16 @@ export function createGateway(o: GatewayOptions) {
     try {
       validateHistory(body.messages);
       const names = new Set<string>();
-      const toolSchemas = new Ajv({
-        strict: false,
-        allErrors: true,
-        validateFormats: false,
-      });
+      // Client-supplied tool schemas are untrusted: the shared dialect gate
+      // (hostSafeSchema) bounds them and validateArgs interprets them with
+      // the same semantics the hosts apply — nothing compiles per host.
       for (const t of body.tools ?? []) {
         if (names.has(t.function.name)) throw 0;
         names.add(t.function.name);
-        if (toolSchemaTooComplex(t.function.parameters)) throw 0;
+        if (!hostSafeSchema(t.function.parameters)) throw 0;
         toolValidators.set(
           t.function.name,
-          toolSchemas.compile(t.function.parameters),
+          schemaValidator.compile(t.function.parameters),
         );
       }
       for (const [i, m] of body.messages.entries())

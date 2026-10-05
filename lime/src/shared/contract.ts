@@ -1,16 +1,17 @@
 import { z } from "zod";
-import { Validator, type Schema } from "@cfworker/json-schema";
 import {
   Bounds,
   Codes as ContractCodes,
   canonical,
   failure,
   hostSafeSchema,
+  matchPattern,
   safePattern,
   success,
+  validateArgs,
   type Code as ContractCode,
 } from "@orchard/bridge-contract";
-export { canonical, failure, hostSafeSchema, safePattern, success };
+export { canonical, failure, hostSafeSchema, matchPattern, safePattern, success, validateArgs };
 export const MAX_BYTES = Bounds.message;
 export const Codes = z.enum(
   ContractCodes as unknown as [ContractCode, ...ContractCode[]],
@@ -104,17 +105,11 @@ export function bounded<S extends z.ZodTypeAny>(
   return schema.parse(JSON.parse(encoded));
 }
 // MV3 extension CSP forbids string code generation, so page-supplied schemas
-// are interpreted per call rather than compiled (Ajv compile emits `new
-// Function`). The bounded schema dialect itself lives in
-// @orchard/bridge-contract (hostSafeSchema/safePattern above).
+// are interpreted per call rather than compiled. The ONE argument validator
+// lives in @orchard/bridge-contract — every host applies identical dialect
+// semantics (prefixItems included) and the linear-time pattern matcher.
 export function validateArguments(tool: Tool, args: unknown): boolean {
-  if (!hostSafeSchema(tool.inputSchema)) return false;
-  try {
-    return new Validator(tool.inputSchema as Schema, "7", false).validate(args)
-      .valid;
-  } catch {
-    return false;
-  }
+  return validateArgs(tool.inputSchema, args);
 }
 export const BindingSchema = z
   .object({ targetId: id, pageInstanceId: id })

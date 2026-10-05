@@ -809,7 +809,7 @@ function typeMatches(t: string, v: unknown): boolean {
   }
 }
 
-function matchSchema(s: unknown, v: unknown): boolean {
+export function matchSchema(s: unknown, v: unknown): boolean {
   if (s === true) return true;
   if (s === false) return false;
   const o = s as Record<string, unknown>;
@@ -925,6 +925,10 @@ function matchSchema(s: unknown, v: unknown): boolean {
 
 // Validates args against a schema already inside the bounded dialect (the
 // hostSafeSchema gate is re-checked here so direct callers stay fail closed).
+// For schemas the caller already trusts — e.g. the gateway's own published
+// api.schema.json envelopes, which legitimately exceed dialect caps — call
+// matchSchema directly instead: it applies the same keyword semantics
+// without re-running the untrusted-input gate.
 export function validateArgs(schema: unknown, args: unknown): boolean {
   if (!hostSafeSchema(schema)) return false;
   try {
