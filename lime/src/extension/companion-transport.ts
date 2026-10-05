@@ -160,7 +160,12 @@ export class CompanionTransport {
     ws.onerror = () => this.onState("error");
   }
   revoke() {
-    this.ws?.send(JSON.stringify({ type: "revoke" }));
+    // send() throws on a CONNECTING socket and silently drops on a dead one;
+    // a dead socket leaves the server-side pair alive but permanently
+    // fail-closed (route() requires an OPEN bridge), so only notify while
+    // OPEN and always wipe our copy of the credentials.
+    if (this.ws?.readyState === WebSocket.OPEN)
+      this.ws.send(JSON.stringify({ type: "revoke" }));
     this.credentials = null;
     this.disconnect();
   }
