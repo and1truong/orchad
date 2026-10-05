@@ -31,6 +31,7 @@ fn send(s: &Native, v: Value) -> Result<(), String> {
     // caller waits (bounded) for it to be restored instead of failing spuriously.
     // input_dead records a failed write so later callers fail fast instead of
     // blocking on a handle that will never be restored.
+    smoke_note("send", v["kind"].as_str().unwrap_or(""));
     if s.input_dead.load(Ordering::SeqCst) {
         return Err("Sidecar disconnected".into());
     }
@@ -58,6 +59,19 @@ fn send(s: &Native, v: Value) -> Result<(), String> {
 fn trusted(w: &Webview) -> Result<(), String> {
     trusted_parts(w.label(), &w.url().map_err(|e| e.to_string())?)
 }
+
+// COCONUT_SMOKE=1 (debug builds only) opens a loopback control channel and
+// emits `COCONUT_SMOKE:` markers on stderr so the native acceptance lane can
+// assert on real runtime events — never compiled into release builds and
+// never reachable outside 127.0.0.1.
+fn smoke_on() -> bool {
+    cfg!(debug_assertions) && std::env::var("COCONUT_SMOKE").ok().as_deref() == Some("1")
+}
+fn smoke_note(kind: &str, detail: &str) {
+    if smoke_on() {
+        eprintln!("COCONUT_SMOKE:{}:{}", kind, detail);
+    }
+}
 // Pure form of `trusted()` so the gating predicates are unit-testable without
 // a Tauri runtime: host label + expected host-webview origins.
 fn trusted_parts(label: &str, u: &url::Url) -> Result<(), String> {
@@ -84,13 +98,24 @@ fn allowed_at(u: &url::Url, trusted_origin: &str) -> bool {
     u.origin().ascii_serialization() == trusted_origin
 }
 
-// Action gate for `host_request`: privileged actions (heartbeat/decide/pair)
-// additionally require an active trusted UI.
+// Action gate for `host_request`: privileged actions (heartbeat/decide/
+// pair/consent — anything that grants or keeps authority alive) additionally
+// require an active trusted UI.
 fn action_allowed(action: &str, host_active: bool) -> Result<(), String> {
-    if ["heartbeat", "decide", "pair"].contains(&action) && !host_active {
+    if ["heartbeat", "decide", "pair", "consent"].contains(&action) && !host_active {
         return Err("Trusted UI is inactive".into());
     }
-    if !["heartbeat", "pair", "revoke", "decide", "cancel", "tool"].contains(&action) {
+    if ![
+        "heartbeat",
+        "pair",
+        "revoke",
+        "decide",
+        "cancel",
+        "tool",
+        "consent",
+    ]
+    .contains(&action)
+    {
         return Err("FORBIDDEN".into());
     }
     Ok(())
@@ -132,13 +157,15 @@ fn invalidate(s: &Native) {
     lock(&s.replies).clear();
     *lock(&s.nonce) = None;
 }
-#[tauri::command]
-async fn host_request(
-    webview: Webview,
-    state: tauri::State<'_, Arc<Native>>,
+// Shared request path for the sidebar command and the smoke control
+// channel: same cap, same action gate, same kind-stripping, same sidecar
+// round-trip. host_active arrives precomputed so each caller applies its own
+// UI-visibility source (the command uses the calling webview's window).
+async fn dispatch_request(
+    state: &Arc<Native>,
     mut request: Value,
+    host_active: bool,
 ) -> Result<Value, String> {
-    trusted(&webview)?;
     if serde_json::to_vec(&request)
         .map_err(|e| e.to_string())?
         .len()
@@ -147,11 +174,7 @@ async fn host_request(
         return Err("Payload too large".into());
     }
     let action = request["action"].as_str().ok_or("Missing action")?;
-    let host = webview.window();
-    action_allowed(
-        action,
-        host.is_visible().unwrap_or(false) && !host.is_minimized().unwrap_or(true),
-    )?;
+    action_allowed(action, host_active)?;
     // Sidebar requests are action-only; 'kind' envelopes are native->sidecar
     // events (binding/reply/closed/dispatch) and must not be injectable.
     if let Some(o) = request.as_object_mut() {
@@ -164,7 +187,7 @@ async fn host_request(
     request["id"] = json!(id);
     let (tx, rx) = oneshot::channel();
     lock(&state.pending).insert(id.clone(), tx);
-    if let Err(e) = send(&state, request) {
+    if let Err(e) = send(state, request) {
         lock(&state.pending).remove(&id);
         return Err(e);
     }
@@ -177,6 +200,21 @@ async fn host_request(
         Ok(Err(_)) => Err("Disconnected".into()),
         Err(_) => Err("TIMEOUT".into()),
     }
+}
+#[tauri::command]
+async fn host_request(
+    webview: Webview,
+    state: tauri::State<'_, Arc<Native>>,
+    request: Value,
+) -> Result<Value, String> {
+    trusted(&webview)?;
+    let host = webview.window();
+    dispatch_request(
+        &state,
+        request,
+        host.is_visible().unwrap_or(false) && !host.is_minimized().unwrap_or(true),
+    )
+    .await
 }
 #[tauri::command]
 fn guest_reply(
@@ -237,18 +275,18 @@ fn guest_reply(
     }
     send(&state, json!({"kind":"reply","id":id,"result":result}))
 }
-#[tauri::command]
-fn discover_guest(webview: Webview, state: tauri::State<'_, Arc<Native>>) -> Result<(), String> {
-    trusted(&webview)?;
-    // Trusted re-discovery for the current guest: an SPA login or a late
-    // bridge install never triggers a page load, so a page whose first probe
-    // failed would otherwise stay undiscoverable. Re-probing is allowed only
-    // while the binding is provisional or absent — never silently rebinds a
-    // live target — and dispatches a bare getContext, so nothing pending can
-    // replay as part of rediscovery.
-    let Some(guest) = webview.window().get_webview("guest") else {
+// Trusted re-discovery for the current guest: an SPA login or a late
+// bridge install never triggers a page load, so a page whose first probe
+// failed would otherwise stay undiscoverable. Re-probing is allowed only
+// while the binding is provisional or absent — never silently rebinds a
+// live target — and dispatches a bare getContext, so nothing pending can
+// replay as part of rediscovery. Shared by the sidebar command and the
+// smoke control channel.
+fn do_discover_guest(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(guest) = app.get_webview("guest") else {
         return Err("No guest".into());
     };
+    let state = app.state::<Arc<Native>>();
     let u = guest.url().map_err(|e| e.to_string())?;
     if !allowed(&u) {
         return Err("Origin not allowlisted".into());
@@ -267,8 +305,13 @@ fn discover_guest(webview: Webview, state: tauri::State<'_, Arc<Native>>) -> Res
     Ok(())
 }
 #[tauri::command]
-async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Result<(), String> {
+fn discover_guest(webview: Webview, app: tauri::AppHandle) -> Result<(), String> {
     trusted(&webview)?;
+    do_discover_guest(&app)
+}
+// The guest-open path minus the trust gate, so both the sidebar command and
+// the smoke control channel run the identical code.
+fn do_open_guest(app: &tauri::AppHandle, url: String) -> Result<(), String> {
     let u = url::Url::parse(&url).map_err(|e| e.to_string())?;
     if !allowed(&u) || !u.username().is_empty() || u.password().is_some() {
         return Err("Origin not allowlisted".into());
@@ -279,7 +322,7 @@ async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Res
     }
     let load = app.clone();
     let window = app.get_window("host").ok_or("Host missing")?;
-    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(|_|true).on_page_load(move |guest,payload|{match payload.event(){tauri::webview::PageLoadEvent::Started=>invalidate(&load.state::<Arc<Native>>()),tauri::webview::PageLoadEvent::Finished=>if allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","sessionEpoch":null,"title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),(t, "getContext".to_string()));let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);},_=>{}}});
+    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(|_|true).on_page_load(move |guest,payload|{match payload.event(){tauri::webview::PageLoadEvent::Started=>{smoke_note("guest","started");invalidate(&load.state::<Arc<Native>>())},tauri::webview::PageLoadEvent::Finished=>{smoke_note("guest","finished");if allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","sessionEpoch":null,"title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),(t, "getContext".to_string()));let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);}},_=>{}}});
     window
         .add_child(
             builder,
@@ -288,6 +331,11 @@ async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Res
         )
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+#[tauri::command]
+async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Result<(), String> {
+    trusted(&webview)?;
+    do_open_guest(&app, url)
 }
 fn bridge_script(id: &str, op: &str, call: &Value, nonce: Option<String>) -> String {
     let request = json!({"id":id,"op":op,"call":call,"nonce":nonce});
@@ -352,8 +400,13 @@ mod tests {
     fn action_gate_enforces_ui_and_allowlist() {
         assert!(action_allowed("tool", false).is_ok());
         assert!(action_allowed("heartbeat", true).is_ok());
+        assert!(action_allowed("consent", true).is_ok());
         assert_eq!(
             action_allowed("pair", false).unwrap_err(),
+            "Trusted UI is inactive"
+        );
+        assert_eq!(
+            action_allowed("consent", false).unwrap_err(),
             "Trusted UI is inactive"
         );
         assert_eq!(action_allowed("open_guest", true).unwrap_err(), "FORBIDDEN");
@@ -398,11 +451,20 @@ mod tests {
 }
 
 fn main() {
+    smoke_note("boot", "main");
     if std::env::args().any(|a| a == "--version" || a == "-V") {
         println!("coconut {}", env!("CARGO_PKG_VERSION"));
         return;
     }
     let state = Arc::new(Native::default());
     let setup_state = state.clone();
-    tauri::Builder::default().manage(state).invoke_handler(tauri::generate_handler![open_guest,discover_guest,host_request,guest_reply]).setup(move |app|{let path=if cfg!(debug_assertions){std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../host/sidecar.mjs")}else{app.path().resource_dir()?.join("_up_/host/sidecar.bundle.mjs")};let mut child=Command::new("node").arg(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;*lock(&setup_state.input)=child.stdin.take();let stdout=child.stdout.take().unwrap();*lock(&setup_state.child)=Some(child);let handle=app.handle().clone();let s=setup_state.clone();std::thread::spawn(move||{for line in BufReader::new(stdout).lines().map_while(Result::ok){let Ok(m)=serde_json::from_str::<Value>(&line)else{continue};let id=m["id"].as_str().unwrap_or("").to_owned();match m["kind"].as_str(){Some("response")=>{if let Some(tx)=lock(&s.pending).remove(&id){let _=tx.send(m["data"].clone());}},Some("dispatch-timeout")=>{lock(&s.replies).remove(&id);},Some("dispatch")=>{if m["operation"]=="invoke" && !handle.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true)){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"APPROVAL_DENIED","message":"Trusted UI inactive","retryable":false}}}));continue;}let t=m["target"].clone();if lock(&s.target).as_ref()!=Some(&t){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"STALE_CONTEXT","message":"Native binding changed","retryable":false}}}));continue;}if let Some(guest)=handle.get_webview("guest"){if guest.url().ok().as_ref().is_some_and(allowed){lock(&s.replies).insert(id.clone(),(t, m["operation"].as_str().unwrap_or("").to_owned()));let _=guest.eval(&bridge_script(&id,m["operation"].as_str().unwrap_or(""),&m["call"],lock(&s.nonce).clone()));}}},_=>{}}}invalidate(&handle.state::<Arc<Native>>());for(_,tx)in lock(&s.pending).drain(){drop(tx);}{let _g=lock(&s.input);s.input_dead.store(true,Ordering::SeqCst);}s.input_cv.notify_all();});Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(&window.state::<Arc<Native>>());let s=window.state::<Arc<Native>>();if let Some(child)=lock(&s.child).as_mut(){let _=child.kill();};}}).run(tauri::generate_context!()).expect("Coconut runtime");
+    tauri::Builder::default().manage(state).invoke_handler(tauri::generate_handler![open_guest,discover_guest,host_request,guest_reply]).setup(move |app|{let path=if cfg!(debug_assertions){std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../host/sidecar.mjs")}else{app.path().resource_dir()?.join("_up_/host/sidecar.bundle.mjs")};let mut child=Command::new("node").arg(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;smoke_note("setup","sidecar-spawned");*lock(&setup_state.input)=child.stdin.take();let stdout=child.stdout.take().unwrap();*lock(&setup_state.child)=Some(child);let handle=app.handle().clone();let s=setup_state.clone();std::thread::spawn(move||{for line in BufReader::new(stdout).lines().map_while(Result::ok){let Ok(m)=serde_json::from_str::<Value>(&line)else{continue};smoke_note("recv",m["kind"].as_str().unwrap_or(""));let id=m["id"].as_str().unwrap_or("").to_owned();match m["kind"].as_str(){Some("response")=>{if let Some(tx)=lock(&s.pending).remove(&id){let _=tx.send(m["data"].clone());}},Some("dispatch-timeout")=>{lock(&s.replies).remove(&id);},Some("dispatch")=>{if m["operation"]=="invoke" && !handle.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true)){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"APPROVAL_DENIED","message":"Trusted UI inactive","retryable":false}}}));continue;}let t=m["target"].clone();if lock(&s.target).as_ref()!=Some(&t){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"STALE_CONTEXT","message":"Native binding changed","retryable":false}}}));continue;}if let Some(guest)=handle.get_webview("guest"){if guest.url().ok().as_ref().is_some_and(allowed){lock(&s.replies).insert(id.clone(),(t, m["operation"].as_str().unwrap_or("").to_owned()));let _=guest.eval(&bridge_script(&id,m["operation"].as_str().unwrap_or(""),&m["call"],lock(&s.nonce).clone()));}}},_=>{}}}invalidate(&handle.state::<Arc<Native>>());for(_,tx)in lock(&s.pending).drain(){drop(tx);}{let _g=lock(&s.input);s.input_dead.store(true,Ordering::SeqCst);}s.input_cv.notify_all();smoke_note("recv","eof");});
+// Debug-only smoke control channel for the native acceptance lane: newline-
+// delimited JSON on 127.0.0.1:4319. `request` ops run through the exact
+// dispatch_request path the sidebar uses (same action gate, same sidecar
+// round-trip); `open_guest` runs the same guest-open path. `heartbeat` sent
+// here exercises the real UI-lease requirement — approvals stay gated on a
+// live trusted UI, so the lane proves heartbeat, not a stub.
+if smoke_on(){let listener=std::net::TcpListener::bind("127.0.0.1:4319")?;let smoke_app=app.handle().clone();std::thread::spawn(move||{for stream in listener.incoming(){let Ok(mut st)=stream else{continue};let h=smoke_app.clone();std::thread::spawn(move||{let mut line=String::new();let mut br=BufReader::new(st.try_clone().unwrap());let mut respond=|v:Value|{let _=writeln!(st,"{}",v);};loop{line.clear();if br.read_line(&mut line).unwrap_or(0)==0{return}let Ok(m)=serde_json::from_str::<Value>(line.trim())else{respond(json!({"ok":false,"error":"bad json"}));continue};let out=match m["op"].as_str(){Some("ping")=>Ok(json!(true)),Some("open_guest")=>do_open_guest(&h,m["url"].as_str().unwrap_or("").to_owned()).map(|_|json!(true)),Some("discover")=>do_discover_guest(&h).map(|_|json!(true)),Some("hide")=>h.get_window("host").ok_or_else(||"Host missing".to_string()).and_then(|w|w.hide().map_err(|e|e.to_string())).map(|_|json!(true)),Some("show")=>h.get_window("host").ok_or_else(||"Host missing".to_string()).and_then(|w|{w.show().map_err(|e|e.to_string())?;w.unminimize().map_err(|e|e.to_string())}).map(|_|json!(true)),Some("request")=>{let st2=h.state::<Arc<Native>>().inner().clone();let active=h.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true));let (tx,rx)=std::sync::mpsc::channel();let req=m["request"].clone();tauri::async_runtime::spawn(async move{let _=tx.send(dispatch_request(&st2,req,active).await);});rx.recv_timeout(Duration::from_secs(60)).unwrap_or_else(|_|Err("SMOKE_TIMEOUT".into()))},Some("quit")=>{h.exit(0);Ok(json!(true))},_=>Err("Unknown op".into()),};respond(match out{Ok(v)=>json!({"ok":true,"result":v}),Err(e)=>json!({"ok":false,"error":e})});}});}});}
+Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(&window.state::<Arc<Native>>());let s=window.state::<Arc<Native>>();if let Some(child)=lock(&s.child).as_mut(){let _=child.kill();};}}).run(tauri::generate_context!()).expect("Coconut runtime");
 }

@@ -12,6 +12,7 @@ import {
   ResultSchema,
   bounded,
   canonical,
+  validateArgs,
 } from "../src/shared/contract.js";
 const call = (overrides: Record<string, unknown> = {}) => ({
   requestId: "r-1",
@@ -376,18 +377,45 @@ test("guava catalog passes the host-safe schema dialect; hostile schemas rejecte
   for (const tool of catalog)
     assert.equal(hostSafeSchema(tool.inputSchema), true, tool.name);
   for (const schema of [
-    { type: "object", properties: { a: { type: "string", pattern: "^(a+)+$" } } },
+    { type: "object", properties: { a: { type: "string", pattern: "^(?=a)a+$" } } },
+    { type: "object", properties: { a: { type: "string", pattern: "(a)\\1" } } },
     { type: "object", $id: "https://evil.example/s", items: { $ref: "#" } },
     { type: "object", patternProperties: { ".*": { type: "string" } } },
     { type: "array", uniqueItems: true },
     { type: "object", oneOf: Array.from({ length: 20 }, () => ({ type: "string" })) },
   ])
     assert.equal(hostSafeSchema(schema), false, JSON.stringify(schema));
+  // Ambiguous-but-parseable patterns are inside the dialect now — the NFA
+  // matcher answers them in bounded time instead of backtracking forever.
+  const ambiguous = {
+    name: "ambiguous_tool",
+    description: "x",
+    effect: "read" as const,
+    inputSchema: {
+      type: "object",
+      properties: { a: { pattern: "^(a|aa)+$" } },
+      required: ["a"],
+    },
+  };
+  const t = Date.now();
+  assert.equal(validateArguments(ambiguous, { a: "a".repeat(64) }), true);
+  assert.equal(validateArguments(ambiguous, { a: "a".repeat(64) + "!" }), false);
+  assert.ok(Date.now() - t < 2000, "ambiguous pattern must stay in a bounded budget");
   const evil = {
     name: "evil_tool",
     description: "x",
     effect: "read" as const,
-    inputSchema: { type: "object", properties: { a: { pattern: "^(a+)+$" } } },
+    inputSchema: { type: "object", properties: { a: { pattern: "^(?=a)a+$" } } },
   };
   assert.equal(validateArguments(evil, { a: "a".repeat(64) }), false);
+  // #44 differential conformance: the SAME tuple repro yields the SAME
+  // verdict on every host — they all call the shared validator.
+  const tuple = {
+    type: "array",
+    prefixItems: [{ type: "string" }, { type: "integer" }],
+    items: false,
+  };
+  assert.equal(validateArgs(tuple, ["x", 3]), true);
+  assert.equal(validateArgs(tuple, ["wrong", "x"]), false);
+  assert.equal(validateArgs(tuple, ["x", 3, "extra"]), false);
 });

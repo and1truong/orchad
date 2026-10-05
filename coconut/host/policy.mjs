@@ -1,11 +1,28 @@
 import {validReply,safeSchema} from './validation.mjs';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
-import Ajv from 'ajv';
+import {canonical,validateArgs} from '@orchard/bridge-contract';
+export {canonical};
 export const ok=(data,revision=null)=>({ok:true,revision,data,error:null});
 export const fail=(code,message=code,retryable=false)=>({ok:false,revision:null,data:null,error:{code,message,retryable}});
-import {canonical} from '@orchard/bridge-contract';
-export {canonical};
-const ajv=new Ajv({strict:false});
+// Page-declared `effect` is metadata, never authorization (contract §): a
+// read-scope pair alone does NOT auto-authorize page-declared reads. Every
+// read tool needs an explicit grant recorded by the trusted consent/pairing
+// surface, and the grant is bound to the descriptor's canonical identity at
+// grant time — a tool that appears later, a descriptor/schema change, or an
+// effect flip does not inherit the earlier consent. Grants live per
+// (client, target) under `c.readGrants`: Map<targetId, Map<name, fp>> where
+// fp===null means "name consented, descriptor pins on first contact".
+const grantsOf=c=>(c.readGrants??=new Map());
+const grantFor=(c,targetId,name)=>grantsOf(c).get(targetId)?.get(name);
+const pinGrants=(c,targetId,names,tools)=>{
+ const known=new Map((tools??[]).map(t=>[t.name,t]));
+ // Consent replaces the grant set for this target wholesale: consenting to
+ // [] revokes, and a narrower re-consent drops tools no longer shown.
+ const g=grantsOf(c);const gmap=new Map();g.set(targetId,gmap);
+ const list=names==='all'?[...known.keys()]:names;
+ for(const n of list)gmap.set(n,known.has(n)?canonical(known.get(n)):null);
+ return gmap.size;
+};
 export class Policy {
  constructor(dispatch,{timeout=10000,approvalTtl=60000}={}) {this.dispatch=dispatch;this.timeout=timeout;this.approvalTtl=approvalTtl;this.targets=new Map();this.clients=new Map();this.pending=new Map();this.audit=[];this.uiUntil=0;this.tools=new Map();}
  log(client,tool,ok,code=null){this.audit.push({at:Date.now(),client,tool,ok,code});if(this.audit.length>200)this.audit.shift();}
@@ -13,18 +30,29 @@ export class Policy {
  // Pairing snapshots the full binding (targetId + pageInstanceId + appId +
  // documentId + sessionEpoch) per target, not just the targetId: a native
  // rebind or session change therefore revokes the grant instead of extending
- // it to the new document/session.
- pair(name,scopes,targetIds,ttl=3600000){if(!name||!scopes.every(s=>['read','write'].includes(s))||!targetIds.every(id=>this.targets.has(id)))throw Error('Invalid pairing');const token=randomBytes(32).toString('base64url');const id=randomUUID();const bindings={};for(const tid of targetIds)bindings[tid]=canonical(this.targets.get(tid));this.clients.set(createHash('sha256').update(token).digest('hex'),{id,name,scopes,bindings,expires:Date.now()+Math.min(ttl,3600000)});this.log(name,'pair',true);return {id,token,expires:Date.now()+Math.min(ttl,3600000)};}
+ // it to the new document/session. readTools pins which read tools this
+ // client may run without a per-call approval: 'all' snapshots the catalog
+ // known at pair time, an array pins those names (descriptor fp pinned on
+ // first contact when the catalog is not listed yet), omitted = none.
+ pair(name,scopes,targetIds,readTools,ttl=3600000){if(!name||!scopes.every(s=>['read','write'].includes(s))||!targetIds.every(id=>this.targets.has(id)))throw Error('Invalid pairing');const token=randomBytes(32).toString('base64url');const id=randomUUID();const bindings={};for(const tid of targetIds)bindings[tid]=canonical(this.targets.get(tid));const client={id,name,scopes,bindings,expires:Date.now()+Math.min(ttl,3600000),readGrants:new Map()};this.clients.set(createHash('sha256').update(token).digest('hex'),client);if(readTools!=null&&readTools!==false)for(const tid of targetIds)pinGrants(client,tid,readTools,this.tools.get(tid));this.log(name,'pair',true);return {id,token,expires:client.expires};}
  authenticate(token){const c=this.clients.get(createHash('sha256').update(token).digest('hex'));return c&&c.expires>Date.now()?c:null;}
  revoke(id){for(const [key,c] of this.clients)if(c.id===id)this.clients.delete(key);for(const [key,a]of this.pending)if(a.client.id===id){a.resolve(false);this.pending.delete(key);}this.log(id,'revoke',true);}
  // Bindings always carry sessionEpoch (null when the app binds no session) so
  // canonical equality covers it; the native layer rotates pageInstanceId and
  // re-pins the epoch whenever documentId or sessionEpoch change.
  bind(t){this.invalidate(t.targetId);this.targets.set(t.targetId,{sessionEpoch:null,...t});}
- invalidate(id){this.targets.delete(id);this.tools.delete(id);for(const [key,a]of this.pending)if(a.target.targetId===id){a.resolve(false);this.pending.delete(key);}}
+ // A binding change revokes everything derived from the old identity:
+ // pending approvals AND read-tool consent for every client, sidebar
+ // included — nothing survives across documents or session epochs.
+ invalidate(id){this.targets.delete(id);this.tools.delete(id);for(const c of [sidebar,...this.clients.values()])grantsOf(c).delete(id);for(const [key,a]of this.pending)if(a.target.targetId===id){a.resolve(false);this.pending.delete(key);}}
  allowed(c,t){return c?.id==='sidebar'||c?.bindings?.[t.targetId]===canonical(t);}
  current(t,c){const now=this.targets.get(t.targetId);return now&&canonical(now)===canonical(t)&&this.allowed(c,now)&&(c.id==='sidebar'||[...this.clients.values()].some(x=>x===c&&x.expires>Date.now()));}
  decide(id,allow){const a=this.pending.get(id);if(!a)return false;this.pending.delete(id);const granted=allow===true&&Date.now()<a.expires&&this.uiUntil>Date.now()&&this.current(a.target,a.client);this.log(a.client.name,'decide',granted);a.resolve(granted);return true;}
+ // Explicit read consent from the trusted sidebar/pairing surface. Pins the
+ // named tools' descriptor fingerprints for this client on this target;
+ // consent granted before the catalog arrives pins the first descriptor
+ // seen under each name. Returns the number of grants stored.
+ consentReads(c,targetId,names){if(!c||!this.targets.has(targetId))return 0;if(!Array.isArray(names)&&names!=='all')return 0;this.log(c.name,'consent-reads',true);return pinGrants(c,targetId,names,this.tools.get(targetId));}
  async page(t,op,call,signal){if(signal?.aborted)return fail('CANCELLED');let timer,abort;try{const result=await Promise.race([this.dispatch(t,op,call,signal),new Promise(resolve=>{timer=setTimeout(()=>resolve(fail('TIMEOUT')),this.timeout);abort=()=>resolve(fail('CANCELLED'));signal?.addEventListener('abort',abort,{once:true});})]);if(!validReply(result,op))return fail('INVALID_ARGUMENT','Invalid page response');if(!result.ok&&['UNAUTHORIZED','FORBIDDEN'].includes(result.error.code))this.invalidate(t.targetId);return result;}catch(e){return fail('TARGET_CLOSED',String(e));}finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}}
  // Drop the stored binding only if it still canonical-equals the stale one
  // the caller held — a concurrent native rebind already replaced it with
@@ -39,18 +67,22 @@ export class Policy {
  if(!['host_get_context','host_list_tools','host_call_tool'].includes(name))return fail('UNSUPPORTED');const t=this.targets.get(args.targetId);if(!t)return fail('TARGET_CLOSED');if(!this.allowed(c,t)||!c.scopes.includes('read'))return fail('FORBIDDEN');if(args.pageInstanceId!==t.pageInstanceId)return fail('STALE_CONTEXT');
  if(name!=='host_call_tool'){const r=await this.page(t,name==='host_get_context'?'getContext':'describe',null,signal);if(r.ok&&name==='host_get_context'&&!this.contextMatches(t,r.data)){this.dropStale(t);return fail('STALE_CONTEXT');}if(!this.current(t,c))return fail('STALE_CONTEXT');if(r.ok&&name==='host_list_tools'){if(r.data.protocolVersion!=='0.1'||r.data.appId!==t.appId)return fail('UNSUPPORTED');this.tools.set(t.targetId,r.data.tools);}return r;}
  const call=args.call;if(!call||Object.keys(call).sort().join(',')!=='arguments,documentId,expectedRevision,idempotencyKey,requestId,toolName'||typeof call.requestId!=='string'||call.documentId!==t.documentId||!call.arguments||typeof call.arguments!=='object'||Array.isArray(call.arguments))return fail('INVALID_ARGUMENT');
- const descriptor=this.tools.get(t.targetId)?.find(x=>x.name===call.toolName);if(!descriptor)return fail('UNSUPPORTED');if(!safeSchema(descriptor.inputSchema))return fail('UNSUPPORTED','Tool schema is outside the host-safe subset');if(!/^[A-Za-z0-9_-]{1,64}$/.test(descriptor.name)||!ajv.validate(descriptor.inputSchema,call.arguments))return fail('INVALID_ARGUMENT');
+ const descriptor=this.tools.get(t.targetId)?.find(x=>x.name===call.toolName);if(!descriptor)return fail('UNSUPPORTED');if(!safeSchema(descriptor.inputSchema))return fail('UNSUPPORTED','Tool schema is outside the host-safe subset');if(!/^[A-Za-z0-9_-]{1,64}$/.test(descriptor.name)||!validateArgs(descriptor.inputSchema,call.arguments))return fail('INVALID_ARGUMENT');
  // Envelope shape follows the declared effect, not the caller: reads carry
  // expectedRevision/idempotencyKey null, mutations carry CAS revision + key.
  // A descriptor that flips read->write produces a null-envelope write call
  // that the app backend rejects — the asymmetry fails safe.
  const isRead=descriptor.effect==='read';if(isRead?(call.expectedRevision!==null||call.idempotencyKey!==null):(!Number.isInteger(call.expectedRevision)||call.expectedRevision<0||typeof call.idempotencyKey!=='string'||!call.idempotencyKey))return fail('INVALID_ARGUMENT');
  const frozen=JSON.parse(canonical(call));
- if(isRead){const pre=await this.page(t,'getContext',null,signal);if(!pre.ok)return pre;if(!this.contextMatches(t,pre.data)||!this.current(t,c)){this.dropStale(t);return fail('STALE_CONTEXT');}return this.page(t,'invoke',frozen,signal);}
- if(!c.scopes.includes('write'))return fail('FORBIDDEN');if(this.uiUntil<Date.now())return fail('APPROVAL_DENIED','Trusted approval UI is inactive');
+ // Read consent: the grant must exist AND match the descriptor's current
+ // canonical identity. fp===null (consented before the catalog was listed)
+ // pins the first descriptor seen under that name; a descriptor swap then
+ // revokes the grant and the call falls back to a trusted approval.
+ if(isRead){const fp=grantFor(c,t.targetId,call.toolName);let consented=false;if(fp!==undefined){if(fp===null){grantsOf(c).get(t.targetId).set(call.toolName,canonical(descriptor));consented=true;}else consented=fp===canonical(descriptor);}if(consented){const pre=await this.page(t,'getContext',null,signal);if(!pre.ok)return pre;if(!this.contextMatches(t,pre.data)||!this.current(t,c)){this.dropStale(t);return fail('STALE_CONTEXT');}return this.page(t,'invoke',frozen,signal);}}
+ if(!isRead&&!c.scopes.includes('write'))return fail('FORBIDDEN');if(this.uiUntil<Date.now())return fail('APPROVAL_DENIED','Trusted approval UI is inactive');
  if(this.pending.size>=64)return fail('APPROVAL_DENIED','Approval queue is full');
  const id=randomUUID();let timer,abort;const approved=await new Promise(resolve=>{this.pending.set(id,{id,client:c,target:{...t},call:frozen,expires:Date.now()+this.approvalTtl,resolve});timer=setTimeout(()=>{this.pending.delete(id);resolve(false);},this.approvalTtl);abort=()=>{this.pending.delete(id);resolve(false);};signal?.addEventListener('abort',abort,{once:true});});clearTimeout(timer);signal?.removeEventListener('abort',abort);if(signal?.aborted)return fail('CANCELLED');if(!this.current(t,c))return fail('STALE_CONTEXT');if(!approved)return fail('APPROVAL_DENIED');const context=await this.page(t,'getContext',null,signal);if(!context.ok)return context;if(!this.contextMatches(t,context.data)||context.data.documentId!==frozen.documentId||!this.current(t,c)){this.dropStale(t);return fail('STALE_CONTEXT');}if(this.uiUntil<Date.now())return fail('APPROVAL_DENIED');return this.page(t,'invoke',frozen,signal);
  }
- snapshot(){return {targets:[...this.targets.values()],approvals:[...this.pending.values()].map(a=>({id:a.id,client:a.client.name,target:a.target,call:a.call,expires:a.expires})),audit:this.audit,clients:[...this.clients.values()].map(c=>({id:c.id,name:c.name,expires:c.expires,scopes:c.scopes,targetIds:Object.keys(c.bindings??{})}))};}
+ snapshot(){return {targets:[...this.targets.values()],approvals:[...this.pending.values()].map(a=>({id:a.id,client:a.client.name,target:a.target,call:a.call,expires:a.expires})),audit:this.audit,clients:[...this.clients.values()].map(c=>({id:c.id,name:c.name,expires:c.expires,scopes:c.scopes,targetIds:Object.keys(c.bindings??{}),readTools:Object.fromEntries([...grantsOf(c)].map(([tid,m])=>[tid,[...m.keys()]]))})),sidebar:{readTools:Object.fromEntries([...grantsOf(sidebar)].map(([tid,m])=>[tid,[...m.keys()]]))}};}
 }
-export const sidebar={id:'sidebar',name:'Sidebar',scopes:['read','write']};
+export const sidebar={id:'sidebar',name:'Sidebar',scopes:['read','write'],readGrants:new Map()};

@@ -16,7 +16,6 @@
     "vendor:contract": "npm --prefix ../packages/bridge-contract run build"
   },
   "dependencies": {
-    "@cfworker/json-schema": "4.1.1",
     "@modelcontextprotocol/sdk": "1.32.0",
     "@orchard/agent-client": "file:../mango/packages/agent-client",
     "react": "19.3.0",

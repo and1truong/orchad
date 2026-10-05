@@ -534,7 +534,7 @@ test("configured feature combinations and model output bounds reject explicitly"
     await s.close();
   }
 });
-test("tool schema $id registries are request-isolated and complexity is bounded", async () => {
+test("tool schema registries stay request-isolated inside the shared dialect", async () => {
   const s = await setup();
   const post = (payload: any, headers = s.headers) =>
     s.app.inject({
@@ -544,6 +544,8 @@ test("tool schema $id registries are request-isolated and complexity is bounded"
       payload,
     });
   try {
+    // $id/$ref/definitions are outside the bounded dialect — the gate
+    // rejects them outright, which also kills the registry-poisoning class.
     const named = {
       type: "function",
       function: {
@@ -556,7 +558,22 @@ test("tool schema $id registries are request-isolated and complexity is bounded"
         },
       },
     };
-    const payload = { ...request, tools: [named] };
+    assert.equal(
+      (await post({ ...request, tools: [named] })).statusCode,
+      400,
+    );
+    const inDialect = {
+      type: "function",
+      function: {
+        name: "probe",
+        parameters: {
+          type: "object",
+          properties: { x: { type: "integer" } },
+          additionalProperties: false,
+        },
+      },
+    };
+    const payload = { ...request, tools: [inDialect] };
     assert.equal((await post(payload)).statusCode, 200);
     assert.equal((await post(payload)).statusCode, 200);
     assert.equal(
@@ -568,7 +585,7 @@ test("tool schema $id registries are request-isolated and complexity is bounded"
       type: "function",
       function: {
         name: "probe",
-        parameters: { $id: "https://schemas.example/probe", type: "nope" },
+        parameters: { type: "nope" },
       },
     };
     assert.equal(

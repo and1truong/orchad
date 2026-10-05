@@ -12,9 +12,12 @@ test('canonical bridge scenario: coconut Policy + makeCounter',async()=>{
   p.bind({...target});
   p.heartbeat();
   await p.execute(sidebar,'host_list_tools',target);
+  // Read consent is explicit in this host: the trusted surface grants all
+  // tools listed, pinned to their descriptor identity.
+  p.consentReads(sidebar,target.targetId,'all');
   const host={
     target,
-    readsConsented:false, // every domain invoke requires approval in this POC
+    readsConsented:true, // consent was granted above; writes still need approval
     listTargets:()=>p.execute(sidebar,'host_list_targets',{}),
     getContext:(t)=>p.execute(sidebar,'host_get_context',t),
     listTools:(t)=>p.execute(sidebar,'host_list_tools',t),

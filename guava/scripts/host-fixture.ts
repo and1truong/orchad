@@ -55,7 +55,16 @@ setInterval(() => {
   policy.heartbeat();
   for (const a of [...policy.pending.values()]) policy.decide(a.id, autoApprove);
 }, 25).unref();
-const pair = policy.pair("guava-integration", ["read", "write"], [target.targetId]);
+// Read consent is pinned to descriptor identity at pair time: the fixture
+// snapshots the real catalog so 'all' grants exactly these tools — a tool
+// appearing or changing later still requires a fresh approval.
+policy.tools.set(target.targetId, catalog);
+const pair = policy.pair(
+  "guava-integration",
+  ["read", "write"],
+  [target.targetId],
+  "all",
+);
 const server = await startMcp(policy, Number(process.env.PORT ?? 0));
 console.log(`export ORCHARD_DESKTOP_MCP_URL=http://127.0.0.1:${server.port}/mcp`);
 console.log(`export ORCHARD_DESKTOP_MCP_TOKEN=${pair.token}`);

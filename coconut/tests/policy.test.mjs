@@ -15,7 +15,7 @@ test('canonical frozen approval payload cannot be mutated by caller',async()=>{c
 test('unsupported bridge and timeout',async()=>{const p=new Policy(async()=>fail('UNSUPPORTED'),{timeout:10});p.bind(target);assert.equal((await p.execute(sidebar,'host_get_context',target)).error.code,'UNSUPPORTED');p.dispatch=()=>new Promise(()=>{});assert.equal((await p.execute(sidebar,'host_get_context',target)).error.code,'TIMEOUT');});
 test('cancellation before approval dispatch',async()=>{const {p,calls}=await setup();const c=new AbortController();const run=p.execute(sidebar,'host_call_tool',call(),c.signal);await new Promise(r=>setImmediate(r));c.abort();assert.equal((await run).error.code,'CANCELLED');assert.equal(calls(),0);});
 test('malformed guest response fails at boundary',async()=>{const {p}=await setup();p.dispatch=async()=>({ok:true,revision:0,data:{},error:{code:'INTERNAL',message:'inconsistent',retryable:false}});assert.equal((await p.execute(sidebar,'host_get_context',target)).error.code,'INVALID_ARGUMENT');});
-test('page-declared schemas outside the host-safe subset are never compiled',async()=>{const ctx=ok({appId:'demo-counter',documentId:'demo-document',revision:0,selectionIds:[],summary:''});for(const inputSchema of [{type:'object',properties:{a:{type:'string',pattern:'^(a+)+$'}}},{type:'object',allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{type:'object'}]}]}]}]}]}]}]}]},{type:'object',$id:'https://app/s',items:{type:'object'},uniqueItems:true}]){const p=new Policy(async(t,op)=>op==='describe'?ok({protocolVersion:'0.1',appId:'demo-counter',tools:[{name:'evil',description:'x',effect:'write',inputSchema}]}):ctx);p.bind({...target});p.heartbeat();await p.execute(sidebar,'host_list_tools',target);const result=await p.execute(sidebar,'host_call_tool',{...target,call:{requestId:'r',documentId:'demo-document',toolName:'evil',arguments:{a:'a'.repeat(64)},expectedRevision:0,idempotencyKey:'k'}});assert.equal(result.error.code,'UNSUPPORTED');}});
+test('page-declared schemas outside the host-safe subset are never compiled',async()=>{const ctx=ok({appId:'demo-counter',documentId:'demo-document',revision:0,selectionIds:[],summary:''});for(const inputSchema of [{type:'object',properties:{a:{type:'string',pattern:'^(?=a)a+$'}}},{type:'object',properties:{a:{type:'string',pattern:'a{300}'}}},{type:'object',allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{allOf:[{type:'object'}]}]}]}]}]}]}]}]},{type:'object',$id:'https://app/s',items:{type:'object'},uniqueItems:true}]){const p=new Policy(async(t,op)=>op==='describe'?ok({protocolVersion:'0.1',appId:'demo-counter',tools:[{name:'evil',description:'x',effect:'write',inputSchema}]}):ctx);p.bind({...target});p.heartbeat();await p.execute(sidebar,'host_list_tools',target);const result=await p.execute(sidebar,'host_call_tool',{...target,call:{requestId:'r',documentId:'demo-document',toolName:'evil',arguments:{a:'a'.repeat(64)},expectedRevision:0,idempotencyKey:'k'}});assert.equal(result.error.code,'UNSUPPORTED');}});
 test('logout result revokes target',async()=>{const {p}=await setup();p.dispatch=async()=>fail('UNAUTHORIZED');assert.equal((await p.execute(sidebar,'host_get_context',target)).error.code,'STALE_CONTEXT');assert.equal(p.targets.size,0);});
 // Mirrors native guest_reply: on a getContext reply announcing a new
 // documentId or a changed sessionEpoch for the same app, install a rotated
@@ -33,14 +33,14 @@ test('provisional binding fails closed but survives for native promotion',async(
 // pass safeSchema; reads use null/null envelopes without approval and run
 // under a read-only grant; mutations keep CAS + idempotency + approval.
 const canvasTarget={targetId:'canvas',pageInstanceId:'cpage',origin:'http://127.0.0.1:4314',appId:'demo-canvas',documentId:'demo-document',title:'Canvas'};
-async function canvasSetup(){const page=makeCanvas();let invokes=0;const p=new Policy(async(t,op,c)=>{if(op==='invoke'){invokes++;return page.invoke(c);}return ok(await page[op]());},{timeout:50});p.bind({...canvasTarget});p.heartbeat();await p.execute(sidebar,'host_list_tools',canvasTarget);return {p,page,invokes:()=>invokes};}
+async function canvasSetup(){const page=makeCanvas();let invokes=0;const p=new Policy(async(t,op,c)=>{if(op==='invoke'){invokes++;return page.invoke(c);}return ok(await page[op]());},{timeout:50});p.bind({...canvasTarget});p.heartbeat();await p.execute(sidebar,'host_list_tools',canvasTarget);p.consentReads(sidebar,'canvas','all');return {p,page,invokes:()=>invokes};}
 const ccall=(toolName,args,rev=null,key=null)=>({...canvasTarget,call:{requestId:'r-'+Math.random(),documentId:'demo-document',toolName,arguments:args,expectedRevision:rev,idempotencyKey:key}});
 test('every Guava catalog descriptor passes the host-safe schema gate',async()=>{assert.equal(canvasCatalog.length,7);const {p}=await canvasSetup();const tools=p.tools.get('canvas');assert.equal(tools.length,7);const names=tools.map(t=>t.name);for(const n of['canvas_get_graph','canvas_get_neighbors','evidence_search','evidence_get','canvas_apply_patch','canvas_undo','investigation_propose_conclusion'])assert(names.includes(n),n);});
 test('all four Guava read tools execute with null envelopes, no approval',async()=>{const {p,invokes}=await canvasSetup();p.uiUntil=0;assert.equal((await p.execute(sidebar,'host_call_tool',ccall('canvas_get_graph',{}))).data.nodes.length,1);assert.equal((await p.execute(sidebar,'host_call_tool',ccall('canvas_get_neighbors',{nodeIds:['n1'],depth:1}))).data.nodes.length,1);assert.equal((await p.execute(sidebar,'host_call_tool',ccall('evidence_search',{query:'alpha'}))).data.results.length,1);assert.equal((await p.execute(sidebar,'host_call_tool',ccall('evidence_get',{evidenceIds:['ev-1']}))).data.evidence.length,1);assert.equal(invokes(),4);});
 test('approved patch, undo and proposal execute through Coconut',async()=>{const {p,invokes}=await canvasSetup();const patch=ccall('canvas_apply_patch',{operations:[{op:'add_node',node:{id:'n2',type:'note',label:'Two',body:'x',position:{x:1,y:2},evidenceIds:['ev-1']}}]},0,'k1');const r1=await approved(p,patch);assert.equal(r1.data.mutationId,'m-1');const undo=ccall('canvas_undo',{mutationId:'m-1'},1,'k2');assert.equal((await approved(p,undo)).data.undone,'m-1');const propose=ccall('investigation_propose_conclusion',{summary:'Lag caused deploy',supportingEvidenceIds:['ev-1'],contradictoryEvidenceIds:[]},2,'k3');assert.equal((await approved(p,propose)).data.nodeId,'c-2');assert.equal(invokes(),3);});
 test('valid + invalid arguments for all seven Guava tools',async()=>{const {p,invokes}=await canvasSetup();const bad={'canvas_get_graph':{nodeLimit:500},'canvas_get_neighbors':{nodeIds:[]},'evidence_search':{query:'x'.repeat(201)},'evidence_get':{evidenceIds:['bad id!']},'canvas_apply_patch':{operations:[{op:'nuke'}]},'canvas_undo':{mutationId:'bad id!'},'investigation_propose_conclusion':{summary:''}};for(const [n,a]of Object.entries(bad)){const w=['canvas_apply_patch','canvas_undo','investigation_propose_conclusion'].includes(n);const r=await (w?approved(p,ccall(n,a,w?undefined:null,w?'kbad':null)):p.execute(sidebar,'host_call_tool',ccall(n,a)));assert.equal(r.error?.code,'INVALID_ARGUMENT',n);}assert.equal(invokes(),0,'invalid args must never reach the page');});
-test('read envelope rules: CAS on read fails, null envelope on write fails, flipped descriptor cannot smuggle',async()=>{const {p}=await canvasSetup();assert.equal((await p.execute(sidebar,'host_call_tool',ccall('canvas_get_graph',{},0,'k'))).error.code,'INVALID_ARGUMENT');const w=await approved(p,ccall('canvas_apply_patch',{operations:[{op:'auto_layout'}]},null,null));assert.equal(w.error.code,'INVALID_ARGUMENT');p.tools.set('canvas',[{name:'canvas_apply_patch',effect:'read',description:'flipped',inputSchema:canvasCatalog.find(t=>t.name==='canvas_apply_patch').inputSchema}]);const flipped=ccall('canvas_apply_patch',{operations:[{op:'auto_layout'}]});const r=await p.execute(sidebar,'host_call_tool',flipped);assert.equal(r.error.code,'INVALID_ARGUMENT','null-envelope write call is rejected by the app boundary');});
-test('read-only MCP grant can read but never mutate',async()=>{const {p}=await canvasSetup();const pair=p.pair('ro',['read'],['canvas']);const c=p.authenticate(pair.token);assert.equal((await p.execute(c,'host_call_tool',ccall('evidence_search',{query:'alpha'}))).data.results.length,1);p.uiUntil=0;assert.equal((await p.execute(c,'host_call_tool',ccall('canvas_apply_patch',{operations:[{op:'auto_layout'}]},0,'k'))).error.code,'FORBIDDEN');assert.equal((await p.execute(c,'host_call_tool',{...canvasTarget,call:ccall('evidence_search',{query:'alpha'}).call})).ok,true,'read path needs no approval heartbeat');});
+test('read envelope rules: CAS on read fails, null envelope on write fails, flipped descriptor cannot smuggle',async()=>{const {p}=await canvasSetup();assert.equal((await p.execute(sidebar,'host_call_tool',ccall('canvas_get_graph',{},0,'k'))).error.code,'INVALID_ARGUMENT');const w=await approved(p,ccall('canvas_apply_patch',{operations:[{op:'auto_layout'}]},null,null));assert.equal(w.error.code,'INVALID_ARGUMENT');p.tools.set('canvas',[{name:'canvas_apply_patch',effect:'read',description:'flipped',inputSchema:canvasCatalog.find(t=>t.name==='canvas_apply_patch').inputSchema}]);const flipped=ccall('canvas_apply_patch',{operations:[{op:'auto_layout'}]});const r=await approved(p,flipped);assert.equal(r.error.code,'INVALID_ARGUMENT','null-envelope write call is rejected by the app boundary');});
+test('read-only MCP grant can read but never mutate',async()=>{const {p}=await canvasSetup();const pair=p.pair('ro',['read'],['canvas'],'all');const c=p.authenticate(pair.token);assert.equal((await p.execute(c,'host_call_tool',ccall('evidence_search',{query:'alpha'}))).data.results.length,1);p.uiUntil=0;assert.equal((await p.execute(c,'host_call_tool',ccall('canvas_apply_patch',{operations:[{op:'auto_layout'}]},0,'k'))).error.code,'FORBIDDEN');assert.equal((await p.execute(c,'host_call_tool',{...canvasTarget,call:ccall('evidence_search',{query:'alpha'}).call})).ok,true,'read path needs no approval heartbeat');});
 test('approval ttl is decoupled from dispatch timeout',async()=>{
   // Pending well past the dispatch timeout but inside the approval TTL still
   // grants and dispatches; past the TTL it expires denied.
@@ -54,3 +54,63 @@ test('approval ttl is decoupled from dispatch timeout',async()=>{
   await new Promise(r=>setTimeout(r,300)); // > approvalTtl
   assert.equal((await late).error.code,'APPROVAL_DENIED');
 });
+// Issue #42: page-declared `effect` is metadata — a read-scope grant alone
+// never auto-authorizes reads. Consent is pinned per (client,target,tool)
+// to the descriptor's canonical identity and a binding change revokes it.
+const rcall=(toolName='demo_read',args={})=>({...target,call:{requestId:'r-'+Math.random(),documentId:'demo-document',toolName,arguments:args,expectedRevision:null,idempotencyKey:null}});
+test('unconsented read requires a trusted approval; consent then runs with null envelope',async()=>{
+  const {p,calls}=await setup();
+  // No consent yet: the read queues for approval even though it is a read.
+  const denied=await approved(p,rcall(),sidebar,false);
+  assert.equal(denied.error.code,'APPROVAL_DENIED');assert.equal(calls(),0);
+  // Explicit consent pins the descriptor; the same call now runs directly
+  // even with the trusted UI heartbeat gone (consent is the grant).
+  p.consentReads(sidebar,'target',['demo_read']);p.uiUntil=0;
+  assert.equal((await p.execute(sidebar,'host_call_tool',rcall())).data.value,0);
+});
+test('unconsented read denied outright when the trusted UI is inactive',async()=>{
+  const {p,calls}=await setup();p.uiUntil=0;
+  assert.equal((await p.execute(sidebar,'host_call_tool',rcall())).error.code,'APPROVAL_DENIED');assert.equal(calls(),0);
+});
+test('descriptor/schema change revokes the pinned read grant',async()=>{
+  const {p,calls}=await setup();p.consentReads(sidebar,'target',['demo_read']);
+  assert.equal((await p.execute(sidebar,'host_call_tool',rcall())).ok,true);
+  // Catalog changes under the same tool name: the grant does not carry.
+  const tools=p.tools.get('target').map(t=>t.name==='demo_read'?{...t,description:'hostile swap',inputSchema:{type:'object',properties:{leak:{type:'string'}},additionalProperties:true}}:t);
+  p.tools.set('target',tools);
+  p.heartbeat();
+  assert.equal((await approved(p,rcall(),sidebar,false)).error.code,'APPROVAL_DENIED');assert.equal(calls(),1);
+});
+test('a new tool under an all-consent still requires approval',async()=>{
+  const {p,calls}=await setup();p.consentReads(sidebar,'target','all');
+  p.tools.set('target',[...p.tools.get('target'),{name:'demo_sneak',description:'added later',effect:'read',inputSchema:{type:'object',properties:{},additionalProperties:false}}]);
+  assert.equal((await approved(p,rcall('demo_sneak'),sidebar,false)).error.code,'APPROVAL_DENIED');
+  const consented=await approved(p,rcall());assert.equal(consented.ok,true,'the originally consented tool is unaffected');
+});
+test('effect flip read->write does not smuggle a consented read',async()=>{
+  const {p}=await setup();p.consentReads(sidebar,'target',['demo_read']);
+  const tools=p.tools.get('target').map(t=>t.name==='demo_read'?{...t,effect:'write'}:t);p.tools.set('target',tools);
+  // read envelope on a write effect fails the shape check; a write-shaped
+  // call goes through the approval path, never the read grant.
+  assert.equal((await p.execute(sidebar,'host_call_tool',rcall())).error.code,'INVALID_ARGUMENT');
+  const w=await approved(p,{...target,call:{requestId:'w',documentId:'demo-document',toolName:'demo_read',arguments:{},expectedRevision:0,idempotencyKey:'k'}},sidebar,false);
+  assert.equal(w.error.code,'APPROVAL_DENIED');
+});
+test('paired client read grants are bound to that client and the binding',async()=>{
+  const {p,calls}=await setup();
+  // 'all' snapshots the catalog known at pair time (list_tools ran in setup).
+  const pair=p.pair('cli',['read'],['target'],'all');const cli=p.authenticate(pair.token);
+  p.uiUntil=0;assert.equal((await p.execute(cli,'host_call_tool',rcall())).data.value,0);
+  // Sidebar, a different client, did not inherit the grant.
+  assert.equal((await p.execute(sidebar,'host_call_tool',rcall())).error.code,'APPROVAL_DENIED');
+  // A rebind revokes grants for every client.
+  p.bind({...target,pageInstanceId:'page-2'});await p.execute(sidebar,'host_list_tools',p.targets.get('target'));
+  assert.equal((await p.execute(cli,'host_call_tool',rcall())).error.code,'FORBIDDEN');
+});
+test('consent is not granted by read scope alone on a fresh pair',async()=>{
+  const {p,calls}=await setup();
+  const pair=p.pair('cli',['read'],['target']);const cli=p.authenticate(pair.token);
+  assert.equal((await approved(p,rcall(),cli,false)).error.code,'APPROVAL_DENIED');assert.equal(calls(),0);
+});
+import {validateArgs} from '@orchard/bridge-contract';
+test('#44 tuple repro matches every other host byte-for-byte',()=>{const tuple={type:'array',prefixItems:[{type:'string'},{type:'integer'}],items:false};assert.equal(validateArgs(tuple,['x',3]),true);assert.equal(validateArgs(tuple,['wrong','x']),false);assert.equal(validateArgs(tuple,['x',3,'extra']),false);});

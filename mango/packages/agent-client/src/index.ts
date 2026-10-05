@@ -1,3 +1,4 @@
+import { hostSafeSchema } from "@orchard/bridge-contract";
 import {
   AgentError,
   sse,
@@ -109,7 +110,11 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
     if (
       !/^[A-Za-z0-9_-]{1,64}$/.test(t.name) ||
       t.inputSchema.type !== "object" ||
-      !["read", "write", "destructive"].includes(t.effect)
+      !["read", "write", "destructive"].includes(t.effect) ||
+      // Caller-supplied tool schemas are untrusted: they must sit inside the
+      // bounded dialect the hosts gate on, or the client silently validates
+      // with different semantics than the host executing them.
+      !hostSafeSchema(t.inputSchema)
     )
       throw new Error("Invalid tool configuration");
   const schemas = new Map(

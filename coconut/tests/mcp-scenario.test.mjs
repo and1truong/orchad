@@ -15,7 +15,10 @@ test('canonical bridge scenario over real MCP transport',async()=>{
   const page=makeCounter();
   const policy=new Policy(async(t,op,call)=>{if(op==='invoke')dispatched++;return op==='invoke'?page.invoke(call):ok(await page[op]());},{timeout:5000});
   policy.bind({...target});policy.heartbeat();
-  const pair=policy.pair('scenario-mcp',['read','write'],[target.targetId]);
+  // 'all' read consent snapshots the catalog known at pair time, so prime it
+  // from the real describe before pairing.
+  policy.tools.set(target.targetId,(await page.describe()).tools);
+  const pair=policy.pair('scenario-mcp',['read','write'],[target.targetId],'all');
   const server=await startMcp(policy,0);
   const realPort=server.port;
   const client=new Client({name:'scenario',version:'1.0.0'});
@@ -26,7 +29,7 @@ test('canonical bridge scenario over real MCP transport',async()=>{
   };
   const host={
     target,
-    readsConsented:false,
+    readsConsented:true,
     listTargets:()=>invoke('host_list_targets',{}),
     getContext:(t)=>invoke('host_get_context',t),
     listTools:(t)=>invoke('host_list_tools',t),

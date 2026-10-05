@@ -1,5 +1,4 @@
-import { Validator, type Schema } from "@cfworker/json-schema";
-import { Bounds } from "@orchard/bridge-contract";
+import { Bounds, matchSchema } from "@orchard/bridge-contract";
 export type Json =
   | null
   | boolean
@@ -87,10 +86,15 @@ export type AgentEvent =
     }
   | { type: "completed"; payload: { finishReason: FinishReason } };
 // No remote schema loading, coercion, defaults or mutation. $ref must resolve locally.
+// The portable client and both hosts share ONE interpreter from
+// @orchard/bridge-contract, so the gateway, the agent client, lime and
+// coconut apply identical keyword semantics (prefixItems included) and the
+// linear-time pattern matcher — nothing compiles per host. This is the raw
+// interpreter: callers validating page- or model-supplied schemas must gate
+// on hostSafeSchema/validateArgs first (the hosts do).
 export const validator = {
   compile(schema: Record<string, unknown>) {
-    const interpreter = new Validator(schema as Schema, "7", true);
-    return (data: unknown) => interpreter.validate(data).valid;
+    return (data: unknown) => matchSchema(schema, data);
   },
 };
 const name = { type: "string", pattern: "^[A-Za-z0-9_-]{1,64}$" };

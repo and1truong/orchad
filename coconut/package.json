@@ -20,7 +20,6 @@
     "@modelcontextprotocol/sdk": "1.32.0",
     "@orchard/agent-client": "file:../mango/packages/agent-client",
     "@tauri-apps/api": "2.12.1",
-    "ajv": "8.17.1",
     "express": "5.1.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
