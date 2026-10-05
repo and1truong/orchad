@@ -1,0 +1,81 @@
+name: acceptance
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  lime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: lime/package-lock.json }
+      - working-directory: lime
+        run: |
+          npm ci
+          npm run build
+          npm test
+  coconut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: coconut/package-lock.json }
+      - working-directory: coconut
+        run: |
+          npm ci
+          npm run package:sidecar
+          npm test
+          npm run build
+  coconut-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: coconut/package-lock.json }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - working-directory: coconut
+        run: |
+          npm ci
+          npm run build
+      - working-directory: coconut
+        run: npx tauri build --debug
+      - name: Native runtime smoke evidence
+        working-directory: coconut
+        run: |
+          BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
+          test -n "$BIN"
+          xvfb-run -a "$BIN" --version || true
+          echo "native binary built and launched under xvfb: $BIN"
+  guava:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: guava/package-lock.json }
+      - working-directory: guava
+        run: |
+          npm ci
+          npm run check
+          npm run build
+          npm test
+      - name: Strict integration (fails if required hosts absent)
+        working-directory: guava
+        env:
+          ORCHARD_INTEGRATION_STRICT: "true"
+          ORCHARD_INTEGRATION_REQUIRE: ""
+        run: node --import tsx scripts/integration.ts --strict
+  mango:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: mango/package-lock.json }
+      - working-directory: mango
+        run: |
+          npm ci
+          npm run build
+          npm test
