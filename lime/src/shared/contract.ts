@@ -1,0 +1,160 @@
+import { z } from "zod";
+import Ajv from "ajv";
+export const MAX_BYTES = 64 * 1024;
+export const Codes = z.enum([
+  "INVALID_ARGUMENT",
+  "UNAUTHORIZED",
+  "FORBIDDEN",
+  "NOT_FOUND",
+  "STALE_CONTEXT",
+  "IDEMPOTENCY_CONFLICT",
+  "APPROVAL_DENIED",
+  "CANCELLED",
+  "TIMEOUT",
+  "TARGET_CLOSED",
+  "UNSUPPORTED",
+  "INTERNAL",
+]);
+const id = z.string().min(1).max(256);
+const rev = z.number().int().nonnegative();
+export const ToolSchema = z
+  .object({
+    name: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+    description: z.string().max(2048),
+    inputSchema: z.record(z.unknown()).refine((s) => s.type === "object"),
+    effect: z.enum(["read", "write", "destructive"]),
+    outputSchema: z.record(z.unknown()).optional(),
+  })
+  .strict();
+export const DescriptionSchema = z
+  .object({
+    protocolVersion: z.literal("0.1"),
+    appId: id,
+    tools: z.array(ToolSchema).max(64),
+  })
+  .strict()
+  .refine((d) => new Set(d.tools.map((t) => t.name)).size === d.tools.length);
+export const ContextSchema = z
+  .object({
+    appId: id,
+    documentId: id,
+    revision: rev,
+    selectionIds: z.array(id).max(256),
+    summary: z.string().max(8192),
+  })
+  .strict();
+export const CallSchema = z
+  .object({
+    requestId: id,
+    documentId: id,
+    toolName: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
+    arguments: z.record(z.unknown()),
+    expectedRevision: rev.nullable(),
+    idempotencyKey: id.nullable(),
+  })
+  .strict();
+export const ResultSchema = z
+  .object({
+    ok: z.boolean(),
+    revision: rev.nullable(),
+    data: z
+      .unknown()
+      .refine((v) => v !== undefined)
+      .nullable(),
+    error: z
+      .object({
+        code: Codes,
+        message: z.string().max(8192),
+        retryable: z.boolean(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict()
+  .refine((r) => (r.ok ? r.error === null : r.error !== null));
+export const TargetSchema = z
+  .object({
+    targetId: id,
+    pageInstanceId: id,
+    origin: z.string().url(),
+    appId: id,
+    documentId: id,
+    title: z.string().max(1024),
+  })
+  .strict();
+export type Tool = z.infer<typeof ToolSchema>;
+export type Context = z.infer<typeof ContextSchema>;
+export type Description = z.infer<typeof DescriptionSchema>;
+export type Call = z.infer<typeof CallSchema>;
+export type Result = z.infer<typeof ResultSchema>;
+export type Target = z.infer<typeof TargetSchema>;
+export type Code = z.infer<typeof Codes>;
+export const failure = (
+  code: Code,
+  message: string,
+  retryable = false,
+): Result => ({
+  ok: false,
+  revision: null,
+  data: null,
+  error: { code, message, retryable },
+});
+export const success = (
+  data: unknown,
+  revision: number | null = null,
+): Result => ResultSchema.parse({ ok: true, revision, data, error: null });
+export function bounded<S extends z.ZodTypeAny>(
+  schema: S,
+  value: unknown,
+): z.output<S> {
+  const encoded = JSON.stringify(value);
+  if (encoded === undefined) throw new Error("Non-JSON payload");
+  const bytes = new TextEncoder().encode(encoded).length;
+  if (bytes > MAX_BYTES) throw new Error("Payload exceeds 64 KiB");
+  return schema.parse(JSON.parse(encoded));
+}
+export function canonical(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
+  return (
+    "{" +
+    Object.keys(value)
+      .sort()
+      .map(
+        (k) =>
+          JSON.stringify(k) +
+          ":" +
+          canonical((value as Record<string, unknown>)[k]),
+      )
+      .join(",") +
+    "}"
+  );
+}
+const ajv = new Ajv({ strict: true, allErrors: true, validateFormats: false });
+export function validateArguments(tool: Tool, args: unknown): boolean {
+  return ajv.compile(tool.inputSchema)(args) as boolean;
+}
+export const BindingSchema = z
+  .object({ targetId: id, pageInstanceId: id })
+  .strict();
+export const HostCallSchema = z
+  .object({ targetId: id, pageInstanceId: id, call: CallSchema })
+  .strict();
+export function gatewayUrl(value: string): string {
+  const u = new URL(value);
+  if (
+    u.username ||
+    u.password ||
+    u.search ||
+    u.hash ||
+    !(
+      u.protocol === "https:" ||
+      (u.protocol === "http:" &&
+        ["127.0.0.1", "localhost", "[::1]"].includes(u.hostname))
+    )
+  )
+    throw new Error(
+      "Gateway must use HTTPS or loopback HTTP, without credentials/query/fragment",
+    );
+  return u.href.replace(/\/$/, "");
+}

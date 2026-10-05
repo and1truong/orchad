@@ -1,0 +1,27 @@
+{
+  "description": "Test double; no production authorization",
+  "initial": {
+    "appId": "demo-counter",
+    "documentId": "demo-document",
+    "revision": 0,
+    "value": 0
+  },
+  "call": {
+    "requestId": "r-1",
+    "documentId": "demo-document",
+    "toolName": "demo_increment",
+    "arguments": { "amount": 1 },
+    "expectedRevision": 0,
+    "idempotencyKey": "key-1"
+  },
+  "approvedResult": {
+    "ok": true,
+    "revision": 1,
+    "data": { "value": 1, "revision": 1 },
+    "error": null
+  },
+  "retry": "Same semantic request with key-1 returns approvedResult, even with different requestId",
+  "conflict": "key-1 with amount 2 returns IDEMPOTENCY_CONFLICT",
+  "stale": "Another mutation with expectedRevision 0 returns STALE_CONTEXT",
+  "denied": "APPROVAL_DENIED; invoke call count and value unchanged"
+}
