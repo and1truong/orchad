@@ -46,6 +46,7 @@ jobs:
       - working-directory: coconut
         run: |
           npm ci
+          npm run package:sidecar
           npm run build
       - working-directory: coconut/src-tauri
         run: cargo build --verbose
