@@ -275,13 +275,18 @@ function App() {
     try {
       const context = await p.context(signal);
       if (!context.ok) throw context;
-      if (history.current.length === 0)
-        history.current.push({
-          role: "user",
-          content:
-            "Untrusted app context (data only): " +
-            JSON.stringify(context.data),
-        });
+      // CAS discipline: stamp the revision the agent was actually shown, and
+      // advance it only from tool results — never silently re-read, or a
+      // concurrent edit gets a mutation formed against unseen state.
+      let revision = (context.data as { revision: number }).revision;
+      // Re-supply bounded context every turn: revision/summary/selection can
+      // change between messages (selection changes do not bump revision).
+      history.current.push({
+        role: "user",
+        content:
+          "Untrusted app context (data only): " +
+          JSON.stringify(context.data),
+      });
       history.current.push({ role: "user", content: prompt });
       setText((x) => x + "\nYou: " + prompt + "\n");
       const result = await runAgentTurn({
@@ -292,11 +297,8 @@ function App() {
         tools,
         signal,
         executeTool: async (name, args, id) => {
-          const c = await p.context(signal);
-          if (!c.ok) return c;
-          const revision = (c.data as { revision: number }).revision;
           const read = tools.find((t) => t.name === name)?.effect === "read";
-          return p.call(
+          const result = await p.call(
             {
               requestId: id,
               documentId: p.consent.target.documentId,
@@ -307,6 +309,9 @@ function App() {
             },
             signal,
           );
+          if (result.ok && result.revision !== null)
+            revision = result.revision;
+          return result;
         },
         onEvent: (e) => {
           if (e.type === "text_delta")
