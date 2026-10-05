@@ -222,6 +222,11 @@ export async function startCompanion(options: CompanionOptions) {
         remove: () => signal.removeEventListener("abort", cancel),
       });
       signal.addEventListener("abort", cancel, { once: true });
+      // Listeners registered on an already-aborted signal never fire; an abort
+      // landing between the earlier check and registration would otherwise be
+      // missed until timeout.
+      if (signal.aborted) cancel();
+      if (!pending.has(requestId)) return;
       pair.socket!.send(
         JSON.stringify({
           type: "request",
