@@ -11,3 +11,15 @@ Potential future clarification: the fixture says data contains value and revisio
 Logout detection requires application cooperation: the contract has no authentication-state notification method. A host can invalidate runtime navigation/document changes and fail on unauthorized page calls; it cannot prove a server session remains logged in without the application's methods enforcing that boundary.
 
 Tool-argument validation interprets page-supplied JSON Schema (draft 7 subset via `@cfworker/json-schema`) instead of compiling it, because MV3 `script-src 'self'` forbids `new Function`. `format` assertions are now honored when the format is known (previously ignored); unknown formats still pass. No wire fields, methods or enums change.
+
+## Agent client wiring
+
+The sidepanel now runs turns through `@orchard/agent-client` (mango's portable
+client) instead of the local mock: real SSE transport, sequential executeTool
+dispatch after arguments are fully streamed, AbortSignal cancellation, and
+opaque `x_gateway_state` replay. The mock stays for unit tests only. Reads still
+dispatch with `expectedRevision: null` / `idempotencyKey: null`; writes pin the
+latest revision and a fresh key — unchanged from the previous contract notes.
+`tests/integration.test.ts` covers the full offline path: real Mango
+(mock-scripted provider) → agent-client → HostPolicy → fixture, including
+denied-approval and cancellation.
