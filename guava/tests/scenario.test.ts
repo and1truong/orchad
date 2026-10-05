@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import Ajv from "ajv";
 import { invokeSchema, id } from "../src/shared/catalog.ts";
 
@@ -8,7 +9,9 @@ import { invokeSchema, id } from "../src/shared/catalog.ts";
 // must pass Guava's own backend validator — same bounds, no drift.
 const scenario = JSON.parse(
   readFileSync(
-    new URL("../../acceptance/bridge-scenario.json", import.meta.url),
+    createRequire(import.meta.url).resolve(
+      "@orchard/bridge-contract/scenario/bridge-scenario.json",
+    ),
     "utf8",
   ),
 );

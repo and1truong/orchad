@@ -100,3 +100,14 @@ Không publish package, deploy dịch vụ public, phát hành extension, sửa 
 MVP phải chạy được khi không có native WebMCP. Native WebMCP chỉ là progressive enhancement adapter dùng cùng registry/domain handlers. Không gắn custom polyfill lên navigator.modelContext rồi tuyên bố đó là native support.
 
 Mỗi repo bàn giao source chạy được, lockfile, README, bản sao CONTRACT.md, contract fixtures, automated tests, cách chạy local, security notes và IMPLEMENTATION-REPORT.md. Report tách rõ đã implement, đã test thực tế, mock-only, live test bị bỏ qua và limitations. Không dừng ở architecture document hoặc TODO trên happy path.
+9. Giới hạn envelope
+
+Tất cả host và app chia cùng một bộ giới hạn; một implementation đúng contract phải chấp nhận đúng các mốc này, không hơn không kém, để tránh drift interop (ví dụ requestId 120 ở một bên nhưng 256 ở bên kia). Giá trị là constants dùng chung qua packages/bridge-contract (Bounds); không định nghĩa lại ở từng repo.
+
+- requestId, idempotencyKey, toolCallId, sessionId, targetId, pageInstanceId: string 1–128 ký tự.
+- appId, documentId, sessionEpoch: string 1–128 ký tự.
+- toolName: pattern ^[A-Za-z0-9_-]{1,64}$.
+- description ≤4096 ký tự; summary và error.message ≤8192; title ≤1024; selectionIds ≤256 phần tử.
+- Mỗi Call, Result hay message envelope sau khi serialize ≤64KiB (65536 byte); catalog ≤64 tools.
+- MCP sessions trên một host ≤64. Vượt mức phải reject session mới (fail-closed), không lặng lẽ evict session còn sống.
+- revision là integer ≥0. Timeout guidance: dispatch timeout mặc định 10s, approval TTL mặc định 60s; host được cấu hình nhưng phải giữ bounded.

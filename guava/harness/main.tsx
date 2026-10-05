@@ -68,7 +68,7 @@ function App() {
               const bridge = iframe.current?.contentWindow?.agentBridgeV1;
               const r = await sim.current.discover(bridge);
               log("discovery", r);
-              setTarget(r.ok ? r.data.targets[0] : null);
+              setTarget(r.ok ? (r.data as any).targets[0] : null);
               setCtx(null);
             }}
           >

@@ -4,10 +4,11 @@ import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/st
 import {startMcp} from '../host/mcp.mjs';
 import {Policy,ok} from '../host/policy.mjs';
 import {makeCounter} from '../fixtures/counter.mjs';
-import {runScenario} from '../../acceptance/run-scenario.mjs';
+import {createRequire} from 'node:module';
+import {runScenario} from '@orchard/bridge-contract/scenario/run-scenario.mjs';
 // Canonical scenario over the REAL MCP transport (no GUI): the strongest
 // integrated evidence this POC can give without a Tauri webview.
-const scenario=JSON.parse(readFileSync(new URL('../../acceptance/bridge-scenario.json',import.meta.url),'utf8'));
+const scenario=JSON.parse(readFileSync(createRequire(import.meta.url).resolve('@orchard/bridge-contract/scenario/bridge-scenario.json'),'utf8'));
 const target={...scenario.target};
 test('canonical bridge scenario over real MCP transport',async()=>{
   let dispatched=0,approveNext=true,rev=0;

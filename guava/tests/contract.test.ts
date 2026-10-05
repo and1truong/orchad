@@ -19,7 +19,7 @@ async function setup() {
   const discovery = await host.discover(page);
   assert.equal(discovery.ok, true);
   host.grantConsent();
-  const target = discovery.data.targets[0];
+  const target = (discovery.data as any).targets[0];
   return {
     page,
     host,
@@ -112,7 +112,7 @@ test("selection and document changes: explicit binding, session changes invalida
   const host = new HostSimulator("https://fixture.test", async () => session);
   const d = await host.discover(page);
   host.grantConsent();
-  const t = d.data.targets[0];
+  const t = (d.data as any).targets[0];
   session = "two";
   assert.equal(
     (await host.call(t.targetId, t.pageInstanceId, request, async () => true))
@@ -218,7 +218,7 @@ test("sessionEpoch rotation invalidates pinned target; fresh discover restores",
   const d = await host.discover(bridge);
   assert.equal(d.ok, true);
   host.grantConsent();
-  const t = d.data.targets[0];
+  const t = (d.data as any).targets[0];
   assert.equal(t.sessionEpoch, "epoch-1");
   epoch = "epoch-2";
   assert.equal(
@@ -229,7 +229,7 @@ test("sessionEpoch rotation invalidates pinned target; fresh discover restores",
   assert.equal(page.state.invocations, 0);
   const d2 = await host.discover(bridge);
   host.grantConsent();
-  const t2 = d2.data.targets[0];
+  const t2 = (d2.data as any).targets[0];
   assert.equal(t2.sessionEpoch, "epoch-2");
   assert.equal(
     (await host.call(t2.targetId, t2.pageInstanceId, request, async () => true))

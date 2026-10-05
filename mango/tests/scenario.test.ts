@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import {
   validator,
   requestSchema,
@@ -11,7 +12,9 @@ import {
 // accept the shared scenario's tool calls and message envelope.
 const scenario = JSON.parse(
   readFileSync(
-    new URL("../../acceptance/bridge-scenario.json", import.meta.url),
+    createRequire(import.meta.url).resolve(
+      "@orchard/bridge-contract/scenario/bridge-scenario.json",
+    ),
     "utf8",
   ),
 );

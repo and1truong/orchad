@@ -2,14 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // Canonical artifact lives at repo root; the .d.mts beside it types the import.
-import { runScenario } from "../../acceptance/run-scenario.mjs";
+import { createRequire } from "node:module";
+import { runScenario } from "@orchard/bridge-contract/scenario/run-scenario.mjs";
 import { CounterFixture } from "../fixtures/counter.js";
 import { HostPolicy, type Approval } from "../src/host/policy.js";
 import type { Result } from "../src/shared/contract.js";
 
 const scenario = JSON.parse(
   readFileSync(
-    new URL("../../acceptance/bridge-scenario.json", import.meta.url),
+    createRequire(import.meta.url).resolve(
+      "@orchard/bridge-contract/scenario/bridge-scenario.json",
+    ),
     "utf8",
   ),
 );

@@ -1,8 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
-import {runScenario} from '../../acceptance/run-scenario.mjs';
+import {createRequire} from 'node:module';
+import {runScenario} from '@orchard/bridge-contract/scenario/run-scenario.mjs';
 import {Policy,ok,sidebar} from '../host/policy.mjs';
 import {makeCounter} from '../fixtures/counter.mjs';
-const scenario=JSON.parse(readFileSync(new URL('../../acceptance/bridge-scenario.json',import.meta.url),'utf8'));
+const scenario=JSON.parse(readFileSync(createRequire(import.meta.url).resolve('@orchard/bridge-contract/scenario/bridge-scenario.json'),'utf8'));
 const target={...scenario.target};
 test('canonical bridge scenario: coconut Policy + makeCounter',async()=>{
   let dispatched=0,approveNext=true,rev=0;

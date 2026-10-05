@@ -50,6 +50,7 @@ export function counterFixture(): Bridge & {
         return failure(
           "INVALID_ARGUMENT",
           "Invalid counter call",
+          false,
           state.revision,
         );
       const semantic = canonical({
@@ -64,16 +65,20 @@ export function counterFixture(): Bridge & {
           : failure(
               "IDEMPOTENCY_CONFLICT",
               "Key payload mismatch",
+              false,
               state.revision,
             );
       if (call.expectedRevision !== state.revision)
-        return failure("STALE_CONTEXT", "Counter changed", state.revision);
+        return failure("STALE_CONTEXT", "Counter changed", false, state.revision);
       state.value += Number(call.arguments.amount);
       state.revision++;
-      const result = success(state.revision, {
-        value: state.value,
-        revision: state.revision,
-      });
+      const result = success(
+        {
+          value: state.value,
+          revision: state.revision,
+        },
+        state.revision,
+      );
       saved.set(call.idempotencyKey, { semantic, result });
       return result;
     },

@@ -10,6 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm, cache-dependency-path: lime/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
       - working-directory: mango
         run: npm ci
       - working-directory: lime
@@ -23,6 +25,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm, cache-dependency-path: coconut/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
       - working-directory: mango
         run: npm ci
       - working-directory: coconut
@@ -41,6 +45,8 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - working-directory: packages/bridge-contract
+        run: npm ci
       - working-directory: mango
         run: npm ci
       - working-directory: coconut
@@ -66,6 +72,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm, cache-dependency-path: guava/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
       - working-directory: guava
         run: |
           npm ci
@@ -89,6 +97,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 24, cache: npm, cache-dependency-path: mango/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
       - working-directory: mango
         run: |
           npm ci

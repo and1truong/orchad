@@ -1,9 +1,11 @@
 # Canonical bridge scenario
 
-`bridge-scenario.json` is the single canonical Agent App Bridge 0.1 interop
-artifact: every POC's acceptance suite executes or validates the same
-sequence, so cross-host conformance is proved on identical steps rather than
-per-POC paraphrases.
+The single canonical Agent App Bridge 0.1 interop artifact lives at
+`packages/bridge-contract/scenario/bridge-scenario.json` (driver:
+`scenario/run-scenario.mjs`): every POC's acceptance suite executes or
+validates the same sequence, so cross-host conformance is proved on identical
+steps rather than per-POC paraphrases. Import it via the package export
+`@orchard/bridge-contract/scenario/...`.
 
 Steps cover discovery → context → catalog → consented read (skipped where the
 host requires approval for reads) → approved write → semantic replay →

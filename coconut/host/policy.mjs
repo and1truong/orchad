@@ -3,7 +3,8 @@ import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import Ajv from 'ajv';
 export const ok=(data,revision=null)=>({ok:true,revision,data,error:null});
 export const fail=(code,message=code,retryable=false)=>({ok:false,revision:null,data:null,error:{code,message,retryable}});
-export const canonical=x=>JSON.stringify(x,(_,v)=>v && typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
+import {canonical} from '@orchard/bridge-contract';
+export {canonical};
 const ajv=new Ajv({strict:false});
 export class Policy {
  constructor(dispatch,{timeout=10000,approvalTtl=60000}={}) {this.dispatch=dispatch;this.timeout=timeout;this.approvalTtl=approvalTtl;this.targets=new Map();this.clients=new Map();this.pending=new Map();this.audit=[];this.uiUntil=0;this.tools=new Map();}
