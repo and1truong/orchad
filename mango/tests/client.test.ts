@@ -329,6 +329,72 @@ test("observer exceptions do not alter tool execution or cleanup", async () => {
     "completed",
   );
 });
+test("maxTurnMs bounds a wedged turn: single terminal event, TIMEOUT error", async () => {
+  const events: AgentEvent[] = [];
+  // Gateway accepts the request, streams one frame, then never completes SSE.
+  const client = createMockAgentClient(((url: unknown, options: any) => {
+    const enc = new TextEncoder();
+    return Promise.resolve(
+      new Response(
+        new ReadableStream({
+          start(c) {
+            c.enqueue(
+              enc.encode(`data: ${JSON.stringify(frames([call])[0])}\n\n`),
+            );
+            options?.signal?.addEventListener(
+              "abort",
+              () => {
+                try {
+                  c.close();
+                } catch {}
+              },
+              { once: true },
+            );
+          },
+        }),
+        { status: 200, headers: { "content-type": "text/event-stream" } },
+      ),
+    );
+  }) as typeof fetch);
+  const started = Date.now();
+  const r = await client.runAgentTurn({
+    ...input,
+    maxTurnMs: 50,
+    onEvent: (e) => events.push(e),
+  });
+  assert.ok(Date.now() - started < 10_000);
+  assert.equal(r.finishReason, "error");
+  const err = events.find((e) => e.type === "error") as any;
+  assert.equal(err.payload.code, "TIMEOUT");
+  assert.equal(events.filter((e) => e.type === "completed").length, 1);
+});
+test("maxTurnMs deadline cancels in-flight and undispatched tool calls", async () => {
+  const events: AgentEvent[] = [];
+  const client = createMockAgentClient((async () =>
+    fragmentedResponse(
+      frames(
+        [call, { ...call, id: "call-2" }],
+        "tool_calls",
+      ),
+    )) as typeof fetch);
+  const r = await client.runAgentTurn({
+    ...input,
+    maxTurnMs: 50,
+    onEvent: (e) => events.push(e),
+    executeTool: () => new Promise(() => {}), // stalled host dispatch
+  });
+  assert.equal(r.finishReason, "error");
+  const done = events.filter((e) => e.type === "tool_completed") as any[];
+  assert.equal(done.length, 2);
+  assert.ok(done.every((e) => e.payload.result.error.code === "CANCELLED"));
+  // History carries a CANCELLED result for every dispatched-but-incomplete
+  // call so the returned messages stay valid for the next turn.
+  const results = r.messages
+    .filter((m) => m.role === "tool")
+    .map((m) => JSON.parse(m.content as string));
+  assert.ok(results.every((res) => res.error.code === "CANCELLED"));
+  assert.equal(events.filter((e) => e.type === "completed").length, 1);
+});
 test("abort on tool_requested prevents host dispatch", async () => {
   const controller = new AbortController();
   let executions = 0;

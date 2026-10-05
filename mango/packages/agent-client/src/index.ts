@@ -25,12 +25,18 @@ export type AgentInput = {
   signal?: AbortSignal;
   maxSteps?: number;
   maxToolCalls?: number;
+  // Bounds the whole turn (all steps + tool dispatches) so a wedged gateway
+  // stream or stalled host still terminates deterministically.
+  maxTurnMs?: number;
   onEvent?: (event: AgentEvent) => void;
 };
 const checkCall = validator.compile(callSchema);
 // Serialized host results and accumulated deltas must stay inside the gateway
 // message cap so history the client produces is never rejected next turn.
 const MESSAGE_MAX_LENGTH = 65536;
+// Generous enough for host approval round-trips inside executeTool, still
+// finite so a stream that never completes cannot hang the run forever.
+const DEFAULT_MAX_TURN_MS = 300_000;
 const checkResult = validator.compile({
   type: "object",
   additionalProperties: false,
@@ -81,7 +87,8 @@ export function runAgentTurn(
 }
 async function run(input: AgentInput, fetcher: typeof fetch) {
   const maxSteps = input.maxSteps ?? 8,
-    maxCalls = input.maxToolCalls ?? 16;
+    maxCalls = input.maxToolCalls ?? 16,
+    maxTurnMs = input.maxTurnMs ?? DEFAULT_MAX_TURN_MS;
   const url = new URL(input.gatewayBaseUrl);
   if (
     !["http:", "https:"].includes(url.protocol) ||
@@ -93,7 +100,9 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
     !Number.isInteger(maxSteps) ||
     maxSteps < 1 ||
     !Number.isInteger(maxCalls) ||
-    maxCalls < 0
+    maxCalls < 0 ||
+    !Number.isFinite(maxTurnMs) ||
+    maxTurnMs <= 0
   )
     throw new Error("Invalid agent configuration");
   for (const t of input.tools)
@@ -117,9 +126,23 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
     } catch {}
   };
   const controller = new AbortController();
-  const abort = () => controller.abort(input.signal?.reason);
-  input.signal?.addEventListener("abort", abort, { once: true });
-  if (input.signal?.aborted) abort();
+  // One turn signal: the caller's abort plus a built-in deadline. The reason
+  // propagates so a deadline abort stays distinguishable from a user cancel.
+  // The AbortSignal *global* is not bound inside sandboxed bundles (MV3 CSP
+  // contexts only inject AbortController), so reach its constructor through
+  // the signal instance instead.
+  const Signal = controller.signal.constructor as unknown as {
+    timeout(ms: number): AbortSignal;
+    any(signals: AbortSignal[]): AbortSignal;
+  };
+  const turnSignal = Signal.any(
+    [input.signal, Signal.timeout(maxTurnMs)].filter(
+      (s): s is AbortSignal => !!s,
+    ),
+  );
+  const abort = () => controller.abort(turnSignal.reason);
+  turnSignal.addEventListener("abort", abort, { once: true });
+  if (turnSignal.aborted) abort();
   try {
     for (let step = 0; step < maxSteps; step++) {
       controller.signal.throwIfAborted();
@@ -379,7 +402,10 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
     }
   } catch (e) {
     const cancelled = controller.signal.aborted;
-    finishReason = cancelled ? "cancelled" : "error";
+    // A deadline abort without a caller cancel is a turn timeout, not a
+    // user-facing cancellation.
+    const timedOut = cancelled && !input.signal?.aborted;
+    finishReason = cancelled && !timedOut ? "cancelled" : "error";
     const error =
       e instanceof AgentError
         ? e
@@ -387,13 +413,17 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
     emit({
       type: "error",
       payload: {
-        code: cancelled ? "CANCELLED" : error.code,
-        message: cancelled ? "Run cancelled" : error.message,
-        retryable: cancelled ? false : error.retryable,
+        code: timedOut ? "TIMEOUT" : cancelled ? "CANCELLED" : error.code,
+        message: timedOut
+          ? `Turn exceeded ${maxTurnMs}ms bound`
+          : cancelled
+            ? "Run cancelled"
+            : error.message,
+        retryable: cancelled && !timedOut ? false : timedOut ? true : error.retryable,
       },
     });
   } finally {
-    input.signal?.removeEventListener("abort", abort);
+    turnSignal.removeEventListener("abort", abort);
     controller.abort();
     emit({ type: "completed", payload: { finishReason } });
   }
