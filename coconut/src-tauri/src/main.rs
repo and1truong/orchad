@@ -47,6 +47,9 @@ fn send(s: &Native, v: Value) -> Result<(), String> {
     if r.is_ok() {
         *lock(&s.input) = Some(input);
     } else {
+        // Dead must change under the same mutex the wait predicate reads, or a
+        // waiter can park after the notify and sleep out the full timeout.
+        let _g = lock(&s.input);
         s.input_dead.store(true, Ordering::SeqCst);
     }
     s.input_cv.notify_all();
