@@ -28,6 +28,9 @@ export type AgentInput = {
   onEvent?: (event: AgentEvent) => void;
 };
 const checkCall = validator.compile(callSchema);
+// Serialized host results must stay inside the gateway message cap so the next
+// turn is never rejected for history the client itself produced.
+const RESULT_MAX_LENGTH = 65536;
 const checkResult = validator.compile({
   type: "object",
   additionalProperties: false,
@@ -291,7 +294,6 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
             result.ok !== (result.error === null)
           )
             throw new Error("Invalid host result");
-          JSON.stringify(result);
         } catch {
           result = {
             ok: false,
@@ -307,10 +309,24 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
           };
         }
         calls++;
+        let serialized = JSON.stringify(result);
+        if (serialized.length > RESULT_MAX_LENGTH) {
+          result = {
+            ok: false,
+            revision: null,
+            data: null,
+            error: {
+              code: "INTERNAL",
+              message: "Host result exceeds size limit",
+              retryable: false,
+            },
+          };
+          serialized = JSON.stringify(result);
+        }
         messages.push({
           role: "tool",
           tool_call_id: c.id,
-          content: JSON.stringify(result),
+          content: serialized,
         });
         emit({
           type: "tool_completed",

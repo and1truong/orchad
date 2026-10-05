@@ -10,7 +10,7 @@ Authentication adapter seam: Storage.authenticate(token) returns Principal polic
 
 ## Bounded requests and quota
 
-- Body limit 512,000 bytes; max 128 messages, 65,536 content/argument characters each, 64 tools, 16 calls per turn; input schema compilation has no network resolver.
+- Body limit 512,000 bytes; max 128 messages, 65,536 content/argument characters each, 64 tools, 16 calls per turn; input schema compilation has no network resolver. Character caps count Unicode characters (JSON Schema `maxLength`), not UTF-8 bytes. Assembled tool calls are re-validated against the published ToolCall schema before any response emits them. The client bounds each serialized host tool result at 65,536 characters, replacing oversized output with a bounded INTERNAL error result rather than letting the next request fail.
 - max_completion_tokens 1..8192, further bounded by configured model. Normalized output hard limit 262,144 UTF-8 bytes. Upstream SSE decode bound 2,000,000 bytes. Client SSE decoder also bounds total bytes at 2,000,000. Continuation payload bound 100,000 plaintext bytes; input opaque state at most 196,608 characters.
 - Per-principal fixed-window requests/minute and active inference concurrency. A rate allowance is consumed on admission attempts, including requests later rejected by concurrency/quota. Policies default in provisioning to 30 requests/minute and 2 active turns. Models listing is authenticated but does not consume inference quota.
 - Lifetime development token quota, not money: each admitted request atomically reserves UTF-8 bytes of content/tools plus per-message/tool framing and max output tokens. No integer token estimate is reported as actual usage. Reservations are accounting ceilings, not usage observations.

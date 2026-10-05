@@ -4,6 +4,8 @@ import { once } from "node:events";
 import {
   validateRequest,
   validateHistory,
+  validator as schemaValidator,
+  callSchema,
   type ChatRequest,
   type Message,
   type ToolCall,
@@ -25,6 +27,7 @@ const validator = new Ajv({
   allErrors: true,
   validateFormats: false,
 });
+const checkCall = schemaValidator.compile(callSchema);
 export type GatewayOptions = {
   store: Storage;
   models: ModelConfig[];
@@ -375,8 +378,7 @@ export function createGateway(o: GatewayOptions) {
                 for (const [position, [i, c]] of ordered.entries()) {
                   if (
                     i !== position ||
-                    !c.id ||
-                    !c.function.name ||
+                    !checkCall(c) ||
                     body.messages.some((m) =>
                       m.tool_calls?.some((old) => old.id === c.id),
                     )
@@ -513,16 +515,25 @@ export function createGateway(o: GatewayOptions) {
       const n = (active.get(p.id) ?? 1) - 1;
       if (n) active.set(p.id, n);
       else active.delete(p.id);
-      o.store.record({
-        id: req.id,
-        principal: p.id,
-        provider: model.provider,
-        model: model.id,
-        status,
-        latencyMs: Date.now() - now,
-        usage,
-        reserved: reservation,
-      });
+      try {
+        o.store.record({
+          id: req.id,
+          principal: p.id,
+          provider: model.provider,
+          model: model.id,
+          status,
+          latencyMs: Date.now() - now,
+          usage,
+          reserved: reservation,
+        });
+      } catch {
+        // A ledger failure must not rewrite an already-computed response; the
+        // orphaned reservation is charged conservatively at next startup.
+        app.log.warn(
+          { requestId: req.id, principal: p.id },
+          "Ledger record failed",
+        );
+      }
       app.log.info(
         {
           requestId: req.id,

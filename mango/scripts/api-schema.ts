@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import prettier from "prettier";
 import {
   requestSchema,
   callSchema,
@@ -169,4 +170,8 @@ const schema = {
     },
   },
 };
-writeFileSync("api.schema.json", JSON.stringify(schema, null, 2) + "\n");
+// Prettier keeps regeneration byte-identical to the committed document.
+writeFileSync(
+  "api.schema.json",
+  await prettier.format(JSON.stringify(schema), { parser: "json" }),
+);

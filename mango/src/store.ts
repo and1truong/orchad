@@ -52,15 +52,35 @@ export class SqliteStore implements Storage {
       token.length < 24
     )
       throw new Error("Invalid principal or token");
-    this.db
-      .prepare(
-        "INSERT INTO principals(id,models,rpm,concurrency,quota) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET models=excluded.models,rpm=excluded.rpm,concurrency=excluded.concurrency,quota=excluded.quota",
-      )
-      .run(p.id, JSON.stringify(p.models), p.rpm, p.concurrency, p.quota);
-    this.db
-      .prepare("INSERT INTO tokens(hash,principal) VALUES(?,?)")
-      .run(tokenHash(token), p.id);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(
+          "INSERT INTO principals(id,models,rpm,concurrency,quota) VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET models=excluded.models,rpm=excluded.rpm,concurrency=excluded.concurrency,quota=excluded.quota",
+        )
+        .run(p.id, JSON.stringify(p.models), p.rpm, p.concurrency, p.quota);
+      this.db
+        .prepare("INSERT INTO tokens(hash,principal) VALUES(?,?)")
+        .run(tokenHash(token), p.id);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
     return token;
+  }
+  getPrincipal(id: string) {
+    const row = this.db
+      .prepare("SELECT * FROM principals WHERE id=?")
+      .get(id) as any;
+    if (!row) return;
+    return {
+      id: row.id,
+      models: JSON.parse(row.models),
+      rpm: row.rpm,
+      concurrency: row.concurrency,
+      quota: row.quota,
+    } as Principal;
   }
   revoke(token: string) {
     this.db
