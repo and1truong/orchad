@@ -22,6 +22,8 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "1.0.4",
+    "@earendil-works/pi-ai": "1.0.4",
     "@orchard/bridge-contract": "file:../../../packages/bridge-contract"
   }
 }
