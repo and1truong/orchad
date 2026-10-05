@@ -52,9 +52,12 @@ const failOut=async(e)=>{console.error(`\n[${lane}] FAILED: ${e?.message??e}`);c
 
 try{
   console.log(`[${lane}] driving ${bin}`);
-  // handshake: sidecar ready marker proves the real host process + sidecar
-  // are wired; it is NOT a --version probe.
-  await waitMarker(/^COCONUT_SMOKE:recv:ready/,30000);
+  // handshake: the binary must at least boot and spawn its sidecar before
+  // the ready marker can mean anything (WebKitGTK under xvfb can be slow —
+  // generous budget, boot marker itself is cheap).
+  await waitMarker(/^COCONUT_SMOKE:boot:main/,20000);
+  await waitMarker(/^COCONUT_SMOKE:setup:sidecar-spawned/,120000);
+  await waitMarker(/^COCONUT_SMOKE:recv:ready/,60000);
   check('handshake: sidecar ready marker emitted by real runtime',true);
 
   // open the real guest webview against the fixture and wait for the real
