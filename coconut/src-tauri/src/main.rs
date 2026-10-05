@@ -18,10 +18,16 @@ struct Native {
     nonce: Mutex<Option<String>>,
     target: Mutex<Option<Value>>,
 }
+fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
 fn send(s: &Native, v: Value) -> Result<(), String> {
-    let mut g = s.input.lock().map_err(|_| "Poisoned")?;
-    let input = g.as_mut().ok_or("Sidecar disconnected")?;
-    writeln!(input, "{}", v).map_err(|e| e.to_string())
+    let mut input = lock(&s.input).take().ok_or("Sidecar disconnected")?;
+    let r = writeln!(input, "{}", v).map_err(|e| e.to_string());
+    if r.is_ok() {
+        *lock(&s.input) = Some(input);
+    }
+    r
 }
 fn trusted(w: &Webview) -> Result<(), String> {
     if w.label() != "host" {
@@ -42,11 +48,11 @@ fn allowed(u: &url::Url) -> bool {
 }
 fn invalidate(app: &tauri::AppHandle) {
     let s = app.state::<Arc<Native>>();
-    if let Some(t) = s.target.lock().unwrap().take() {
+    if let Some(t) = lock(&s.target).take() {
         let _ = send(&s, json!({"kind":"closed","targetId":t["targetId"]}));
     }
-    s.replies.lock().unwrap().clear();
-    *s.nonce.lock().unwrap() = None;
+    lock(&s.replies).clear();
+    *lock(&s.nonce) = None;
 }
 #[tauri::command]
 async fn host_request(
@@ -78,13 +84,15 @@ async fn host_request(
         .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     request["id"] = json!(id);
     let (tx, rx) = oneshot::channel();
-    state.pending.lock().unwrap().insert(id.clone(), tx);
+    lock(&state.pending).insert(id.clone(), tx);
     if let Err(e) = send(&state, request) {
-        state.pending.lock().unwrap().remove(&id);
+        lock(&state.pending).remove(&id);
         return Err(e);
     }
-    let r = tokio::time::timeout(Duration::from_secs(30), rx).await;
-    state.pending.lock().unwrap().remove(&id);
+    // Must outlast the sidecar's worst-case policy budget (~10s approval wait
+    // plus two 10s guest dispatches) so a late reply is never orphaned.
+    let r = tokio::time::timeout(Duration::from_secs(45), rx).await;
+    lock(&state.pending).remove(&id);
     match r {
         Ok(Ok(v)) => Ok(v),
         Ok(Err(_)) => Err("Disconnected".into()),
@@ -109,16 +117,11 @@ fn guest_reply(
     {
         return Err("Payload too large".into());
     }
-    let pinned = state
-        .replies
-        .lock()
-        .unwrap()
-        .remove(&id)
-        .ok_or("Unknown request")?;
-    if state.target.lock().unwrap().as_ref() != Some(&pinned) {
+    let pinned = lock(&state.replies).remove(&id).ok_or("Unknown request")?;
+    if lock(&state.target).as_ref() != Some(&pinned) {
         return Err("STALE_CONTEXT".into());
     }
-    if pinned["appId"] != "" && state.nonce.lock().unwrap().as_ref() != Some(&document_nonce) {
+    if pinned["appId"] != "" && lock(&state.nonce).as_ref() != Some(&document_nonce) {
         return Err("STALE_CONTEXT".into());
     }
     if pinned["appId"] == "" {
@@ -130,11 +133,11 @@ fn guest_reply(
             {
                 return Err("Invalid context".into());
             }
-            *state.nonce.lock().unwrap() = Some(document_nonce);
+            *lock(&state.nonce) = Some(document_nonce);
             let mut t = pinned.clone();
             t["appId"] = data["appId"].clone();
             t["documentId"] = data["documentId"].clone();
-            *state.target.lock().unwrap() = Some(t.clone());
+            *lock(&state.target) = Some(t.clone());
             return send(&state, json!({"kind":"binding","target":t}));
         }
         return Ok(());
@@ -155,7 +158,7 @@ async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Res
     let nav = app.clone();
     let load = app.clone();
     let window = app.get_window("host").ok_or("Host missing")?;
-    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(move |_|{invalidate(&nav);true}).on_page_load(move |guest,payload|{if matches!(payload.event(),tauri::webview::PageLoadEvent::Finished)&&allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*s.target.lock().unwrap()=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();s.replies.lock().unwrap().insert(id.clone(),t);let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);}});
+    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(move |_|{invalidate(&nav);true}).on_page_load(move |guest,payload|{if matches!(payload.event(),tauri::webview::PageLoadEvent::Finished)&&allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),t);let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);}});
     window
         .add_child(
             builder,
@@ -177,5 +180,5 @@ fn bridge_script(id: &str, op: &str, call: &Value, nonce: Option<String>) -> Str
 fn main() {
     let state = Arc::new(Native::default());
     let setup_state = state.clone();
-    tauri::Builder::default().manage(state).invoke_handler(tauri::generate_handler![open_guest,host_request,guest_reply]).setup(move |app|{let path=if cfg!(debug_assertions){std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../host/sidecar.mjs")}else{app.path().resource_dir()?.join("_up_/host/sidecar.bundle.mjs")};let mut child=Command::new("node").arg(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;*setup_state.input.lock().unwrap()=child.stdin.take();let stdout=child.stdout.take().unwrap();*setup_state.child.lock().unwrap()=Some(child);let handle=app.handle().clone();let s=setup_state.clone();std::thread::spawn(move||{for line in BufReader::new(stdout).lines().map_while(Result::ok){let Ok(m)=serde_json::from_str::<Value>(&line)else{continue};let id=m["id"].as_str().unwrap_or("").to_owned();match m["kind"].as_str(){Some("response")=>{if let Some(tx)=s.pending.lock().unwrap().remove(&id){let _=tx.send(m["data"].clone());}},Some("dispatch-timeout")=>{s.replies.lock().unwrap().remove(&id);},Some("dispatch")=>{if m["operation"]=="invoke" && !handle.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true)){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"APPROVAL_DENIED","message":"Trusted UI inactive","retryable":false}}}));continue;}let t=m["target"].clone();if s.target.lock().unwrap().as_ref()!=Some(&t){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"STALE_CONTEXT","message":"Native binding changed","retryable":false}}}));continue;}if let Some(guest)=handle.get_webview("guest"){if guest.url().ok().as_ref().is_some_and(allowed){s.replies.lock().unwrap().insert(id.clone(),t);let _=guest.eval(&bridge_script(&id,m["operation"].as_str().unwrap_or(""),&m["call"],s.nonce.lock().unwrap().clone()));}}},_=>{}}}invalidate(&handle);});Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(window.app_handle());let s=window.state::<Arc<Native>>();if let Some(child)=s.child.lock().unwrap().as_mut(){let _=child.kill();}}}).run(tauri::generate_context!()).expect("Coconut runtime");
+    tauri::Builder::default().manage(state).invoke_handler(tauri::generate_handler![open_guest,host_request,guest_reply]).setup(move |app|{let path=if cfg!(debug_assertions){std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../host/sidecar.mjs")}else{app.path().resource_dir()?.join("_up_/host/sidecar.bundle.mjs")};let mut child=Command::new("node").arg(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;*lock(&setup_state.input)=child.stdin.take();let stdout=child.stdout.take().unwrap();*lock(&setup_state.child)=Some(child);let handle=app.handle().clone();let s=setup_state.clone();std::thread::spawn(move||{for line in BufReader::new(stdout).lines().map_while(Result::ok){let Ok(m)=serde_json::from_str::<Value>(&line)else{continue};let id=m["id"].as_str().unwrap_or("").to_owned();match m["kind"].as_str(){Some("response")=>{if let Some(tx)=s.pending.lock().unwrap().remove(&id){let _=tx.send(m["data"].clone());}},Some("dispatch-timeout")=>{lock(&s.replies).remove(&id);},Some("dispatch")=>{if m["operation"]=="invoke" && !handle.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true)){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"APPROVAL_DENIED","message":"Trusted UI inactive","retryable":false}}}));continue;}let t=m["target"].clone();if lock(&s.target).as_ref()!=Some(&t){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"STALE_CONTEXT","message":"Native binding changed","retryable":false}}}));continue;}if let Some(guest)=handle.get_webview("guest"){if guest.url().ok().as_ref().is_some_and(allowed){lock(&s.replies).insert(id.clone(),t);let _=guest.eval(&bridge_script(&id,m["operation"].as_str().unwrap_or(""),&m["call"],lock(&s.nonce).clone()));}}},_=>{}}}invalidate(&handle);});Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(window.app_handle());let s=window.state::<Arc<Native>>();if let Some(child)=lock(&s.child).as_mut(){let _=child.kill();}}}).run(tauri::generate_context!()).expect("Coconut runtime");
 }
