@@ -34,7 +34,7 @@ await new Promise(r=>fixture.listen(4310,'127.0.0.1',r));
 // --- spawn the real binary ----------------------------------------------
 const bin=process.argv[2]??`${coconutRoot}/src-tauri/target/debug/coconut`;
 await access(bin);
-const child=spawn(bin,[],{env:{...process.env,COCONUT_SMOKE:'1',COCONUT_MCP_PORT:String(MCP_PORT)},stdio:['ignore','ignore','pipe']});
+const child=spawn(bin,[],{env:{...process.env,COCONUT_SMOKE:'1',COCONUT_MCP_PORT:String(MCP_PORT),WEBKIT_DISABLE_DMABUF_RENDERER:'1',WEBKIT_DISABLE_COMPOSITING_MODE:'1',LIBGL_ALWAYS_SOFTWARE:'1',GALLIUM_DRIVER:'llvmpipe'},stdio:['ignore','ignore','pipe']});
 let stderr='';const markers=[];let exitCode=null;
 child.stderr.on('data',d=>{stderr+=d;for(const l of String(d).split('\n'))if(l.startsWith('COCONUT_SMOKE:'))markers.push(l.trim());});
 child.on('exit',c=>exitCode=c);
@@ -46,6 +46,7 @@ const smoke=(op,extra={},ms=65000)=>new Promise((resolve,reject)=>{const s=conne
 const request=(req,ms)=>smoke('request',{request:req},ms);
 const tool=(name,args,ms)=>request({action:'tool',tool:name,args},ms);
 const heartbeat=async()=>{const r=await request({action:'heartbeat'});return r;};
+const openAndBind=async(url)=>{for(let i=0;i<3;i++){await smoke('open_guest',{url});try{await waitMarker(/^COCONUT_SMOKE:send:binding/,30000);return;}catch(e){if(i===2)throw e;}}};
 const waitFor=async(fn,ms,step=250)=>{const t=Date.now()+ms;for(;;){const v=await fn();if(v)return v;if(Date.now()>t)throw new Error('waitFor timed out');await sleep(step);}};
 
 const failOut=async(e)=>{console.error(`\n[${lane}] FAILED: ${e?.message??e}`);console.error('last stderr:\n'+stderr.slice(-3000));try{await smoke('quit',{},2000);}catch{}child.kill('SIGKILL');fixture.close();process.exit(1);};
@@ -63,8 +64,7 @@ try{
   // open the real guest webview against the fixture and wait for the real
   // binding envelope the guest bridge replies with.
   markers.length=0;
-  await smoke('open_guest',{url:TRUSTED+'/'});
-  await waitMarker(/^COCONUT_SMOKE:send:binding/,20000);
+  await openAndBind(TRUSTED+'/');
   check('binding: guest bridge bound through real WebView',true);
 
   // negative: hide the host window, let the 4s lease lapse — writes must
@@ -136,8 +136,7 @@ try{
   // demo_read goes back through the approval path. Re-creating the guest
   // webview can be slow on CI runners — generous budget, one retry.
   markers.length=0;
-  await smoke('open_guest',{url:TRUSTED+'/'});
-  await waitMarker(/^COCONUT_SMOKE:send:binding/,60000).catch(async()=>{await smoke('open_guest',{url:TRUSTED+'/'});await waitMarker(/^COCONUT_SMOKE:send:binding/,30000);});
+  await openAndBind(TRUSTED+'/');
   const t2=(await tool('host_list_targets',{}))?.data?.targets?.[0];
   await tool('host_list_tools',{targetId:t2.targetId,pageInstanceId:t2.pageInstanceId});
   const againP=tool('host_call_tool',{targetId:t2.targetId,pageInstanceId:t2.pageInstanceId,call:{toolName:'demo_read',arguments:{},documentId:t2.documentId,expectedRevision:null,idempotencyKey:null,requestId:randomUUID()}});
