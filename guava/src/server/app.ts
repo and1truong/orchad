@@ -194,14 +194,13 @@ export async function createApp(opts: AppOptions) {
   app.get("/health", async () => ({ ok: true }));
   app.setErrorHandler((error, req, reply) => {
     const e = error as any;
+    const client = e.validation || (e.statusCode && e.statusCode < 500);
     reply
-      .code(e.validation ? 400 : 500)
+      .code(client ? 400 : 500)
       .send(
         failure(
-          e.validation ? "INVALID_ARGUMENT" : "INTERNAL",
-          e.validation
-            ? "Invalid request schema"
-            : "Internal application error",
+          client ? "INVALID_ARGUMENT" : "INTERNAL",
+          client ? "Invalid request" : "Internal application error",
         ),
       );
   });
