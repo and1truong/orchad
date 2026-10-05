@@ -1,0 +1,191 @@
+import type { Document, Evidence, GraphNode } from "../shared/domain.ts";
+const n = (
+  id: string,
+  type: GraphNode["type"],
+  label: string,
+  body: string,
+  x: number,
+  y: number,
+  evidenceIds: string[] = [],
+): GraphNode => ({ id, type, label, body, position: { x, y }, evidenceIds });
+export const documents: Document[] = [
+  {
+    id: "rca-consumer-lag",
+    title: "Consumer lag after deployment",
+    summary:
+      "Synthetic incident: orders consumer lag rose after v2.18. Test configuration regression, traffic surge, and broker saturation against evidence.",
+    revision: 0,
+    graph: {
+      nodes: [
+        n(
+          "incident-1",
+          "incident",
+          "Orders processing delayed",
+          "SYNTHETIC · 10:08 UTC. Consumer lag crossed 80,000; order processing SLO exceeded.",
+          0,
+          180,
+          ["ev-summary"],
+        ),
+        n(
+          "consumer-lag",
+          "observation",
+          "Consumer lag rising",
+          "Lag grew from 400 to 86,000 after the 10:00 deployment. Temporal correlation alone does not establish causation.",
+          320,
+          180,
+          ["ev-metrics"],
+        ),
+        n(
+          "deployment",
+          "observation",
+          "v2.18 deployed at 10:00",
+          "The deployment changed consumer configuration. Compare metrics, config, broker health and traffic.",
+          320,
+          420,
+          ["ev-deploy"],
+        ),
+      ],
+      edges: [
+        {
+          id: "edge-lag",
+          source: "incident-1",
+          target: "consumer-lag",
+          type: "relates",
+          label: "observed symptom",
+        },
+        {
+          id: "edge-deploy",
+          source: "deployment",
+          target: "consumer-lag",
+          type: "relates",
+          label: "preceded lag",
+        },
+      ],
+    },
+  },
+  {
+    id: "brainstorm-workshop",
+    title: "Design a calmer on-call week",
+    summary:
+      "Synthetic brainstorming map. Explore ideas; notes are ideas rather than established evidence.",
+    revision: 0,
+    graph: {
+      nodes: [
+        n(
+          "workshop",
+          "note",
+          "Calmer on-call week",
+          "How can a small platform team reduce interruptions without hiding operational risk?",
+          100,
+          220,
+        ),
+        n(
+          "reduce-noise",
+          "note",
+          "Reduce alert noise",
+          "Review duplicate pages and clear ownership.",
+          430,
+          80,
+        ),
+        n(
+          "improve-handover",
+          "note",
+          "Improve handover",
+          "Make recent changes and unresolved questions easy to find.",
+          430,
+          330,
+        ),
+      ],
+      edges: [
+        {
+          id: "idea-noise",
+          source: "workshop",
+          target: "reduce-noise",
+          type: "relates",
+          label: "idea",
+        },
+        {
+          id: "idea-handover",
+          source: "workshop",
+          target: "improve-handover",
+          type: "relates",
+          label: "idea",
+        },
+      ],
+    },
+  },
+];
+const e = (
+  id: string,
+  timestamp: string,
+  kind: string,
+  title: string,
+  content: string,
+  tags: string[],
+): Evidence => ({
+  id,
+  documentId: "rca-consumer-lag",
+  timestamp,
+  source: { kind, name: "synthetic/orders-fixture" },
+  title,
+  content,
+  tags,
+});
+export const evidence: Evidence[] = [
+  e(
+    "ev-summary",
+    "2026-04-12T10:08:00Z",
+    "incident",
+    "Incident summary",
+    "Orders consumer group lag 86,000 at 10:08 UTC, normally below 500. Producer requests succeeded. No user data in this synthetic dataset.",
+    ["incident", "lag"],
+  ),
+  e(
+    "ev-deploy",
+    "2026-04-12T10:00:00Z",
+    "deployment",
+    "Deployment timeline",
+    "09:55 v2.17 healthy. 10:00 v2.18 rolling deployment began. 10:03 all 6 replicas updated. 10:05 lag alert. No rollback data available.",
+    ["deployment", "timeline"],
+  ),
+  e(
+    "ev-config",
+    "2026-04-12T10:01:00Z",
+    "configuration",
+    "Consumer configuration diff",
+    "v2.17 max.poll.records=500; v2.18 max.poll.records=20. Processing is sequential within batches; poll overhead remains ~40ms. No change in partition count or replica count. This could reduce throughput but does not prove causation.",
+    ["deployment", "configuration"],
+  ),
+  e(
+    "ev-metrics",
+    "2026-04-12T10:08:00Z",
+    "metric",
+    "Traffic and throughput snapshots",
+    "09:50 incoming=1200 records/s, consumed=1210/s, lag=400. 10:04 incoming=1190/s, consumed=820/s, lag=24000. 10:08 incoming=1220/s, consumed=815/s, lag=86000. CPU=42%, memory=48%; previous CPU=45%, memory=46%. Stable input contradicts traffic-surge explanation.",
+    ["lag", "traffic", "throughput"],
+  ),
+  e(
+    "ev-broker",
+    "2026-04-12T10:07:00Z",
+    "metric",
+    "Broker health",
+    "Broker p99 produce latency 11ms before, 12ms after; disk utilization 38%; ISR stable at 3; under-replicated partitions=0. Evidence against broker saturation; consumer-specific issues still possible.",
+    ["broker", "counterevidence"],
+  ),
+  e(
+    "ev-logs",
+    "2026-04-12T10:06:00Z",
+    "log",
+    "Consumer logs",
+    "10:02:12 INFO assigned partitions=8 member=orders-3; 10:02:13 INFO poll returned records=20 elapsed=41ms; 10:02:14 INFO batch completed elapsed=18ms. No sustained rebalance or timeout lines in sampled interval. Absence in a sample cannot rule out all transient failures.",
+    ["poll", "rebalance", "counterevidence"],
+  ),
+  e(
+    "ev-transient",
+    "2026-04-12T10:02:00Z",
+    "log",
+    "One transient rebalance",
+    "10:02:02 WARN rebalance triggered by rolling deployment, duration=1.2s. A short rebalance supports a transient deployment effect, but does not explain sustained loss of throughput through 10:08 on its own.",
+    ["rebalance", "alternative"],
+  ),
+];
