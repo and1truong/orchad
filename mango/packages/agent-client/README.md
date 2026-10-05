@@ -2,6 +2,8 @@
 
 Portable trusted-host agent loop for Agent App Bridge 0.1. Bundle this ESM package in browser extensions or desktop shell frontends. Uses web-standard APIs and interpreted JSON Schema validation compatible with MV3 CSP. No Node, Chrome, Tauri or provider SDK APIs.
 
+Orchestration runs on `@earendil-works/pi-agent-core` (pinned 1.0.4): `runAgentLoop` drives turns with sequential tool execution, while a custom `streamFn` adapter translates Mango Chat Completions SSE into Pi assistant events. All strict gates (whole-batch call validation, budgets, opaque `x_gateway_state`, raw arguments) stay on the raw wire payload before Pi sees anything; Pi never coerces arguments and its synthetic messages never enter the Orchard transcript. The pin matters: upgrade deliberately and re-run the MV3 CSP bundle test in mango/tests.
+
 Import runAgentTurn and supply the exact shared-contract input. The callback executeTool(toolName, arguments, toolCallId) owns all authorization, approval, target binding and execution. tools are ToolDescriptor objects, not OpenAI provider schemas. The client handles mapping.
 
 Save returned messages including assistant tool_calls and x_gateway_state unchanged. onEvent emits the contract's text_delta, tool_requested, tool_completed, error and exactly one completed event. Defaults: 8 steps, 16 tool calls. Calls execute sequentially after complete stream validation. Errors are reported through events/finishReason; invalid configuration can throw.
