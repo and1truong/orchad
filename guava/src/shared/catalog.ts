@@ -1,9 +1,10 @@
+import { Bounds } from "@orchard/bridge-contract";
 import { nodeTypes, edgeTypes } from "./domain.ts";
 import type { ToolDescriptor } from "./contract.ts";
 export const id = {
   type: "string",
   minLength: 1,
-  maxLength: 80,
+  maxLength: Bounds.id,
   pattern: "^[a-zA-Z0-9_-]+$",
 };
 const text = (maxLength: number) => ({ type: "string", maxLength });
@@ -109,8 +110,8 @@ export const catalog: ToolDescriptor[] = [
     inputSchema: object(
       {
         query: text(200),
-        sourceKind: text(80),
-        tag: text(80),
+        sourceKind: text(Bounds.id),
+        tag: text(Bounds.id),
         offset: boundedInt(1000),
         limit: boundedInt(40, 1),
       },
@@ -151,12 +152,12 @@ export const catalog: ToolDescriptor[] = [
   },
 ];
 export const invokeSchema = object({
-  requestId: { type: "string", minLength: 1, maxLength: 120 },
+  requestId: { type: "string", minLength: 1, maxLength: Bounds.id },
   documentId: id,
   toolName: {
     type: "string",
     minLength: 1,
-    maxLength: 64,
+    maxLength: Bounds.toolName,
     pattern: "^[a-zA-Z0-9_-]+$",
   },
   arguments: { type: "object" },
@@ -164,6 +165,6 @@ export const invokeSchema = object({
     anyOf: [{ type: "integer", minimum: 0 }, { type: "null" }],
   },
   idempotencyKey: {
-    anyOf: [{ type: "string", minLength: 1, maxLength: 120 }, { type: "null" }],
+    anyOf: [{ type: "string", minLength: 1, maxLength: Bounds.id }, { type: "null" }],
   },
 });

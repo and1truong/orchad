@@ -1,21 +1,10 @@
-export type ErrorCode =
-  | "INVALID_ARGUMENT"
-  | "UNAUTHORIZED"
-  | "FORBIDDEN"
-  | "NOT_FOUND"
-  | "STALE_CONTEXT"
-  | "IDEMPOTENCY_CONFLICT"
-  | "APPROVAL_DENIED"
-  | "CANCELLED"
-  | "TIMEOUT"
-  | "TARGET_CLOSED"
-  | "UNSUPPORTED"
-  | "INTERNAL";
+export type { Code as ErrorCode } from "@orchard/bridge-contract";
+import type { Code } from "@orchard/bridge-contract";
 export interface Result {
   ok: boolean;
   revision: number | null;
   data: any | null;
-  error: { code: ErrorCode; message: string; retryable: boolean } | null;
+  error: { code: Code; message: string; retryable: boolean } | null;
 }
 export interface Invoke {
   requestId: string;
@@ -61,36 +50,13 @@ export interface TargetDescriptor {
   sessionEpoch?: string | null;
   title: string;
 }
-export const success = (revision: number | null, data: any): Result => ({
-  ok: true,
-  revision,
-  data,
-  error: null,
-});
-export const failure = (
-  code: ErrorCode,
-  message: string,
-  revision: number | null = null,
-  retryable = false,
-): Result => ({
-  ok: false,
-  revision,
-  data: null,
-  error: { code, message, retryable },
-});
-export function canonical(value: unknown): string {
-  if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
-  if (value && typeof value === "object")
-    return (
-      "{" +
-      Object.keys(value)
-        .sort()
-        .map((k) => JSON.stringify(k) + ":" + canonical((value as any)[k]))
-        .join(",") +
-      "}"
-    );
-  return JSON.stringify(value);
-}
+// Single implementation of canonical()/success()/failure() lives in
+// @orchard/bridge-contract — this file only holds Guava-side types.
+export {
+  canonical,
+  failure,
+  success,
+} from "@orchard/bridge-contract";
 export const appId = "orchard-guava";
 declare global {
   interface Window {

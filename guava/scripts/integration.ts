@@ -2,13 +2,38 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import assert from "node:assert/strict";
 import type { Result, TargetDescriptor } from "../src/shared/contract.ts";
+// Strict mode (CI/acceptance): required hosts MUST be present and every
+// scenario MUST run — a "NOT RUN" line is a failure, not a skip.
+//   ORCHARD_INTEGRATION_STRICT=true  — fail when any required kind is absent
+//   ORCHARD_INTEGRATION_REQUIRE      — comma list, default "BROWSER,DESKTOP"
+//   ORCHARD_APP_ID                   — target appId, default "orchard-guava"
+const strict =
+    process.env.ORCHARD_INTEGRATION_STRICT === "true" ||
+    process.argv.includes("--strict"),
+  required = new Set(
+    strict
+      ? (process.env.ORCHARD_INTEGRATION_REQUIRE ?? "BROWSER,DESKTOP")
+          .split(",")
+          .map((x) => x.trim())
+          .filter(Boolean)
+      : [],
+  ),
+  wantedAppId = process.env.ORCHARD_APP_ID ?? "orchard-guava",
+  writesRequired =
+    strict && process.env.ORCHARD_RUN_WRITES !== "false";
+const notRun: string[] = [];
 for (const kind of ["BROWSER", "DESKTOP"]) {
   const url = process.env[`ORCHARD_${kind}_MCP_URL`],
     token = process.env[`ORCHARD_${kind}_MCP_TOKEN`];
   if (!url || !token) {
-    console.log(
-      `${kind}: NOT RUN — configure loopback MCP URL and paired token; external artifact absent`,
-    );
+    const reason = `configure ORCHARD_${kind}_MCP_URL + ORCHARD_${kind}_MCP_TOKEN (loopback MCP + paired token)`;
+    if (required.has(kind)) {
+      console.error(`${kind}: NOT RUN — REQUIRED host absent — ${reason}`);
+      notRun.push(kind);
+    } else
+      console.log(
+        `${kind}: NOT RUN — ${reason}; external artifact absent`,
+      );
     continue;
   }
   const endpoint = new URL(url);
@@ -47,7 +72,7 @@ for (const kind of ["BROWSER", "DESKTOP"]) {
     assert.equal(list.ok, true);
     const target = (list.data.targets as TargetDescriptor[]).find(
       (t) =>
-        t.appId === "orchard-guava" &&
+        t.appId === wantedAppId &&
         t.documentId ===
           (process.env.ORCHARD_DOCUMENT_ID ?? "rca-consumer-lag"),
     );
@@ -128,10 +153,12 @@ for (const kind of ["BROWSER", "DESKTOP"]) {
       console.log(
         `${kind}: PASS live write/replay/stale; host approvals were manual`,
       );
-    } else
+    } else {
       console.log(
         `${kind}: write scenarios NOT RUN — set ORCHARD_RUN_WRITES=true and use host approval UI`,
       );
+      if (writesRequired) notRun.push(`${kind} writes`);
+    }
   } catch (e) {
     console.error(`${kind}: FAILED — ${(e as Error).message}`);
     process.exitCode = 1;
@@ -139,3 +166,10 @@ for (const kind of ["BROWSER", "DESKTOP"]) {
     await client.close();
   }
 }
+
+if (notRun.length || process.exitCode) {
+  console.error(
+    `Integration suite${strict ? " (STRICT)" : ""} FAILED — not run: ${notRun.join(", ") || "none"}`,
+  );
+  process.exitCode = 1;
+} else console.log(`Integration suite${strict ? " (STRICT)" : ""} PASSED — all required hosts covered`);

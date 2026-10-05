@@ -388,7 +388,7 @@ export class CanvasService {
         );
       }
       if (!write) {
-        const result = success(d.revision, this.read(p, d, call));
+        const result = success(this.read(p, d, call), d.revision);
         this.audit(p, call, before, before, "OK");
         this.db.exec("COMMIT");
         inTx = false;
@@ -474,7 +474,7 @@ export class CanvasService {
           "INSERT INTO history(id,document_id,principal,before_graph,after_revision) VALUES(?,?,?,?,?)",
         )
         .run(mutationId, d.id, p.id, beforeGraph, d.revision);
-      const result = success(d.revision, { mutationId, ...extra });
+      const result = success({ mutationId, ...extra }, d.revision);
       this.db
         .prepare("INSERT INTO idempotency VALUES(?,?,?,?,?)")
         .run(
@@ -499,7 +499,7 @@ export class CanvasService {
       } catch {
         /* Audit is best-effort; the domain error still reaches the caller. */
       }
-      return failure(error.code, error.message, before);
+      return failure(error.code, error.message, false, before);
     }
   }
 }

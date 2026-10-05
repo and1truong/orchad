@@ -1,4 +1,5 @@
 import { Validator, type Schema } from "@cfworker/json-schema";
+import { Bounds } from "@orchard/bridge-contract";
 export type Json =
   | null
   | boolean
@@ -98,13 +99,13 @@ export const callSchema = {
   additionalProperties: false,
   required: ["id", "type", "function"],
   properties: {
-    id: { type: "string", minLength: 1, maxLength: 128 },
+    id: { type: "string", minLength: 1, maxLength: Bounds.id },
     type: { const: "function" },
     function: {
       type: "object",
       additionalProperties: false,
       required: ["name", "arguments"],
-      properties: { name, arguments: { type: "string", maxLength: 65536 } },
+      properties: { name, arguments: { type: "string", maxLength: Bounds.message } },
     },
   },
 };
@@ -113,7 +114,7 @@ export const requestSchema = {
   additionalProperties: false,
   required: ["model", "messages"],
   properties: {
-    model: { type: "string", minLength: 1, maxLength: 128 },
+    model: { type: "string", minLength: 1, maxLength: Bounds.id },
     n: { const: 1 },
     stream: { type: "boolean" },
     tool_choice: { enum: ["auto", "none"] },
@@ -129,7 +130,7 @@ export const requestSchema = {
         properties: {
           role: { enum: ["system", "user", "assistant", "tool"] },
           content: {
-            anyOf: [{ type: "string", maxLength: 65536 }, { type: "null" }],
+            anyOf: [{ type: "string", maxLength: Bounds.message }, { type: "null" }],
           },
           tool_calls: {
             type: "array",
@@ -137,14 +138,14 @@ export const requestSchema = {
             maxItems: 16,
             items: callSchema,
           },
-          tool_call_id: { type: "string", minLength: 1, maxLength: 128 },
+          tool_call_id: { type: "string", minLength: 1, maxLength: Bounds.id },
           x_gateway_state: { type: "string", minLength: 1, maxLength: 196608 },
         },
       },
     },
     tools: {
       type: "array",
-      maxItems: 64,
+      maxItems: Bounds.tools,
       items: {
         type: "object",
         additionalProperties: false,
@@ -157,7 +158,7 @@ export const requestSchema = {
             required: ["name", "parameters"],
             properties: {
               name,
-              description: { type: "string", maxLength: 4096 },
+              description: { type: "string", maxLength: Bounds.description },
               parameters: {
                 type: "object",
                 required: ["type"],

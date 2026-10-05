@@ -57,7 +57,7 @@ export class HostSimulator {
         sessionEpoch: ctx.sessionEpoch ?? null,
         title: ctx.summary.slice(0, 80),
       };
-      return success(ctx.revision, { targets: [this.target] });
+      return success({ targets: [this.target] }, ctx.revision);
     } catch {
       return failure("UNAUTHORIZED", "Page is not authenticated");
     }
@@ -104,7 +104,7 @@ export class HostSimulator {
         this.close();
         return failure("TARGET_CLOSED", "Document or session changed");
       }
-      return success(ctx.revision, ctx);
+      return success(ctx, ctx.revision);
     } catch {
       this.close();
       return failure("TARGET_CLOSED", "Page closed or logged out");

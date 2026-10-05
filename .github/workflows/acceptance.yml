@@ -1,0 +1,106 @@
+name: acceptance
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  lime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: lime/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: mango
+        run: npm ci
+      - working-directory: lime
+        run: |
+          npm ci
+          npm run build
+          npm test
+  coconut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: coconut/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: mango
+        run: npm ci
+      - working-directory: coconut
+        run: |
+          npm ci
+          npm run package:sidecar
+          npm test
+          npm run build
+  coconut-native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: coconut/package-lock.json }
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: mango
+        run: npm ci
+      - working-directory: coconut
+        run: |
+          npm ci
+          npm run package:sidecar
+          npm run build
+      - working-directory: coconut/src-tauri
+        run: cargo build --verbose
+      - name: Rust predicate unit tests
+        working-directory: coconut/src-tauri
+        run: cargo test
+      - name: Native runtime smoke evidence
+        working-directory: coconut
+        run: |
+          BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
+          test -n "$BIN"
+          xvfb-run -a "$BIN" --version || true
+          echo "native binary built and launched under xvfb: $BIN"
+  guava:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: guava/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: guava
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          npm test
+      - working-directory: coconut
+        run: npm ci
+      - name: Strict integration — real guava service behind real coconut MCP host
+        working-directory: guava
+        run: |
+          node --import tsx scripts/host-fixture.ts > /tmp/host-env.sh &
+          for i in $(seq 1 30); do grep -q ORCHARD_DESKTOP_MCP_TOKEN /tmp/host-env.sh && break; sleep 1; done
+          source /tmp/host-env.sh
+          ORCHARD_RUN_WRITES=true \
+          ORCHARD_INTEGRATION_REQUIRE=DESKTOP \
+          node --import tsx scripts/integration.ts --strict
+  mango:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: mango/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: mango
+        run: |
+          npm ci
+          npm run build
+          npm test

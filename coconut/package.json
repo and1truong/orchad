@@ -1,1 +1,38 @@
-{"name":"@orchard/coconut","version":"0.1.0","private":true,"type":"module","scripts":{"pretest":"npm run capabilities && npm run vendor:client && npm run package:sidecar","test":"node --test tests/*.test.mjs","dev":"vite --host 127.0.0.1 --port 1420","build":"tsc --noEmit && vite build","fixture":"node fixtures/server.mjs","tauri":"tauri","package:sidecar":"node scripts/package-sidecar.mjs","vendor:client":"npm --prefix ../mango run build -w @orchard/agent-client","capabilities":"node scripts/gen-capabilities.mjs","prebuild":"npm run capabilities && npm run vendor:client"},"dependencies":{"@modelcontextprotocol/sdk":"1.32.0","@orchard/agent-client":"file:../mango/packages/agent-client","@tauri-apps/api":"2.12.1","ajv":"8.17.1","express":"5.1.0","react":"19.3.0","react-dom":"19.3.0","zod":"3.25.76"},"devDependencies":{"@tauri-apps/cli":"2.12.1","@types/react":"19.2.2","@types/react-dom":"19.2.2","esbuild":"0.25.11","typescript":"5.9.3","vite":"7.1.12"}}
+{
+  "name": "@orchard/coconut",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest": "npm run capabilities && npm run vendor:contract && npm run vendor:client && npm run package:sidecar",
+    "test": "node --test tests/*.test.mjs",
+    "dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "tsc --noEmit && vite build",
+    "fixture": "node fixtures/server.mjs",
+    "tauri": "tauri",
+    "package:sidecar": "npm run vendor:contract && node scripts/package-sidecar.mjs",
+    "vendor:client": "npm --prefix ../mango run build -w @orchard/agent-client",
+    "prebuild": "npm run capabilities && npm run vendor:contract && npm run vendor:client",
+    "vendor:contract": "npm --prefix ../packages/bridge-contract run build",
+    "capabilities": "node scripts/gen-capabilities.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "@orchard/agent-client": "file:../mango/packages/agent-client",
+    "@tauri-apps/api": "2.12.1",
+    "ajv": "8.17.1",
+    "express": "5.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "3.25.76",
+    "@orchard/bridge-contract": "file:../packages/bridge-contract"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1",
+    "@types/react": "19.2.2",
+    "@types/react-dom": "19.2.2",
+    "esbuild": "0.25.11",
+    "typescript": "5.9.3",
+    "vite": "7.1.12"
+  }
+}

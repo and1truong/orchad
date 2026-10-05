@@ -1,0 +1,240 @@
+{
+  "scenario": "agent-app-bridge/0.1 conformance floor",
+  "target": {
+    "targetId": "fixture-target",
+    "pageInstanceId": "fixture-page-0",
+    "origin": "http://127.0.0.1:4310",
+    "appId": "demo-counter",
+    "documentId": "demo-document",
+    "title": "Counter test double"
+  },
+  "catalog": {
+    "protocolVersion": "0.1",
+    "requiredTool": "demo_increment"
+  },
+  "steps": [
+    {
+      "name": "discovery returns the target with explicit ids",
+      "op": "listTargets",
+      "expect": {
+        "ok": true,
+        "hasTargetId": "fixture-target"
+      }
+    },
+    {
+      "name": "context binds documentId and an integer revision",
+      "op": "getContext",
+      "expect": {
+        "ok": true,
+        "documentId": "demo-document",
+        "integerRevision": true
+      }
+    },
+    {
+      "name": "catalog is protocol 0.1 and declares the write tool",
+      "op": "listTools",
+      "expect": {
+        "ok": true,
+        "protocolVersion": "0.1",
+        "tool": "demo_increment",
+        "effect": "write"
+      }
+    },
+    {
+      "name": "read with null envelope succeeds when consented",
+      "op": "call",
+      "ifReadsConsented": true,
+      "call": {
+        "toolName": "demo_read",
+        "arguments": {},
+        "expectedRevision": null,
+        "idempotencyKey": null
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "approved write mutates and bumps the revision",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 0,
+        "idempotencyKey": "fixture-key-1"
+      },
+      "expect": {
+        "ok": true,
+        "data": {
+          "value": 1
+        },
+        "revisionBumped": true
+      }
+    },
+    {
+      "name": "semantic replay returns the recorded result",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 0,
+        "idempotencyKey": "fixture-key-1"
+      },
+      "expect": {
+        "ok": true,
+        "data": {
+          "value": 1
+        }
+      }
+    },
+    {
+      "name": "conflicting replay fails as IDEMPOTENCY_CONFLICT",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 2
+        },
+        "expectedRevision": 1,
+        "idempotencyKey": "fixture-key-1"
+      },
+      "expect": {
+        "ok": false,
+        "code": "IDEMPOTENCY_CONFLICT"
+      }
+    },
+    {
+      "name": "stale revision fails as STALE_CONTEXT",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 0,
+        "idempotencyKey": "fixture-key-2"
+      },
+      "expect": {
+        "ok": false,
+        "code": "STALE_CONTEXT"
+      }
+    },
+    {
+      "name": "write without an envelope fails closed",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": null,
+        "idempotencyKey": null
+      },
+      "expect": {
+        "ok": false,
+        "code": "INVALID_ARGUMENT",
+        "noDispatch": true
+      }
+    },
+    {
+      "name": "unknown tool fails as UNSUPPORTED",
+      "op": "call",
+      "call": {
+        "toolName": "shell_exec",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 1,
+        "idempotencyKey": "fixture-key-3"
+      },
+      "expect": {
+        "ok": false,
+        "code": "UNSUPPORTED",
+        "noDispatch": true
+      }
+    },
+    {
+      "name": "schema-violating arguments fail as INVALID_ARGUMENT",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": "one"
+        },
+        "expectedRevision": 1,
+        "idempotencyKey": "fixture-key-4"
+      },
+      "expect": {
+        "ok": false,
+        "code": "INVALID_ARGUMENT",
+        "noDispatch": true
+      }
+    },
+    {
+      "name": "foreign documentId fails closed",
+      "op": "call",
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 1,
+        "idempotencyKey": "fixture-key-5",
+        "documentId": "other-document"
+      },
+      "expect": {
+        "ok": false,
+        "code": [
+          "STALE_CONTEXT",
+          "INVALID_ARGUMENT",
+          "NOT_FOUND"
+        ],
+        "noDispatch": true
+      }
+    },
+    {
+      "name": "denied approval fails as APPROVAL_DENIED with zero dispatch",
+      "op": "call",
+      "approve": false,
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 1,
+        "idempotencyKey": "fixture-key-6"
+      },
+      "expect": {
+        "ok": false,
+        "code": "APPROVAL_DENIED",
+        "noDispatch": true
+      }
+    },
+    {
+      "name": "cancellation fails as CANCELLED with zero dispatch",
+      "op": "call",
+      "abort": true,
+      "call": {
+        "toolName": "demo_increment",
+        "arguments": {
+          "amount": 1
+        },
+        "expectedRevision": 1,
+        "idempotencyKey": "fixture-key-7"
+      },
+      "expect": {
+        "ok": false,
+        "code": [
+          "CANCELLED",
+          "APPROVAL_DENIED",
+          "STALE_CONTEXT"
+        ],
+        "noDispatch": true
+      }
+    }
+  ]
+}

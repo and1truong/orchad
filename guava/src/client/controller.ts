@@ -138,7 +138,6 @@ export class ApplicationController {
         failure(
           "INTERNAL",
           "Connection lost; mutation outcome unknown. Do not automatically retry.",
-          null,
           true,
         )
       );
