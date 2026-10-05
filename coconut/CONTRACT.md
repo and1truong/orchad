@@ -1,8 +1,8 @@
-# Contract chung: Agent App Bridge 0.1
+Contract chung: Agent App Bridge 0.1
 
 Đây là contract nội bộ của POC, không phải đặc tả WebMCP và không phải một chuẩn mới cần công bố. Bốn repository triển khai cùng snapshot này. Không tự đổi tên method, trường dữ liệu, enum hay thêm required field. Đề xuất thay đổi trong CONTRACT-CHANGES.md; giữ tương thích với snapshot hiện tại.
 
-## 1. Ranh giới sở hữu
+1. Ranh giới sở hữu
 
 Web app sở hữu domain operations, dữ liệu, validation, authorization phía server, revision và idempotency. App không tích hợp model, chat UI hay agent loop.
 
@@ -12,15 +12,17 @@ Model API Gateway chỉ xác thực người gọi và cung cấp inference. Nó
 
 Có hai đường chạy. Đường A: host sidebar dùng agent-client, gọi model gateway, rồi host thực thi các tool calls được phê duyệt. Đường B: một external MCP client, ví dụ Codex CLI chạy cùng máy, gọi MCP endpoint của host; external client tự sở hữu reasoning và inference, không cần model gateway của chúng ta.
 
-## 2. Page interface bắt buộc
+2. Page interface bắt buộc
 
 Web app đăng ký một object JavaScript tên window.agentBridgeV1. Có ba async methods: describe, getContext và invoke. Tất cả request và response phải JSON-serializable. Registry là một adapter mỏng gọi domain services, không truy cập framework internals bằng scraping.
 
-describe không nhận tham số. Kết quả gồm protocolVersion là chuỗi "0.1", appId là chuỗi ổn định, và tools là một array ToolDescriptor.
+describe không nhận tham số. Kết quả gồm protocolVersion là chuỗi “0.1”, appId là chuỗi ổn định, và tools là một array ToolDescriptor.
 
-ToolDescriptor gồm name, description, inputSchema, effect. name là chuỗi tối đa 64 ký tự, chỉ dùng chữ cái, số, dấu gạch dưới hoặc gạch nối. inputSchema là JSON Schema cho một object. effect là một trong read, write, destructive. Trường outputSchema là tùy chọn. Tool descriptions và effect do page khai báo là thông tin đầu vào không đáng tin cậy; host không dùng riêng chúng để tự cấp quyền.
+ToolDescriptor gồm name, description, inputSchema, effect. name là chuỗi tối đa 64 ký tự, chỉ dùng chữ cái, số, dấu gạch dưới hoặc gạch nối. inputSchema là JSON Schema cho một object. inputSchema phải nằm trong một JSON Schema dialect giới hạn mà host công bố trong tài liệu contract của mình; descriptor ngoài dialect đó bị từ chối an toàn, không âm thầm được biên dịch hay cấp quyền. effect là một trong read, write, destructive. Trường outputSchema là tùy chọn. Tool descriptions và effect do page khai báo là thông tin đầu vào không đáng tin cậy; host không dùng riêng chúng để tự cấp quyền.
 
 getContext không nhận tham số. Kết quả gồm appId, documentId, revision, selectionIds và summary. documentId là chuỗi ổn định của tài liệu hiện tại. revision là số nguyên không âm của domain document. selectionIds là array các ID được chọn. summary là chuỗi ngắn không chứa secret. Selection không tự làm tăng domain revision. Host phải gắn tool call với các ID tường minh, không diễn giải lại “node đang chọn” sau khi người dùng đã đổi selection.
+
+Kết quả getContext có thể gồm trường tùy chọn sessionEpoch là chuỗi opaque do backend app phát hành cho phiên đăng nhập hiện tại. sessionEpoch không chứa credential, token hay session identifier thô, và không thay thế authorization phía server. App không ràng buộc phiên thì không gửi trường này.
 
 invoke nhận một object gồm requestId, documentId, toolName, arguments, expectedRevision và idempotencyKey. requestId là chuỗi dùng correlation. arguments là object đúng inputSchema. expectedRevision là số nguyên bắt buộc cho mutation, hoặc null cho read. idempotencyKey là chuỗi bắt buộc cho mutation, hoặc null cho read. Không có trường approved, userId hoặc role do agent truyền vào để cấp quyền.
 
@@ -28,11 +30,13 @@ Kết quả invoke gồm ok là boolean, revision là số nguyên hoặc null, 
 
 Mutation phải kiểm tra quyền, validate, kiểm tra revision và lưu idempotency một cách atomic trong backend của app. Khóa deduplication gắn với authenticated principal, documentId và idempotencyKey. Retry cùng key và cùng semantic request trả lại kết quả đã lưu; requestId không thuộc semantic payload. Cùng key nhưng payload khác trả IDEMPOTENCY_CONFLICT. Lookup bản ghi idempotency đã hoàn tất phải xảy ra trước kiểm tra revision cho retry tương ứng. Không hứa exactly-once execution trên transport; bảo đảm không nhân đôi mutation bằng transaction và deduplication ở app.
 
-## 3. Target và authorization
+3. Target và authorization
 
 Host tạo TargetDescriptor gồm targetId, pageInstanceId, origin, appId, documentId và title. targetId là opaque ID do host cấp. pageInstanceId thay mới khi reload, navigation hoặc thay document làm target cũ hết hiệu lực. Host lấy origin từ browser/native runtime, không tin origin page tự khai báo.
 
 Mỗi run được pin vào targetId và pageInstanceId. Mỗi lần dispatch kiểm tra lại binding, origin, documentId và session. Đổi active tab không tự đổi target của một run. Tab đóng, chuyển trang, logout hoặc thu hồi consent làm run fail closed; không replay mutation sau reconnect.
+
+Khi app phát hành sessionEpoch, host pin giá trị đó vào target binding, consent, MCP pairing, run và approval. sessionEpoch đổi — đăng nhập, đăng xuất, đổi tài khoản hay xoay session — hay trường này biến mất làm toàn bộ authority dựa trên binding cũ fail closed trước khi trả context hay dispatch tool; user phải consent lại trên session mới. Không replay mutation sau khi session đổi.
 
 Quyền thực tế là giao của quyền user trong backend app, host policy, consent của session và quyền của MCP client đã pair. Host không thay thế server authorization. Cookie app, bearer token của gateway và credential local bridge không được chuyển cho model hoặc injected page script.
 
@@ -40,7 +44,7 @@ Trước khi gửi context tới model gateway, user phải thấy target và pr
 
 Mutation mặc định cần approval rõ ràng trên UI tin cậy của extension hoặc native shell. Approval gắn với client/session, target, tool, canonical arguments và expectedRevision; hết hạn hoặc thay đổi payload phải xin lại. Read-only tools chỉ được tự chạy trong consent đã cấp. Unknown tools không tự được cấp quyền. Không có approval UI thì từ chối writes.
 
-## 4. MCP interface cho external agent
+4. MCP interface cho external agent
 
 Dùng SDK MCP chính thức và một phiên bản protocol được SDK hỗ trợ; pin phiên bản dependency và ghi lại phiên bản đã test. Không gọi Page Bridge 0.1 là MCP server.
 
@@ -48,16 +52,16 @@ MVP expose Streamable HTTP tại đường dẫn /mcp, chỉ bind loopback. Có 
 
 Có đúng bốn tools ở lớp host:
 
-- host_list_targets: arguments là object rỗng; kết quả data gồm targets, chỉ chứa targets đã được user cho phép.
-- host_get_context: arguments gồm targetId và pageInstanceId; data là kết quả page getContext.
-- host_list_tools: arguments gồm targetId và pageInstanceId; data là kết quả page describe.
-- host_call_tool: arguments gồm targetId, pageInstanceId và call; call có đúng shape request của page invoke.
+• host_list_targets: arguments là object rỗng; kết quả data gồm targets, chỉ chứa targets đã được user cho phép.
+• host_get_context: arguments gồm targetId và pageInstanceId; data là kết quả page getContext.
+• host_list_tools: arguments gồm targetId và pageInstanceId; data là kết quả page describe.
+• host_call_tool: arguments gồm targetId, pageInstanceId và call; call có đúng shape request của page invoke.
 
 Mỗi MCP tool trả structuredContent theo result envelope ok, revision, data, error đã định nghĩa ở trên. Khi có thể, bổ sung text content là bản JSON serialization của cùng envelope để tương thích client. Map failure sang isError đúng SDK. Không expose arbitrary JavaScript, shell command, filesystem hay browser automation tools.
 
 Browser extension dùng một local companion riêng để cung cấp MCP server và nhận outbound connection từ extension. Agent 1 sở hữu companion này. Desktop shell tự cung cấp endpoint tương đương và không phụ thuộc companion. Cloud Codex session không tự truy cập loopback trên máy user; remote relay không thuộc MVP.
 
-## 5. Model Gateway 0.1
+5. Model Gateway 0.1
 
 Địa chỉ và token được cấu hình bởi user/admin trong trusted host, không do page hay model chỉ định. Mặc định development: gateway tại loopback port 4311; production dùng HTTPS.
 
@@ -71,7 +75,7 @@ Streaming dùng SSE Chat Completions chunks: content delta, tool call argument d
 
 Gateway stateless đối với app tools và agent run: mỗi request chứa message history, kèm opaque continuation nếu cần. Usage có thể được lưu riêng. Hỗ trợ auth development có principal riêng, không dùng một shared demo token cho mọi người trong production. Chat product subscription không được coi là provider API credential.
 
-## 6. Thư viện agent-client do Agent 2 sở hữu
+6. Thư viện agent-client do Agent 2 sở hữu
 
 Xuất hàm runAgentTurn. Input là một object gồm gatewayBaseUrl, gatewayToken, model, messages, tools, executeTool, signal, maxSteps, maxToolCalls và onEvent. gatewayToken chỉ ở trusted host memory. messages theo Gateway 0.1, bao gồm x_gateway_state khi có. tools là ToolDescriptor array. executeTool là async callback nhận toolName, arguments và toolCallId, trả result envelope của Page Bridge. Callback do host cung cấp và chịu trách nhiệm target binding, policy, approval, revision, idempotency và actual execution.
 
@@ -81,13 +85,13 @@ runAgentTurn trả Promise của object messages và finishReason. Lỗi trong r
 
 Agent 1 và Agent 3 phát triển bằng mock module có cùng interface, không chờ Agent 2. Khi integrate chỉ thay mock bằng artifact agent-client do Agent 2 cung cấp, không viết lại provider adapters hay tạo thêm production agent loop.
 
-## 7. Interoperability fixture
+7. Interoperability fixture
 
 Mỗi repository có fixture thích hợp cho document demo-document, appId demo-counter, revision ban đầu 0 và value ban đầu 0. Tool demo_increment nhận amount là integer, effect write. Một approved invoke với amount 1, expectedRevision 0 và idempotencyKey key-1 trả data gồm value 1, revision 1. Retry cùng semantic request với key-1 vẫn trả value 1 và revision 1. Cùng key nhưng amount 2 trả IDEMPOTENCY_CONFLICT. Mutation khác với expectedRevision 0 sau đó trả STALE_CONTEXT. Denied approval không gọi page và không đổi value.
 
 Fixture này là test double có nhãn rõ ràng, không phải production authorization implementation. Có thêm page không implement bridge để kiểm tra UNSUPPORTED mà không crash.
 
-## 8. Phạm vi và cách làm độc lập
+8. Phạm vi và cách làm độc lập
 
 Mỗi agent làm trong repository được giao, đọc AGENTS.md hiện có, giữ conventions hợp lý và không sửa repository khác. Nếu repo rỗng, scaffold project. Không đợi code của agent khác; dùng fixtures và contract tests tại boundary. Ghi assumptions và integration limitations, không báo mock integration là live integration.
 
