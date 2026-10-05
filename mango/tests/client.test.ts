@@ -225,6 +225,67 @@ test("no dispatch on truncated SSE, truncated tool call, bad schema, unknown too
     assert.equal(events.filter((e) => e.type === "completed").length, 1);
   }
 });
+test("strict batch gate: invalid last call and coercible args dispatch nothing; state round-trips across runs", async () => {
+  // A valid first call plus an invalid final call in one batch must leave the
+  // whole batch undispatched; args a JSON Schema coercer would silently fix
+  // ("1" → 1) still fail the strict Orchard interpreter.
+  for (const fs of [
+    frames([
+      call,
+      {
+        ...call,
+        id: "call-2",
+        function: { ...call.function, arguments: '{"amount":"one"}' },
+      },
+    ]),
+    frames([
+      { ...call, function: { ...call.function, arguments: '{"amount":"1"}' } },
+    ]),
+  ]) {
+    let executed = 0;
+    const c = createMockAgentClient((async () =>
+      fragmentedResponse(fs)) as typeof fetch);
+    const r = await c.runAgentTurn({
+      ...input,
+      executeTool: async () => {
+        executed++;
+        return { ok: true, revision: 1, data: null, error: null };
+      },
+    });
+    assert.equal(r.finishReason, "error");
+    assert.equal(executed, 0);
+    // The failed assistant turn never entered history: only the user
+    // prompt is sent back out, and it carries no tool_calls.
+    assert.equal(r.messages.some((m) => m.tool_calls), false);
+  }
+  // Continuation state survives a full turn boundary: messages returned by
+  // one run replay the opaque state verbatim into the next run's request.
+  const firstRequests: any[] = [];
+  let step = 0;
+  const c1 = createMockAgentClient((async (_url, options) => {
+    firstRequests.push(JSON.parse(options!.body as string));
+    return fragmentedResponse(
+      step++ === 0 ? frames([], "stop", "opaque-state") : frames(),
+    );
+  }) as typeof fetch);
+  const r1 = await c1.runAgentTurn({ ...input });
+  assert.equal(r1.finishReason, "completed");
+  const stateMsg = r1.messages[1];
+  assert.equal(stateMsg.x_gateway_state, "opaque-state");
+  const secondRequests: any[] = [];
+  const c2 = createMockAgentClient((async (_url, options) => {
+    secondRequests.push(JSON.parse(options!.body as string));
+    return fragmentedResponse(frames());
+  }) as typeof fetch);
+  const r2 = await c2.runAgentTurn({ ...input, messages: r1.messages });
+  assert.equal(r2.finishReason, "completed");
+  assert.equal(
+    secondRequests[0].messages.find(
+      (m: Message) => m.x_gateway_state === "opaque-state",
+    )?.x_gateway_state,
+    "opaque-state",
+  );
+});
 test("tool failure becomes error result and model continues", async () => {
   const requests: any[] = [];
   let n = 0;
