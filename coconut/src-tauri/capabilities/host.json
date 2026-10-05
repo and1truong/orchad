@@ -1,0 +1,1 @@
+{"identifier":"host","description":"Bundled trusted UI only","webviews":["host"],"local":true,"permissions":["allow-open-guest","allow-host-request"]}
