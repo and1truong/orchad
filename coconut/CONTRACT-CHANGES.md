@@ -12,3 +12,14 @@ with `expectedRevision: null` / `idempotencyKey: null` (the sidecar already
 rejects read calls carrying write envelopes, which the old client violated);
 writes pin `lastRevision` plus a fresh UUID. Cancellation and approval-denied
 flow through the shared client unchanged.
+
+## Trusted app origin
+
+One file, `coconut/trusted-origin.txt`, is the trusted app origin for every
+consumer: `build.rs` bakes it into `TRUSTED_APP_ORIGIN` for the native
+`allowed()` check, `scripts/gen-capabilities.mjs` regenerates
+`capabilities/guest-replies.json` (run by `prebuild`), and the sidebar's launch
+default imports it via vite `?raw`. Exact-origin comparisons only — no
+wildcards. The checked-in value tracks Guava's default
+(`http://127.0.0.1:4310`); `tests/origin.test.mjs` fails if it drifts from
+Guava's `PORT` default or the generated capability.

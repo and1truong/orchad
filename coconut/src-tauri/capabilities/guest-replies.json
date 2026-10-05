@@ -1,1 +1,1 @@
-{"identifier":"guest-replies","description":"Only correlated bridge replies; no privileged guest commands","webviews":["guest"],"local":false,"remote":{"urls":["http://127.0.0.1:4314/*"]},"permissions":["allow-guest-reply"]}
+{"identifier":"guest-replies","description":"Only correlated bridge replies; no privileged guest commands","webviews":["guest"],"local":false,"remote":{"urls":["http://127.0.0.1:4310/*"]},"permissions":["allow-guest-reply"]}
