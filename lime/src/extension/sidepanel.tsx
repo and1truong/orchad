@@ -370,7 +370,7 @@ function App() {
             // Chrome strips url/title and discovery would fail FORBIDDEN.
             .filter((t) => t.id && t.url && /^https?:/.test(t.url))
             .map((t) => (
-              <option key={t.id} value={t.id}>
+              <option key={t.id} value={t.id} data-url={t.url}>
                 {t.title || "Tab " + t.id}
               </option>
             ))}
