@@ -1,0 +1,137 @@
+{
+  "results": [
+    {
+      "step": "1",
+      "name": "fixture counter initial",
+      "ok": true,
+      "detail": "{\"v\":\"0\",\"r\":\"Revision 0\",\"h\":\"Demo Counter\"}"
+    },
+    {
+      "step": "1",
+      "name": "panel initial state",
+      "ok": true,
+      "detail": "{\"h\":\"◒ Lime\",\"s\":\"disconnected\",\"msg\":\"/tool demo_increment {\\\"amount\\\":1}\",\"sendDisabled\":true,\"title\":\"Lime — Browser agent\"}"
+    },
+    {
+      "step": "2",
+      "name": "picker lists fixture tab",
+      "ok": true,
+      "detail": "[{\"v\":\"\",\"u\":\"\",\"t\":\"Choose tab\"},{\"v\":\"291705992\",\"u\":\"http://127.0.0.1:4313/\",\"t\":\"Demo Counter — test double\"}]"
+    },
+    {
+      "step": "2",
+      "name": "fixture tab selected by default",
+      "ok": true,
+      "detail": "select.value=291705992"
+    },
+    {
+      "step": "3",
+      "name": "pin → connected + doc id",
+      "ok": true,
+      "detail": "status=connected pin=\"demo-counter\\nhttp://127.0.0.1:4313\\nDocument: demo-document\\nInstance: f2d2903e-25b9-4056-9690-912fcd7d047a\""
+    },
+    {
+      "step": "3",
+      "name": "discovery log line",
+      "ok": true,
+      "detail": "No messages yet.\nDiscovered demo-counter; consent required"
+    },
+    {
+      "step": "3",
+      "name": "read tool checkbox listed",
+      "ok": true,
+      "detail": "demo_read visible=true"
+    },
+    {
+      "step": "4",
+      "name": "model select = mock-counter",
+      "ok": true,
+      "detail": "value=mock-counter"
+    },
+    {
+      "step": "5",
+      "name": "consent granted",
+      "ok": true,
+      "detail": "status=connected grantedBtn=true"
+    },
+    {
+      "step": "5",
+      "name": "Send enabled after consent",
+      "ok": true,
+      "detail": "Send.disabled=false expected"
+    },
+    {
+      "step": "6",
+      "name": "approval card contents",
+      "ok": true,
+      "detail": "\"Approve mutation\\nClient: sidebar\\nApp: demo-counter\\nOrigin: http://127.0.0.1:4313\\nDocument: demo-document\\nTool: demo_increment\\nTarget objects: Explicit document demo-document\\nExpected revision: 0\\nArguments: {\\\"amount\\\":1}\\nApproveDeny\""
+    },
+    {
+      "step": "6",
+      "name": "status waiting for approval",
+      "ok": true,
+      "detail": "status=waiting for approval"
+    },
+    {
+      "step": "6",
+      "name": "counter still 0 before approval",
+      "ok": true,
+      "detail": "value=0"
+    },
+    {
+      "step": "7",
+      "name": "counter incremented to 1",
+      "ok": true,
+      "detail": "{\"v\":\"1\",\"r\":\"Revision 1\"}"
+    },
+    {
+      "step": "7",
+      "name": "transcript ends Done.",
+      "ok": true,
+      "detail": "tail=\"\\nYou: /tool demo_increment {\\\"amount\\\":1}\\nDone.\""
+    },
+    {
+      "step": "7",
+      "name": "status back to connected",
+      "ok": true,
+      "detail": "status=connected"
+    },
+    {
+      "step": "8",
+      "name": "second approval card (rev 1)",
+      "ok": true,
+      "detail": "\"Approve mutation\\nClient: sidebar\\nApp: demo-counter\\nOrigin: http://127.0.0.1:4313\\nDocument: demo-document\\nTool: demo_increment\\nTarget objects: Explicit document demo-document\\nExpected revision: 1\\nArguments: {\\\"amount\\\":1}\\nA\""
+    },
+    {
+      "step": "8",
+      "name": "counter unchanged after deny",
+      "ok": true,
+      "detail": "{\"v\":\"1\",\"r\":\"Revision 1\"}"
+    },
+    {
+      "step": "8",
+      "name": "status connected after deny",
+      "ok": true,
+      "detail": "status=connected"
+    },
+    {
+      "step": "9",
+      "name": "status target changed",
+      "ok": true,
+      "detail": "status=target changed"
+    },
+    {
+      "step": "9",
+      "name": "consent revoked (button reverted+disabled)",
+      "ok": true,
+      "detail": "{\"t\":\"Consent to pinned target + model\",\"dis\":true}"
+    },
+    {
+      "step": "9",
+      "name": "Send disabled after invalidation",
+      "ok": true,
+      "detail": "Send.disabled=true"
+    }
+  ],
+  "consoleErrors": []
+}
