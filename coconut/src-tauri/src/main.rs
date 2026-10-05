@@ -275,18 +275,18 @@ fn guest_reply(
     }
     send(&state, json!({"kind":"reply","id":id,"result":result}))
 }
-#[tauri::command]
-fn discover_guest(webview: Webview, state: tauri::State<'_, Arc<Native>>) -> Result<(), String> {
-    trusted(&webview)?;
-    // Trusted re-discovery for the current guest: an SPA login or a late
-    // bridge install never triggers a page load, so a page whose first probe
-    // failed would otherwise stay undiscoverable. Re-probing is allowed only
-    // while the binding is provisional or absent — never silently rebinds a
-    // live target — and dispatches a bare getContext, so nothing pending can
-    // replay as part of rediscovery.
-    let Some(guest) = webview.window().get_webview("guest") else {
+// Trusted re-discovery for the current guest: an SPA login or a late
+// bridge install never triggers a page load, so a page whose first probe
+// failed would otherwise stay undiscoverable. Re-probing is allowed only
+// while the binding is provisional or absent — never silently rebinds a
+// live target — and dispatches a bare getContext, so nothing pending can
+// replay as part of rediscovery. Shared by the sidebar command and the
+// smoke control channel.
+fn do_discover_guest(app: &tauri::AppHandle) -> Result<(), String> {
+    let Some(guest) = app.get_webview("guest") else {
         return Err("No guest".into());
     };
+    let state = app.state::<Arc<Native>>();
     let u = guest.url().map_err(|e| e.to_string())?;
     if !allowed(&u) {
         return Err("Origin not allowlisted".into());
@@ -303,6 +303,11 @@ fn discover_guest(webview: Webview, state: tauri::State<'_, Arc<Native>>) -> Res
     lock(&state.replies).insert(id.clone(), (t, "getContext".to_string()));
     let _ = guest.eval(&bridge_script(&id, "getContext", &Value::Null, None));
     Ok(())
+}
+#[tauri::command]
+fn discover_guest(webview: Webview, app: tauri::AppHandle) -> Result<(), String> {
+    trusted(&webview)?;
+    do_discover_guest(&app)
 }
 // The guest-open path minus the trust gate, so both the sidebar command and
 // the smoke control channel run the identical code.
@@ -460,6 +465,6 @@ fn main() {
 // round-trip); `open_guest` runs the same guest-open path. `heartbeat` sent
 // here exercises the real UI-lease requirement — approvals stay gated on a
 // live trusted UI, so the lane proves heartbeat, not a stub.
-if smoke_on(){let listener=std::net::TcpListener::bind("127.0.0.1:4319")?;let smoke_app=app.handle().clone();std::thread::spawn(move||{for stream in listener.incoming(){let Ok(mut st)=stream else{continue};let h=smoke_app.clone();std::thread::spawn(move||{let mut line=String::new();let mut br=BufReader::new(st.try_clone().unwrap());let mut respond=|v:Value|{let _=writeln!(st,"{}",v);};loop{line.clear();if br.read_line(&mut line).unwrap_or(0)==0{return}let Ok(m)=serde_json::from_str::<Value>(line.trim())else{respond(json!({"ok":false,"error":"bad json"}));continue};let out=match m["op"].as_str(){Some("ping")=>Ok(json!(true)),Some("open_guest")=>do_open_guest(&h,m["url"].as_str().unwrap_or("").to_owned()).map(|_|json!(true)),Some("hide")=>h.get_window("host").ok_or_else(||"Host missing".to_string()).and_then(|w|w.hide().map_err(|e|e.to_string())).map(|_|json!(true)),Some("show")=>h.get_window("host").ok_or_else(||"Host missing".to_string()).and_then(|w|{w.show().map_err(|e|e.to_string())?;w.unminimize().map_err(|e|e.to_string())}).map(|_|json!(true)),Some("request")=>{let st2=h.state::<Arc<Native>>().inner().clone();let active=h.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true));let (tx,rx)=std::sync::mpsc::channel();let req=m["request"].clone();tauri::async_runtime::spawn(async move{let _=tx.send(dispatch_request(&st2,req,active).await);});rx.recv_timeout(Duration::from_secs(60)).unwrap_or_else(|_|Err("SMOKE_TIMEOUT".into()))},Some("quit")=>{h.exit(0);Ok(json!(true))},_=>Err("Unknown op".into()),};respond(match out{Ok(v)=>json!({"ok":true,"result":v}),Err(e)=>json!({"ok":false,"error":e})});}});}});}
+if smoke_on(){let listener=std::net::TcpListener::bind("127.0.0.1:4319")?;let smoke_app=app.handle().clone();std::thread::spawn(move||{for stream in listener.incoming(){let Ok(mut st)=stream else{continue};let h=smoke_app.clone();std::thread::spawn(move||{let mut line=String::new();let mut br=BufReader::new(st.try_clone().unwrap());let mut respond=|v:Value|{let _=writeln!(st,"{}",v);};loop{line.clear();if br.read_line(&mut line).unwrap_or(0)==0{return}let Ok(m)=serde_json::from_str::<Value>(line.trim())else{respond(json!({"ok":false,"error":"bad json"}));continue};let out=match m["op"].as_str(){Some("ping")=>Ok(json!(true)),Some("open_guest")=>do_open_guest(&h,m["url"].as_str().unwrap_or("").to_owned()).map(|_|json!(true)),Some("discover")=>do_discover_guest(&h).map(|_|json!(true)),Some("hide")=>h.get_window("host").ok_or_else(||"Host missing".to_string()).and_then(|w|w.hide().map_err(|e|e.to_string())).map(|_|json!(true)),Some("show")=>h.get_window("host").ok_or_else(||"Host missing".to_string()).and_then(|w|{w.show().map_err(|e|e.to_string())?;w.unminimize().map_err(|e|e.to_string())}).map(|_|json!(true)),Some("request")=>{let st2=h.state::<Arc<Native>>().inner().clone();let active=h.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true));let (tx,rx)=std::sync::mpsc::channel();let req=m["request"].clone();tauri::async_runtime::spawn(async move{let _=tx.send(dispatch_request(&st2,req,active).await);});rx.recv_timeout(Duration::from_secs(60)).unwrap_or_else(|_|Err("SMOKE_TIMEOUT".into()))},Some("quit")=>{h.exit(0);Ok(json!(true))},_=>Err("Unknown op".into()),};respond(match out{Ok(v)=>json!({"ok":true,"result":v}),Err(e)=>json!({"ok":false,"error":e})});}});}});}
 Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(&window.state::<Arc<Native>>());let s=window.state::<Arc<Native>>();if let Some(child)=lock(&s.child).as_mut(){let _=child.kill();};}}).run(tauri::generate_context!()).expect("Coconut runtime");
 }

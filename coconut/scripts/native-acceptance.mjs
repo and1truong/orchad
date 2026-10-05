@@ -46,7 +46,7 @@ const smoke=(op,extra={},ms=65000)=>new Promise((resolve,reject)=>{const s=conne
 const request=(req,ms)=>smoke('request',{request:req},ms);
 const tool=(name,args,ms)=>request({action:'tool',tool:name,args},ms);
 const heartbeat=async()=>{const r=await request({action:'heartbeat'});return r;};
-const openAndBind=async(url)=>{for(let i=0;i<3;i++){await smoke('open_guest',{url});try{await waitMarker(/^COCONUT_SMOKE:send:binding/,30000);return;}catch(e){if(i===2)throw e;}}};
+const openAndBind=async(url)=>{await smoke('open_guest',{url});for(let i=0;i<4;i++){try{await waitMarker(/^COCONUT_SMOKE:send:binding/,i?15000:40000);return;}catch(e){if(i===3)throw e;try{await smoke('discover');}catch{await smoke('open_guest',{url});}}}};
 const waitFor=async(fn,ms,step=250)=>{const t=Date.now()+ms;for(;;){const v=await fn();if(v)return v;if(Date.now()>t)throw new Error('waitFor timed out');await sleep(step);}};
 
 const failOut=async(e)=>{console.error(`\n[${lane}] FAILED: ${e?.message??e}`);console.error('last stderr:\n'+stderr.slice(-3000));try{await smoke('quit',{},2000);}catch{}child.kill('SIGKILL');fixture.close();process.exit(1);};
