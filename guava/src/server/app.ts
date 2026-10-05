@@ -62,7 +62,7 @@ export async function createApp(opts: AppOptions) {
       return reply
         .code(403)
         .send(failure("FORBIDDEN", "Same-origin request required"));
-    if (req.url === "/api/login") return;
+    if (req.url.split("?")[0] === "/api/login") return;
     const token = req.cookies[sessionName];
     const session = token
       ? (opts.db

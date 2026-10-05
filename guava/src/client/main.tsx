@@ -369,7 +369,10 @@ function App() {
                 setTab(t);
                 if (t === "evidence") readEvidence();
                 if (t === "audit")
-                  controller.audit().then((r) => setAudit(r.entries));
+                  controller
+                    .audit()
+                    .then((r) => setAudit(r.entries))
+                    .catch((e) => setError((e as Error).message));
               }}
             >
               {t}
