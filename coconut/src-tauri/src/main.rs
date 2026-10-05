@@ -78,6 +78,11 @@ async fn host_request(
     if !["heartbeat", "pair", "revoke", "decide", "cancel", "tool"].contains(&action) {
         return Err("FORBIDDEN".into());
     }
+    // Sidebar requests are action-only; 'kind' envelopes are native->sidecar
+    // events (binding/reply/closed/dispatch) and must not be injectable.
+    if let Some(o) = request.as_object_mut() {
+        o.remove("kind");
+    }
     let id = request["id"]
         .as_str()
         .map(str::to_owned)
