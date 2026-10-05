@@ -210,16 +210,24 @@ export class HostPolicy {
     }
   }
 }
+// Walk the argument tree so nested explicit IDs (e.g. items:[{id:...}]) are
+// also surfaced in the approval card, not just top-level *id/*ids keys.
 function extractIds(args: Record<string, unknown>): string[] {
-  return Object.entries(args)
-    .filter(([k]) => /ids?$/i.test(k))
-    .flatMap(([, v]) =>
-      typeof v === "string"
-        ? [v]
-        : Array.isArray(v)
-          ? v.filter((x) => typeof x === "string")
-          : [],
-    );
+  const found: string[] = [];
+  const visit = (value: unknown, depth: number) => {
+    if (!value || typeof value !== "object" || depth > 8 || found.length >= 64)
+      return;
+    for (const [key, v] of Object.entries(value)) {
+      if (/ids?$/i.test(key)) {
+        if (typeof v === "string") found.push(v);
+        else if (Array.isArray(v))
+          for (const x of v) if (typeof x === "string") found.push(x);
+      }
+      visit(v, depth + 1);
+    }
+  };
+  visit(args, 0);
+  return [...new Set(found)].slice(0, 64);
 }
 async function waitApproval(
   fn: (a: Approval, s: AbortSignal) => Promise<boolean>,
