@@ -22,12 +22,23 @@ import {
   type Usage,
 } from "./providers/types.js";
 const Ajv = AjvModule as unknown as typeof AjvModule.default;
-const validator = new Ajv({
-  strict: false,
-  allErrors: true,
-  validateFormats: false,
-});
 const checkCall = schemaValidator.compile(callSchema);
+// Client-supplied tool schemas are untrusted: compile them in a per-request
+// registry and bound their complexity so no request can poison another.
+const TOOL_SCHEMA_MAX_BYTES = 64 * 1024;
+const TOOL_SCHEMA_MAX_NODES = 512;
+const toolSchemaTooComplex = (schema: unknown): boolean => {
+  if (Buffer.byteLength(JSON.stringify(schema)) > TOOL_SCHEMA_MAX_BYTES)
+    return true;
+  let nodes = 0;
+  const stack = [schema];
+  while (stack.length) {
+    const v = stack.pop();
+    if (++nodes > TOOL_SCHEMA_MAX_NODES) return true;
+    if (v && typeof v === "object") stack.push(...Object.values(v));
+  }
+  return false;
+};
 export type GatewayOptions = {
   store: Storage;
   models: ModelConfig[];
@@ -194,14 +205,39 @@ export function createGateway(o: GatewayOptions) {
         "OUTPUT_LIMIT",
         "Configured output limit exceeded",
       );
+    // Admission runs before expensive validation so untrusted schemas cannot
+    // bypass rate/concurrency limits.
+    const now = Date.now();
+    if (rates.size > 10000)
+      for (const [k, v] of rates) if (now - v.start >= 60000) rates.delete(k);
+    let rate = rates.get(p.id);
+    if (!rate || now - rate.start >= 60000) {
+      rate = { start: now, count: 0 };
+      rates.set(p.id, rate);
+    }
+    if (rate.count >= p.rpm)
+      return failure(reply, 429, "RATE_LIMIT", "Request rate exceeded");
+    rate.count++;
+    if ((active.get(p.id) ?? 0) >= p.concurrency)
+      return failure(reply, 429, "CONCURRENCY_LIMIT", "Concurrency exceeded");
     const continuations = new Map<number, unknown>();
+    const toolValidators = new Map<string, (args: unknown) => boolean>();
     try {
       validateHistory(body.messages);
       const names = new Set<string>();
+      const toolSchemas = new Ajv({
+        strict: false,
+        allErrors: true,
+        validateFormats: false,
+      });
       for (const t of body.tools ?? []) {
         if (names.has(t.function.name)) throw 0;
         names.add(t.function.name);
-        validator.compile(t.function.parameters);
+        if (toolSchemaTooComplex(t.function.parameters)) throw 0;
+        toolValidators.set(
+          t.function.name,
+          toolSchemas.compile(t.function.parameters),
+        );
       }
       for (const [i, m] of body.messages.entries())
         if (m.x_gateway_state)
@@ -217,19 +253,6 @@ export function createGateway(o: GatewayOptions) {
         "Invalid history, schema or continuation state",
       );
     }
-    const now = Date.now();
-    if (rates.size > 10000)
-      for (const [k, v] of rates) if (now - v.start >= 60000) rates.delete(k);
-    let rate = rates.get(p.id);
-    if (!rate || now - rate.start >= 60000) {
-      rate = { start: now, count: 0 };
-      rates.set(p.id, rate);
-    }
-    if (rate.count >= p.rpm)
-      return failure(reply, 429, "RATE_LIMIT", "Request rate exceeded");
-    rate.count++;
-    if ((active.get(p.id) ?? 0) >= p.concurrency)
-      return failure(reply, 429, "CONCURRENCY_LIMIT", "Concurrency exceeded");
     // UTF-8 bytes + per-message/tool framing are a conservative input token reservation.
     const inputReservation =
       Buffer.byteLength(
@@ -391,7 +414,7 @@ export function createGateway(o: GatewayOptions) {
                   );
                   if (
                     !tool ||
-                    !validator.compile(tool.function.parameters)(
+                    !toolValidators.get(tool.function.name)?.(
                       JSON.parse(c.function.arguments),
                     )
                   )

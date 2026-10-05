@@ -534,3 +534,98 @@ test("configured feature combinations and model output bounds reject explicitly"
     await s.close();
   }
 });
+test("tool schema $id registries are request-isolated and complexity is bounded", async () => {
+  const s = await setup();
+  const post = (payload: any, headers = s.headers) =>
+    s.app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers,
+      payload,
+    });
+  try {
+    const named = {
+      type: "function",
+      function: {
+        name: "probe",
+        parameters: {
+          $id: "https://schemas.example/probe",
+          type: "object",
+          properties: { x: { $ref: "#/definitions/num" } },
+          definitions: { num: { type: "integer" } },
+        },
+      },
+    };
+    const payload = { ...request, tools: [named] };
+    assert.equal((await post(payload)).statusCode, 200);
+    assert.equal((await post(payload)).statusCode, 200);
+    assert.equal(
+      (await post(payload, { authorization: `Bearer ${s.otherToken}` }))
+        .statusCode,
+      200,
+    );
+    const poisoned = {
+      type: "function",
+      function: {
+        name: "probe",
+        parameters: { $id: "https://schemas.example/probe", type: "nope" },
+      },
+    };
+    assert.equal(
+      (await post({ ...request, tools: [poisoned] })).statusCode,
+      400,
+    );
+    assert.equal((await post(payload)).statusCode, 200);
+    const huge = {
+      type: "object",
+      properties: Object.fromEntries(
+        Array.from({ length: 600 }, (_, i) => [`p${i}`, { type: "string" }]),
+      ),
+    };
+    assert.equal(
+      (
+        await post({
+          ...request,
+          tools: [
+            { type: "function", function: { name: "huge", parameters: huge } },
+          ],
+        })
+      ).statusCode,
+      400,
+    );
+  } finally {
+    await s.close();
+  }
+});
+test("admission runs before expensive tool schema validation", async () => {
+  const s = await setup(undefined, {}, { rpm: 1 });
+  const post = (payload: any) =>
+    s.app.inject({
+      method: "POST",
+      url: "/v1/chat/completions",
+      headers: s.headers,
+      payload,
+    });
+  try {
+    assert.equal((await post(request)).statusCode, 200);
+    const expensive = {
+      ...request,
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "probe",
+            parameters: {
+              $id: "https://schemas.example/probe",
+              type: "object",
+              patternProperties: { ".*": { type: "string" } },
+            },
+          },
+        },
+      ],
+    };
+    assert.equal((await post(expensive)).statusCode, 429);
+  } finally {
+    await s.close();
+  }
+});
