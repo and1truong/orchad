@@ -1,5 +1,5 @@
 // Canonical Agent App Bridge 0.1 scenario runner. Each host drives its real
-// Policy + fixture through acceptance/bridge-scenario.json with this driver
+// Policy + fixture through packages/bridge-contract/scenario/bridge-scenario.json with this driver
 // contract:
 //
 //   host = {
