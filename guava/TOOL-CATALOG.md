@@ -136,7 +136,7 @@ Input schema:
 
 ## canvas_apply_patch
 
-Effect: write. Atomically apply up to 100 domain operations at expectedRevision: add/update/delete nodes, add/update/delete edges, or deterministic auto_layout. Node deletion requires incident edges deleted in the same batch. Hypotheses remain hypotheses; conclusions must use investigation_propose_conclusion. Maximum graph 500 nodes / 1000 edges.
+Effect: write. Atomically apply up to 100 domain operations at expectedRevision: add/update/delete nodes, add/update/delete edges, or deterministic auto_layout. Node deletion requires incident edges deleted in the same batch. Hypotheses remain hypotheses; conclusions must use investigation_propose_conclusion. Accepted conclusions cannot be deleted. Maximum graph 500 nodes / 1000 edges.
 
 Input schema:
 
@@ -170,7 +170,6 @@ Input schema:
                       "observation",
                       "hypothesis",
                       "evidence",
-                      "conclusion",
                       "note"
                     ]
                   },
@@ -456,7 +455,7 @@ Input schema:
 
 ## canvas_undo
 
-Effect: write. Undo an explicitly identified latest document mutation only if no intervening mutation occurred. Produces a new revision; SQLite document changes only. Read mutationId from the original result.
+Effect: write. Undo an explicitly identified latest document mutation only if no intervening mutation occurred. Cannot revert an accepted conclusion. Produces a new revision; SQLite document changes only. Read mutationId from the original result.
 
 Input schema:
 
@@ -524,7 +523,7 @@ Input schema:
 
 ## Operations and conclusion boundary
 
-add_node requires id, type, label, body, position and evidenceIds. update_node allows label/body/position/evidenceIds; conclusion content is immutable. delete_node must leave no dangling edges at the end of its batch. add_edge requires id/source/target/type/label. update_edge edits label/type. delete_edge removes an explicit edge ID. auto_layout uses deterministic type columns and ID order. All operations commit together and increment revision once.
+add_node requires id, type, label, body, position and evidenceIds; the schema excludes type conclusion — propose one instead. update_node allows label/body/position/evidenceIds; conclusion content is immutable. delete_node must leave no dangling edges at the end of its batch, and cannot remove an accepted conclusion. add_edge requires id/source/target/type/label. update_edge edits label/type. delete_edge removes an explicit edge ID. auto_layout uses deterministic type columns and ID order. All operations commit together and increment revision once.
 
 Use investigation_propose_conclusion for conclusions, with summary and both supportingEvidenceIds/contradictoryEvidenceIds arrays. At least one supporting record is required. Empty contradictions is allowed but shown honestly as none cited. All cited records are validated for document membership. Human acceptance is not exposed as a tool.
 

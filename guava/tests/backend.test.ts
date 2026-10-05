@@ -414,6 +414,102 @@ test("conclusion proposed with references; bridge cannot accept or forge accepte
   }
 });
 
+test("accepted conclusion cannot be deleted or reverted, and the human endpoint runs only the human operation", async () => {
+  const f = await fixture();
+  try {
+    const s = await f.login();
+    const propose = await f.invoke(
+      call(
+        "investigation_propose_conclusion",
+        {
+          summary: "Configuration regression may explain the lag.",
+          supportingEvidenceIds: ["ev-config"],
+          contradictoryEvidenceIds: ["ev-metrics"],
+        },
+        0,
+        "propose",
+      ),
+      s,
+    );
+    const nodeId = propose.result.data.nodeId;
+    const wrongTool = await f.app.inject({
+      method: "POST",
+      url: "/api/human/accept-conclusion",
+      headers: { origin, cookie: s.cookie, "x-csrf-token": s.csrf },
+      payload: call(
+        "canvas_apply_patch",
+        { operations: [{ op: "delete_node", id: "incident-1" }] },
+        1,
+        "via-human",
+      ),
+    });
+    assert.equal(wrongTool.json().error?.code, "INVALID_ARGUMENT");
+    const retract = await f.invoke(
+      call(
+        "investigation_propose_conclusion",
+        {
+          summary: "A draft claim to retract.",
+          supportingEvidenceIds: ["ev-deploy"],
+          contradictoryEvidenceIds: [],
+        },
+        1,
+        "propose-2",
+      ),
+      s,
+    );
+    const draftId = retract.result.data.nodeId;
+    const deleted = await f.invoke(
+      call(
+        "canvas_apply_patch",
+        { operations: [{ op: "delete_node", id: draftId }] },
+        2,
+        "retract",
+      ),
+      s,
+    );
+    assert.equal(deleted.result.ok, true);
+    const accept = await f.app.inject({
+      method: "POST",
+      url: "/api/human/accept-conclusion",
+      headers: { origin, cookie: s.cookie, "x-csrf-token": s.csrf },
+      payload: call("human_accept_conclusion", { nodeId }, 3, "accept"),
+    });
+    assert.equal(accept.statusCode, 200);
+    const acceptMutation = accept.json().data.mutationId;
+    assert.equal(
+      (
+        await f.invoke(
+          call(
+            "canvas_apply_patch",
+            { operations: [{ op: "delete_node", id: nodeId }] },
+            4,
+            "delete-accepted",
+          ),
+          s,
+        )
+      ).result.error?.code,
+      "INVALID_ARGUMENT",
+    );
+    assert.equal(
+      (
+        await f.invoke(
+          call("canvas_undo", { mutationId: acceptMutation }, 4, "undo-accept"),
+          s,
+        )
+      ).result.error?.code,
+      "INVALID_ARGUMENT",
+    );
+    assert.equal(
+      f.service
+        .document({ id: "investigator", role: "investigator" }, documentId)
+        .graph.nodes.find((n) => n.id === nodeId)?.status,
+      "accepted",
+    );
+  } finally {
+    await f.close();
+  }
+});
+
 test("proposed conclusion requires existing supporting and contradictory records, forbids overlapping claims", async () => {
   const f = await fixture();
   try {

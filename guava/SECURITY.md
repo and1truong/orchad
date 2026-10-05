@@ -22,7 +22,7 @@ Undo requires an explicit history ID matching this document's latest current rev
 
 ## Epistemic boundary
 
-Graph patches cannot insert a conclusion, set accepted status or rewrite conclusion claims. Proposal requires referenced supporting/contradictory records, forbids overlapping evidence classifications, and sets proposed server-side. A separate human endpoint with the same backend role, CSRF, revision and idempotency checks acknowledges a conclusion. It is absent from the bridge tool registry. It is an explicit UI action rather than cryptographic proof of human presence; a malicious authenticated application session can invoke ordinary human endpoints. Verified factual truth is not a property this POC asserts.
+Graph patches cannot insert a conclusion, set accepted status, rewrite conclusion claims or delete an accepted conclusion, and undo cannot revert one. Proposal requires referenced supporting/contradictory records, forbids overlapping evidence classifications, and sets proposed server-side. A separate human endpoint with the same backend role, CSRF, revision and idempotency checks acknowledges a conclusion. It is absent from the bridge tool registry. It is an explicit UI action rather than cryptographic proof of human presence; a malicious authenticated application session can invoke ordinary human endpoints. Verified factual truth is not a property this POC asserts.
 
 ## Host boundary
 

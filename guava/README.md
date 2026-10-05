@@ -39,7 +39,7 @@ All persisted edits go through the same application controller, HTTP API and dom
 
 Undo operates on an explicit mutation ID and the latest document revision. The toolbar tracks the last mutation acknowledged in this page. Reload loses that toolbar pointer, but `canvas_undo` can still use a known persisted mutation ID. Undo restores a SQLite document snapshot, adds a revision and is itself replay-safe. It does not undo external effects or bypass intervening edits.
 
-Hypotheses remain hypotheses. `investigation_propose_conclusion` creates an immutable proposed claim with supporting and contradictory references. Only the separate human inspector action accepts that conclusion. Acceptance records human acknowledgement; it is not automated proof of truth. Graph tools cannot create accepted conclusions or rewrite conclusion content. Positions can still change.
+Hypotheses remain hypotheses. `investigation_propose_conclusion` creates an immutable proposed claim with supporting and contradictory references. Only the separate human inspector action accepts that conclusion. Acceptance records human acknowledgement; it is not automated proof of truth. Graph tools cannot create accepted conclusions, rewrite conclusion content, or delete or undo an accepted conclusion. Positions can still change.
 
 ## Seeded data
 

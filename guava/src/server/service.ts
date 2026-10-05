@@ -150,14 +150,17 @@ export class CanvasService {
           Object.assign(node, op.changes);
           break;
         }
-        case "delete_node":
+        case "delete_node": {
+          const node = g.nodes.find((n) => n.id === op.id);
+          assert(node, "NOT_FOUND", "Node not found");
           assert(
-            g.nodes.some((n) => n.id === op.id),
-            "NOT_FOUND",
-            "Node not found",
+            node.type !== "conclusion" || node.status !== "accepted",
+            "INVALID_ARGUMENT",
+            "Accepted conclusions cannot be deleted by tools",
           );
           g.nodes = g.nodes.filter((n) => n.id !== op.id);
           break;
+        }
         case "add_edge":
           assert(
             !g.edges.some((e) => e.id === op.edge.id),
@@ -301,26 +304,35 @@ export class CanvasService {
         raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
       const bounded = (value: unknown, max: number, fallback: string) =>
         typeof value === "string" ? value.slice(0, max) : fallback;
-      this.audit(
-        p,
-        {
-          requestId: bounded(input.requestId, 120, "invalid-request"),
-          documentId: bounded(input.documentId, 80, "unknown"),
-          toolName: bounded(input.toolName, 64, "invalid-envelope"),
-          arguments: {},
-          expectedRevision: null,
-          idempotencyKey: null,
-        },
-        null,
-        null,
-        "INVALID_ARGUMENT",
-      );
+      try {
+        this.audit(
+          p,
+          {
+            requestId: bounded(input.requestId, 120, "invalid-request"),
+            documentId: bounded(input.documentId, 80, "unknown"),
+            toolName: bounded(input.toolName, 64, "invalid-envelope"),
+            arguments: {},
+            expectedRevision: null,
+            idempotencyKey: null,
+          },
+          null,
+          null,
+          "INVALID_ARGUMENT",
+        );
+      } catch {
+        /* Audit is best-effort; still return the envelope error. */
+      }
       return failure("INVALID_ARGUMENT", "Invalid request envelope");
     }
     const call = raw as unknown as Invoke;
     let before: number | null = null;
     let inTx = false;
     try {
+      assert(
+        !human || call.toolName === "human_accept_conclusion",
+        "INVALID_ARGUMENT",
+        "Human endpoint only runs the conclusion acceptance operation",
+      );
       const tool = catalog.find((t) => t.name === call.toolName);
       const accepting = human && call.toolName === "human_accept_conclusion";
       assert(tool || accepting, "UNSUPPORTED", "Unknown tool");
@@ -439,8 +451,17 @@ export class CanvasService {
           "STALE_CONTEXT",
           "Undo conflicts with subsequent changes",
         );
+        const accepted = d.graph.nodes.filter(
+          (n) => n.type === "conclusion" && n.status === "accepted",
+        );
         d.graph = JSON.parse(h.before_graph);
         this.validateGraph(p, d);
+        for (const n of accepted)
+          assert(
+            d.graph.nodes.find((m) => m.id === n.id)?.status === "accepted",
+            "INVALID_ARGUMENT",
+            "Undo cannot revert an accepted conclusion",
+          );
         this.db.prepare("UPDATE history SET undone=1 WHERE id=?").run(h.id);
         extra = { undoneMutationId: h.id };
       }
@@ -473,7 +494,11 @@ export class CanvasService {
         e instanceof DomainError
           ? e
           : new DomainError("INTERNAL", "Internal application error");
-      this.audit(p, call, before, before, error.code);
+      try {
+        this.audit(p, call, before, before, error.code);
+      } catch {
+        /* Audit is best-effort; the domain error still reaches the caller. */
+      }
       return failure(error.code, error.message, before);
     }
   }

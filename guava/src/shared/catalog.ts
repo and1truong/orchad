@@ -18,7 +18,8 @@ const position = object({
 });
 const node = object({
   id,
-  type: { enum: nodeTypes },
+  // Conclusions are created only via investigation_propose_conclusion.
+  type: { enum: nodeTypes.filter((t) => t !== "conclusion") },
   label: { ...text(160), minLength: 1 },
   body: text(4000),
   position,
@@ -127,14 +128,14 @@ export const catalog: ToolDescriptor[] = [
     name: "canvas_apply_patch",
     effect: "write",
     description:
-      "Atomically apply up to 100 domain operations at expectedRevision: add/update/delete nodes, add/update/delete edges, or deterministic auto_layout. Node deletion requires incident edges deleted in the same batch. Hypotheses remain hypotheses; conclusions must use investigation_propose_conclusion. Maximum graph 500 nodes / 1000 edges.",
+      "Atomically apply up to 100 domain operations at expectedRevision: add/update/delete nodes, add/update/delete edges, or deterministic auto_layout. Node deletion requires incident edges deleted in the same batch. Hypotheses remain hypotheses; conclusions must use investigation_propose_conclusion. Accepted conclusions cannot be deleted. Maximum graph 500 nodes / 1000 edges.",
     inputSchema: object({ operations }),
   },
   {
     name: "canvas_undo",
     effect: "write",
     description:
-      "Undo an explicitly identified latest document mutation only if no intervening mutation occurred. Produces a new revision; SQLite document changes only. Read mutationId from the original result.",
+      "Undo an explicitly identified latest document mutation only if no intervening mutation occurred. Cannot revert an accepted conclusion. Produces a new revision; SQLite document changes only. Read mutationId from the original result.",
     inputSchema: object({ mutationId: id }),
   },
   {
