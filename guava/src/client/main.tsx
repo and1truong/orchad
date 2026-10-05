@@ -63,8 +63,7 @@ function App() {
     [evidence, setEvidence] = useState<Evidence[]>([]),
     [audit, setAudit] = useState<any[]>([]),
     [tab, setTab] = useState("inspector"),
-    [dragging, setDragging] = useState(false),
-    [edgeId, setEdgeId] = useState<string | null>(null);
+    [dragging, setDragging] = useState(false);
   useEffect(() => controller.subscribe(update), []);
   useEffect(() => {
     controller.restore().finally(() => setReady(true));
@@ -123,9 +122,9 @@ function App() {
   const selected = doc?.graph.nodes.find((n) =>
     controller.selectionIds.includes(n.id),
   );
-  const selectedEdge =
-    doc?.graph.edges.find((e) => e.id === edgeId) ??
-    doc?.graph.edges.find((e) => controller.selectionIds.includes(e.id));
+  const selectedEdge = doc?.graph.edges.find((e) =>
+    controller.selectionIds.includes(e.id),
+  );
   const readEvidence = async (query = "") => {
     if (!doc) return;
     const result = await controller.invoke({
@@ -313,14 +312,8 @@ function App() {
               if (ids.join(",") !== controller.selectionIds.join(","))
                 controller.select(ids);
             }}
-            onNodeClick={(_, n) => {
-              setEdgeId(null);
-              setTab("inspector");
-            }}
-            onEdgeClick={(_, e) => {
-              setEdgeId(e.id);
-              setTab("inspector");
-            }}
+            onNodeClick={() => setTab("inspector")}
+            onEdgeClick={() => setTab("inspector")}
             onNodeDragStart={() => setDragging(true)}
             onNodeDragStop={(_, node, dragged) =>
               act(async () => {
