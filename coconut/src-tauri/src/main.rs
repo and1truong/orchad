@@ -4,7 +4,10 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Condvar, Mutex,
+    },
     time::Duration,
 };
 use tauri::{webview::WebviewBuilder, Manager, Webview, WebviewUrl};
@@ -13,6 +16,7 @@ use tokio::sync::oneshot;
 struct Native {
     input: Mutex<Option<ChildStdin>>,
     input_cv: Condvar,
+    input_dead: AtomicBool,
     child: Mutex<Option<Child>>,
     pending: Mutex<HashMap<String, oneshot::Sender<Value>>>,
     replies: Mutex<HashMap<String, Value>>,
@@ -25,19 +29,27 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
 fn send(s: &Native, v: Value) -> Result<(), String> {
     // Writes serialize by temporarily removing the stdin handle; a concurrent
     // caller waits (bounded) for it to be restored instead of failing spuriously.
-    // A still-missing handle after the wait means the sidecar pipe is gone.
+    // input_dead records a failed write so later callers fail fast instead of
+    // blocking on a handle that will never be restored.
+    if s.input_dead.load(Ordering::SeqCst) {
+        return Err("Sidecar disconnected".into());
+    }
     let guard = lock(&s.input);
     let (mut guard, _) = s
         .input_cv
-        .wait_timeout_while(guard, Duration::from_secs(30), |o| o.is_none())
+        .wait_timeout_while(guard, Duration::from_secs(30), |o| {
+            o.is_none() && !s.input_dead.load(Ordering::SeqCst)
+        })
         .unwrap_or_else(|e| e.into_inner());
     let mut input = guard.take().ok_or("Sidecar disconnected")?;
     drop(guard);
     let r = writeln!(input, "{}", v).map_err(|e| e.to_string());
     if r.is_ok() {
         *lock(&s.input) = Some(input);
-        s.input_cv.notify_all();
+    } else {
+        s.input_dead.store(true, Ordering::SeqCst);
     }
+    s.input_cv.notify_all();
     r
 }
 fn trusted(w: &Webview) -> Result<(), String> {
@@ -171,10 +183,9 @@ async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Res
     if let Some(old) = app.get_webview("guest") {
         old.close().map_err(|e| e.to_string())?;
     }
-    let nav = app.clone();
     let load = app.clone();
     let window = app.get_window("host").ok_or("Host missing")?;
-    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(move |u|{let s=nav.state::<Arc<Native>>();let same_document=lock(&s.target).as_ref().is_some_and(|t|t["title"].as_str().unwrap_or_default().split('#').next()==u.as_str().split('#').next());if !same_document{invalidate(&nav);}true}).on_page_load(move |guest,payload|{if matches!(payload.event(),tauri::webview::PageLoadEvent::Finished)&&allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),t);let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);}});
+    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(|_|true).on_page_load(move |guest,payload|{match payload.event(){tauri::webview::PageLoadEvent::Started=>invalidate(&load),tauri::webview::PageLoadEvent::Finished=>if allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),t);let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);},_=>{}}});
     window
         .add_child(
             builder,
