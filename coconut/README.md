@@ -6,11 +6,11 @@ Development POC source. React trusted sidebar, dedicated Tauri 2 guest WebView, 
 
 Use Node 22 or later, Rust stable, and Tauri 2 prerequisites for your OS. On Linux install pkg-config, GTK 3, WebKitGTK 4.1 development packages and a graphical session. macOS uses WKWebView; Windows uses WebView2; Linux uses WebKitGTK. macOS and Windows have not been tested.
 
-From coconut: run npm ci, npm test, npm run build, and npm run package:sidecar. Start npm run fixture in a second terminal, then npm run tauri -- dev. Open http://127.0.0.1:4314/ from the trusted host. The existing page registry is used unchanged. The mock agent requests one fixture increment. Approve or deny in the sidebar.
+From coconut: run npm ci, npm run package:sidecar, npm test, and npm run build. The sidecar test needs the bundled host/sidecar.bundle.mjs produced by package:sidecar. Start npm run fixture in a second terminal, then npm run tauri -- dev. Open http://127.0.0.1:4314/ from the trusted host. The existing page registry is used unchanged. The mock agent requests one fixture increment. Approve or deny in the sidebar.
 
 The initial allowlist is deliberately fixed to http://127.0.0.1:4314 in native code and the guest-replies capability. Change BOTH when adding an application origin; this POC has no runtime origin editor. Navigation to other origins is permitted for same-WebView login redirects but immediately revokes the bridge. Popups are denied. Real SSO and app login have not been tested. Guest cookies belong to its own embedded session; Chrome cookies are never read.
 
-Native app owns the sidecar child and kills it when the host is destroyed. MCP is enabled without a gateway. COCONUT_MCP_PORT configures the loopback listener, default 4313. Port conflicts fail startup. The development/runtime package currently requires Node on PATH; an embedded Node executable is not included.
+Native app owns the sidecar child and kills it when the host is destroyed. MCP is enabled without a gateway. COCONUT_MCP_PORT configures the loopback listener, default 4313. Port conflicts fail startup. COCONUT_DISPATCH_TIMEOUT overrides the 10-second guest dispatch timeout (a test hook; timed-out or cancelled dispatches notify native via dispatch-timeout so stale reply state is dropped). The development/runtime package currently requires Node on PATH; an embedded Node executable is not included.
 
 ## MCP pairing and CLI
 
