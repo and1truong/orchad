@@ -45,10 +45,13 @@ export class ApplicationController {
       this.principal = session.principal;
       this.csrf = session.csrf;
       await this.loadDocuments();
-    } catch {
-      this.principal = null;
-      this.document = null;
-      this.csrf = "";
+    } catch (e) {
+      if ((e as any).result?.error?.code === "UNAUTHORIZED") {
+        this.principal = null;
+        this.document = null;
+        this.csrf = "";
+      }
+      // Transient failures keep the current view; the next poll retries.
     }
     this.notify();
   }
@@ -69,8 +72,10 @@ export class ApplicationController {
   }
   async loadDocuments() {
     this.documents = (await this.request("/api/documents")).documents;
+    const current = this.document?.id;
     await this.open(
-      this.documents.find((d) => d.id === "rca-consumer-lag")?.id ??
+      this.documents.find((d) => d.id === current)?.id ??
+        this.documents.find((d) => d.id === "rca-consumer-lag")?.id ??
         this.documents[0].id,
     );
   }
