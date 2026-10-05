@@ -24,7 +24,7 @@ Environment: Linux, Node 24.19.0, npm 11.9.0, TypeScript 7.0.2, Playwright 1.63.
 | Check | Actual result |
 | --- | --- |
 | Strict TypeScript typecheck | PASS |
-| Backend/contract/native-adapter tests | 26 PASS; native registration tests explicitly mock-only |
+| Backend/contract/native-adapter tests | 27 PASS; native registration tests explicitly mock-only |
 | Browser UI/bridge/dev harness tests | 5 PASS on real Chromium |
 | Browser production bundle test | 1 PASS against Fastify serving built assets |
 | Vite production build | PASS; 175 modules, about 417 KiB JS / 132 KiB gzip |

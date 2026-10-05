@@ -8,6 +8,7 @@ import {
   Handle,
   Position,
   applyNodeChanges,
+  applyEdgeChanges,
   type NodeProps,
   type Node,
   type Edge,
@@ -100,6 +101,7 @@ function App() {
                 : "#94a3b8",
         },
         data: { domainType: e.type },
+        selected: controller.selectionIds.includes(e.id),
       })),
     );
   }, [doc, dragging, controller.selectionIds.join(",")]);
@@ -121,7 +123,9 @@ function App() {
   const selected = doc?.graph.nodes.find((n) =>
     controller.selectionIds.includes(n.id),
   );
-  const selectedEdge = doc?.graph.edges.find((e) => e.id === edgeId);
+  const selectedEdge =
+    doc?.graph.edges.find((e) => e.id === edgeId) ??
+    doc?.graph.edges.find((e) => controller.selectionIds.includes(e.id));
   const readEvidence = async (query = "") => {
     if (!doc) return;
     const result = await controller.invoke({
@@ -297,6 +301,9 @@ function App() {
             nodeTypes={types}
             onNodesChange={(changes) =>
               setNodes((old) => applyNodeChanges(changes, old))
+            }
+            onEdgesChange={(changes) =>
+              setEdges((old) => applyEdgeChanges(changes, old))
             }
             onSelectionChange={({ nodes, edges }) => {
               const ids = [
