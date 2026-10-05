@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import Ajv from "ajv";
 import { invokeSchema, id } from "../src/shared/catalog.ts";
+import { Bounds } from "@orchard/bridge-contract";
 
 // Canonical artifact at repo root: every call envelope in the shared scenario
 // must pass Guava's own backend validator — same bounds, no drift.
@@ -49,6 +50,6 @@ test("canonical scenario ids satisfy guava bounds", () => {
   }
   for (const s of scenario.steps) {
     if (s.call?.idempotencyKey)
-      assert.ok(s.call.idempotencyKey.length <= 120, s.name);
+      assert.ok(s.call.idempotencyKey.length <= Bounds.id, s.name);
   }
 });

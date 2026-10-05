@@ -205,7 +205,8 @@ export const SAFE_SCHEMA_KEYS = new Set([
 
 // Page-declared patterns execute inside the trusted host on every argument
 // check. Length is capped and backreferences or a quantified group containing
-// an unbounded repeat ((a+)+, (a*)*, (\d{2,}){3}) are refused. The heuristic
+// an unbounded repeat ((a+)+, (a*)*) are refused; a bounded outer quantifier
+// like (\d{2,}){3} stays linear and is allowed. The heuristic
 // intentionally fails closed on odd shapes rather than proving linearity.
 function repeatedGroup(p: string): boolean {
   const unbounded = (s: string) => {

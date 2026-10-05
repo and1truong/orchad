@@ -8,13 +8,13 @@ import {
   hostSafeSchema,
   safePattern,
   success,
+  type Code as ContractCode,
 } from "@orchard/bridge-contract";
 export { canonical, failure, hostSafeSchema, safePattern, success };
 export const MAX_BYTES = Bounds.message;
-export const Codes = z.enum(ContractCodes as unknown as [
-  string,
-  ...string[],
-]);
+export const Codes = z.enum(
+  ContractCodes as unknown as [ContractCode, ...ContractCode[]],
+);
 const id = z.string().min(1).max(Bounds.id);
 const rev = z.number().int().nonnegative();
 export const ToolSchema = z

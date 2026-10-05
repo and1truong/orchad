@@ -5,9 +5,15 @@
 import { Policy, ok } from "../host/policy.mjs";
 import { makeCounter } from "../fixtures/counter.mjs";
 import { startMcp } from "../host/mcp.mjs";
+import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
 const scenario = JSON.parse(
-  readFileSync(new URL("../../acceptance/bridge-scenario.json", import.meta.url), "utf8"),
+  readFileSync(
+    createRequire(import.meta.url).resolve(
+      "@orchard/bridge-contract/scenario/bridge-scenario.json",
+    ),
+    "utf8",
+  ),
 );
 const page = makeCounter();
 const autoApprove = process.env.COCONUT_FIXTURE_AUTO_APPROVE !== "false";
