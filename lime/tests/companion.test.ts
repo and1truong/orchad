@@ -347,3 +347,126 @@ test("real MCP SDK over Streamable HTTP and authenticated WebSocket to shared fi
     await companion.close();
   }
 });
+
+test("MCP request outlives the former 15s socket timeout: pending approval completes and SSE GET stays open", async () => {
+  const fixture = new CounterFixture();
+  const ctl = new AbortController();
+  const policy = new HostPolicy(
+    fixture,
+    {
+      clientId: "timeout-test",
+      sessionId: "s",
+      target: { ...fixture.target },
+      sessionEpoch: null,
+      reads: new Set(["demo_read"]),
+    },
+    async () => true,
+    ctl.signal,
+  );
+  const companion = await startCompanion({
+    port: 0,
+    extensionOrigins: [origin],
+    // Dispatch deadline must exceed the artificial hold below.
+    requestTimeoutMs: 30_000,
+  });
+  const url = `http://127.0.0.1:${companion.port}/mcp`,
+    wsUrl = `ws://127.0.0.1:${companion.port}/bridge`;
+  const ws = new WebSocket(wsUrl, { origin });
+  const next = inbox(ws);
+  try {
+    await once(ws, "open");
+    const code = companion.beginPairing();
+    ws.send(
+      JSON.stringify({
+        type: "pair",
+        code: code.code,
+        targets: [fixture.target],
+      }),
+    );
+    assert.equal((await next()).type, "confirmation");
+    ws.send(JSON.stringify({ type: "confirm", accept: true }));
+    const paired = await next();
+    // Bridge responder: the first host_call_tool is held until `release` —
+    // simulating a slow human approval — then routed through the real policy.
+    let release = () => {};
+    let sawRequest: () => void = () => {};
+    const requested = new Promise<void>((r) => (sawRequest = r));
+    ws.on("message", async (raw) => {
+      const m = JSON.parse(raw.toString());
+      if (m.type !== "request") return;
+      sawRequest();
+      if (m.name === "host_call_tool")
+        await new Promise<void>((r) => (release = r));
+      const result =
+        m.name === "host_call_tool"
+          ? await policy.call(m.arguments.call)
+          : await policy.context();
+      if (ws.readyState === WebSocket.OPEN)
+        ws.send(
+          JSON.stringify({ type: "response", requestId: m.requestId, result }),
+        );
+    });
+    const client = new Client({ name: "lime-timeout", version: "0.1.0" });
+    const transport = new StreamableHTTPClientTransport(new URL(url), {
+      requestInit: { headers: { Authorization: "Bearer " + paired.mcpToken } },
+    });
+    await client.connect(transport);
+    // Standalone GET SSE stream, as the transport keeps it open for the
+    // session; it previously died with the socket at 15s.
+    const sse = await fetch(url, {
+      headers: {
+        Authorization: "Bearer " + paired.mcpToken,
+        "mcp-session-id": transport.sessionId!,
+        Accept: "text/event-stream",
+      },
+    });
+    assert.equal(sse.status, 200);
+    const reader = sse.body!.getReader();
+    let sseClosed = false;
+    const watch = (async () => {
+      try {
+        for (;;) {
+          const { done } = await reader.read();
+          if (done) {
+            sseClosed = true;
+            return;
+          }
+        }
+      } catch {
+        sseClosed = true;
+      }
+    })();
+    const pending = client.callTool({
+      name: "host_call_tool",
+      arguments: {
+        targetId: fixture.target.targetId,
+        pageInstanceId: "fixture-page-0",
+        call: {
+          requestId: "held-call-1",
+          documentId: "demo-document",
+          toolName: "demo_increment",
+          arguments: { amount: 1 },
+          expectedRevision: 0,
+          idempotencyKey: "held-key-1",
+        },
+      },
+    });
+    await requested;
+    // The old server-wide http.requestTimeout destroyed both sockets at 15s.
+    await new Promise((r) => setTimeout(r, 16_500));
+    assert.equal(sseClosed, false, "SSE GET stream must stay open past 15s");
+    release();
+    const result = await pending;
+    assert.equal(result.isError, false);
+    assert.deepEqual((result.structuredContent as Result).data, {
+      value: 1,
+      revision: 1,
+    });
+    await client.close();
+    await reader.cancel().catch(() => {});
+    await watch;
+  } finally {
+    ws.terminate();
+    await companion.close();
+  }
+});
