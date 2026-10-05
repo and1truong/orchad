@@ -6,7 +6,7 @@ import { documents, evidence } from "./seed.ts";
 export function openDatabase(path: string, seed = true) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
-  db.exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;");
+  db.exec("PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;");
   db.exec(
     readFileSync(new URL("../../migrations/001.sql", import.meta.url), "utf8"),
   );
