@@ -1,5 +1,5 @@
 import { z } from "zod";
-import Ajv from "ajv";
+import { Validator, type Schema } from "@cfworker/json-schema";
 export const MAX_BYTES = 64 * 1024;
 export const Codes = z.enum([
   "INVALID_ARGUMENT",
@@ -133,9 +133,15 @@ export function canonical(value: unknown): string {
     "}"
   );
 }
-const ajv = new Ajv({ strict: true, allErrors: true, validateFormats: false });
+// MV3 extension CSP forbids string code generation, so page-supplied schemas
+// are interpreted per call rather than compiled (Ajv compile emits `new Function`).
 export function validateArguments(tool: Tool, args: unknown): boolean {
-  return ajv.compile(tool.inputSchema)(args) as boolean;
+  try {
+    return new Validator(tool.inputSchema as Schema, "7", false).validate(args)
+      .valid;
+  } catch {
+    return false;
+  }
 }
 export const BindingSchema = z
   .object({ targetId: id, pageInstanceId: id })
