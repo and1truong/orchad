@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "runtime": "Playwright Chromium extension page (not native side-panel container)",
+  "checks": [
+    "sidebar approved/denied write",
+    "real MCP SDK -> companion -> actual extension -> MAIN-world fixture",
+    "navigation invalidation",
+    "unsupported bridge"
+  ],
+  "nativeSidePanelManual": true
+}

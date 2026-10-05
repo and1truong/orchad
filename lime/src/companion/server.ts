@@ -125,6 +125,7 @@ export async function startCompanion(options: CompanionOptions) {
     >();
   let pairing: { code: string; expiresAt: number } | null = null;
   let boundPort = options.port ?? 4312;
+  const requestTimeoutMs = options.requestTimeoutMs ?? 65_000;
   const originAllowed = (origin: string | undefined) =>
     !!origin && options.extensionOrigins.includes(origin);
   const hostAllowed = (host: string | undefined) =>
@@ -214,7 +215,7 @@ export async function startCompanion(options: CompanionOptions) {
             "Execution timed out; outcome may be unknown. No replay.",
           ),
         );
-      }, options.requestTimeoutMs ?? 65_000);
+      }, requestTimeoutMs);
       pending.set(requestId, {
         pair,
         resolve,
@@ -352,7 +353,14 @@ export async function startCompanion(options: CompanionOptions) {
     }
   });
   http.headersTimeout = 10_000;
-  http.requestTimeout = 15_000;
+  // /mcp requests legitimately outlive any socket-level deadline: a
+  // host_call_tool POST can wait on human approval up to requestTimeoutMs,
+  // and the transport's standalone GET SSE stream stays open for the whole
+  // session. Node's requestTimeout covers the entire request lifetime, so
+  // any finite value would truncate both mid-flight. Disabled here: per-call
+  // deadlines live in route() (requestTimeoutMs plus client abort), and
+  // headersTimeout still bounds header receive.
+  http.requestTimeout = 0;
   http.keepAliveTimeout = 5_000;
   const wss = new WebSocketServer({
     noServer: true,

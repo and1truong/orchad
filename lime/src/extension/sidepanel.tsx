@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./sidepanel.css";
 import { ChromePageAdapter } from "./page-adapter.js";
 import { HostPolicy, type Approval } from "../host/policy.js";
+import { ApprovalQueue } from "../host/approval-queue.js";
 import {
   BindingSchema,
   ContextSchema,
@@ -51,40 +52,35 @@ function App() {
     session = useRef(new AbortController()),
     run = useRef<AbortController | null>(null),
     policy = useRef<HostPolicy | null>(null),
-    resolveApproval = useRef<((yes: boolean) => void) | null>(null),
+    approvals = useRef<ApprovalQueue | null>(null),
     history = useRef<Message[]>([]),
     externalPolicies = useRef(new Map<string, HostPolicy>()),
     transport = useRef<CompanionTransport | null>(null);
   const log = (s: string) => setActivity((x) => [...x.slice(-49), s]);
+  // Approval prompts queue FIFO: a second concurrent request waits for its
+  // card instead of silently auto-denying the one being shown. Entries free
+  // their slot on answer, caller abort, or their own expiry.
+  approvals.current ??= new ApprovalQueue((current) => {
+    setApproval(current);
+    if (current) setStatus("waiting for approval");
+  });
   const ask = (a: Approval, signal: AbortSignal) =>
-    new Promise<boolean>((resolve) => {
-      if (resolveApproval.current) {
-        resolve(false);
-        return;
-      }
-      setApproval(a);
-      setStatus("waiting for approval");
-      let finished = false;
-      const finish = (yes: boolean) => {
-        if (finished) return;
-        finished = true;
-        resolveApproval.current = null;
-        setApproval(null);
-        setStatus(signal.aborted ? "cancelled" : "connected");
-        clearTimeout(timer);
-        signal.removeEventListener("abort", cancel);
-        resolve(yes);
-      };
-      const cancel = () => finish(false);
-      const timer = setTimeout(cancel, Math.max(0, a.expiresAt - Date.now()));
-      resolveApproval.current = finish;
-      signal.addEventListener("abort", cancel, { once: true });
+    approvals.current!.ask(a, signal).then((yes) => {
+      setStatus(
+        approvals.current!.pending
+          ? "waiting for approval"
+          : signal.aborted
+            ? "cancelled"
+            : "connected",
+      );
+      return yes;
     });
   const clearConsent = () => {
     history.current = [];
     session.current.abort();
     run.current?.abort();
-    resolveApproval.current?.(false);
+    // Consent revocation ends every queued approval, not just the visible card.
+    approvals.current?.resolveAll(false);
     policy.current?.revoke();
     for (const p of externalPolicies.current.values()) p.revoke();
     externalPolicies.current.clear();
@@ -370,7 +366,7 @@ function App() {
             // Chrome strips url/title and discovery would fail FORBIDDEN.
             .filter((t) => t.id && t.url && /^https?:/.test(t.url))
             .map((t) => (
-              <option key={t.id} value={t.id}>
+              <option key={t.id} value={t.id} data-url={t.url}>
                 {t.title || "Tab " + t.id}
               </option>
             ))}
@@ -480,12 +476,12 @@ function App() {
             <br />
             Arguments: {approval.canonicalArguments}
           </div>
-          <button onClick={() => resolveApproval.current?.(true)}>
+          <button onClick={() => approvals.current?.resolveCurrent(true)}>
             Approve
           </button>
           <button
             className="danger"
-            onClick={() => resolveApproval.current?.(false)}
+            onClick={() => approvals.current?.resolveCurrent(false)}
           >
             Deny
           </button>
@@ -506,8 +502,9 @@ function App() {
         <button
           className="danger"
           onClick={() => {
+            // Aborting the run settles its own pending approvals via their
+            // signals; other clients' queued cards stay untouched.
             run.current?.abort();
-            resolveApproval.current?.(false);
             setStatus("cancelled");
           }}
         >
