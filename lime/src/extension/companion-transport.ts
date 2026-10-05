@@ -148,14 +148,15 @@ export class CompanionTransport {
       }
     };
     ws.onclose = () => {
+      // A superseded socket's late close must not abort requests already
+      // routed over its replacement.
+      if (this.ws !== ws) return;
       for (const c of this.cancelled.values()) c.abort();
       this.cancelled.clear();
-      if (this.ws === ws) {
-        this.ws = null;
-        this.onState(
-          "disconnected — reconnect required; pending calls discarded",
-        );
-      }
+      this.ws = null;
+      this.onState(
+        "disconnected — reconnect required; pending calls discarded",
+      );
     };
     ws.onerror = () => this.onState("error");
   }
