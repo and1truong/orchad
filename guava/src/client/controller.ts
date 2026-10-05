@@ -73,11 +73,16 @@ export class ApplicationController {
   async loadDocuments() {
     this.documents = (await this.request("/api/documents")).documents;
     const current = this.document?.id;
-    await this.open(
+    const next =
       this.documents.find((d) => d.id === current)?.id ??
-        this.documents.find((d) => d.id === "rca-consumer-lag")?.id ??
-        this.documents[0].id,
-    );
+      this.documents.find((d) => d.id === "rca-consumer-lag")?.id ??
+      this.documents[0]?.id;
+    if (!next) {
+      this.document = null;
+      this.selectionIds = [];
+      return;
+    }
+    await this.open(next);
   }
   async open(id: string) {
     const document = await this.request(
@@ -94,8 +99,10 @@ export class ApplicationController {
     const d = await this.request("/api/documents/" + encodeURIComponent(id));
     if (this.document?.id === id) {
       this.document = d;
-      this.selectionIds = this.selectionIds.filter((id) =>
-        d.graph.nodes.some((n: any) => n.id === id),
+      this.selectionIds = this.selectionIds.filter(
+        (id) =>
+          d.graph.nodes.some((n: any) => n.id === id) ||
+          d.graph.edges.some((e: any) => e.id === id),
       );
       this.notify();
     }

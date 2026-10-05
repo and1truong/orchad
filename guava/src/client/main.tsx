@@ -62,6 +62,7 @@ function App() {
     [evidence, setEvidence] = useState<Evidence[]>([]),
     [audit, setAudit] = useState<any[]>([]),
     [tab, setTab] = useState("inspector"),
+    [dragging, setDragging] = useState(false),
     [edgeId, setEdgeId] = useState<string | null>(null);
   useEffect(() => controller.subscribe(update), []);
   useEffect(() => {
@@ -75,7 +76,7 @@ function App() {
   const doc = controller.document;
   const editable = controller.principal?.role === "investigator";
   useEffect(() => {
-    if (!doc) return;
+    if (!doc || dragging) return;
     setNodes(
       doc.graph.nodes.map((n) => ({
         id: n.id,
@@ -101,7 +102,7 @@ function App() {
         data: { domainType: e.type },
       })),
     );
-  }, [doc, controller.selectionIds.join(",")]);
+  }, [doc, dragging, controller.selectionIds.join(",")]);
   const act = async (work: () => Promise<Result | void>) => {
     setBusy(true);
     setError("");
@@ -117,8 +118,8 @@ function App() {
       setBusy(false);
     }
   };
-  const selected = doc?.graph.nodes.find(
-    (n) => n.id === controller.selectionIds[0],
+  const selected = doc?.graph.nodes.find((n) =>
+    controller.selectionIds.includes(n.id),
   );
   const selectedEdge = doc?.graph.edges.find((e) => e.id === edgeId);
   const readEvidence = async (query = "") => {
@@ -297,8 +298,11 @@ function App() {
             onNodesChange={(changes) =>
               setNodes((old) => applyNodeChanges(changes, old))
             }
-            onSelectionChange={({ nodes }) => {
-              const ids = nodes.map((n) => n.id);
+            onSelectionChange={({ nodes, edges }) => {
+              const ids = [
+                ...nodes.map((n) => n.id),
+                ...edges.map((e) => e.id),
+              ];
               if (ids.join(",") !== controller.selectionIds.join(","))
                 controller.select(ids);
             }}
@@ -310,16 +314,21 @@ function App() {
               setEdgeId(e.id);
               setTab("inspector");
             }}
+            onNodeDragStart={() => setDragging(true)}
             onNodeDragStop={(_, node, dragged) =>
-              act(() =>
-                controller.patch(
-                  (dragged.length ? dragged : [node]).map((n) => ({
-                    op: "update_node",
-                    id: n.id,
-                    changes: { position: n.position },
-                  })),
-                ),
-              )
+              act(async () => {
+                try {
+                  return await controller.patch(
+                    (dragged.length ? dragged : [node]).map((n) => ({
+                      op: "update_node",
+                      id: n.id,
+                      changes: { position: n.position },
+                    })),
+                  );
+                } finally {
+                  setDragging(false);
+                }
+              })
             }
             onConnect={(c) =>
               act(() =>
