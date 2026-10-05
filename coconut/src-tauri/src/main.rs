@@ -173,6 +173,20 @@ fn guest_reply(
         }
         return Ok(());
     }
+    // Rebind without navigation: a bound page reports a different documentId
+    // for the same app in a context-shaped reply. Install the new target
+    // before forwarding so the sidecar revokes the old document's authority
+    // (pending approvals, cached tools) before it sees the reply.
+    if result["ok"] == true
+        && result["data"]["appId"] == pinned["appId"]
+        && result["data"]["documentId"].is_string()
+        && result["data"]["documentId"] != pinned["documentId"]
+    {
+        let mut t = pinned.clone();
+        t["documentId"] = result["data"]["documentId"].clone();
+        *lock(&state.target) = Some(t.clone());
+        let _ = send(&state, json!({"kind":"binding","target":t}));
+    }
     send(&state, json!({"kind":"reply","id":id,"result":result}))
 }
 #[tauri::command]
