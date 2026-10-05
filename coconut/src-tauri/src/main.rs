@@ -313,7 +313,7 @@ mod tests {
             "http://127.0.0.1:4314"
         ));
         assert!(!allowed_at(
-            &url("http://127.0.0.1:4314.evil.example"),
+            &url("http://127.0.0.1.evil.example:4314"),
             "http://127.0.0.1:4314"
         ));
         assert!(!allowed_at(
@@ -324,8 +324,9 @@ mod tests {
             &url("https://127.0.0.1:4314"),
             "http://127.0.0.1:4314"
         ));
-        // Origin comparison ignores path/query but not credentials-in-URL.
-        assert!(!allowed_at(
+        // Origin comparison ignores path/query and credentials-in-URL
+        // (matching `new URL(u).origin` semantics in the webviews).
+        assert!(allowed_at(
             &url("http://user@127.0.0.1:4314"),
             "http://127.0.0.1:4314"
         ));
@@ -381,8 +382,9 @@ mod tests {
         let t = rebind_needed("getContext", &doc_ctx("d2", json!("e1")), &pinned).unwrap();
         assert_eq!(t["documentId"], json!("d2"));
         assert_eq!(t["sessionEpoch"], json!("e1"));
-        assert!(t.get("pageInstanceId").is_none()); // caller rotates it
-                                                    // Session-epoch change alone rebinds too.
+        // Caller rotates the page instance; the predicate keeps the old one.
+        assert_eq!(t["pageInstanceId"], pinned["pageInstanceId"]);
+        // Session-epoch change alone rebinds too.
         assert!(rebind_needed("getContext", &doc_ctx("d", json!("e2")), &pinned).is_some());
         assert!(rebind_needed("getContext", &doc_ctx("d", Value::Null), &pinned).is_some());
         // Same document + same epoch: no rebind.
