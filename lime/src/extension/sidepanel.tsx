@@ -13,7 +13,11 @@ import {
   type Tool,
   type Result,
 } from "../shared/contract.js";
-import { runAgentTurn, type Message } from "../agent-client/mock.js";
+import {
+  runAgentTurn,
+  type Message,
+  type Result as ClientResult,
+} from "@orchard/agent-client";
 import { listModels } from "../agent-client/gateway-adapter.js";
 import { CompanionTransport, type Paired } from "./companion-transport.js";
 function App() {
@@ -27,8 +31,8 @@ function App() {
     [consented, setConsented] = useState(false),
     [base, setBase] = useState("http://127.0.0.1:4311"),
     [token, setToken] = useState(""),
-    [models, setModels] = useState(["mock-counter"]),
-    [model, setModel] = useState("mock-counter"),
+    [models, setModels] = useState<string[]>([]),
+    [model, setModel] = useState(""),
     [prompt, setPrompt] = useState('/tool demo_increment {"amount":1}'),
     [text, setText] = useState(""),
     [activity, setActivity] = useState<string[]>([]),
@@ -311,7 +315,7 @@ function App() {
           );
           if (result.ok && result.revision !== null)
             revision = result.revision;
-          return result;
+          return result as unknown as ClientResult;
         },
         onEvent: (e) => {
           if (e.type === "text_delta")
@@ -341,7 +345,7 @@ function App() {
         <span className="status">{status}</span>
       </header>
       <p className="muted">
-        Browser agent host · Bridge 0.1 · development mock
+        Browser agent host · Bridge 0.1
       </p>
       <section>
         <h2>Target</h2>
@@ -401,7 +405,7 @@ function App() {
         <button className="secondary" onClick={() => void loadModels()}>
           Load models
         </button>
-        <label>Model · mock execution until Agent 2 artifact installed</label>
+        <label>Model · served by the configured gateway</label>
         <select
           value={model}
           onChange={(e) => {
@@ -415,8 +419,8 @@ function App() {
         </select>
         <p className="muted">
           Consent permits this pinned context and bounded tool results to reach
-          the selected provider/model. The current mock sends no inference
-          requests. Page descriptions and tool output are untrusted data.
+          the selected provider/model. Page descriptions and tool output are
+          untrusted data.
         </p>
         {tools
           .filter((t) => t.effect === "read")

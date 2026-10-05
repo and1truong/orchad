@@ -9,11 +9,15 @@
     "companion": "node --import tsx src/companion/cli.ts",
     "fixtures": "node --import tsx fixtures/server.ts",
     "test:browser": "node --import tsx tests/browser.ts",
-    "gateway:mock": "node --import tsx fixtures/gateway.ts"
+    "gateway:mock": "node --import tsx fixtures/gateway.ts",
+    "vendor:client": "npm --prefix ../mango run build -w @orchard/agent-client",
+    "prebuild": "npm run vendor:client",
+    "pretest": "npm run vendor:client"
   },
   "dependencies": {
     "@cfworker/json-schema": "4.1.1",
     "@modelcontextprotocol/sdk": "1.32.0",
+    "@orchard/agent-client": "file:../mango/packages/agent-client",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "ws": "8.18.3",
