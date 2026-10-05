@@ -56,10 +56,14 @@ fn send(s: &Native, v: Value) -> Result<(), String> {
     r
 }
 fn trusted(w: &Webview) -> Result<(), String> {
-    if w.label() != "host" {
+    trusted_parts(w.label(), &w.url().map_err(|e| e.to_string())?)
+}
+// Pure form of `trusted()` so the gating predicates are unit-testable without
+// a Tauri runtime: host label + expected host-webview origins.
+fn trusted_parts(label: &str, u: &url::Url) -> Result<(), String> {
+    if label != "host" {
         return Err("FORBIDDEN".into());
     }
-    let u = w.url().map_err(|e| e.to_string())?;
     if !(u.scheme() == "tauri"
         || u.as_str().starts_with("http://tauri.localhost/")
         || u.as_str().starts_with("https://tauri.localhost/")
@@ -74,7 +78,52 @@ fn trusted(w: &Webview) -> Result<(), String> {
 // capability and the sidebar launcher default.
 const TRUSTED_APP_ORIGIN: &str = env!("TRUSTED_APP_ORIGIN");
 fn allowed(u: &url::Url) -> bool {
-    u.origin().ascii_serialization() == TRUSTED_APP_ORIGIN
+    allowed_at(u, TRUSTED_APP_ORIGIN)
+}
+fn allowed_at(u: &url::Url, trusted_origin: &str) -> bool {
+    u.origin().ascii_serialization() == trusted_origin
+}
+
+// Action gate for `host_request`: privileged actions (heartbeat/decide/pair)
+// additionally require an active trusted UI.
+fn action_allowed(action: &str, host_active: bool) -> Result<(), String> {
+    if ["heartbeat", "decide", "pair"].contains(&action) && !host_active {
+        return Err("Trusted UI is inactive".into());
+    }
+    if !["heartbeat", "pair", "revoke", "decide", "cancel", "tool"].contains(&action) {
+        return Err("FORBIDDEN".into());
+    }
+    Ok(())
+}
+
+// Predicates for `guest_reply`: whether a provisional-binding context reply
+// carries a valid context payload.
+fn valid_context_data(data: &Value) -> bool {
+    data["appId"].is_string() && data["documentId"].is_string() && data["revision"].is_u64()
+}
+
+// Whether a bound-app getContext reply signals an SPA rebind (documentId or
+// sessionEpoch changed for the same app). Tool results never rebind.
+fn rebind_needed(op: &str, result: &Value, pinned: &Value) -> Option<Value> {
+    if op != "getContext" || result["ok"] != true || result["data"]["appId"] != pinned["appId"] {
+        return None;
+    }
+    let epoch = result["data"]
+        .get("sessionEpoch")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let doc_changed = result["data"]["documentId"].is_string()
+        && result["data"]["documentId"] != pinned["documentId"];
+    let epoch_changed = epoch != pinned.get("sessionEpoch").cloned().unwrap_or(Value::Null);
+    if !(doc_changed || epoch_changed) {
+        return None;
+    }
+    let mut t = pinned.clone();
+    if result["data"]["documentId"].is_string() {
+        t["documentId"] = result["data"]["documentId"].clone();
+    }
+    t["sessionEpoch"] = epoch;
+    Some(t)
 }
 fn invalidate(s: &Native) {
     if let Some(t) = lock(&s.target).take() {
@@ -99,14 +148,10 @@ async fn host_request(
     }
     let action = request["action"].as_str().ok_or("Missing action")?;
     let host = webview.window();
-    if ["heartbeat", "decide", "pair"].contains(&action)
-        && (!host.is_visible().unwrap_or(false) || host.is_minimized().unwrap_or(true))
-    {
-        return Err("Trusted UI is inactive".into());
-    }
-    if !["heartbeat", "pair", "revoke", "decide", "cancel", "tool"].contains(&action) {
-        return Err("FORBIDDEN".into());
-    }
+    action_allowed(
+        action,
+        host.is_visible().unwrap_or(false) && !host.is_minimized().unwrap_or(true),
+    )?;
     // Sidebar requests are action-only; 'kind' envelopes are native->sidecar
     // events (binding/reply/closed/dispatch) and must not be injectable.
     if let Some(o) = request.as_object_mut() {
@@ -161,10 +206,7 @@ fn guest_reply(
     if pinned["appId"] == "" {
         if result["ok"] == true {
             let data = &result["data"];
-            if !data["appId"].is_string()
-                || !data["documentId"].is_string()
-                || !data["revision"].is_u64()
-            {
+            if !valid_context_data(data) {
                 return Err("Invalid context".into());
             }
             *lock(&state.nonce) = Some(document_nonce);
@@ -188,22 +230,7 @@ fn guest_reply(
     // approvals) before it can see or act on this reply. Only context
     // replies may rebind — a tool result carrying these fields is data, not
     // a claim that the active document or session changed.
-    let epoch = result["data"]
-        .get("sessionEpoch")
-        .cloned()
-        .unwrap_or(Value::Null);
-    if op == "getContext"
-        && result["ok"] == true
-        && result["data"]["appId"] == pinned["appId"]
-        && ((result["data"]["documentId"].is_string()
-            && result["data"]["documentId"] != pinned["documentId"])
-            || epoch != pinned.get("sessionEpoch").cloned().unwrap_or(Value::Null))
-    {
-        let mut t = pinned.clone();
-        if result["data"]["documentId"].is_string() {
-            t["documentId"] = result["data"]["documentId"].clone();
-        }
-        t["sessionEpoch"] = epoch;
+    if let Some(mut t) = rebind_needed(&op, &result, &pinned) {
         t["pageInstanceId"] = json!(uuid::Uuid::new_v4().to_string());
         *lock(&state.target) = Some(t.clone());
         let _ = send(&state, json!({"kind":"binding","target":t}));
@@ -269,6 +296,103 @@ fn bridge_script(id: &str, op: &str, call: &Value, nonce: Option<String>) -> Str
         &serde_json::to_string(&request).unwrap(),
         1,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn url(s: &str) -> url::Url {
+        url::Url::parse(s).unwrap()
+    }
+
+    #[test]
+    fn allowed_matches_exact_origin_only() {
+        assert!(allowed_at(
+            &url("http://127.0.0.1:4314/app?x=1"),
+            "http://127.0.0.1:4314"
+        ));
+        assert!(!allowed_at(
+            &url("http://127.0.0.1:4314.evil.example"),
+            "http://127.0.0.1:4314"
+        ));
+        assert!(!allowed_at(
+            &url("http://127.0.0.1:4315"),
+            "http://127.0.0.1:4314"
+        ));
+        assert!(!allowed_at(
+            &url("https://127.0.0.1:4314"),
+            "http://127.0.0.1:4314"
+        ));
+        // Origin comparison ignores path/query but not credentials-in-URL.
+        assert!(!allowed_at(
+            &url("http://user@127.0.0.1:4314"),
+            "http://127.0.0.1:4314"
+        ));
+    }
+
+    #[test]
+    fn trusted_requires_host_label_and_host_origin() {
+        assert!(trusted_parts("host", &url("tauri://localhost/")).is_ok());
+        assert!(trusted_parts("host", &url("http://tauri.localhost/index.html")).is_ok());
+        assert_eq!(
+            trusted_parts("guest", &url("tauri://localhost/")).unwrap_err(),
+            "FORBIDDEN"
+        );
+        assert_eq!(
+            trusted_parts("host", &url("https://evil.example/")).unwrap_err(),
+            "Untrusted host origin"
+        );
+        #[cfg(debug_assertions)]
+        assert!(trusted_parts("host", &url("http://127.0.0.1:1420/")).is_ok());
+    }
+
+    #[test]
+    fn action_gate_enforces_ui_and_allowlist() {
+        assert!(action_allowed("tool", false).is_ok());
+        assert!(action_allowed("heartbeat", true).is_ok());
+        assert_eq!(
+            action_allowed("pair", false).unwrap_err(),
+            "Trusted UI is inactive"
+        );
+        assert_eq!(action_allowed("open_guest", true).unwrap_err(), "FORBIDDEN");
+        assert_eq!(action_allowed("dispatch", true).unwrap_err(), "FORBIDDEN");
+    }
+
+    #[test]
+    fn context_data_shape_is_checked() {
+        assert!(valid_context_data(
+            &json!({"appId":"a","documentId":"d","revision":0})
+        ));
+        assert!(!valid_context_data(
+            &json!({"appId":"a","documentId":"d","revision":-1})
+        ));
+        assert!(!valid_context_data(&json!({"appId":"a","revision":0})));
+        assert!(!valid_context_data(
+            &json!({"appId":1,"documentId":"d","revision":0})
+        ));
+    }
+
+    #[test]
+    fn rebind_only_on_getcontext_identity_change() {
+        let pinned = json!({"targetId":"t","pageInstanceId":"p","origin":"http://x","appId":"a","documentId":"d","sessionEpoch":"e1","title":"t"});
+        let doc_ctx = |doc: &str, epoch: Value| json!({"ok":true,"data":{"appId":"a","documentId":doc,"sessionEpoch":epoch,"revision":2}});
+        // Document change rebinds with rotated identity.
+        let t = rebind_needed("getContext", &doc_ctx("d2", json!("e1")), &pinned).unwrap();
+        assert_eq!(t["documentId"], json!("d2"));
+        assert_eq!(t["sessionEpoch"], json!("e1"));
+        assert!(t.get("pageInstanceId").is_none()); // caller rotates it
+                                                    // Session-epoch change alone rebinds too.
+        assert!(rebind_needed("getContext", &doc_ctx("d", json!("e2")), &pinned).is_some());
+        assert!(rebind_needed("getContext", &doc_ctx("d", Value::Null), &pinned).is_some());
+        // Same document + same epoch: no rebind.
+        assert!(rebind_needed("getContext", &doc_ctx("d", json!("e1")), &pinned).is_none());
+        // Tool results and other apps never rebind.
+        assert!(rebind_needed("invoke", &doc_ctx("d2", json!("e2")), &pinned).is_none());
+        let foreign = json!({"ok":true,"data":{"appId":"b","documentId":"d2","sessionEpoch":"e2"}});
+        assert!(rebind_needed("getContext", &foreign, &pinned).is_none());
+        assert!(rebind_needed("getContext", &json!({"ok":false,"data":{}}), &pinned).is_none());
+    }
 }
 
 fn main() {
