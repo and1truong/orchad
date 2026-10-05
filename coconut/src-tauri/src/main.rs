@@ -69,8 +69,12 @@ fn trusted(w: &Webview) -> Result<(), String> {
     }
     Ok(())
 }
+// Trusted app origin: single value from coconut/trusted-origin.txt, embedded
+// at build time and shared by native authorization, the generated guest
+// capability and the sidebar launcher default.
+const TRUSTED_APP_ORIGIN: &str = env!("TRUSTED_APP_ORIGIN");
 fn allowed(u: &url::Url) -> bool {
-    u.origin().ascii_serialization() == "http://127.0.0.1:4314"
+    u.origin().ascii_serialization() == TRUSTED_APP_ORIGIN
 }
 fn invalidate(app: &tauri::AppHandle) {
     let s = app.state::<Arc<Native>>();
