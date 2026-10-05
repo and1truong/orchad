@@ -47,8 +47,11 @@ jobs:
         run: |
           npm ci
           npm run build
-      - working-directory: coconut
-        run: npx tauri build --debug
+      - working-directory: coconut/src-tauri
+        run: cargo build --verbose
+      - name: Rust predicate unit tests
+        working-directory: coconut/src-tauri
+        run: cargo test
       - name: Native runtime smoke evidence
         working-directory: coconut
         run: |
