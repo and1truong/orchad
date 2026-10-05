@@ -1,0 +1,33 @@
+{
+  "name": "@orchard/lime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "companion": "node --import tsx src/companion/cli.ts",
+    "fixtures": "node --import tsx fixtures/server.ts",
+    "test:browser": "node --import tsx tests/browser.ts",
+    "gateway:mock": "node --import tsx fixtures/gateway.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.0",
+    "ajv": "8.17.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "ws": "8.18.3",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/chrome": "0.1.32",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.27.2",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "playwright": "1.58.2"
+  }
+}

@@ -1,0 +1,45 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @orchard/lime@0.1.0 test
+> node --import tsx --test tests/*.test.ts
+
+✔ Chrome adapter double: fixed MAIN dispatcher, top frame, runtime document and policy (44.389306ms)
+✔ MAIN validation denies arbitrary methods and malformed invoke (0.749287ms)
+✔ MAIN output shape and payload limits validated before returning (0.449063ms)
+✔ Chrome adapter double: unsupported page explicit, no fallback (0.505426ms)
+▶ real MCP SDK over Streamable HTTP and authenticated WebSocket to shared fixture policy
+  ✔ SDK initialization tools/list context describe and scoped targets (31.891123ms)
+  ✔ approved write duplicate and conflict via actual SDK (49.627876ms)
+  ✔ denied MCP write does not dispatch (4.124423ms)
+  ✔ no external approved flag or target escape (5.8824ms)
+  ✔ every MCP HTTP request authenticates and rejects forged Origin Host and URL token (7.882835ms)
+  ✔ forged WebSocket origin and oversized HTTP request (5.514176ms)
+  ✔ disconnect gives unknown outcome and reconnect does not replay (90.4758ms)
+  ✔ SDK cancellation propagates across bridge (42.393443ms)
+  ✔ revoked pairing invalidates existing MCP credential (5.5371ms)
+✔ real MCP SDK over Streamable HTTP and authenticated WebSocket to shared fixture policy (307.616539ms)
+✔ real mock HTTP gateway: authenticated model listing and interrupted SSE arguments (41.198418ms)
+✔ discover interoperability fixture and context (3.713285ms)
+✔ approved write and completed idempotency lookup before stale revision (32.228597ms)
+✔ denied and absent approver never dispatch (3.888955ms)
+✔ stale revision and idempotency conflict (4.929973ms)
+✔ duplicate correlation with altered payload rejected (2.440735ms)
+✔ navigation between read and approval/write fails closed (2.254941ms)
+✔ tab close and consent revoke (2.838934ms)
+✔ malformed schema and smuggled approved field (3.74291ms)
+✔ oversized output rejected at boundary (1.056941ms)
+✔ partial gateway arguments never execute (0.542932ms)
+✔ cancel approval, no replay after reconnect/new session (11.617883ms)
+✔ page without bridge returns explicit unsupported marker (0.517815ms)
+✔ sidebar mock path uses same policy; events terminal exactly once (2.092902ms)
+✔ unconsented or effect-changed reads do not auto-grant (1.045314ms)
+✔ canonical object keys stable (0.134579ms)
+✔ cancel after dispatch returns unknown outcome without retry (1.947557ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1006.139291

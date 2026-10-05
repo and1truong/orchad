@@ -1,0 +1,231 @@
+import {
+  bounded,
+  DescriptionSchema,
+  ContextSchema,
+  ResultSchema,
+  CallSchema,
+  failure,
+  type Call,
+  type Target,
+} from "../shared/contract.js";
+import type { PageAdapter } from "../host/policy.js";
+// Fixed MAIN-world dispatcher. Chrome serializes this function; no closures, eval, arbitrary JS or command endpoints.
+export async function dispatcher(
+  method: "describe" | "getContext" | "invoke",
+  payload: unknown = null,
+): Promise<unknown> {
+  if (window !== window.top) throw new Error("Only top frame supported");
+  if (!["describe", "getContext", "invoke"].includes(method))
+    throw new Error("Invalid method");
+  const bridge = (
+    window as unknown as {
+      agentBridgeV1?: {
+        describe: () => Promise<unknown>;
+        getContext: () => Promise<unknown>;
+        invoke: (v: unknown) => Promise<unknown>;
+      };
+    }
+  ).agentBridgeV1;
+  if (
+    !bridge ||
+    !["describe", "getContext", "invoke"].every(
+      (k) =>
+        typeof (bridge as unknown as Record<string, unknown>)[k] === "function",
+    )
+  )
+    return { unsupported: true };
+  if (method === "invoke") {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload))
+      throw new Error("Invalid invoke");
+    const p = payload as Record<string, unknown>,
+      keys = [
+        "requestId",
+        "documentId",
+        "toolName",
+        "arguments",
+        "expectedRevision",
+        "idempotencyKey",
+      ];
+    if (
+      Object.keys(p).length !== keys.length ||
+      !keys.every((k) => Object.hasOwn(p, k)) ||
+      typeof p.requestId !== "string" ||
+      typeof p.documentId !== "string" ||
+      typeof p.toolName !== "string" ||
+      !p.arguments ||
+      typeof p.arguments !== "object" ||
+      Array.isArray(p.arguments) ||
+      !(
+        p.expectedRevision === null ||
+        (Number.isInteger(p.expectedRevision) &&
+          (p.expectedRevision as number) >= 0)
+      ) ||
+      !(p.idempotencyKey === null || typeof p.idempotencyKey === "string")
+    )
+      throw new Error("Invalid invoke shape");
+  }
+  if (new TextEncoder().encode(JSON.stringify(payload)).length > 65536)
+    throw new Error("Oversized request");
+  const result =
+    method === "describe"
+      ? await bridge.describe()
+      : method === "getContext"
+        ? await bridge.getContext()
+        : await bridge.invoke(payload);
+  const object = (v: unknown): v is Record<string, unknown> =>
+    !!v && typeof v === "object" && !Array.isArray(v);
+  const nonnegative = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
+  if (!object(result)) throw new Error("Invalid response object");
+  if (method === "describe") {
+    if (
+      result.protocolVersion !== "0.1" ||
+      typeof result.appId !== "string" ||
+      !Array.isArray(result.tools) ||
+      result.tools.length > 64
+    )
+      throw new Error("Invalid description");
+    for (const t of result.tools)
+      if (
+        !object(t) ||
+        typeof t.name !== "string" ||
+        !/^[A-Za-z0-9_-]{1,64}$/.test(t.name) ||
+        typeof t.description !== "string" ||
+        !object(t.inputSchema) ||
+        t.inputSchema.type !== "object" ||
+        !["read", "write", "destructive"].includes(t.effect as string)
+      )
+        throw new Error("Invalid descriptor");
+  }
+  if (
+    method === "getContext" &&
+    (typeof result.appId !== "string" ||
+      typeof result.documentId !== "string" ||
+      !nonnegative(result.revision) ||
+      !Array.isArray(result.selectionIds) ||
+      !result.selectionIds.every((v) => typeof v === "string") ||
+      typeof result.summary !== "string")
+  )
+    throw new Error("Invalid context");
+  if (
+    method === "invoke" &&
+    (typeof result.ok !== "boolean" ||
+      !(result.revision === null || nonnegative(result.revision)) ||
+      !Object.hasOwn(result, "data") ||
+      !Object.hasOwn(result, "error") ||
+      (result.ok ? result.error !== null : !object(result.error)))
+  )
+    throw new Error("Invalid result");
+  const serialized = JSON.stringify(result);
+  if (!serialized || new TextEncoder().encode(serialized).length > 65536)
+    throw new Error("Oversized or non-JSON page output");
+  return JSON.parse(serialized);
+}
+export class ChromePageAdapter implements PageAdapter {
+  private invalid = false;
+  private constructor(
+    readonly target: Target,
+    readonly tabId: number,
+    readonly documentId: string,
+  ) {}
+  static async discover(tabId: number) {
+    const tab = await chrome.tabs.get(tabId);
+    if (!tab.url) throw failure("FORBIDDEN", "No user-granted tab access");
+    const origin = new URL(tab.url).origin;
+    if (!/^https?:/.test(tab.url))
+      throw failure("UNSUPPORTED", "Only HTTP(S) pages");
+    const frames = await chrome.scripting.executeScript({
+      target: { tabId, frameIds: [0] },
+      world: "MAIN",
+      func: dispatcher,
+      args: ["describe"],
+    });
+    const f = frames[0];
+    if (!f || f.frameId !== 0 || !f.documentId)
+      throw failure("UNSUPPORTED", "No top-level document");
+    if ((f.result as { unsupported?: boolean })?.unsupported)
+      throw failure(
+        "UNSUPPORTED",
+        "This app has no Agent App Bridge; DOM automation is unavailable",
+      );
+    const d = bounded(DescriptionSchema, f.result);
+    const contexts = await chrome.scripting.executeScript({
+      target: { tabId, documentIds: [f.documentId] },
+      world: "MAIN",
+      func: dispatcher,
+      args: ["getContext"],
+    });
+    const c = bounded(ContextSchema, contexts[0]?.result);
+    if (c.appId !== d.appId)
+      throw failure("STALE_CONTEXT", "App changed during discovery");
+    return new ChromePageAdapter(
+      {
+        targetId: crypto.randomUUID(),
+        pageInstanceId: crypto.randomUUID(),
+        origin,
+        appId: d.appId,
+        documentId: c.documentId,
+        title: tab.title || "Untitled",
+      },
+      tabId,
+      f.documentId,
+    );
+  }
+  invalidate() {
+    this.invalid = true;
+  }
+  async current() {
+    if (this.invalid)
+      throw failure("STALE_CONTEXT", "Page navigation invalidated target");
+    let tab: chrome.tabs.Tab;
+    try {
+      tab = await chrome.tabs.get(this.tabId);
+    } catch {
+      throw failure("TARGET_CLOSED", "Target tab closed");
+    }
+    if (
+      !tab.url ||
+      new URL(tab.url).origin !== this.target.origin ||
+      tab.status === "loading"
+    )
+      throw failure("STALE_CONTEXT", "Target origin/navigation changed");
+    return { ...this.target };
+  }
+  private async dispatch(
+    method: "describe" | "getContext" | "invoke",
+    call: Call | null = null,
+  ) {
+    await this.current();
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: this.tabId, documentIds: [this.documentId] },
+        world: "MAIN",
+        func: dispatcher,
+        args: [method, call],
+      });
+      const r = results[0];
+      if (!r || r.frameId !== 0 || r.documentId !== this.documentId)
+        throw failure("STALE_CONTEXT", "Runtime document binding changed");
+      if ((r.result as { unsupported?: boolean })?.unsupported)
+        throw failure("UNSUPPORTED", "Bridge removed");
+      return r.result;
+    } catch (e) {
+      if (e && typeof e === "object" && "ok" in e) throw e;
+      throw failure(
+        "STALE_CONTEXT",
+        "Document unavailable or page output invalid",
+      );
+    }
+  }
+  async describe() {
+    return bounded(DescriptionSchema, await this.dispatch("describe"));
+  }
+  async getContext() {
+    return bounded(ContextSchema, await this.dispatch("getContext"));
+  }
+  async invoke(c: Call) {
+    return bounded(
+      ResultSchema,
+      await this.dispatch("invoke", bounded(CallSchema, c)),
+    );
+  }
+}
