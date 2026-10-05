@@ -62,12 +62,15 @@ jobs:
           npm run check
           npm run build
           npm test
-      - name: Strict integration (fails if required hosts absent)
+      - name: Strict integration — real guava service behind real coconut MCP host
         working-directory: guava
-        env:
-          ORCHARD_INTEGRATION_STRICT: "true"
-          ORCHARD_INTEGRATION_REQUIRE: ""
-        run: node --import tsx scripts/integration.ts --strict
+        run: |
+          node --import tsx scripts/host-fixture.ts > /tmp/host-env.sh &
+          for i in $(seq 1 30); do grep -q ORCHARD_DESKTOP_MCP_TOKEN /tmp/host-env.sh && break; sleep 1; done
+          source /tmp/host-env.sh
+          ORCHARD_RUN_WRITES=true \
+          ORCHARD_INTEGRATION_REQUIRE=DESKTOP \
+          node --import tsx scripts/integration.ts --strict
   mango:
     runs-on: ubuntu-latest
     steps:

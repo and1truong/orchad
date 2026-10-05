@@ -45,22 +45,17 @@ const page = {
   invoke: async (call: unknown) => service.invoke(principal, call),
 };
 
-// @ts-expect-error plain .mjs
 const policy = new Policy(async (_t: unknown, op: string, call: unknown) =>
   op === "invoke" ? page.invoke(call) : ok(await (page as any)[op]()),
 );
-// @ts-expect-error plain .mjs
 policy.bind(target);
 policy.heartbeat();
 const autoApprove = process.env.COCONUT_FIXTURE_AUTO_APPROVE !== "false";
 setInterval(() => {
   policy.heartbeat();
-  // @ts-expect-error plain .mjs
   for (const a of [...policy.pending.values()]) policy.decide(a.id, autoApprove);
 }, 25).unref();
-// @ts-expect-error plain .mjs
 const pair = policy.pair("guava-integration", ["read", "write"], [target.targetId]);
-// @ts-expect-error plain .mjs
 const server = await startMcp(policy, Number(process.env.PORT ?? 0));
 console.log(`export ORCHARD_DESKTOP_MCP_URL=http://127.0.0.1:${server.port}/mcp`);
 console.log(`export ORCHARD_DESKTOP_MCP_TOKEN=${pair.token}`);

@@ -25,6 +25,7 @@ test("canonical bridge scenario: lime HostPolicy + CounterFixture", async () => 
       clientId: "scenario",
       sessionId: "s1",
       target: { ...fixture.target },
+      sessionEpoch: null,
       reads: new Set(["demo_read"]),
     },
     async (a) => {
