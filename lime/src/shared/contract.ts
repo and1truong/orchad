@@ -307,7 +307,6 @@ export function hostSafeSchema(
   }
   return true;
 }
->>>>>>> 65230d6 (lime+guava: pin opaque sessionEpoch into consent and context)
 export function validateArguments(tool: Tool, args: unknown): boolean {
   if (!hostSafeSchema(tool.inputSchema)) return false;
   try {
