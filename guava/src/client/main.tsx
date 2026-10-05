@@ -1,4 +1,4 @@
-import React, { useEffect, useReducer, useState } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ReactFlow,
@@ -53,6 +53,7 @@ function CanvasNode({ data, selected }: NodeProps) {
 const types = { card: CanvasNode };
 function App() {
   const [, update] = useReducer((x) => x + 1, 0);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [ready, setReady] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -184,7 +185,8 @@ function App() {
         <div className="brand">◈ guava</div>
         <div className="workspace">INVESTIGATION WORKSPACE</div>
         <h3>
-          Documents <span>02</span>
+          Documents{" "}
+          <span>{String(controller.documents.length).padStart(2, "0")}</span>
         </h3>
         {controller.documents.map((d) => (
           <button
@@ -413,7 +415,11 @@ function App() {
             <input
               aria-label="Search evidence"
               placeholder="Search fixture records…"
-              onChange={(e) => readEvidence(e.target.value)}
+              onChange={(e) => {
+                const query = e.target.value;
+                clearTimeout(searchTimer.current);
+                searchTimer.current = setTimeout(() => readEvidence(query), 300);
+              }}
             />
             {evidence.map((e) => (
               <article key={e.id}>
