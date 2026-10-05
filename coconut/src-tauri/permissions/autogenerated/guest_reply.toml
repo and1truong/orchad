@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-guest-reply"
+description = "Enables the guest_reply command without any pre-configured scope."
+commands.allow = ["guest_reply"]
+
+[[permission]]
+identifier = "deny-guest-reply"
+description = "Denies the guest_reply command without any pre-configured scope."
+commands.deny = ["guest_reply"]
