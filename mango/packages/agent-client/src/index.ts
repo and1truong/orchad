@@ -28,9 +28,9 @@ export type AgentInput = {
   onEvent?: (event: AgentEvent) => void;
 };
 const checkCall = validator.compile(callSchema);
-// Serialized host results must stay inside the gateway message cap so the next
-// turn is never rejected for history the client itself produced.
-const RESULT_MAX_LENGTH = 65536;
+// Serialized host results and accumulated deltas must stay inside the gateway
+// message cap so history the client produces is never rejected next turn.
+const MESSAGE_MAX_LENGTH = 65536;
 const checkResult = validator.compile({
   type: "object",
   additionalProperties: false,
@@ -146,7 +146,6 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
             })),
             tool_choice: "auto",
             stream: true,
-            max_completion_tokens: 2048,
           }),
           signal: controller.signal,
         },
@@ -192,6 +191,8 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
           if (typeof d.content !== "string")
             throw new AgentError("TRANSPORT", "Invalid content delta");
           content += d.content;
+          if (content.length > MESSAGE_MAX_LENGTH)
+            throw new AgentError("OUTPUT_LIMIT", "Response exceeds message cap");
           emit({ type: "text_delta", payload: { text: d.content } });
         }
         for (const c of d.tool_calls ?? []) {
@@ -270,8 +271,42 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
         finishReason = "completed";
         break;
       }
+      // Cancellation leaves no unresolved calls: every undispatched call gets a
+      // CANCELLED result so the returned history stays valid for the next turn.
+      const cancelledResult = (): Result => ({
+        ok: false,
+        revision: null,
+        data: null,
+        error: {
+          code: "CANCELLED",
+          message: "Run cancelled",
+          retryable: false,
+        },
+      });
+      const fillUndispatched = (from: number) => {
+        for (let j = from; j < completeCalls.length; j++) {
+          const cj = completeCalls[j];
+          const cancelled = cancelledResult();
+          messages.push({
+            role: "tool",
+            tool_call_id: cj.id,
+            content: JSON.stringify(cancelled),
+          });
+          emit({
+            type: "tool_completed",
+            payload: {
+              toolCallId: cj.id,
+              toolName: cj.function.name,
+              result: cancelled,
+            },
+          });
+        }
+      };
       for (let i = 0; i < completeCalls.length; i++) {
-        controller.signal.throwIfAborted();
+        if (controller.signal.aborted) {
+          fillUndispatched(i);
+          controller.signal.throwIfAborted();
+        }
         const c = completeCalls[i];
         emit({
           type: "tool_requested",
@@ -281,7 +316,10 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
             arguments: args[i],
           },
         });
-        controller.signal.throwIfAborted();
+        if (controller.signal.aborted) {
+          fillUndispatched(i);
+          controller.signal.throwIfAborted();
+        }
         let result: Result;
         try {
           result = await abortable(
@@ -310,7 +348,7 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
         }
         calls++;
         let serialized = JSON.stringify(result);
-        if (serialized.length > RESULT_MAX_LENGTH) {
+        if (serialized.length > MESSAGE_MAX_LENGTH) {
           result = {
             ok: false,
             revision: null,
@@ -332,7 +370,10 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
           type: "tool_completed",
           payload: { toolCallId: c.id, toolName: c.function.name, result },
         });
-        controller.signal.throwIfAborted();
+        if (controller.signal.aborted) {
+          fillUndispatched(i + 1);
+          controller.signal.throwIfAborted();
+        }
       }
       finishReason = "step_limit";
     }

@@ -13,17 +13,16 @@ try {
   if (action === "issue" && id && modelList) {
     if (store.getPrincipal(id))
       throw new Error(
-        `Principal ${id} already exists; use 'token update' to replace its policy (applies to all its tokens)`,
+        `Principal ${id} already exists; use 'token update' to replace its model list (applies to all its tokens)`,
       );
     process.stdout.write(store.provision(principalFor(modelList)) + "\n");
   } else if (action === "update" && id && modelList) {
     if (!store.getPrincipal(id))
       throw new Error(`Principal ${id} does not exist; use 'token issue'`);
-    const token = store.provision(principalFor(modelList));
+    store.setModels(id, modelList.split(","));
     process.stderr.write(
-      `Replaced policy for ${id}; every existing token now uses the new policy\n`,
+      `Replaced model list for ${id} (limits unchanged); every existing token now uses it\n`,
     );
-    process.stdout.write(token + "\n");
   } else if (action === "revoke") {
     store.revoke(readFileSync(0, "utf8").trim());
   } else

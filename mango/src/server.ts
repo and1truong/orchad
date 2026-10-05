@@ -319,6 +319,8 @@ export function createGateway(o: GatewayOptions) {
               if (event.content) {
                 outputBytes += Buffer.byteLength(event.content);
                 message.content = (message.content ?? "") + event.content;
+                if (message.content.length > 65536)
+                  throw new UpstreamError(413);
               }
               for (const delta of event.tool_calls ?? []) {
                 toolObserved = true;

@@ -19,20 +19,27 @@ export function environmentConfig() {
     ? Buffer.from(process.env.GATEWAY_STATE_KEY, "hex")
     : randomBytes(32);
   const origins = (process.env.CORS_ORIGINS ?? "").split(",").filter(Boolean);
-  if (production && (!process.env.GATEWAY_STATE_KEY || !origins.length))
+  if (
+    production &&
+    (!process.env.GATEWAY_STATE_KEY ||
+      !origins.length ||
+      !process.env.MODELS_FILE)
+  )
     throw new Error(
-      "Production requires persistent state key and CORS allowlist",
+      "Production requires persistent state key, CORS allowlist and explicit model registry",
     );
   const models: ModelConfig[] = process.env.MODELS_FILE
     ? JSON.parse(readFileSync(process.env.MODELS_FILE, "utf8"))
     : [mockModel];
-  const adapters: ProviderAdapter[] = [
-    new MockProvider(
-      process.env.MOCK_SCRIPT_FILE
-        ? JSON.parse(readFileSync(process.env.MOCK_SCRIPT_FILE, "utf8"))
-        : undefined,
-    ),
-  ];
+  const adapters: ProviderAdapter[] = [];
+  if (!production || process.env.ALLOW_MOCK_PROVIDER === "true")
+    adapters.push(
+      new MockProvider(
+        process.env.MOCK_SCRIPT_FILE
+          ? JSON.parse(readFileSync(process.env.MOCK_SCRIPT_FILE, "utf8"))
+          : undefined,
+      ),
+    );
   if (process.env.OPENAI_API_KEY)
     adapters.push(
       new OpenAIProvider({

@@ -69,6 +69,12 @@ export class SqliteStore implements Storage {
     }
     return token;
   }
+  setModels(id: string, models: string[]) {
+    if (!models.length) throw new Error("Invalid principal");
+    this.db
+      .prepare("UPDATE principals SET models=? WHERE id=?")
+      .run(JSON.stringify(models), id);
+  }
   getPrincipal(id: string) {
     const row = this.db
       .prepare("SELECT * FROM principals WHERE id=?")
