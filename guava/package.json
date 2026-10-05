@@ -17,7 +17,8 @@
     "test:production": "npm run build && playwright test --config playwright.production.config.ts",
     "vendor:contract": "npm --prefix ../packages/bridge-contract run build",
     "pretest": "npm run vendor:contract",
-    "prebuild": "npm run vendor:contract"
+    "prebuild": "npm run vendor:contract",
+    "pretypecheck": "npm run vendor:contract"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
