@@ -32,6 +32,7 @@ test("real CompanionTransport: pairing, routed calls, cancel, reconnect, revoke"
       clientId: "transport-test",
       sessionId: "s",
       target: { ...fixture.target },
+      sessionEpoch: null,
       reads: new Set(["demo_read"]),
     },
     async () => true,

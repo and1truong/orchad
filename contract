@@ -18,9 +18,11 @@ Web app đăng ký một object JavaScript tên window.agentBridgeV1. Có ba asy
 
 describe không nhận tham số. Kết quả gồm protocolVersion là chuỗi “0.1”, appId là chuỗi ổn định, và tools là một array ToolDescriptor.
 
-ToolDescriptor gồm name, description, inputSchema, effect. name là chuỗi tối đa 64 ký tự, chỉ dùng chữ cái, số, dấu gạch dưới hoặc gạch nối. inputSchema là JSON Schema cho một object. effect là một trong read, write, destructive. Trường outputSchema là tùy chọn. Tool descriptions và effect do page khai báo là thông tin đầu vào không đáng tin cậy; host không dùng riêng chúng để tự cấp quyền.
+ToolDescriptor gồm name, description, inputSchema, effect. name là chuỗi tối đa 64 ký tự, chỉ dùng chữ cái, số, dấu gạch dưới hoặc gạch nối. inputSchema là JSON Schema cho một object. inputSchema phải nằm trong một JSON Schema dialect giới hạn mà host công bố trong tài liệu contract của mình; descriptor ngoài dialect đó bị từ chối an toàn, không âm thầm được biên dịch hay cấp quyền. effect là một trong read, write, destructive. Trường outputSchema là tùy chọn. Tool descriptions và effect do page khai báo là thông tin đầu vào không đáng tin cậy; host không dùng riêng chúng để tự cấp quyền.
 
 getContext không nhận tham số. Kết quả gồm appId, documentId, revision, selectionIds và summary. documentId là chuỗi ổn định của tài liệu hiện tại. revision là số nguyên không âm của domain document. selectionIds là array các ID được chọn. summary là chuỗi ngắn không chứa secret. Selection không tự làm tăng domain revision. Host phải gắn tool call với các ID tường minh, không diễn giải lại “node đang chọn” sau khi người dùng đã đổi selection.
+
+Kết quả getContext có thể gồm trường tùy chọn sessionEpoch là chuỗi opaque do backend app phát hành cho phiên đăng nhập hiện tại. sessionEpoch không chứa credential, token hay session identifier thô, và không thay thế authorization phía server. App không ràng buộc phiên thì không gửi trường này.
 
 invoke nhận một object gồm requestId, documentId, toolName, arguments, expectedRevision và idempotencyKey. requestId là chuỗi dùng correlation. arguments là object đúng inputSchema. expectedRevision là số nguyên bắt buộc cho mutation, hoặc null cho read. idempotencyKey là chuỗi bắt buộc cho mutation, hoặc null cho read. Không có trường approved, userId hoặc role do agent truyền vào để cấp quyền.
 
@@ -33,6 +35,8 @@ Mutation phải kiểm tra quyền, validate, kiểm tra revision và lưu idemp
 Host tạo TargetDescriptor gồm targetId, pageInstanceId, origin, appId, documentId và title. targetId là opaque ID do host cấp. pageInstanceId thay mới khi reload, navigation hoặc thay document làm target cũ hết hiệu lực. Host lấy origin từ browser/native runtime, không tin origin page tự khai báo.
 
 Mỗi run được pin vào targetId và pageInstanceId. Mỗi lần dispatch kiểm tra lại binding, origin, documentId và session. Đổi active tab không tự đổi target của một run. Tab đóng, chuyển trang, logout hoặc thu hồi consent làm run fail closed; không replay mutation sau reconnect.
+
+Khi app phát hành sessionEpoch, host pin giá trị đó vào target binding, consent, MCP pairing, run và approval. sessionEpoch đổi — đăng nhập, đăng xuất, đổi tài khoản hay xoay session — hay trường này biến mất làm toàn bộ authority dựa trên binding cũ fail closed trước khi trả context hay dispatch tool; user phải consent lại trên session mới. Không replay mutation sau khi session đổi.
 
 Quyền thực tế là giao của quyền user trong backend app, host policy, consent của session và quyền của MCP client đã pair. Host không thay thế server authorization. Cookie app, bearer token của gateway và credential local bridge không được chuyển cho model hoặc injected page script.
 

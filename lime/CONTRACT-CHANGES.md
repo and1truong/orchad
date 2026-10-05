@@ -23,3 +23,10 @@ latest revision and a fresh key — unchanged from the previous contract notes.
 `tests/integration.test.ts` covers the full offline path: real Mango
 (mock-scripted provider) → agent-client → HostPolicy → fixture, including
 denied-approval and cancellation.
+
+
+## Update: `sessionEpoch` adopted into the shared contract
+
+Root `contract` was updated at commit `c4de57a` (SHA-256 `1ae668a66fcaac00183e54cbbd1bb67877ff55045e94ebb6eb982c0d1a4d1333`, git blob `480d6a53b27a7f4c9d15c49f694804a296ebb5ea`); `lime/CONTRACT.md` is byte-for-byte identical to it again. This resolves the earlier note about logout detection requiring application cooperation: apps that emit `sessionEpoch` give hosts an explicit session marker to invalidate on, while the contract stays optional for apps without sessions.
+
+Lime's implementation: consent pins `sessionEpoch` from `getContext` at grant time (null when the app binds none); every `binding()` re-check fails closed — revoking the consent and any pairing derived from it — when the epoch changes, appears, or disappears. MCP-paired clients get the same policy object and the same check. `validateArguments` now gates page-declared schemas on the same bounded dialect coconut publishes (see `coconut/CONTRACT-CHANGES.md` §1) before Ajv compiles them, so a hostile `pattern`/`$id` cannot wedge the trusted extension.

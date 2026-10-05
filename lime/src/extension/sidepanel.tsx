@@ -5,7 +5,9 @@ import { ChromePageAdapter } from "./page-adapter.js";
 import { HostPolicy, type Approval } from "../host/policy.js";
 import {
   BindingSchema,
+  ContextSchema,
   HostCallSchema,
+  bounded,
   failure,
   success,
   gatewayUrl,
@@ -246,6 +248,13 @@ function App() {
       // pairing bound to it) instead of leaving a live orphaned session.
       clearConsent();
       await adapter.current.current();
+      // Pin the app's opaque session epoch into the consent: a login, logout,
+      // account switch or session rotation later invalidates this consent and
+      // any pairing derived from it. Apps without sessions pin null.
+      const pinned = bounded(
+        ContextSchema,
+        await adapter.current.getContext(),
+      );
       session.current = new AbortController();
       policy.current = new HostPolicy(
         adapter.current,
@@ -253,6 +262,7 @@ function App() {
           clientId: "sidebar",
           sessionId: crypto.randomUUID(),
           target: { ...adapter.current.target },
+          sessionEpoch: pinned.sessionEpoch ?? null,
           reads: new Set(readNames),
         },
         ask,

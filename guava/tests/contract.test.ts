@@ -208,3 +208,32 @@ test("portable JSON interoperability scenario matches executable fixture", async
       assert.equal(s.page.state.invocations, item.expectedDispatches);
   }
 });
+test("sessionEpoch rotation invalidates pinned target; fresh discover restores", async () => {
+  const page = counterFixture();
+  let epoch = "epoch-1";
+  const bridge: typeof page = Object.assign(Object.create(Object.getPrototypeOf(page)), page);
+  const inner = page.getContext;
+  bridge.getContext = async () => ({ ...(await inner()), sessionEpoch: epoch });
+  const host = new HostSimulator("http://127.0.0.1:4310");
+  const d = await host.discover(bridge);
+  assert.equal(d.ok, true);
+  host.grantConsent();
+  const t = d.data.targets[0];
+  assert.equal(t.sessionEpoch, "epoch-1");
+  epoch = "epoch-2";
+  assert.equal(
+    (await host.call(t.targetId, t.pageInstanceId, request, async () => true))
+      .error?.code,
+    "TARGET_CLOSED",
+  );
+  assert.equal(page.state.invocations, 0);
+  const d2 = await host.discover(bridge);
+  host.grantConsent();
+  const t2 = d2.data.targets[0];
+  assert.equal(t2.sessionEpoch, "epoch-2");
+  assert.equal(
+    (await host.call(t2.targetId, t2.pageInstanceId, request, async () => true))
+      .ok,
+    true,
+  );
+});

@@ -13,6 +13,7 @@ export class CounterFixture implements PageAdapter {
   revision = 0;
   calls = 0;
   closed = false;
+  sessionEpoch: string | null = null;
   target: Target = {
     targetId: "fixture-target",
     pageInstanceId: "fixture-page-0",
@@ -58,7 +59,11 @@ export class CounterFixture implements PageAdapter {
       revision: this.revision,
       selectionIds: [],
       summary: "Counter value " + this.value,
+      sessionEpoch: this.sessionEpoch,
     };
+  }
+  rotateSession(epoch: string | null = "session-" + this.revision + "-" + this.calls) {
+    this.sessionEpoch = epoch;
   }
   async invoke(raw: Call) {
     this.calls++;

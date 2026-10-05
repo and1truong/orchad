@@ -74,6 +74,7 @@ test("Chrome adapter double: fixed MAIN dispatcher, top frame, runtime document 
         clientId: "sidebar",
         sessionId: "s",
         target: adapter.target,
+        sessionEpoch: null,
         reads: new Set(),
       },
       async () => true,
@@ -106,6 +107,7 @@ test("MAIN output shape and payload limits validated before returning", () =>
     fixture.getContext = async () => ({
       appId: "demo-counter",
       documentId: "demo-document",
+      sessionEpoch: null,
       revision: -1,
       selectionIds: [],
       summary: "",
@@ -114,6 +116,7 @@ test("MAIN output shape and payload limits validated before returning", () =>
     fixture.getContext = async () => ({
       appId: "demo-counter",
       documentId: "demo-document",
+      sessionEpoch: null,
       revision: 0,
       selectionIds: [],
       summary: "x".repeat(70000),

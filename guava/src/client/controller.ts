@@ -181,7 +181,12 @@ export class ApplicationController {
         tools: structuredClone(catalog),
       }),
       getContext: async () => {
-        await this.request("/api/session");
+        const session = await this.request("/api/session");
+        // sessionInstanceId is an opaque per-login marker (already returned by
+        // /api/session); hosts pin it as the binding's sessionEpoch so a login,
+        // logout, account switch or session rotation invalidates authority.
+        // Keep the stored CSRF aligned with the session that answered.
+        this.csrf = session.csrf;
         await this.refresh();
         if (!this.document) throw new Error("No authenticated active document");
         return {
@@ -190,6 +195,7 @@ export class ApplicationController {
           revision: this.document.revision,
           selectionIds: [...this.selectionIds],
           summary: this.document.summary.slice(0, 400),
+          sessionEpoch: session.sessionInstanceId,
         };
       },
       invoke: (call) => this.invoke(call),
