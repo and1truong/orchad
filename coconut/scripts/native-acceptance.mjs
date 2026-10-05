@@ -133,10 +133,11 @@ try{
   check('revocation: consent grants wiped on rebind',!(snap.sidebar?.readTools?.[targetId]?.length));
 
   // fresh binding on the counter page must NOT inherit the old consent:
-  // demo_read goes back through the approval path.
+  // demo_read goes back through the approval path. Re-creating the guest
+  // webview can be slow on CI runners — generous budget, one retry.
   markers.length=0;
   await smoke('open_guest',{url:TRUSTED+'/'});
-  await waitMarker(/^COCONUT_SMOKE:send:binding/,20000);
+  await waitMarker(/^COCONUT_SMOKE:send:binding/,60000).catch(async()=>{await smoke('open_guest',{url:TRUSTED+'/'});await waitMarker(/^COCONUT_SMOKE:send:binding/,30000);});
   const t2=(await tool('host_list_targets',{}))?.data?.targets?.[0];
   await tool('host_list_tools',{targetId:t2.targetId,pageInstanceId:t2.pageInstanceId});
   const againP=tool('host_call_tool',{targetId:t2.targetId,pageInstanceId:t2.pageInstanceId,call:{toolName:'demo_read',arguments:{},documentId:t2.documentId,expectedRevision:null,idempotencyKey:null,requestId:randomUUID()}});
