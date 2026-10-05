@@ -14,3 +14,10 @@ Application-specific choices do not add required bridge fields:
 - human_accept_conclusion is a separate human HTTP operation, never a bridge tool.
 - Read calls require null revision and key. Writes store canonical semantic toolName/arguments/expectedRevision; requestId is excluded.
 - Native draft WebMCP adapter has a transport-specific envelope schema and still routes through host policy to the same bridge. It does not change Page Bridge 0.1 and is not auto-enabled.
+
+## Update: `sessionEpoch` adopted into the shared contract
+
+Root `contract` was updated at commit `c4de57a` (SHA-256 `1ae668a66fcaac00183e54cbbd1bb67877ff55045e94ebb6eb982c0d1a4d1333`, git blob `480d6a53b27a7f4c9d15c49f694804a296ebb5ea`); `guava/CONTRACT.md` is byte-for-byte identical to it again. Two optional additions were adopted, adding no required fields:
+
+- `getContext` may return an optional `sessionEpoch`: an opaque string the app's backend issues per login session. Guava returns the `/api/session` `sessionInstanceId` (already an opaque hash of the session record, never a credential). Hosts pin it into consent/pairing/bind and fail closed when it changes or disappears; backend authorization is unchanged and still enforced per call.
+- A `ToolDescriptor.inputSchema` must sit inside the bounded host-declared JSON Schema dialect the host publishes. Guava's catalog (pattern/uniqueItems/oneOf/min-max bounds) is inside coconut's and lime's published dialects; the backend still validates every argument server-side regardless of host checks.
