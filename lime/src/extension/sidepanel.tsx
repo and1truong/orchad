@@ -84,7 +84,15 @@ function App() {
     externalPolicies.current.clear();
     policy.current = null;
     setConsented(false);
-    transport.current?.disconnect();
+    setPairConfirm(null);
+    setPairCode("");
+    setPaired(null);
+    // Consent invalidation must end the pairing, not leave a valid-but-dead
+    // credential. Always revoke (unconditional: this callback also runs in
+    // stale mount-effect closures where `paired` is never current). revoke
+    // clears in-memory credentials, sends the server-side revoke while the
+    // socket is open, then disconnects.
+    transport.current?.revoke();
   };
   const disconnect = () => {
     clearConsent();
@@ -171,6 +179,9 @@ function App() {
   }, []);
   useEffect(() => {
     if (paired && adapter.current && policy.current) {
+      // One live pairing owns the map; a prior pair's entries can never be
+      // reached again once the transport reconnects under a new clientId.
+      externalPolicies.current.clear();
       externalPolicies.current.set(
         paired.clientId,
         new HostPolicy(
@@ -227,6 +238,9 @@ function App() {
     try {
       if (!adapter.current) throw new Error("Select target first");
       gatewayUrl(base);
+      // A new consent session supersedes the previous one: end it (and any
+      // pairing bound to it) instead of leaving a live orphaned session.
+      clearConsent();
       await adapter.current.current();
       session.current = new AbortController();
       policy.current = new HostPolicy(
@@ -333,7 +347,9 @@ function App() {
         >
           <option value="">Choose tab</option>
           {tabs
-            .filter((t) => t.id)
+            // Only tabs whose url is visible can be pinned; without a grant
+            // Chrome strips url/title and discovery would fail FORBIDDEN.
+            .filter((t) => t.id && t.url && /^https?:/.test(t.url))
             .map((t) => (
               <option key={t.id} value={t.id}>
                 {t.title || "Tab " + t.id}
