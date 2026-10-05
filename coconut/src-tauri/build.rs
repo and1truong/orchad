@@ -14,7 +14,12 @@ fn main() {
     println!("cargo:rustc-env=TRUSTED_APP_ORIGIN={origin}");
     println!("cargo:rerun-if-changed=../trusted-origin.txt");
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
-        tauri_build::AppManifest::new().commands(&["open_guest", "host_request", "guest_reply"]),
+        tauri_build::AppManifest::new().commands(&[
+            "open_guest",
+            "discover_guest",
+            "host_request",
+            "guest_reply",
+        ]),
     ))
     .expect("Tauri build");
 }
