@@ -30,3 +30,23 @@ denied-approval and cancellation.
 Root `contract` was updated at commit `c4de57a` (SHA-256 `1ae668a66fcaac00183e54cbbd1bb67877ff55045e94ebb6eb982c0d1a4d1333`, git blob `480d6a53b27a7f4c9d15c49f694804a296ebb5ea`); `lime/CONTRACT.md` is byte-for-byte identical to it again. This resolves the earlier note about logout detection requiring application cooperation: apps that emit `sessionEpoch` give hosts an explicit session marker to invalidate on, while the contract stays optional for apps without sessions.
 
 Lime's implementation: consent pins `sessionEpoch` from `getContext` at grant time (null when the app binds none); every `binding()` re-check fails closed — revoking the consent and any pairing derived from it — when the epoch changes, appears, or disappears. MCP-paired clients get the same policy object and the same check. `validateArguments` now gates page-declared schemas on the same bounded dialect coconut publishes (see `coconut/CONTRACT-CHANGES.md` §1) before Ajv compiles them, so a hostile `pattern`/`$id` cannot wedge the trusted extension.
+
+## Behavior notes — finding fixes (#18, #19, #24)
+
+- The companion HTTP server no longer applies `http.requestTimeout` (previously
+  15 s) to `/mcp` requests. A `host_call_tool` POST legitimately waits on human
+  approval up to the per-dispatch deadline (`requestTimeoutMs`, default 65 s),
+  and the transport's standalone GET SSE stream stays open for the whole
+  pairing. Per-call deadlines still live in `route()` and `headersTimeout`
+  still bounds header receive; the wire protocol is unchanged.
+- The sidepanel approval card is now a FIFO queue (`ApprovalQueue`) instead of
+  a single `resolveApproval` slot. A concurrent approval request waits behind
+  the visible card rather than silently auto-denying it; queued entries free
+  their slot on answer, caller abort, or their own `expiresAt` deadline, so a
+  disconnected or timed-out client can never hold the slot forever. Approvals
+  remain bound to client+session+target+tool+canonical args+expectedRevision —
+  queuing order is the only change.
+- `tests/browser.ts` selects the fixture option by `data-url` instead of
+  localized title text, and the fixture server now sends `charset=utf-8` (its
+  title em-dash mojibaked on windows-1252-locale Chromium). The mock gateway
+  gained a scripted mode so the e2e reaches the real approval card.
