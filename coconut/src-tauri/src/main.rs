@@ -4,7 +4,7 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Write},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::{Arc, Mutex},
+    sync::{Arc, Condvar, Mutex},
     time::Duration,
 };
 use tauri::{webview::WebviewBuilder, Manager, Webview, WebviewUrl};
@@ -12,6 +12,7 @@ use tokio::sync::oneshot;
 #[derive(Default)]
 struct Native {
     input: Mutex<Option<ChildStdin>>,
+    input_cv: Condvar,
     child: Mutex<Option<Child>>,
     pending: Mutex<HashMap<String, oneshot::Sender<Value>>>,
     replies: Mutex<HashMap<String, Value>>,
@@ -22,10 +23,20 @@ fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 fn send(s: &Native, v: Value) -> Result<(), String> {
-    let mut input = lock(&s.input).take().ok_or("Sidecar disconnected")?;
+    // Writes serialize by temporarily removing the stdin handle; a concurrent
+    // caller waits (bounded) for it to be restored instead of failing spuriously.
+    // A still-missing handle after the wait means the sidecar pipe is gone.
+    let guard = lock(&s.input);
+    let (mut guard, _) = s
+        .input_cv
+        .wait_timeout_while(guard, Duration::from_secs(30), |o| o.is_none())
+        .unwrap_or_else(|e| e.into_inner());
+    let mut input = guard.take().ok_or("Sidecar disconnected")?;
+    drop(guard);
     let r = writeln!(input, "{}", v).map_err(|e| e.to_string());
     if r.is_ok() {
         *lock(&s.input) = Some(input);
+        s.input_cv.notify_all();
     }
     r
 }
