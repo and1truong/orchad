@@ -2,18 +2,6 @@
 
 Adopted into the shared contract (root `contract` updated at commit `c4de57a`, SHA-256 `1ae668a66fcaac00183e54cbbd1bb67877ff55045e94ebb6eb982c0d1a4d1333`, git blob `480d6a53b27a7f4c9d15c49f694804a296ebb5ea`; `coconut/CONTRACT.md` is byte-for-byte identical). Previously coconut's copy was a drifted older snapshot (`18ec8f8d…`); it now matches every other POC byte-identically.
 
-Coconut policy is intentionally stricter: domain tools declaring read still require write scope and trusted approval. No descriptor alone grants invocation authority. Page-declared inputSchemas are validated against a host-safe keyword subset (no pattern/$ref/combinators/format, no schema-registry keys $id/$schema, no quadratic-cost uniqueItems; depth and size caps) before the sidecar compiles them with Ajv, so a hostile schema cannot wedge, stall, or crash the enforcement process; tools outside the subset fail UNSUPPORTED. This changes no field or method in the snapshot.
-
-## Agent client wiring
-
-The trusted sidebar runs turns through `@orchard/agent-client` instead of its
-inline mock loop. `executeTool` now distinguishes effects: read tools dispatch
-with `expectedRevision: null` / `idempotencyKey: null` (the sidecar already
-rejects read calls carrying write envelopes, which the old client violated);
-writes pin `lastRevision` plus a fresh UUID. Cancellation and approval-denied
-flow through the shared client unchanged.
-Coconut policy is intentionally stricter: domain tools declaring read still require write scope and trusted approval. No descriptor alone grants invocation authority. Page-declared inputSchemas are validated against a host-safe keyword subset (no pattern/$ref/combinators/format, no schema-registry keys $id/$schema, no quadratic-cost uniqueItems; depth and size caps) before the sidecar compiles them with Ajv, so a hostile schema cannot wedge, stall, or crash the enforcement process; tools outside the subset fail UNSUPPORTED. This changes no field or method in the snapshot.
-
 ## 1. Host-safe JSON Schema dialect (adopted)
 
 The contract now states that a `ToolDescriptor.inputSchema` must sit inside one bounded JSON Schema dialect that the host publishes in its contract documentation; descriptors outside it are rejected safely, never silently compiled or granted.
@@ -49,3 +37,23 @@ A `getContext` reply announcing a different `documentId` or a different `session
 ## 6. Trusted rediscovery (`discover_guest`)
 
 A new trusted-only command re-runs bridge discovery for the current guest without a page load — needed after SPA login or a bridge that installed late. It is reachable only from the bundled host UI (`allow-discover-guest`), refuses when the guest URL is off the allowlist or a live bound target exists, and probes with a bare `getContext`, so nothing pending can replay. Rediscovery installs a fresh provisional binding; promotion then requires the normal consent/pairing path on the new identity.
+
+## Agent client wiring
+
+The trusted sidebar runs turns through `@orchard/agent-client` instead of its
+inline mock loop. `executeTool` now distinguishes effects: read tools dispatch
+with `expectedRevision: null` / `idempotencyKey: null` (the sidecar already
+rejects read calls carrying write envelopes, which the old client violated);
+writes pin `lastRevision` plus a fresh UUID. Cancellation and approval-denied
+flow through the shared client unchanged.
+
+## Trusted app origin
+
+One file, `coconut/trusted-origin.txt`, is the trusted app origin for every
+consumer: `build.rs` bakes it into `TRUSTED_APP_ORIGIN` for the native
+`allowed()` check, `scripts/gen-capabilities.mjs` regenerates
+`capabilities/guest-replies.json` (run by `prebuild`), and the sidebar's launch
+default imports it via vite `?raw`. Exact-origin comparisons only — no
+wildcards. The checked-in value tracks Guava's default
+(`http://127.0.0.1:4310`); `tests/origin.test.mjs` fails if it drifts from
+Guava's `PORT` default or the generated capability.
