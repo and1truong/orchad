@@ -16,7 +16,9 @@ const grantsOf=c=>(c.readGrants??=new Map());
 const grantFor=(c,targetId,name)=>grantsOf(c).get(targetId)?.get(name);
 const pinGrants=(c,targetId,names,tools)=>{
  const known=new Map((tools??[]).map(t=>[t.name,t]));
- const g=grantsOf(c);let gmap=g.get(targetId);if(!gmap){gmap=new Map();g.set(targetId,gmap);}
+ // Consent replaces the grant set for this target wholesale: consenting to
+ // [] revokes, and a narrower re-consent drops tools no longer shown.
+ const g=grantsOf(c);const gmap=new Map();g.set(targetId,gmap);
  const list=names==='all'?[...known.keys()]:names;
  for(const n of list)gmap.set(n,known.has(n)?canonical(known.get(n)):null);
  return gmap.size;

@@ -52,7 +52,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xvfb
       - working-directory: packages/bridge-contract
         run: npm ci
       - working-directory: mango
@@ -67,13 +67,19 @@ jobs:
       - name: Rust predicate unit tests
         working-directory: coconut/src-tauri
         run: cargo test
-      - name: Native runtime smoke evidence
+      # Lane: native-runtime. Drives the real Tauri binary under xvfb through
+      # the COCONUT_SMOKE=1 debug control channel — ready/binding markers,
+      # heartbeat lease, consent, approval-gated mutation, hidden-UI denial,
+      # rebind revocation. Any failure exits non-zero and fails this lane;
+      # there is no `--version` shortcut and no `|| true`.
+      - name: Native runtime acceptance lane
         working-directory: coconut
         run: |
           BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
           test -n "$BIN"
-          timeout 20 xvfb-run -a "$BIN" --version || true
-          echo "native binary built and launched under xvfb: $BIN"
+          npm run dev >/tmp/coconut-vite.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:1420/ >/dev/null && break; sleep 1; done
+          xvfb-run -a node scripts/native-acceptance.mjs "$BIN"
   guava:
     runs-on: ubuntu-latest
     steps:
