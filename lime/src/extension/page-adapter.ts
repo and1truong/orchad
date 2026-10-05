@@ -210,10 +210,20 @@ export class ChromePageAdapter implements PageAdapter {
       return r.result;
     } catch (e) {
       if (e && typeof e === "object" && "ok" in e) throw e;
-      throw failure(
-        "STALE_CONTEXT",
-        "Document unavailable or page output invalid",
-      );
+      // Classify truthfully: a closed target is TARGET_CLOSED, a gone
+      // document binding is STALE_CONTEXT, and page-side faults (malformed
+      // or oversized output, dispatcher rejection) are INTERNAL — never
+      // silently one code for all three.
+      const message = e instanceof Error ? e.message : "document unavailable";
+      if (/no tab with id|tab was closed|target closed|browser is closed/i.test(message))
+        throw failure("TARGET_CLOSED", "Target tab closed or navigated");
+      if (
+        /no document|document unavailable|frame was removed|cannot access|inspected target navigated/i.test(
+          message,
+        )
+      )
+        throw failure("STALE_CONTEXT", "Document unavailable: " + message);
+      throw failure("INTERNAL", "Page output invalid: " + message);
     }
   }
   async describe() {

@@ -6,6 +6,7 @@ import {
   ResultSchema,
   canonical,
   failure,
+  hostSafeSchema,
   success,
   validateArguments,
   type Call,
@@ -108,12 +109,16 @@ export class HostPolicy {
     try {
       return await fn();
     } catch (e) {
-      return ResultSchema.safeParse(e).success
-        ? (e as Result)
-        : failure(
-            "INVALID_ARGUMENT",
-            e instanceof Error ? e.message : "Invalid boundary data",
-          );
+      // Caller faults are reported at their own sites (call envelope parse
+      // below, argument validation). Everything reaching this catch is a
+      // host/page boundary fault: classify by shape, never INVALID_ARGUMENT.
+      if (ResultSchema.safeParse(e).success) return e as Result;
+      const message =
+        e instanceof Error ? e.message : "Unknown page boundary fault";
+      if (e instanceof Error && e.name === "AbortError")
+        return failure("CANCELLED", "Aborted at page boundary");
+      if (adapterClosed(e)) return failure("TARGET_CLOSED", message);
+      return failure("INTERNAL", message);
     }
   }
   call(raw: unknown, requestSignal?: AbortSignal): Promise<Result> {
@@ -127,7 +132,17 @@ export class HostPolicy {
     raw: unknown,
     requestSignal?: AbortSignal,
   ): Promise<Result> {
-    const call = bounded(CallSchema, raw);
+    let call: Call;
+    try {
+      call = bounded(CallSchema, raw);
+    } catch (e) {
+      // The only caller-fault site: the agent's own call envelope.
+      return failure(
+        "INVALID_ARGUMENT",
+        "Malformed call envelope: " +
+          (e instanceof Error ? e.message : String(e)),
+      );
+    }
     const signal = requestSignal
       ? AbortSignal.any([this.signal, requestSignal])
       : this.signal;
@@ -143,6 +158,14 @@ export class HostPolicy {
       return failure("STALE_CONTEXT", "App changed");
     const tool = description.tools.find((t) => t.name === call.toolName);
     if (!tool) return failure("UNSUPPORTED", "Unknown tool");
+    // A page-declared schema outside the host-safe dialect is the page's
+    // fault, not the caller's; only genuine argument violations blame the
+    // agent.
+    if (!hostSafeSchema(tool.inputSchema))
+      return failure(
+        "UNSUPPORTED",
+        "Tool inputSchema outside the host-safe dialect",
+      );
     if (!validateArguments(tool, call.arguments))
       return failure("INVALID_ARGUMENT", "Arguments fail inputSchema");
     // Page effect never grants read permission: only explicitly user-consented names can auto-run.
@@ -260,6 +283,16 @@ async function waitApproval(
     s.addEventListener("abort", cancel, { once: true });
     fn(a, s).then(finish, () => finish(false));
   });
+}
+
+// Adapters that cannot throw a Result envelope report a closed target with
+// a named error or the platform's closed-tab message; catch both here.
+function adapterClosed(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  if (e.name === "TargetClosedError") return true;
+  return /no tab with id|tab was closed|target closed|browser is closed/i.test(
+    e.message,
+  );
 }
 
 function boundary<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {

@@ -50,3 +50,15 @@ Lime's implementation: consent pins `sessionEpoch` from `getContext` at grant ti
   localized title text, and the fixture server now sends `charset=utf-8` (its
   title em-dash mojibaked on windows-1252-locale Chromium). The mock gateway
   gained a scripted mode so the e2e reaches the real approval card.
+- Error-code classification at the policy boundary (#25): `HostPolicy.guard()`
+  no longer flattens every non-Result throw to INVALID_ARGUMENT. Result-shaped
+  throws pass through, AbortError maps to CANCELLED, closed-target errors map
+  to TARGET_CLOSED, and everything else maps to INTERNAL with the underlying
+  message (e.g. "Payload exceeds 64 KiB" or a Zod envelope failure). The one
+  caller-fault site — parsing the agent's own call envelope — returns
+  INVALID_ARGUMENT explicitly, and a page-declared inputSchema outside the
+  host-safe dialect now fails as UNSUPPORTED (page fault) instead of blaming
+  the caller's arguments. `ChromePageAdapter.dispatch` likewise splits
+  closed-target (TARGET_CLOSED), vanished document binding (STALE_CONTEXT)
+  and page-side faults (INTERNAL) instead of one STALE_CONTEXT for all.
+  Result envelope shape unchanged; error.code/error.message only.

@@ -406,17 +406,45 @@ test("MCP request outlives the former 15s socket timeout: pending approval compl
           JSON.stringify({ type: "response", requestId: m.requestId, result }),
         );
     });
-    const client = new Client({ name: "lime-timeout", version: "0.1.0" });
-    const transport = new StreamableHTTPClientTransport(new URL(url), {
-      requestInit: { headers: { Authorization: "Bearer " + paired.mcpToken } },
+    // Raw HTTP: the real SDK server transport answers these, while the SDK
+    // client would race its own auto-opened standalone SSE against ours.
+    const headers = {
+      Authorization: "Bearer " + paired.mcpToken,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    };
+    const init = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: { name: "lime-timeout", version: "0.1.0" },
+        },
+      }),
     });
-    await client.connect(transport);
+    assert.equal(init.status, 200);
+    const sessionId = init.headers.get("mcp-session-id")!;
+    const notify = await fetch(url, {
+      method: "POST",
+      headers: { ...headers, "mcp-session-id": sessionId },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "notifications/initialized",
+      }),
+    });
+    assert.equal(notify.status, 202);
+    await notify.body?.cancel();
     // Standalone GET SSE stream, as the transport keeps it open for the
     // session; it previously died with the socket at 15s.
     const sse = await fetch(url, {
       headers: {
         Authorization: "Bearer " + paired.mcpToken,
-        "mcp-session-id": transport.sessionId!,
+        "mcp-session-id": sessionId,
         Accept: "text/event-stream",
       },
     });
@@ -436,33 +464,45 @@ test("MCP request outlives the former 15s socket timeout: pending approval compl
         sseClosed = true;
       }
     })();
-    const pending = client.callTool({
-      name: "host_call_tool",
-      arguments: {
-        targetId: fixture.target.targetId,
-        pageInstanceId: "fixture-page-0",
-        call: {
-          requestId: "held-call-1",
-          documentId: "demo-document",
-          toolName: "demo_increment",
-          arguments: { amount: 1 },
-          expectedRevision: 0,
-          idempotencyKey: "held-key-1",
+    const pending = fetch(url, {
+      method: "POST",
+      headers: { ...headers, "mcp-session-id": sessionId },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "host_call_tool",
+          arguments: {
+            targetId: fixture.target.targetId,
+            pageInstanceId: "fixture-page-0",
+            call: {
+              requestId: "held-call-1",
+              documentId: "demo-document",
+              toolName: "demo_increment",
+              arguments: { amount: 1 },
+              expectedRevision: 0,
+              idempotencyKey: "held-key-1",
+            },
+          },
         },
-      },
+      }),
     });
     await requested;
     // The old server-wide http.requestTimeout destroyed both sockets at 15s.
     await new Promise((r) => setTimeout(r, 16_500));
     assert.equal(sseClosed, false, "SSE GET stream must stay open past 15s");
     release();
-    const result = await pending;
-    assert.equal(result.isError, false);
-    assert.deepEqual((result.structuredContent as Result).data, {
+    const reply = await pending;
+    assert.equal(reply.status, 200);
+    const envelope = (await reply.json()) as {
+      result: { structuredContent: Result; isError: boolean };
+    };
+    assert.equal(envelope.result.isError, false);
+    assert.deepEqual(envelope.result.structuredContent.data, {
       value: 1,
       revision: 1,
     });
-    await client.close();
     await reader.cancel().catch(() => {});
     await watch;
   } finally {

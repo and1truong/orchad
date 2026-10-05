@@ -123,6 +123,42 @@ test("MAIN output shape and payload limits validated before returning", () =>
     });
     await assert.rejects(() => dispatcher("getContext"));
   }));
+test("adapter dispatch classifies closed target, stale document and page faults", () =>
+  runtime(async (fixture) => {
+    const adapter = await ChromePageAdapter.discover(7);
+    const consent = {
+      clientId: "sidebar",
+      sessionId: "s",
+      target: adapter.target,
+      sessionEpoch: null,
+      reads: new Set<string>(),
+    };
+    const policy = new HostPolicy(
+      adapter,
+      consent,
+      async () => true,
+      new AbortController().signal,
+    );
+    const chromeObj = (globalThis as unknown as { chrome: any }).chrome;
+    // Chrome reports a tab that closed between current() and the injection.
+    chromeObj.scripting.executeScript = async () => {
+      throw new Error("No tab with id: 7");
+    };
+    assert.equal((await policy.context()).error?.code, "TARGET_CLOSED");
+    // A document binding that vanished is STALE_CONTEXT, not a page bug.
+    chromeObj.scripting.executeScript = async () => {
+      throw new Error("No document with id runtime-document");
+    };
+    assert.equal((await policy.context()).error?.code, "STALE_CONTEXT");
+    // An honest page fault (e.g. oversized output) is INTERNAL with its
+    // real message — not STALE_CONTEXT, never INVALID_ARGUMENT.
+    chromeObj.scripting.executeScript = async () => {
+      throw new Error("Oversized or non-JSON page output");
+    };
+    const fault = await policy.context();
+    assert.equal(fault.error?.code, "INTERNAL");
+    assert.match(fault.error!.message, /Oversized or non-JSON page output/);
+  }));
 test("Chrome adapter double: unsupported page explicit, no fallback", () =>
   runtime(async () => {
     Reflect.deleteProperty(

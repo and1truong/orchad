@@ -124,6 +124,71 @@ test("malformed schema and smuggled approved field", async () => {
     assert.equal((await policy.call(c)).ok, false);
   assert.equal(fixture.calls, 0);
 });
+test("page and host faults never surface as INVALID_ARGUMENT", async () => {
+  const { policy, fixture } = setup();
+  // Oversized page reply: boundary fault, not a caller mistake.
+  fixture.getContext = async () => ({
+    appId: "demo-counter",
+    documentId: "demo-document",
+    sessionEpoch: null,
+    revision: 0,
+    selectionIds: [],
+    summary: "x".repeat(70000),
+  });
+  const big = await policy.context();
+  assert.equal(big.error?.code, "INTERNAL");
+  assert.match(big.error!.message, /64 KiB/);
+  // Malformed envelope from the page: same classification.
+  const second = setup();
+  second.fixture.getContext = (async () => ({
+    wrong: "shape",
+  })) as unknown as typeof second.fixture.getContext;
+  const malformed = await second.policy.context();
+  assert.equal(malformed.error?.code, "INTERNAL");
+  assert.equal(malformed.error!.message.length > 0, true);
+  // Adapters that throw plain closed-target or abort errors classify too.
+  const third = setup();
+  third.fixture.getContext = async () => {
+    throw new Error("No tab with id: 42");
+  };
+  assert.equal((await third.policy.context()).error?.code, "TARGET_CLOSED");
+  const fourth = setup();
+  fourth.fixture.current = async () => {
+    throw new DOMException("aborted", "AbortError");
+  };
+  assert.equal((await fourth.policy.context()).error?.code, "CANCELLED");
+  // Genuinely bad caller input still blames the caller.
+  const { policy: honest } = setup();
+  assert.equal(
+    (await honest.call({ not: "a call" })).error?.code,
+    "INVALID_ARGUMENT",
+  );
+  assert.equal(
+    (await honest.call(call({ arguments: { amount: "x" } }))).error?.code,
+    "INVALID_ARGUMENT",
+  );
+});
+test("page-declared hostile inputSchema is UNSUPPORTED, not caller error", async () => {
+  const { policy, fixture } = setup();
+  const description = bounded(DescriptionSchema, await fixture.describe());
+  fixture.describe = (async () => ({
+    ...description,
+    tools: [
+      ...description.tools,
+      {
+        name: "evil_tool",
+        description: "x",
+        inputSchema: { type: "object", $id: "https://evil.example/s" },
+        effect: "write" as const,
+      },
+    ],
+  })) as typeof fixture.describe;
+  const result = await policy.call(
+    call({ toolName: "evil_tool", requestId: "r-evil" }),
+  );
+  assert.equal(result.error?.code, "UNSUPPORTED");
+  assert.equal(fixture.calls, 0);
+});
 test("oversized output rejected at boundary", async () => {
   const { policy, fixture } = setup();
   fixture.getContext = async () => ({
