@@ -1,0 +1,11 @@
+PRAGMA foreign_keys=ON;
+CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY, password_hash TEXT NOT NULL, salt TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('reader','investigator')));
+CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, principal TEXT NOT NULL REFERENCES accounts(id), csrf TEXT NOT NULL, expires INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS documents(id TEXT PRIMARY KEY, title TEXT NOT NULL, summary TEXT NOT NULL, revision INTEGER NOT NULL CHECK(revision>=0), graph TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS access(principal TEXT NOT NULL REFERENCES accounts(id), document_id TEXT NOT NULL REFERENCES documents(id), PRIMARY KEY(principal,document_id));
+CREATE TABLE IF NOT EXISTS evidence(id TEXT PRIMARY KEY, document_id TEXT NOT NULL REFERENCES documents(id), record TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS idempotency(principal TEXT NOT NULL, document_id TEXT NOT NULL, key TEXT NOT NULL, semantic TEXT NOT NULL, result TEXT NOT NULL, PRIMARY KEY(principal,document_id,key));
+CREATE TABLE IF NOT EXISTS history(id TEXT PRIMARY KEY, document_id TEXT NOT NULL, principal TEXT NOT NULL, before_graph TEXT NOT NULL, after_revision INTEGER NOT NULL, undone INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, timestamp TEXT NOT NULL, principal TEXT NOT NULL, request_id TEXT NOT NULL, document_id TEXT NOT NULL, summary TEXT NOT NULL, before_revision INTEGER, after_revision INTEGER, result TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY);
+INSERT OR IGNORE INTO schema_migrations VALUES(1);
