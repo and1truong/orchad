@@ -19,7 +19,7 @@ struct Native {
     input_dead: AtomicBool,
     child: Mutex<Option<Child>>,
     pending: Mutex<HashMap<String, oneshot::Sender<Value>>>,
-    replies: Mutex<HashMap<String, Value>>,
+    replies: Mutex<HashMap<String, (Value, String)>>,
     nonce: Mutex<Option<String>>,
     target: Mutex<Option<Value>>,
 }
@@ -148,7 +148,7 @@ fn guest_reply(
     {
         return Err("Payload too large".into());
     }
-    let pinned = lock(&state.replies).remove(&id).ok_or("Unknown request")?;
+    let (pinned, op) = lock(&state.replies).remove(&id).ok_or("Unknown request")?;
     if lock(&state.target).as_ref() != Some(&pinned) {
         return Err("STALE_CONTEXT".into());
     }
@@ -173,11 +173,14 @@ fn guest_reply(
         }
         return Ok(());
     }
-    // Rebind without navigation: a bound page reports a different documentId
-    // for the same app in a context-shaped reply. Install the new target
-    // before forwarding so the sidecar revokes the old document's authority
+    // Rebind without navigation: a getContext reply reports a different
+    // documentId for the same app and page instance. Only context replies
+    // may rebind — a tool result carrying a documentId is data, not a claim
+    // that the active document changed. Install the new target before
+    // forwarding so the sidecar revokes the old document's authority
     // (pending approvals, cached tools) before it sees the reply.
-    if result["ok"] == true
+    if op == "getContext"
+        && result["ok"] == true
         && result["data"]["appId"] == pinned["appId"]
         && result["data"]["documentId"].is_string()
         && result["data"]["documentId"] != pinned["documentId"]
@@ -202,7 +205,7 @@ async fn open_guest(webview: Webview, app: tauri::AppHandle, url: String) -> Res
     }
     let load = app.clone();
     let window = app.get_window("host").ok_or("Host missing")?;
-    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(|_|true).on_page_load(move |guest,payload|{match payload.event(){tauri::webview::PageLoadEvent::Started=>invalidate(&load),tauri::webview::PageLoadEvent::Finished=>if allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),t);let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);},_=>{}}});
+    let builder=WebviewBuilder::new("guest",WebviewUrl::External(u)).on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny).initialization_script("Object.defineProperty(window,'__coconutNonce',{value:crypto.randomUUID(),writable:false,configurable:false});").on_navigation(|_|true).on_page_load(move |guest,payload|{match payload.event(){tauri::webview::PageLoadEvent::Started=>invalidate(&load),tauri::webview::PageLoadEvent::Finished=>if allowed(payload.url()) {let t=json!({"targetId":uuid::Uuid::new_v4().to_string(),"pageInstanceId":uuid::Uuid::new_v4().to_string(),"origin":payload.url().origin().ascii_serialization(),"appId":"","documentId":"","title":payload.url().as_str()});let s=load.state::<Arc<Native>>();*lock(&s.target)=Some(t.clone());let id=uuid::Uuid::new_v4().to_string();lock(&s.replies).insert(id.clone(),(t, "getContext".to_string()));let script=bridge_script(&id,"getContext",&Value::Null,None);let _=guest.eval(&script);},_=>{}}});
     window
         .add_child(
             builder,
@@ -224,5 +227,5 @@ fn bridge_script(id: &str, op: &str, call: &Value, nonce: Option<String>) -> Str
 fn main() {
     let state = Arc::new(Native::default());
     let setup_state = state.clone();
-    tauri::Builder::default().manage(state).invoke_handler(tauri::generate_handler![open_guest,host_request,guest_reply]).setup(move |app|{let path=if cfg!(debug_assertions){std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../host/sidecar.mjs")}else{app.path().resource_dir()?.join("_up_/host/sidecar.bundle.mjs")};let mut child=Command::new("node").arg(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;*lock(&setup_state.input)=child.stdin.take();let stdout=child.stdout.take().unwrap();*lock(&setup_state.child)=Some(child);let handle=app.handle().clone();let s=setup_state.clone();std::thread::spawn(move||{for line in BufReader::new(stdout).lines().map_while(Result::ok){let Ok(m)=serde_json::from_str::<Value>(&line)else{continue};let id=m["id"].as_str().unwrap_or("").to_owned();match m["kind"].as_str(){Some("response")=>{if let Some(tx)=lock(&s.pending).remove(&id){let _=tx.send(m["data"].clone());}},Some("dispatch-timeout")=>{lock(&s.replies).remove(&id);},Some("dispatch")=>{if m["operation"]=="invoke" && !handle.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true)){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"APPROVAL_DENIED","message":"Trusted UI inactive","retryable":false}}}));continue;}let t=m["target"].clone();if lock(&s.target).as_ref()!=Some(&t){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"STALE_CONTEXT","message":"Native binding changed","retryable":false}}}));continue;}if let Some(guest)=handle.get_webview("guest"){if guest.url().ok().as_ref().is_some_and(allowed){lock(&s.replies).insert(id.clone(),t);let _=guest.eval(&bridge_script(&id,m["operation"].as_str().unwrap_or(""),&m["call"],lock(&s.nonce).clone()));}}},_=>{}}}invalidate(&handle);for(_,tx)in lock(&s.pending).drain(){drop(tx);}{let _g=lock(&s.input);s.input_dead.store(true,Ordering::SeqCst);}s.input_cv.notify_all();});Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(window.app_handle());let s=window.state::<Arc<Native>>();if let Some(child)=lock(&s.child).as_mut(){let _=child.kill();}}}).run(tauri::generate_context!()).expect("Coconut runtime");
+    tauri::Builder::default().manage(state).invoke_handler(tauri::generate_handler![open_guest,host_request,guest_reply]).setup(move |app|{let path=if cfg!(debug_assertions){std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../host/sidecar.mjs")}else{app.path().resource_dir()?.join("_up_/host/sidecar.bundle.mjs")};let mut child=Command::new("node").arg(path).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::inherit()).spawn()?;*lock(&setup_state.input)=child.stdin.take();let stdout=child.stdout.take().unwrap();*lock(&setup_state.child)=Some(child);let handle=app.handle().clone();let s=setup_state.clone();std::thread::spawn(move||{for line in BufReader::new(stdout).lines().map_while(Result::ok){let Ok(m)=serde_json::from_str::<Value>(&line)else{continue};let id=m["id"].as_str().unwrap_or("").to_owned();match m["kind"].as_str(){Some("response")=>{if let Some(tx)=lock(&s.pending).remove(&id){let _=tx.send(m["data"].clone());}},Some("dispatch-timeout")=>{lock(&s.replies).remove(&id);},Some("dispatch")=>{if m["operation"]=="invoke" && !handle.get_window("host").is_some_and(|w|w.is_visible().unwrap_or(false)&&!w.is_minimized().unwrap_or(true)){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"APPROVAL_DENIED","message":"Trusted UI inactive","retryable":false}}}));continue;}let t=m["target"].clone();if lock(&s.target).as_ref()!=Some(&t){let _=send(&s,json!({"kind":"reply","id":id,"result":{"ok":false,"revision":null,"data":null,"error":{"code":"STALE_CONTEXT","message":"Native binding changed","retryable":false}}}));continue;}if let Some(guest)=handle.get_webview("guest"){if guest.url().ok().as_ref().is_some_and(allowed){lock(&s.replies).insert(id.clone(),(t, m["operation"].as_str().unwrap_or("").to_owned()));let _=guest.eval(&bridge_script(&id,m["operation"].as_str().unwrap_or(""),&m["call"],lock(&s.nonce).clone()));}}},_=>{}}}invalidate(&handle);for(_,tx)in lock(&s.pending).drain(){drop(tx);}{let _g=lock(&s.input);s.input_dead.store(true,Ordering::SeqCst);}s.input_cv.notify_all();});Ok(())}).on_window_event(|window,event|{if matches!(event,tauri::WindowEvent::Destroyed){invalidate(window.app_handle());let s=window.state::<Arc<Native>>();if let Some(child)=lock(&s.child).as_mut(){let _=child.kill();}}}).run(tauri::generate_context!()).expect("Coconut runtime");
 }
