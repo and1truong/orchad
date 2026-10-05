@@ -1,0 +1,40 @@
+[
+  {
+    "id": "mock-scripted",
+    "provider": "mock",
+    "upstreamModel": "mock-scripted",
+    "capabilities": { "text": true, "streaming": true, "functionTools": true },
+    "maxOutputTokens": 8192,
+    "compatibility": ["Offline synthetic fixture"]
+  },
+  {
+    "id": "configured-openai",
+    "provider": "openai",
+    "upstreamModel": "REPLACE_WITH_ADMIN_CHOSEN_CHAT_COMPLETIONS_MODEL",
+    "capabilities": { "text": true, "streaming": true, "functionTools": true },
+    "maxOutputTokens": 2048,
+    "compatibility": [
+      "Chat Completions text/function subset only; no reasoning extension, multimodal or built-in tools"
+    ]
+  },
+  {
+    "id": "configured-anthropic",
+    "provider": "anthropic",
+    "upstreamModel": "REPLACE_WITH_ADMIN_CHOSEN_MESSAGES_MODEL",
+    "capabilities": { "text": true, "streaming": true, "functionTools": true },
+    "maxOutputTokens": 2048,
+    "compatibility": [
+      "Extended thinking and server tools disabled; unexpected thinking blocks rejected"
+    ]
+  },
+  {
+    "id": "configured-gemini",
+    "provider": "gemini",
+    "upstreamModel": "REPLACE_WITH_ADMIN_CHOSEN_GENERATE_CONTENT_MODEL",
+    "capabilities": { "text": true, "streaming": true, "functionTools": true },
+    "maxOutputTokens": 2048,
+    "compatibility": [
+      "Signed public response parts replayed via encrypted state; exposed thought text rejected"
+    ]
+  }
+]

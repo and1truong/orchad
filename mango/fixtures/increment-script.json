@@ -1,0 +1,13 @@
+[
+  {
+    "toolCalls": [
+      {
+        "id": "call-1",
+        "type": "function",
+        "function": { "name": "demo_increment", "arguments": "{\"amount\":1}" }
+      }
+    ],
+    "usage": { "input": 12, "output": 8 }
+  },
+  { "content": "Counter incremented.", "usage": { "input": 25, "output": 5 } }
+]
