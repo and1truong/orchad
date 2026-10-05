@@ -2,9 +2,14 @@ import {z} from 'zod';
 const codes=z.enum(['INVALID_ARGUMENT','UNAUTHORIZED','FORBIDDEN','NOT_FOUND','STALE_CONTEXT','IDEMPOTENCY_CONFLICT','APPROVAL_DENIED','CANCELLED','TIMEOUT','TARGET_CLOSED','UNSUPPORTED','INTERNAL']);
 const result=z.object({ok:z.boolean(),revision:z.number().int().nonnegative().nullable(),data:z.unknown().nullable(),error:z.object({code:codes,message:z.string().max(4096),retryable:z.boolean()}).nullable()}).refine(x=>x.ok?x.error===null:x.error!==null);
 const context=z.object({appId:z.string().max(256),documentId:z.string().max(256),revision:z.number().int().nonnegative(),selectionIds:z.array(z.string().max(256)).max(256),summary:z.string().max(16000)});
-const describe=z.object({protocolVersion:z.literal('0.1'),appId:z.string().max(256),tools:z.array(z.object({name:z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),description:z.string().max(4096),inputSchema:z.object({type:z.literal('object')}).passthrough(),effect:z.enum(['read','write','destructive']),outputSchema:z.record(z.unknown()).optional()})).max(64)});
+const describe=z.object({protocolVersion:z.literal('0.1'),appId:z.string().max(256),tools:z.array(z.object({name:z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),description:z.string().max(4096),inputSchema:z.object({type:z.literal('object').optional()}).passthrough(),effect:z.enum(['read','write','destructive']),outputSchema:z.record(z.unknown()).optional()})).max(64)});
 export function validReply(value,op){if(JSON.stringify(value).length>65536||!result.safeParse(value).success)return false;if(!value.ok)return true;return op==='describe'?describe.safeParse(value.data).success:op==='getContext'?context.safeParse(value.data).success:true;}
-const SAFE_KEYS=new Set(['type','properties','required','additionalProperties','items','prefixItems','enum','const','minimum','maximum','exclusiveMinimum','exclusiveMaximum','multipleOf','minLength','maxLength','minItems','maxItems','uniqueItems','minProperties','maxProperties','description','title','default','examples','deprecated','readOnly','writeOnly','$comment','$id','$schema']);
+// '$id'/'$schema' are excluded: Ajv registers $id process-wide on the single
+// shared instance, so a page could permanently poison other targets' tools;
+// '$schema' can select an unsupported draft and break compilation.
+// 'uniqueItems' is excluded: pairwise comparison on object arrays is O(n^2)
+// at validation time and can stall the single-threaded sidecar pre-approval.
+const SAFE_KEYS=new Set(['type','properties','required','additionalProperties','items','prefixItems','enum','const','minimum','maximum','exclusiveMinimum','exclusiveMaximum','multipleOf','minLength','maxLength','minItems','maxItems','minProperties','maxProperties','description','title','default','examples','deprecated','readOnly','writeOnly','$comment']);
 // Page-declared schemas are untrusted input, but they are compiled and executed
 // by Ajv in the trusted sidecar before approval. Only a keyword subset that
 // cannot carry user regexes ($ref, pattern, format, combinators...) or explode
@@ -19,7 +24,7 @@ export function safeSchema(schema,depth=0){if(schema===true||schema===false)retu
  if(schema.type!==undefined&&!(typeof schema.type==='string'||(Array.isArray(schema.type)&&schema.type.every(t=>typeof t==='string'))))return false;
  if(schema.enum!==undefined&&(!Array.isArray(schema.enum)||schema.enum.length>256))return false;
  for(const k of['minimum','maximum','exclusiveMinimum','exclusiveMaximum','multipleOf','minLength','maxLength','minItems','maxItems','minProperties','maxProperties'])if(schema[k]!==undefined&&(typeof schema[k]!=='number'||!Number.isFinite(schema[k])))return false;
- for(const k of['uniqueItems','deprecated','readOnly','writeOnly'])if(schema[k]!==undefined&&typeof schema[k]!=='boolean')return false;
- for(const k of['description','title','$comment','$id','$schema'])if(schema[k]!==undefined&&typeof schema[k]!=='string')return false;
+ for(const k of['deprecated','readOnly','writeOnly'])if(schema[k]!==undefined&&typeof schema[k]!=='boolean')return false;
+ for(const k of['description','title','$comment'])if(schema[k]!==undefined&&typeof schema[k]!=='string')return false;
  if(schema.const!==undefined&&JSON.stringify(schema.const).length>8192)return false;if(schema.default!==undefined&&JSON.stringify(schema.default).length>8192)return false;if(schema.examples!==undefined&&JSON.stringify(schema.examples).length>8192)return false;
  return true;}
