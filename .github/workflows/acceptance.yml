@@ -68,6 +68,8 @@ jobs:
           npm run typecheck
           npm run build
           npm test
+      - working-directory: coconut
+        run: npm ci
       - name: Strict integration — real guava service behind real coconut MCP host
         working-directory: guava
         run: |
