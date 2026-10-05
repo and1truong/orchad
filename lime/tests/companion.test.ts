@@ -35,6 +35,7 @@ test("real MCP SDK over Streamable HTTP and authenticated WebSocket to shared fi
       clientId: "external-test",
       sessionId: "s",
       target: { ...fixture.target },
+      sessionEpoch: null,
       reads: new Set(["demo_read"]),
     },
     async () => approved,

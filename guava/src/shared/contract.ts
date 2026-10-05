@@ -38,6 +38,10 @@ export interface Context {
   revision: number;
   selectionIds: string[];
   summary: string;
+  // Opaque per-login-session marker issued by the app's backend. Hosts pin
+  // it at consent/bind and fail closed when it changes or disappears; it
+  // never carries credentials and never replaces server-side authorization.
+  sessionEpoch?: string;
 }
 export interface Bridge {
   describe(): Promise<{
@@ -54,6 +58,7 @@ export interface TargetDescriptor {
   origin: string;
   appId: string;
   documentId: string;
+  sessionEpoch?: string | null;
   title: string;
 }
 export const success = (revision: number | null, data: any): Result => ({

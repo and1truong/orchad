@@ -74,6 +74,7 @@ test("Chrome adapter double: fixed MAIN dispatcher, top frame, runtime document 
         clientId: "sidebar",
         sessionId: "s",
         target: adapter.target,
+        sessionEpoch: null,
         reads: new Set(),
       },
       async () => true,

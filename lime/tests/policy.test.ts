@@ -35,6 +35,7 @@ function setup(
       clientId: "test",
       sessionId: "s1",
       target: { ...fixture.target },
+      sessionEpoch: null,
       reads: new Set(["demo_read"]),
     },
     approve,
@@ -169,6 +170,7 @@ test("cancel approval, no replay after reconnect/new session", async () => {
       clientId: "test",
       sessionId: "new",
       target: fixture.target,
+      sessionEpoch: null,
       reads: new Set(),
     },
     null,
@@ -214,7 +216,13 @@ test("unconsented or effect-changed reads do not auto-grant", async () => {
   const { fixture } = setup();
   const p = new HostPolicy(
     fixture,
-    { clientId: "x", sessionId: "s", target: fixture.target, reads: new Set() },
+    {
+      clientId: "x",
+      sessionId: "s",
+      target: fixture.target,
+      sessionEpoch: null,
+      reads: new Set(),
+    },
     null,
     new AbortController().signal,
   );
@@ -248,4 +256,72 @@ test("cancel after dispatch returns unknown outcome without retry", async () => 
   controller.abort();
   assert.equal((await pending).error?.code, "INTERNAL");
   assert.equal(fixture.calls, 1);
+});
+test("app session epoch change revokes consent and fails closed", async () => {
+  const fixture = new CounterFixture();
+  fixture.rotateSession("epoch-1");
+  const ctl = new AbortController();
+  const pinned = new HostPolicy(
+    fixture,
+    {
+      clientId: "test",
+      sessionId: "s1",
+      target: { ...fixture.target },
+      sessionEpoch: "epoch-1",
+      reads: new Set(["demo_read"]),
+    },
+    async () => true,
+    ctl.signal,
+  );
+  assert.equal((await pinned.context()).ok, true);
+  // A login/logout/account switch or rotation changes the opaque epoch:
+  // context is never returned under the old consent again.
+  fixture.rotateSession("epoch-2");
+  assert.equal((await pinned.context()).error?.code, "STALE_CONTEXT");
+  assert.equal((await pinned.context()).error?.code, "FORBIDDEN");
+  assert.equal(
+    (await pinned.call(call({ toolName: "demo_read", expectedRevision: null, idempotencyKey: null })))
+      .error?.code,
+    "FORBIDDEN",
+  );
+  const fresh = new HostPolicy(
+    fixture,
+    {
+      clientId: "test",
+      sessionId: "s2",
+      target: { ...fixture.target },
+      sessionEpoch: "epoch-2",
+      reads: new Set(["demo_read"]),
+    },
+    async () => true,
+    new AbortController().signal,
+  );
+  assert.equal((await fresh.context()).ok, true);
+});
+test("guava catalog passes the host-safe schema dialect; hostile schemas rejected", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { hostSafeSchema, validateArguments } = await import(
+    "../src/shared/contract.js"
+  );
+  const catalog = JSON.parse(
+    readFileSync(new URL("../../guava/tool-catalog.json", import.meta.url), "utf8"),
+  );
+  assert.equal(catalog.length, 7);
+  for (const tool of catalog)
+    assert.equal(hostSafeSchema(tool.inputSchema), true, tool.name);
+  for (const schema of [
+    { type: "object", properties: { a: { type: "string", pattern: "^(a+)+$" } } },
+    { type: "object", $id: "https://evil.example/s", items: { $ref: "#" } },
+    { type: "object", patternProperties: { ".*": { type: "string" } } },
+    { type: "array", uniqueItems: true },
+    { type: "object", oneOf: Array.from({ length: 20 }, () => ({ type: "string" })) },
+  ])
+    assert.equal(hostSafeSchema(schema), false, JSON.stringify(schema));
+  const evil = {
+    name: "evil_tool",
+    description: "x",
+    effect: "read" as const,
+    inputSchema: { type: "object", properties: { a: { pattern: "^(a+)+$" } } },
+  };
+  assert.equal(validateArguments(evil, { a: "a".repeat(64) }), false);
 });

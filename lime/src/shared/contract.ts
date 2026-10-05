@@ -41,6 +41,10 @@ export const ContextSchema = z
     revision: rev,
     selectionIds: z.array(id).max(256),
     summary: z.string().max(8192),
+    // Opaque per-login-session marker issued by the app's backend. Hosts pin
+    // it into consent/pairing and fail closed when it changes or disappears;
+    // it never carries credentials and never replaces server authorization.
+    sessionEpoch: z.string().max(256).nullable().optional(),
   })
   .strict();
 export const CallSchema = z
@@ -135,7 +139,177 @@ export function canonical(value: unknown): string {
 }
 // MV3 extension CSP forbids string code generation, so page-supplied schemas
 // are interpreted per call rather than compiled (Ajv compile emits `new Function`).
+// Bounded page-declared schema dialect — the same subset coconut's host
+// validator accepts. Combinators are allowed with a fan-out cap; '$id',
+// '$schema', '$ref'/'$defs' and 'format' stay excluded (process-wide $id
+// registration, unsupported drafts, divergent annotation semantics), as do
+// patternProperties/propertyNames/dependentSchemas/contains/if-then-else and
+// unevaluated* to keep the dialect a small closed set.
+const SAFE_SCHEMA_KEYS = new Set([
+  "type",
+  "properties",
+  "required",
+  "additionalProperties",
+  "items",
+  "prefixItems",
+  "enum",
+  "const",
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "minLength",
+  "maxLength",
+  "minItems",
+  "maxItems",
+  "minProperties",
+  "maxProperties",
+  "description",
+  "title",
+  "default",
+  "examples",
+  "deprecated",
+  "readOnly",
+  "writeOnly",
+  "$comment",
+  "pattern",
+  "uniqueItems",
+  "oneOf",
+  "anyOf",
+  "allOf",
+  "not",
+]);
+// Page-declared patterns execute inside the trusted extension on every
+// argument check: length is capped and backreferences or a quantified group
+// containing an unbounded repeat ((a+)+, (a*)*, (\d{2,}){3}) are refused.
+// The heuristic intentionally fails closed on odd shapes rather than proving
+// linearity.
+function safePattern(p: unknown): boolean {
+  if (typeof p !== "string" || !p.length || p.length > 256) return false;
+  if (/\\[1-9]|\\k</.test(p)) return false;
+  const unbounded = (s: string) => {
+    const m = /^(?:([+*])|\{(\d+)(,(\d*))?\})/.exec(s);
+    if (!m) return s[0] === "{";
+    if (m[1]) return true;
+    return m[3] === "," && m[4] === "";
+  };
+  for (let i = 0; i < p.length; i++) {
+    if (p[i] === "\\") {
+      i++;
+      continue;
+    }
+    if (p[i] === "[") {
+      i++;
+      if (p[i] === "^") i++;
+      while (i < p.length && p[i] !== "]") {
+        if (p[i] === "\\") i++;
+        i++;
+      }
+      continue;
+    }
+    if (p[i] !== "(") continue;
+    let inner = false,
+      depth = 1,
+      j = i + 1;
+    for (; j < p.length && depth; j++) {
+      if (p[j] === "\\") {
+        j++;
+        continue;
+      }
+      if (p[j] === "[") {
+        j++;
+        if (p[j] === "^") j++;
+        while (j < p.length && p[j] !== "]") {
+          if (p[j] === "\\") j++;
+          j++;
+        }
+        continue;
+      }
+      if (p[j] === "(") depth++;
+      else if (p[j] === ")") depth--;
+      if (depth && unbounded(p.slice(j))) inner = true;
+    }
+    if (inner && unbounded(p.slice(j))) return false;
+  }
+  try {
+    new RegExp(p);
+  } catch {
+    return false;
+  }
+  return true;
+}
+export function hostSafeSchema(
+  schema: unknown,
+  depth = 0,
+  budget?: { count: number },
+): boolean {
+  if (depth === 0) budget = { count: 0 };
+  if (++budget!.count > 128) return false;
+  if (schema === true || schema === false) return true;
+  if (schema === null || typeof schema !== "object" || Array.isArray(schema))
+    return false;
+  if (depth === 0 && JSON.stringify(schema).length > 8192) return false;
+  if (depth > 6) return false;
+  const s = schema as Record<string, unknown>;
+  for (const k of Object.keys(s)) if (!SAFE_SCHEMA_KEYS.has(k)) return false;
+  const sub = (v: unknown): boolean =>
+    v === true ||
+    v === false ||
+    (v !== null &&
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      hostSafeSchema(v, depth + 1, budget));
+  if (s.properties !== undefined) {
+    const p = s.properties;
+    if (
+      p === null ||
+      typeof p !== "object" ||
+      Array.isArray(p) ||
+      Object.keys(p).length > 64
+    )
+      return false;
+    for (const v of Object.values(p)) if (!sub(v)) return false;
+  }
+  for (const k of ["items", "additionalProperties"] as const)
+    if (s[k] !== undefined && !(Array.isArray(s[k]) ? (s[k] as unknown[]).every(sub) : sub(s[k])))
+      return false;
+  if (
+    s.prefixItems !== undefined &&
+    !(
+      Array.isArray(s.prefixItems) &&
+      s.prefixItems.length <= 16 &&
+      s.prefixItems.every(sub)
+    )
+  )
+    return false;
+  for (const k of ["oneOf", "anyOf", "allOf"] as const)
+    if (
+      s[k] !== undefined &&
+      !(Array.isArray(s[k]) && s[k].length >= 1 && s[k].length <= 16 && (s[k] as unknown[]).every(sub))
+    )
+      return false;
+  if (s.not !== undefined && !sub(s.not)) return false;
+  if (s.pattern !== undefined && !safePattern(s.pattern)) return false;
+  if (s.uniqueItems !== undefined) {
+    if (typeof s.uniqueItems !== "boolean") return false;
+    // uniqueItems is O(n^2) pairwise at validation time; only permit it on
+    // arrays already bounded by a small maxItems.
+    if (
+      s.uniqueItems === true &&
+      !(
+        Number.isInteger(s.maxItems) &&
+        (s.maxItems as number) >= 0 &&
+        (s.maxItems as number) <= 256
+      )
+    )
+      return false;
+  }
+  return true;
+}
+>>>>>>> 65230d6 (lime+guava: pin opaque sessionEpoch into consent and context)
 export function validateArguments(tool: Tool, args: unknown): boolean {
+  if (!hostSafeSchema(tool.inputSchema)) return false;
   try {
     return new Validator(tool.inputSchema as Schema, "7", false).validate(args)
       .valid;

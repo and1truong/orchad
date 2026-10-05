@@ -36,6 +36,11 @@ export interface Consent {
   clientId: string;
   sessionId: string;
   target: Target;
+  // Opaque app-session marker pinned from getContext at consent time (null
+  // when the app binds no session). Login, logout, account switch or session
+  // rotation changes it and invalidates this consent and everything derived
+  // from it (pairings, approvals) before further context or dispatch.
+  sessionEpoch: string | null;
   reads: Set<string>;
 }
 export class HostPolicy {
@@ -77,6 +82,12 @@ export class HostPolicy {
     );
     if (c.documentId !== current.documentId || c.appId !== current.appId)
       throw failure("STALE_CONTEXT", "Document changed");
+    // A session epoch appearing, changing or disappearing voids the consent
+    // this policy was granted under — fail closed before returning context.
+    if ((c.sessionEpoch ?? null) !== this.consent.sessionEpoch) {
+      this.revoke();
+      throw failure("STALE_CONTEXT", "App session changed; consent again");
+    }
     return c;
   }
   async context(signal?: AbortSignal): Promise<Result> {

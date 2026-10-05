@@ -52,6 +52,9 @@ export class HostSimulator {
         origin: this.runtimeOrigin,
         appId: descriptor.appId,
         documentId: ctx.documentId,
+        // The app's opaque session marker is pinned into the target identity
+        // like a real host does; any later change voids this consent.
+        sessionEpoch: ctx.sessionEpoch ?? null,
         title: ctx.summary.slice(0, 80),
       };
       return success(ctx.revision, { targets: [this.target] });
@@ -95,6 +98,7 @@ export class HostSimulator {
       if (
         ctx.documentId !== this.target.documentId ||
         ctx.appId !== this.target.appId ||
+        (ctx.sessionEpoch ?? null) !== (this.target.sessionEpoch ?? null) ||
         (await this.getSession()) !== this.session
       ) {
         this.close();
