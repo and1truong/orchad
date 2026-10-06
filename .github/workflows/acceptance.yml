@@ -11,6 +11,22 @@ jobs:
       - name: CONTRACT.md stays byte-identical to the root contract
         run: |
           for poc in lime coconut guava mango; do cmp contract "$poc/CONTRACT.md"; done
+  agent-durable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: packages/agent-durable/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: mango
+        run: npm ci
+      - working-directory: packages/agent-durable
+        run: |
+          npm ci
+          npm run check
+          npm run build
+          npm test
   lime:
     runs-on: ubuntu-latest
     steps:

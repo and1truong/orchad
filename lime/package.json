@@ -14,7 +14,7 @@
     "prebuild": "npm run vendor:contract && npm run vendor:client && npm run vendor:durable",
     "pretest": "npm run vendor:contract && npm run vendor:client && npm run vendor:durable",
     "vendor:contract": "npm --prefix ../packages/bridge-contract run build",
-    "vendor:durable": "npm --prefix ../packages/agent-durable run build"
+    "vendor:durable": "npm --prefix ../packages/agent-durable ci --no-audit --no-fund && npm --prefix ../packages/agent-durable run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",
