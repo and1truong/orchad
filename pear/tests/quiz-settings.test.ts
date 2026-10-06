@@ -61,6 +61,6 @@ test("actual cookie human/bridge HTTP keeps fifty-question human feedback and au
   assert.equal(human.statusCode,200);assert.equal(human.json().data.feedback.length,50);assert.equal(human.json().data.resultMessage,value.quiz.failMessage);
   assert.equal(bridge.statusCode,200);assert.equal(bridge.json().data.feedback.length,0);assert.equal(bridge.body.includes(value.quiz.failMessage!),false);assert.equal(bridge.body.includes('"correct":'),false);assert.ok(Buffer.byteLength(human.body)<65536);
   const otherLogin=await app.inject({method:"POST",url:"/api/login",headers:base,payload:{username:"learner-b",password:"learner-b-dev"}}),other={...base,cookie:String(otherLogin.headers["set-cookie"]).split(";")[0],"x-csrf-token":otherLogin.json().csrf,"x-pear-epoch":otherLogin.json().sessionEpoch};
-  assert.notEqual((await app.inject({method:"POST",url:"/api/human/invoke",headers:other,payload:{...payload,documentId:"learning:demo:learner-b"}}})).statusCode,200);
+  assert.notEqual((await app.inject({method:"POST",url:"/api/human/invoke",headers:other,payload:{...payload,documentId:"learning:demo:learner-b"}})).statusCode,200);
  }finally{if(app)await app.close();f.db.close();}
 });
