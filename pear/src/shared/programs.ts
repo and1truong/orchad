@@ -10,6 +10,7 @@ export interface Requirement {
   title: string;
   required: boolean;
   credits: number;
+  creditMode?:"fixed"|"nested_earned";
   alternatives: Reference[];
 }
 export interface Playlist {
@@ -63,8 +64,9 @@ export const awardSchema = optionalAudience({
       title: string(160),
       required: { type: "boolean" },
       credits: integer(1000, 1),
+      creditMode:enumeration("fixed","nested_earned"),
       alternatives: array(reference(["course", "award", "external"]), 8, 1),
-    }),
+    },["id","title","required","credits","alternatives"]),
     16,
     1,
   ),

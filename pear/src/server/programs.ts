@@ -238,6 +238,7 @@ export class ProgramService {
       reject("INVALID_ARGUMENT", "Invalid collection structure or size");
     const value = structuredClone(raw) as Award | Playlist;
     new ContentAccess(this.db).validate(p,value);
+    const capacity=(content:Award,depth=1):number=>{if(depth>4)reject("INVALID_ARGUMENT","Nested credit capacity exceeds depth bound");return content.requirements.reduce((sum,r)=>sum+(r.creditMode==="nested_earned"?Math.max(...r.alternatives.map(ref=>{if(ref.kind!=="award")reject("INVALID_ARGUMENT","Actual nested credits require only child awards");const child=this.collection(p,ref.id);return capacity(this.version(child.id,ref.version??child.latest_version) as Award,depth+1);})):r.credits),0);};
     let nodes = 0,
       criteria = 0,
       graphBytes = 0,
@@ -267,7 +268,7 @@ export class ProgramService {
       if (
         new Set(content.requirements.map((r) => r.id)).size !==
           content.requirements.length ||
-        content.completionMode!=="one_item"&&content.target > content.requirements.reduce((n, r) => n + r.credits, 0)
+        content.completionMode!=="one_item"&&content.target > capacity(content)
       )
         reject(
           "INVALID_ARGUMENT",
@@ -287,10 +288,13 @@ export class ProgramService {
             "INVALID_ARGUMENT",
             "Invalid or duplicate criterion alternatives",
           );
+        if(r.creditMode==="nested_earned"&&r.alternatives.some(ref=>ref.kind!=="award"))reject("INVALID_ARGUMENT","Actual nested credit criteria accept only child awards");
         for (const ref of r.alternatives) {
           this.reference(p, ref, content.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(awardId,p.tenant) as any)?.owner??p.id,content.groupIds??[]);
           if (ref.kind === "award") {
             const child = this.collection(p, ref.id);
+            const childContent=this.version(child.id,ref.version??child.latest_version) as Award;
+            if(r.creditMode==="nested_earned"&&(childContent.unit!==content.unit||content.unit==="custom"&&(childContent.unitSingular!==content.unitSingular||childContent.unitPlural!==content.unitPlural)))reject("INVALID_ARGUMENT","Actual nested credits require identical unit labels; quantity conversion is unsupported");
             // Draft cycle checks are deliberately conservative, including drafts
             // that have not yet been published. Published graphs remain immutable.
             walk(
@@ -391,7 +395,7 @@ export class ProgramService {
         reject("INTERNAL", "Stored award graph violates bounds");
       const requirements = award.requirements.map((r) => {
         const criterionPath = prefix + r.id;
-        let earned = 0;
+        let earned = 0,nestedComplete=false,nestedCapacity=0;
         const alternatives = r.alternatives.map((ref) => {
           if (ref.kind === "course") {
             const completed = !!this.db
@@ -414,7 +418,7 @@ export class ProgramService {
               `${criterionPath}/${ref.id}@${ref.version}/`,
               depth + 1,
             );
-            if (child.completed) earned = r.credits;
+            if(r.creditMode==="nested_earned"){earned=Math.max(earned,child.earned);nestedComplete ||= child.completed;nestedCapacity=Math.max(nestedCapacity,child.capacity);}else if (child.completed) earned = r.credits;
             return { ...ref, ...child };
           }
           const evidence = records.filter(
@@ -453,9 +457,10 @@ export class ProgramService {
           id: r.id,
           title: r.title,
           required: r.required,
-          credits: r.credits,
+          credits: r.creditMode==="nested_earned"?nestedCapacity:r.credits,
+          creditMode:r.creditMode??"fixed",
           earned,
-          completed: earned >= r.credits,
+          completed: r.creditMode==="nested_earned"?nestedComplete:earned >= r.credits,
           criterionPath,
           alternatives,
         };
@@ -472,6 +477,7 @@ export class ProgramService {
         completionMode:award.completionMode??"target",
         target: award.target,
         ongoing: award.ongoing,
+        capacity:requirements.reduce((sum:any,r:any)=>sum+r.credits,0),
         earned,
         requiredComplete,
         completed: !award.ongoing && (award.completionMode==="one_item"?requirements.some(r=>r.completed):requiredComplete && earned >= award.target),

@@ -190,7 +190,7 @@ function Progress({
         <section className="panel" key={r.criterionPath}>
           <h4>{r.title}</h4>
           <p>
-            {r.required ? "Required" : "Elective"} · {r.earned} / {r.credits}{" "}
+            {r.creditMode==="nested_earned"&&<span>{translateUI("Actual earned child award credits")} · </span>}{r.required ? "Required" : "Elective"} · {r.earned} / {r.credits}{" "}
             {awardUnitLabel(progress,r.credits)} · {r.completed ? "Complete" : "In progress"}
           </p>
           {r.alternatives.map((ref: any, i: number) => (
@@ -684,7 +684,9 @@ export function Programs(props: Props) {
                             })
                           }
                         />{translateUI("Required criterion")}</label>
-                      <label>{translateUI("Criterion credits or hours")}<input
+                      <label>{translateUI("Criterion credit calculation")}<select value={r.creditMode??"fixed"} onChange={e=>updateRequirement(i,{...r,creditMode:e.target.value as Requirement["creditMode"]})}><option value="fixed">{translateUI("Fixed criterion quantity")}</option><option value="nested_earned">{translateUI("Actual earned child award credits")}</option></select></label>
+                      {r.creditMode==="nested_earned"&&<p>{translateUI("Only child award alternatives with identical units. Greatest actual child quantity counts once; child completion determines the required criterion.")}</p>}
+                      <label>{translateUI("Criterion credits or hours")}<input disabled={r.creditMode==="nested_earned"}
                           type="number"
                           min={1}
                           max={1000}
@@ -703,7 +705,7 @@ export function Programs(props: Props) {
                         onChange={(alternatives) =>
                           updateRequirement(i, { ...r, alternatives })
                         }
-                        kinds={["course", "award", "external"]}
+                        kinds={r.creditMode==="nested_earned"?["award"]:["course", "award", "external"]}
                         busy={busy}
                       />
                       <button
