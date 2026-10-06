@@ -28,6 +28,7 @@ test("admin reviews a pinned endpoint, actual signed event arrives, delivery is 
   await expect(region.getByText(/delivered/)).toBeVisible();
   const description=await page.evaluate(()=>window.agentBridgeV1!.describe());expect(description.tools.some(t=>/webhook|integration|credential/.test(t.name))).toBe(false);
   await region.getByRole("button",{name:"Disable event delivery",exact:true}).click();
+  await expect(region.getByText(/Paused/)).toBeVisible();
   await expect(region.getByRole("button",{name:"Disable event delivery",exact:true})).toBeDisabled();
   const next=service.context("learner-b","learning:demo:learner-b");
   expect(service.invoke("learner-b",{requestId:crypto.randomUUID(),documentId:next.documentId,toolName:"learning_enroll",arguments:{courseId:"systems-basics"},expectedRevision:next.revision,idempotencyKey:"disabled-event"},"human").ok).toBe(true);
