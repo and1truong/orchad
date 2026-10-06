@@ -178,7 +178,15 @@ export class ReportService {
         score: null,
         requiredComplete: null,
       }));
-    return [...courses, ...awards, ...items];
+    return [...courses, ...awards, ...items].map(row => {
+      const measured = row.kind==="award" ? null : this.db.prepare(
+        "SELECT elapsed_ms FROM study_totals WHERE tenant=? AND learner=? AND kind=? AND target_id=?"
+      ).get(p.tenant,row.learnerId,row.kind,row.id) as any;
+      return {...row, estimatedMinutes: row.kind==="course"
+        ? JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(row.contentId,row.version) as any).content).duration
+        : null,
+        observedSeconds: row.kind==="award" ? null : Math.floor((measured?.elapsed_ms ?? 0)/1000)};
+    });
   }
   private filtered(rows: any[], s: ReportSpec) {
     const q = s.query.normalize("NFKC").toLowerCase();

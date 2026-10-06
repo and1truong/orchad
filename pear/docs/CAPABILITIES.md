@@ -59,3 +59,5 @@ Feedback/certificate layer: ADR-012 records human-confirmed version opinions, pr
 Standalone ledger layer: ADR-013 records exact-version tracking, human-confirmed reading, retained retired-source access, model/file egress gates and scoped item transcripts/reports. It never creates course/award credit, assessment score or a certificate.
 
 Calendar recurrence layer: ADR-014 adds reviewed named-zone monthly anchors, original-anchor month-end clamping, explicit fold choice, forward gap resolution and calendar fixed deadlines while retaining elapsed rolling deadlines and legacy UTC-day plans. Fixtures cover restart and immutable delivered cycles. Exact reference recurrence semantics and external notification delivery remain open; current-head CI is required.
+
+Study telemetry layer: ADR-015 adds explicit human study timers with bounded server intervals, session leases, gap exclusion and durable totals. Reports keep intended minutes, observed timer seconds, official scores and credits separate. This is observed timer telemetry, not verified attention or provider-runtime tracking. Full reference reconciliation remains open.

@@ -18,6 +18,8 @@ export const reportColumns = [
   "cycleId",
   "score",
   "requiredComplete",
+  "estimatedMinutes",
+  "observedSeconds",
 ] as const;
 export type ReportColumn = (typeof reportColumns)[number];
 export interface ReportSpec {
@@ -59,7 +61,7 @@ export const reportSchema = object({
   contentId: string(64, 0),
   completedFrom: { type: ["string", "null"], maxLength: 10 },
   completedTo: { type: ["string", "null"], maxLength: 10 },
-  columns: array(enumeration(...reportColumns), 17, 1),
+  columns: array(enumeration(...reportColumns), 19, 1),
   sortBy: enumeration(...reportColumns),
   descending: { type: "boolean" },
 });

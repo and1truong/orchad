@@ -1,3 +1,4 @@
+import { TelemetryService } from "./telemetry.ts";
 import { uploadLimit, type MediaContext } from "./media.ts";
 import { DomainError } from "./errors.ts";
 import Fastify from "fastify";
@@ -290,6 +291,24 @@ export async function createApp(opts: {
         .send(failure(e.code, e.message));
     throw e;
   };
+  const telemetry = new TelemetryService(opts.db);
+  app.get("/api/study-timer", async (req, reply) => {
+    try {
+      const q=req.query as any;
+      return telemetry.get(service.principal((req as any).session.principal),q.kind,q.targetId);
+    } catch(e) { return mediaFailure(e,reply); }
+  });
+  app.post("/api/study-timer", {schema:{body:object({
+    action:{type:"string",enum:["start","pulse","stop"]},
+    kind:{type:"string",enum:["course","item"]},
+    targetId:{type:"string",minLength:1,maxLength:64},
+    token:{type:"string",minLength:1,maxLength:64},
+  },["action","kind","targetId"])}}, async (req, reply) => {
+    try {
+      const s=(req as any).session;
+      return telemetry.act(service.principal(s.principal),s.token_hash,req.body as any);
+    } catch(e) { return mediaFailure(e,reply); }
+  });
   app.post("/api/uploads", { bodyLimit: uploadLimit }, async (req, reply) => {
     try {
       if (!opts.developmentAuth)

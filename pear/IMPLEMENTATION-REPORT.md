@@ -120,3 +120,9 @@ Observed standalone head: build/typecheck PASS; 81 domain/HTTP tests PASS; host 
 Optional monthly policy uses original date/clock anchors in a named timezone, clamps month ends, explicitly resolves repeated times and shifts missing times by the gap. Fixed deadlines retain their separate calendar anchor; rolling deadlines remain elapsed days from actual delivery. Existing delivered cycles remain pinned through edits. Six domain fixtures and one browser journey extend validation for transitions, deadlines, restart and bounded catchup. No migration or external delivery claim. See ADR-014.
 
 The local execution environment is disconnected. Calendar arithmetic goldens were exercised against the actual helper in the authoring runtime; Node build/typecheck, SQLite tests and browser lanes have not yet been claimed as passing. Exact-head GitHub Actions results will be recorded in the PR.
+
+Calendar PR #73 head b0ac1160431ce32672479cd7fe7870d3440315e3 passed all eight acceptance jobs in run 37475793046, including strict unpacked Lime and actual Coconut native; Pear ran 87 domain/HTTP tests, 14 development and 14 production journeys, and 2 shared-Pi journeys.
+
+## Optional study telemetry — stacked on PR #73
+
+Migration 013 stores private timer totals and one session-bound lease per learner. Human readers explicitly start/pause; visible-browser pulses accumulate bounded server-clock intervals without accepting client duration. Long gaps, hidden tabs, revoked access and overlapping leases cannot inflate the same interval. Timers never change official learning or CAS revisions. Course/item transcript/report/export rows add separate intended duration and observed seconds; awards remain null. Five domain/HTTP fixtures and a production/development browser journey cover persistence, authority, rollback and no official progress. Local runner remains offline; exact-head CI is required before claiming Node/SQLite/browser PASS.

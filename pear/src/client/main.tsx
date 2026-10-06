@@ -1,3 +1,4 @@
+import { StudyTimer } from "./study-timer.tsx";
 import { StandaloneLearning } from "./standalone-learning.tsx";
 import { Certificate } from "./certificate.tsx";
 import { CourseFeedback, CourseRatings, FeedbackReview } from "./feedback.tsx";
@@ -931,6 +932,7 @@ function App() {
             {active && (
               <section className="panel">
                 <h2>{active.course.title}</h2>
+                <StudyTimer key={session.sessionEpoch+active.id} session={session} kind="course" targetId={active.id} busy={busy} />
                 <nav className="lesson-nav">
                   {active.course.modules?.map((m: any) => (
                     <span className="badge" key={m.id}>

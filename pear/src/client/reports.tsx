@@ -34,6 +34,8 @@ const labels: Record<ReportColumn, string> = {
   cycleId: "Cycle ID",
   score: "Quiz score (%)",
   requiredComplete: "Required satisfied",
+  estimatedMinutes: "Intended duration (minutes)",
+  observedSeconds: "Study timer (seconds)",
 };
 const download = (csv: string, name: string) => {
   const url = URL.createObjectURL(

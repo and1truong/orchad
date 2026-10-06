@@ -196,7 +196,7 @@ test("export row/column matrix never broadens ACL, escapes formulas and binds al
           f.call("manager", "learning_export_report", { spec, rows, columns }),
         );
         const csv = parseCsv(result.csv);
-        assert.equal(csv[0].length, columns === "all" ? 17 : 2);
+        assert.equal(csv[0].length, columns === "all" ? 19 : 2);
         assert.equal(csv.length, rows === "all" ? 2 : 1);
         if (rows === "all") {
           assert.ok(

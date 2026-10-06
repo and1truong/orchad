@@ -105,7 +105,7 @@ test("human report builder saves owner definition, exports reviewed columns, and
     .getByRole("button", { name: "Download report CSV", exact: true })
     .click();
   const full = parseCsv(await readFile((await (await all).path())!, "utf8"));
-  expect(full[0]).toHaveLength(17);
+  expect(full[0]).toHaveLength(19);
   expect(full.slice(1).every((r) => r[0] !== "learner-b")).toBe(true);
   await report
     .getByRole("button", { name: "Delete saved report", exact: true })

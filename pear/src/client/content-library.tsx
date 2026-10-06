@@ -1,3 +1,4 @@
+import { StudyTimer } from "./study-timer.tsx";
 import { UploadField, UploadedMedia } from "./media.tsx";
 import type { Session } from "./api.ts";
 import React, { useState } from "react";
@@ -290,6 +291,7 @@ export function StandaloneReader({
         certificate
       </p>
       <p className="lesson-text">{item.text}</p>
+      {item.itemEnrollmentId && <StudyTimer key={session.sessionEpoch+item.itemEnrollmentId} session={session} kind="item" targetId={item.itemEnrollmentId} busy={busy} />}
       {!item.itemEnrollmentId && onTrack && (
         <button disabled={busy} onClick={onTrack}>
           Track this standalone version
