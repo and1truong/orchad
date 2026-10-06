@@ -7,7 +7,7 @@ test("mobile, tablet and desktop reflow; keyboard skip/navigation/lesson/quiz an
  const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist")});
  async function login(id:string){await page.getByLabel("Account",{exact:true}).fill(id);await page.getByLabel("Password",{exact:true}).fill(id+"-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();await expect(page.getByRole("button",{name:"Sign out",exact:true})).toBeVisible();}
  async function reflow(surface:string){const layout=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth}));expect(layout.scroll,surface+" must reflow without page-level horizontal scrolling").toBeLessThanOrEqual(layout.width+1);checks.push({surface,...layout});}
- async function keyboardButton(name:string){const button=page.getByRole("button",{name,exact:true});await button.focus();await expect(button).toBeFocused();await page.keyboard.press("Enter");}
+ async function keyboardButton(name:string){const button=page.getByRole("button",{name,exact:true});await expect(button).toBeEnabled();await button.focus();await expect(button).toBeFocused();await page.keyboard.press("Enter");}
  try{
   await app.listen({port:4322,host:"127.0.0.1"});await page.goto(origin);await login("learner-a");
   await expect(page.getByRole("main")).toHaveCount(1);await expect(page.getByRole("navigation",{name:"Learning navigation",exact:true})).toBeVisible();expect(await page.locator("html").getAttribute("lang")).toBe("en");
