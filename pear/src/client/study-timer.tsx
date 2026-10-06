@@ -40,7 +40,11 @@ export function StudyTimer({session,kind,targetId,busy=false}:{
         if(r.token)void request(path,session,{action:"stop",kind,targetId,token:r.token}).catch(()=>{});
         return;
       }
-      token.current=r.token??null;setActive(!!r.token);setSeconds(r.totalSeconds);
+      if(r.token && document.visibilityState!=="visible"){
+        token.current=null;setActive(false);
+        const stopped=await request<Result>(path,session,{action:"stop",kind,targetId,token:r.token});
+        if(live.current)setSeconds(stopped.totalSeconds);
+      } else {token.current=r.token??null;setActive(!!r.token);setSeconds(r.totalSeconds);}
     }catch(e){if(live.current){token.current=null;setActive(false);setError((e as Error).message);}}
     finally{if(live.current)setPending(false);}
   };
