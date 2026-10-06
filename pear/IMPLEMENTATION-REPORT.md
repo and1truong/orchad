@@ -152,3 +152,10 @@ Migration 015 records actual publication timestamps with unknown legacy dates. V
 ## Original timed captions — stacked on discovery
 
 No migration: optional versioned metadata references bounded validated text/vtt files, preserving media authority/quota/audit and existing production gates. Reusable source captions are pinned; bridge excludes file identifiers. Six domain/HTTP fixtures and one browser journey exercise malformed files, live read scope, source snapshot integrity and actual native cue/keyboard transcript behavior. Exact-head CI is required; no general WebVTT or WCAG conformance claim. ADR-019 records the frozen profile.
+
+
+Discovery PR #77 exact head b025c70cd489358a7a1c023572202d268468ec0e passed all eight acceptance jobs in run 37485541970: 105 domain/HTTP tests, 17 development/17 production journeys, shared-Pi, unpacked Lime and actual Pear native/MCP.
+
+## EN/VI interface expansion — stacked on timed captions
+
+Explicit UI text localization covers major learner/admin surfaces while keeping authored text, backend enums/IDs and official learning untouched. The locale persists independently of content preferences; switching keeps controlled drafts and bridge authority. Report dates keep UTC and source recommendation declarations remain verbatim. Three unit fixtures and one real locale/draft/reload/source browser journey require exact-head CI. ADR-020 records untranslated diagnostic/provider and content-variant gaps; no full provider-language parity claim.

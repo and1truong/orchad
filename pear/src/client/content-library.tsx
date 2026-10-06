@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { StudyTimer } from "./study-timer.tsx";
 import { UploadField, UploadedMedia } from "./media.tsx";
@@ -45,8 +46,8 @@ export function ContentLibrary({
     [id, setId] = useState("");
   const [item, setItem] = useState<ContentItem>(emptyItem);
   return (
-    <section className="panel" aria-label="Reusable content library">
-      <h2>Standalone content library</h2>
+    <section className="panel" aria-label={translateUI("Reusable content library")}>
+      <h2>{translateUI("Standalone content library")}</h2>
       <p className="muted">
         Self-authored text, video, audio, document, interactive HTML or link.
         Publish exact reusable versions; source edits never rewrite enrolled
@@ -69,22 +70,16 @@ export function ContentLibrary({
                 setId(row.id);
                 setItem(structuredClone(row.draft));
               }}
-            >
-              Edit item draft
-            </button>
+            >{translateUI("Edit item draft")}</button>
             <button
               disabled={busy}
               onClick={() => onAction("learning_publish_content_item", row.id)}
-            >
-              Publish item
-            </button>
+            >{translateUI("Publish item")}</button>
             <button
               className="ghost"
               disabled={busy || row.state === "retired"}
               onClick={() => onAction("learning_retire_content_item", row.id)}
-            >
-              Retire item
-            </button>
+            >{translateUI("Retire item")}</button>
           </div>
         </section>
       ))}
@@ -93,16 +88,12 @@ export function ContentLibrary({
           className="ghost"
           disabled={offset === 0 || busy}
           onClick={() => onPage(Math.max(0, offset - 20))}
-        >
-          Previous items
-        </button>
+        >{translateUI("Previous items")}</button>
         <button
           className="ghost"
           disabled={nextOffset === null || busy}
           onClick={() => onPage(nextOffset!)}
-        >
-          Next items
-        </button>
+        >{translateUI("Next items")}</button>
       </div>
       <h3>{editing ? "Edit standalone draft" : "Create standalone item"}</h3>
       <form
@@ -114,11 +105,9 @@ export function ContentLibrary({
         }}
       >
         <fieldset disabled={busy}>
-          <legend>Item content and permissions</legend>
+          <legend>{translateUI("Item content and permissions")}</legend>
           <div className="editor">
-            <label>
-              Item ID
-              <input
+            <label>{translateUI("Item ID")}<input
                 required
                 maxLength={64}
                 disabled={editing}
@@ -126,18 +115,14 @@ export function ContentLibrary({
                 onChange={(e) => setId(e.target.value)}
               />
             </label>
-            <label>
-              Item title
-              <input
+            <label>{translateUI("Item title")}<input
                 required
                 maxLength={160}
                 value={item.title}
                 onChange={(e) => setItem({ ...item, title: e.target.value })}
               />
             </label>
-            <label>
-              Item summary
-              <textarea
+            <label>{translateUI("Item summary")}<textarea
                 required
                 maxLength={600}
                 value={item.summary}
@@ -145,9 +130,7 @@ export function ContentLibrary({
               />
             </label>
             <DiscoveryMetadataEditor value={item.discovery} onChange={value=>setItem(current=>{if(value)return {...current,discovery:value};const {discovery,...rest}=current;return rest;})} />
-            <label>
-              Item language
-              <select
+            <label>{translateUI("Item language")}<select
                 value={item.language}
                 onChange={(e) =>
                   setItem({
@@ -156,23 +139,19 @@ export function ContentLibrary({
                   })
                 }
               >
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
+                <option value="en">{translateUI("English")}</option>
+                <option value="vi">{translateUI("Tiếng Việt")}</option>
               </select>
             </label>
-            <label>
-              Item provider
-              <input
+            <label>{translateUI("Item provider")}<input
                 required
                 maxLength={100}
                 value={item.provider}
                 onChange={(e) => setItem({ ...item, provider: e.target.value })}
               />
             </label>
-            <label>
-              Item format
-              <select
-                aria-label="Item format"
+            <label>{translateUI("Item format")}<select
+                aria-label={translateUI("Item format")}
                 value={item.kind}
                 onChange={(e) =>
                   setItem({
@@ -185,17 +164,15 @@ export function ContentLibrary({
                   })
                 }
               >
-                <option value="text">Text</option>
-                <option value="video">HTTPS video</option>
-                <option value="link">HTTPS link</option>
-                <option value="audio">Uploaded audio</option>
-                <option value="document">Uploaded PDF</option>
-                <option value="interactive">Interactive HTML</option>
+                <option value="text">{translateUI("Text")}</option>
+                <option value="video">{translateUI("HTTPS video")}</option>
+                <option value="link">{translateUI("HTTPS link")}</option>
+                <option value="audio">{translateUI("Uploaded audio")}</option>
+                <option value="document">{translateUI("Uploaded PDF")}</option>
+                <option value="interactive">{translateUI("Interactive HTML")}</option>
               </select>
             </label>
-            <label>
-              Item text
-              <textarea
+            <label>{translateUI("Item text")}<textarea
                 required
                 maxLength={2500}
                 value={item.text}
@@ -214,16 +191,14 @@ export function ContentLibrary({
                     setItem((current) => ({ ...current, assetId }))
                   }
                 />
-                {item.assetId && <p>Stored asset: {item.assetId}</p>}
+                {item.assetId && <p>{translateUI("Stored asset:")}{" "}{item.assetId}</p>}
               </>
             )}
             {["audio","video"].includes(item.kind)&&item.assetId&&<CaptionEditor session={session} tracks={item.captions} onChange={captions=>setItem(current=>{
               const next={...current};if(captions)next.captions=captions;else delete next.captions;return next;
             })}/>}
             {["video", "link"].includes(item.kind) && !item.assetId && (
-              <label>
-                Item HTTPS URL
-                <input
+              <label>{translateUI("Item HTTPS URL")}<input
                   required
                   type="url"
                   maxLength={2048}
@@ -233,9 +208,7 @@ export function ContentLibrary({
               </label>
             )}
             {["video", "audio", "interactive"].includes(item.kind) && (
-              <label>
-                Item transcript
-                <textarea
+              <label>{translateUI("Item transcript")}<textarea
                   required
                   maxLength={2500}
                   value={item.transcript ?? ""}
@@ -252,13 +225,11 @@ export function ContentLibrary({
                 onChange={(e) =>
                   setItem({ ...item, aiProcessingAllowed: e.target.checked })
                 }
-              />
-              Allow model processing of this self-authored item
-            </label>
+              />{translateUI("Allow model processing of this self-authored item")}</label>
           </div>
         </fieldset>
         <div className="actions">
-          <button disabled={busy}>Save item draft</button>
+          <button disabled={busy}>{translateUI("Save item draft")}</button>
           <button
             type="button"
             className="ghost"
@@ -267,9 +238,7 @@ export function ContentLibrary({
               setEditing(false);
               setItem(emptyItem());
             }}
-          >
-            New item
-          </button>
+          >{translateUI("New item")}</button>
         </div>
       </form>
     </section>
@@ -292,18 +261,15 @@ export function StandaloneReader({
 }) {
   const [confirmed, setConfirmed] = useState(false);
   return (
-    <section className="panel" aria-label="Standalone item reader">
+    <section className="panel" aria-label={translateUI("Standalone item reader")}>
       <h2>{item.title}</h2>
-      <p>
-        Standalone item · Version {item.version} · No course progress or
+      <p>{translateUI("Standalone item · Version")}{" "}{item.version} · No course progress or
         certificate
       </p>
       <p className="lesson-text">{item.text}</p>
       {item.itemEnrollmentId && <StudyTimer key={session.sessionEpoch+item.itemEnrollmentId} session={session} kind="item" targetId={item.itemEnrollmentId} busy={busy} />}
       {!item.itemEnrollmentId && onTrack && (
-        <button disabled={busy} onClick={onTrack}>
-          Track this standalone version
-        </button>
+        <button disabled={busy} onClick={onTrack}>{translateUI("Track this standalone version")}</button>
       )}
       {item.itemEnrollmentId && (
         <p>
@@ -314,18 +280,14 @@ export function StandaloneReader({
       )}
       {item.itemEnrollmentId && item.status !== "completed" && onComplete && (
         <fieldset disabled={busy}>
-          <legend>Confirm reading</legend>
+          <legend>{translateUI("Confirm reading")}</legend>
           <label className="choice">
             <input
               type="checkbox"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
-            />
-            I confirm I have studied this standalone version.
-          </label>
-          <button disabled={!confirmed} onClick={onComplete}>
-            Confirm standalone reading
-          </button>
+            />{translateUI("I confirm I have studied this standalone version.")}</label>
+          <button disabled={!confirmed} onClick={onComplete}>{translateUI("Confirm standalone reading")}</button>
         </fieldset>
       )}
       <UploadedMedia
@@ -341,19 +303,15 @@ export function StandaloneReader({
         <video controls preload="none" src={item.url} aria-label={item.title} />
       )}
       {item.kind === "link" && (
-        <a href={item.url} target="_blank" rel="noopener noreferrer">
-          Open content link
-        </a>
+        <a href={item.url} target="_blank" rel="noopener noreferrer">{translateUI("Open content link")}</a>
       )}
       {item.transcript && (
         <details>
-          <summary>Transcript</summary>
+          <summary>{translateUI("Transcript")}</summary>
           <p className="lesson-text">{item.transcript}</p>
         </details>
       )}
-      <button className="ghost" disabled={busy} onClick={onClose}>
-        Close item
-      </button>
+      <button className="ghost" disabled={busy} onClick={onClose}>{translateUI("Close item")}</button>
     </section>
   );
 }

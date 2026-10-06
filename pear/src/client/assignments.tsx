@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 import type { AssignmentPlan } from "../shared/assignments.ts";
 type Props = {
@@ -75,7 +76,7 @@ export function Assignments(p: Props) {
     setMemberOffset(0);
   };
   return (
-    <section className="assignments" aria-label="Assignment operations">
+    <section className="assignments" aria-label={translateUI("Assignment operations")}>
       <h2>
         {p.administrative ? "Scheduled assignments" : "Your notifications"}
       </h2>
@@ -92,12 +93,10 @@ export function Assignments(p: Props) {
           {rows.map((row) => (
             <section className="panel" key={row.id}>
               <h3>{row.plan.title}</h3>
-              <p>
-                ID {row.id} · {row.state} · Version {row.version} ·{" "}
+              <p>{translateUI("ID")}{" "}{row.id} · {row.state} · Version {row.version} ·{" "}
                 {row.cycleCount} cycles · Target version {row.target_version}
               </p>
-              <p>
-                Starts {row.plan.startsAt} ·{" "}
+              <p>{translateUI("Starts")}{" "}{row.plan.startsAt} ·{" "}
                 {row.plan.repeatDays
                   ? `Every ${row.plan.repeatDays} UTC days`
                   : "Once"}{" "}
@@ -112,9 +111,7 @@ export function Assignments(p: Props) {
                   change(row.plan);
                   setReason("");
                 }}
-              >
-                Edit future rules
-              </button>
+              >{translateUI("Edit future rules")}</button>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -132,29 +129,21 @@ export function Assignments(p: Props) {
                   });
                 }}
               >
-                <label>
-                  Plan action
-                  <select name="state" aria-label="Plan action">
-                    <option value="closed">Close future delivery</option>
-                    <option value="cancelled">
-                      Cancel outstanding obligations
-                    </option>
-                    <option value="active">Reactivate future delivery</option>
+                <label>{translateUI("Plan action")}<select name="state" aria-label={translateUI("Plan action")}>
+                    <option value="closed">{translateUI("Close future delivery")}</option>
+                    <option value="cancelled">{translateUI("Cancel outstanding obligations")}</option>
+                    <option value="active">{translateUI("Reactivate future delivery")}</option>
                   </select>
                 </label>
-                <label>
-                  Plan action reason
-                  <input name="reason" required maxLength={600} />
+                <label>{translateUI("Plan action reason")}<input name="reason" required maxLength={600} />
                 </label>
-                <button disabled={p.busy || row.state === "cancelled"}>
-                  Apply plan action
-                </button>
+                <button disabled={p.busy || row.state === "cancelled"}>{translateUI("Apply plan action")}</button>
               </form>
             </section>
           ))}
           <form
             className="panel"
-            aria-label="Assignment plan editor"
+            aria-label={translateUI("Assignment plan editor")}
             onSubmit={(e) => {
               e.preventDefault();
               void p.run(async () => {
@@ -169,11 +158,9 @@ export function Assignments(p: Props) {
               });
             }}
           >
-            <h3>Assignment plan editor</h3>
+            <h3>{translateUI("Assignment plan editor")}</h3>
             <fieldset disabled={p.busy}>
-              <label>
-                Plan ID
-                <input
+              <label>{translateUI("Plan ID")}<input
                   value={id}
                   required
                   pattern="[A-Za-z0-9_-]+"
@@ -181,31 +168,25 @@ export function Assignments(p: Props) {
                   onChange={(e) => setId(e.target.value)}
                 />
               </label>
-              <label>
-                Assignment title
-                <input
+              <label>{translateUI("Assignment title")}<input
                   value={spec.title}
                   required
                   maxLength={160}
                   onChange={(e) => change({ ...spec, title: e.target.value })}
                 />
               </label>
-              <label>
-                Target type
-                <select
-                  aria-label="Target type"
+              <label>{translateUI("Target type")}<select
+                  aria-label={translateUI("Target type")}
                   value={spec.targetKind}
                   onChange={(e) =>
                     change({ ...spec, targetKind: e.target.value as any })
                   }
                 >
-                  <option value="course">Course</option>
-                  <option value="award">Award</option>
+                  <option value="course">{translateUI("Course")}</option>
+                  <option value="award">{translateUI("Award")}</option>
                 </select>
               </label>
-              <label>
-                Assignment target ID
-                <input
+              <label>{translateUI("Assignment target ID")}<input
                   value={spec.targetId}
                   required
                   maxLength={64}
@@ -214,10 +195,8 @@ export function Assignments(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Audience type
-                <select
-                  aria-label="Audience type"
+              <label>{translateUI("Audience type")}<select
+                  aria-label={translateUI("Audience type")}
                   value={spec.audienceKind}
                   onChange={(e) =>
                     change(
@@ -238,15 +217,13 @@ export function Assignments(p: Props) {
                     )
                   }
                 >
-                  <option value="individuals">Individuals</option>
-                  <option value="group">Group</option>
+                  <option value="individuals">{translateUI("Individuals")}</option>
+                  <option value="group">{translateUI("Group")}</option>
                 </select>
               </label>
               {spec.audienceKind === "individuals" ? (
-                <label>
-                  Assignment learner IDs · one per line
-                  <textarea
-                    aria-label="Assignment learner IDs · one per line"
+                <label>{translateUI("Assignment learner IDs · one per line")}<textarea
+                    aria-label={translateUI("Assignment learner IDs · one per line")}
                     value={spec.learnerIds.join("\n")}
                     onChange={(e) =>
                       change({
@@ -258,9 +235,7 @@ export function Assignments(p: Props) {
                 </label>
               ) : (
                 <>
-                  <label>
-                    Assignment group ID
-                    <input
+                  <label>{translateUI("Assignment group ID")}<input
                       value={spec.groupId}
                       required
                       maxLength={64}
@@ -269,24 +244,20 @@ export function Assignments(p: Props) {
                       }
                     />
                   </label>
-                  <label>
-                    Membership policy
-                    <select
-                      aria-label="Membership policy"
+                  <label>{translateUI("Membership policy")}<select
+                      aria-label={translateUI("Membership policy")}
                       value={spec.membership}
                       onChange={(e) =>
                         change({ ...spec, membership: e.target.value as any })
                       }
                     >
-                      <option value="fixed">Fixed cohort at save</option>
-                      <option value="dynamic">Dynamic joins and leaves</option>
+                      <option value="fixed">{translateUI("Fixed cohort at save")}</option>
+                      <option value="dynamic">{translateUI("Dynamic joins and leaves")}</option>
                     </select>
                   </label>
                 </>
               )}
-              <label>
-                Starts · your local time
-                <input
+              <label>{translateUI("Starts · your local time")}<input
                   type="datetime-local"
                   required
                   value={local(spec.startsAt)}
@@ -308,35 +279,26 @@ export function Assignments(p: Props) {
                     const {repeatMonths, timeZone, dstChoice, ...legacy} = spec;
                     change(legacy);
                   }
-                }} />
-                Use calendar-month recurrence
-              </label>
+                }} />{translateUI("Use calendar-month recurrence")}</label>
               {spec.repeatMonths ? <>
-                <label>Repeat every calendar months
-                  <input type="number" min={1} max={12} required value={spec.repeatMonths}
+                <label>{translateUI("Repeat every calendar months")}<input type="number" min={1} max={12} required value={spec.repeatMonths}
                     onChange={e => change({...spec, repeatMonths: Number(e.target.value)})} />
                 </label>
-                <label>Recurrence timezone · IANA region or UTC
-                  <input required maxLength={80} value={spec.timeZone ?? ""}
+                <label>{translateUI("Recurrence timezone · IANA region or UTC")}<input required maxLength={80} value={spec.timeZone ?? ""}
                     onChange={e => change({...spec, timeZone: e.target.value})} />
                 </label>
-                <label>Repeated DST wall time
-                  <select aria-label="Repeated DST wall time" value={spec.dstChoice ?? "earlier"}
+                <label>{translateUI("Repeated DST wall time")}<select aria-label={translateUI("Repeated DST wall time")} value={spec.dstChoice ?? "earlier"}
                     onChange={e => change({...spec, dstChoice: e.target.value as "earlier" | "later"})}>
-                    <option value="earlier">Earlier occurrence</option>
-                    <option value="later">Later occurrence</option>
+                    <option value="earlier">{translateUI("Earlier occurrence")}</option>
+                    <option value="later">{translateUI("Later occurrence")}</option>
                   </select>
                 </label>
                 <p>Month ends clamp to the last day. A missing wall time shifts forward by its DST gap.
                   Start/deadline inputs use your browser timezone; future repeats use the named recurrence timezone shown below.</p>
-              </> : <label>
-                Repeat every UTC days · 0 for once
-                <input type="number" min={0} max={366} value={spec.repeatDays}
+              </> : <label>{translateUI("Repeat every UTC days · 0 for once")}<input type="number" min={0} max={366} value={spec.repeatDays}
                   onChange={e => change({...spec, repeatDays: Number(e.target.value)})} />
               </label>}
-              <label>
-                Ends · your local time · optional
-                <input
+              <label>{translateUI("Ends · your local time · optional")}<input
                   type="datetime-local"
                   value={local(spec.endAt)}
                   onChange={(e) =>
@@ -349,10 +311,8 @@ export function Assignments(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Deadline type
-                <select
-                  aria-label="Deadline type"
+              <label>{translateUI("Deadline type")}<select
+                  aria-label={translateUI("Deadline type")}
                   value={spec.dueKind}
                   onChange={(e) =>
                     change(
@@ -384,15 +344,13 @@ export function Assignments(p: Props) {
                     )
                   }
                 >
-                  <option value="none">No deadline</option>
-                  <option value="fixed">Fixed cohort deadline</option>
-                  <option value="rolling">Rolling from delivery</option>
+                  <option value="none">{translateUI("No deadline")}</option>
+                  <option value="fixed">{translateUI("Fixed cohort deadline")}</option>
+                  <option value="rolling">{translateUI("Rolling from delivery")}</option>
                 </select>
               </label>
               {spec.dueKind === "fixed" && (
-                <label>
-                  First fixed deadline · your local time
-                  <input
+                <label>{translateUI("First fixed deadline · your local time")}<input
                     type="datetime-local"
                     required
                     value={local(spec.fixedDueAt)}
@@ -408,9 +366,7 @@ export function Assignments(p: Props) {
                 </label>
               )}
               {spec.dueKind === "rolling" && (
-                <label>
-                  Days after delivery
-                  <input
+                <label>{translateUI("Days after delivery")}<input
                     type="number"
                     min={1}
                     max={366}
@@ -422,21 +378,15 @@ export function Assignments(p: Props) {
                   />
                 </label>
               )}
-              <p>
-                Recurring fixed deadlines advance with the selected day or calendar-month cadence.
-                Rolling deadlines start when each member actually receives the
-                assignment. Every cycle pins its content and rules.
-              </p>
-              <label>
-                Assignment change reason
-                <input
+              <p>{translateUI("Recurring fixed deadlines advance with the selected day or calendar-month cadence. Rolling deadlines start when each member actually receives the assignment. Every cycle pins its content and rules.")}</p>
+              <label>{translateUI("Assignment change reason")}<input
                   value={reason}
                   required
                   maxLength={600}
                   onChange={(e) => setReason(e.target.value)}
                 />
               </label>
-              <button>Preview assignment audience</button>
+              <button>{translateUI("Preview assignment audience")}</button>
               {preview && (
                 <>
                   <p>
@@ -444,9 +394,9 @@ export function Assignments(p: Props) {
                     version {preview.version}
                   </p>
                   {preview.policy.nextRuns && <div>
-                    <h4>Calendar anchor and sample runs</h4>
+                    <h4>{translateUI("Calendar anchor and sample runs")}</h4>
                     <ul>{preview.policy.nextRuns.map((r: any) => <li key={r.utc}>{r.local} · {r.timeZone} · UTC {r.utc}</li>)}</ul>
-                    <p>Repeated times: {preview.policy.dstChoice}. Missing times: shift forward.
+                    <p>{translateUI("Repeated times:")}{" "}{preview.policy.dstChoice}. Missing times: shift forward.
                       Month ends: last day. Existing delivered cycles keep their original rules.</p>
                   </div>}
                   {preview.items.map((u: any) => (
@@ -459,17 +409,13 @@ export function Assignments(p: Props) {
                     onClick={() =>
                       setMemberOffset(Math.max(0, memberOffset - 20))
                     }
-                  >
-                    Previous audience · then preview
-                  </button>
+                  >{translateUI("Previous audience · then preview")}</button>
                   <button
                     type="button"
                     className="ghost"
                     disabled={preview.nextOffset === null}
                     onClick={() => setMemberOffset(preview.nextOffset)}
-                  >
-                    Next audience · then preview
-                  </button>
+                  >{translateUI("Next audience · then preview")}</button>
                 </>
               )}
               <button
@@ -490,9 +436,7 @@ export function Assignments(p: Props) {
                     setReview("");
                   })
                 }
-              >
-                Save reviewed assignment plan
-              </button>
+              >{translateUI("Save reviewed assignment plan")}</button>
               <button
                 className="ghost"
                 type="button"
@@ -501,9 +445,7 @@ export function Assignments(p: Props) {
                   change(fresh());
                   setReason("");
                 }}
-              >
-                New assignment plan
-              </button>
+              >{translateUI("New assignment plan")}</button>
             </fieldset>
           </form>
           {p.role === "admin" && (
@@ -520,9 +462,7 @@ export function Assignments(p: Props) {
                   );
                 })
               }
-            >
-              Run due assignment jobs
-            </button>
+            >{translateUI("Run due assignment jobs")}</button>
           )}
           <p>
             Deterministic jobs also run every 30 seconds while the Pear server
@@ -551,27 +491,23 @@ export function Assignments(p: Props) {
                     });
                   })
                 }
-              >
-                Mark notification read
-              </button>
+              >{translateUI("Mark notification read")}</button>
             </section>
           ))}
-          {!rows.length && <p>No notifications.</p>}
+          {!rows.length && <p>{translateUI("No notifications.")}</p>}
         </>
       )}
       <button
         className="ghost"
         disabled={p.busy || offset === 0}
         onClick={() => setOffset(Math.max(0, offset - 20))}
-      >
-        Previous {p.administrative ? "plans" : "notifications"}
+      >{translateUI("Previous")}{" "}{p.administrative ? "plans" : "notifications"}
       </button>
       <button
         className="ghost"
         disabled={p.busy || next === null}
         onClick={() => setOffset(next!)}
-      >
-        Next {p.administrative ? "plans" : "notifications"}
+      >{translateUI("Next")}{" "}{p.administrative ? "plans" : "notifications"}
       </button>
     </section>
   );

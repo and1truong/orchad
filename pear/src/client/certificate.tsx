@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useRef } from "react";
 import { printView } from "./print.ts";
 export function Certificate({
@@ -19,17 +20,15 @@ export function Certificate({
       <p>
         {c.learnerName} completed {c.title}, version {c.version}.
       </p>
-      <p>Issued {issued}</p>
+      <p>{translateUI("Issued")}{" "}{issued}</p>
       {award && (
         <p>
           {c.earned} {c.unit} earned
         </p>
       )}
-      <p>Certificate ID: {c.id}</p>
+      <p>{translateUI("Certificate ID:")}{" "}{c.id}</p>
       <p>{c.issuer}</p>
-      <p>
-        Self-authored development content. This certificate is not accredited.
-      </p>
+      <p>{translateUI("Self-authored development content. This certificate is not accredited.")}</p>
       <div className="print-controls">
         <a
           download={`pear-${award ? "award" : "certificate"}-${c.id}.txt`}
@@ -42,10 +41,8 @@ export function Certificate({
           onClick={() => {
             if (ref.current) printView(ref.current);
           }}
-        >
-          Print / save certificate PDF
-        </button>
-        <p>Choose Save as PDF in your browser's print dialog.</p>
+        >{translateUI("Print / save certificate PDF")}</button>
+        <p>{translateUI("Choose Save as PDF in your browser's print dialog.")}</p>
       </div>
     </section>
   );

@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useRef, useState } from "react";
 import { request, type Session } from "./api.ts";
 import {parseCaptions} from "../shared/captions.ts";
@@ -37,18 +38,14 @@ export function UploadField({
   };
   return (
     <fieldset disabled={uploading}>
-      <legend>Upload self-authored content</legend>
+      <legend>{translateUI("Upload self-authored content")}</legend>
       <label className="choice">
         <input
           type="checkbox"
           checked={confirmed}
           onChange={(e) => setConfirmed(e.target.checked)}
-        />
-        I own this content and may upload it
-      </label>
-      <label>
-        Content file
-        <input
+        />{translateUI("I own this content and may upload it")}</label>
+      <label>{translateUI("Content file")}<input
           type="file"
           accept={types[kind]}
           disabled={!confirmed}
@@ -193,7 +190,7 @@ export function UploadedMedia({
   }, [session.sessionEpoch, content.assetId, content.kind, contextKey]);
   if (!content.assetId) return null;
   return (
-    <section aria-label="Uploaded learning content">
+    <section aria-label={translateUI("Uploaded learning content")}>
       {error && <p role="alert">{error}</p>}
       {url &&
         (content.kind === "interactive" ? (
@@ -218,11 +215,9 @@ export function UploadedMedia({
             preload="metadata"
           >{tracks.map((t,i)=><track key={t.assetId} kind="captions" src={t.url} srcLang={t.language} label={t.label} default={i===0}/>)}</video>
         ) : (
-          <a href={url} download={content.title + ".pdf"}>
-            Download document
-          </a>
+          <a href={url} download={content.title + ".pdf"}>{translateUI("Download document")}</a>
         ))}
-      {tracks.map(t=><details key={t.assetId}><summary>Caption transcript · {t.label}</summary><p style={{whiteSpace:"pre-wrap"}}>{t.text}</p></details>)}
+      {tracks.map(t=><details key={t.assetId}><summary>{translateUI("Caption transcript ·")}{" "}{t.label}</summary><p style={{whiteSpace:"pre-wrap"}}>{t.text}</p></details>)}
     </section>
   );
 }

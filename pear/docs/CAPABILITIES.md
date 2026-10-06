@@ -69,3 +69,5 @@ Native host evidence layer: ADR-017 adds a strict actual Tauri WebView → built
 Discovery layer: ADR-018 adds complete internal metadata filters, explicit authorized comparison, controlled-concept retrieval and declared-profile recommendations with reasons/source IDs. This is a bounded rule baseline; full semantic/assistant quality and provider taxonomies remain open. Publication dates are actual Pear transactions; legacy dates stay unknown and accessibility remains author-declared.
 
 Timed caption layer: ADR-019 adds validated original plain-text WebVTT uploads, immutable source/version tracks, authorized human-only caption file access and native browser cues with keyboard-operable text transcripts. General WebVTT formats, caption quality and full screen-reader/mobile/WCAG audits remain open.
+
+Interface localization layer: ADR-020 adds explicit Vietnamese UI labels/accessible names across major surfaces and independent persisted interface locale without translating authored source data or backend IDs. Provider language coverage/content variants, exhaustive diagnostic translation and linguistic/accessibility audits remain open.

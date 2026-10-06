@@ -1,3 +1,4 @@
+import {translateUI,getUILocale,setUILocale} from "./i18n.ts";
 import { Discovery } from "./discovery.tsx";
 import { CurationPanel, CuratedContent } from "./curation.tsx";
 import { StudyTimer } from "./study-timer.tsx";
@@ -64,11 +65,12 @@ const labels = {
 const personal = (s: Session) =>
   `learning:${s.principal.tenant}:${s.principal.id}`;
 function App() {
+  useEffect(()=>{document.documentElement.lang=getUILocale();},[]);
   const [session, setSessionState] = useState<Session | null>(null),
     [ready, setReady] = useState(false),
     [view, setView] = useState("catalog"),
     [assistantGroup, setAssistantGroup] = useState<ToolGroup>("learning"),
-    [locale, setLocale] = useState<"en" | "vi">("en"),
+    [locale, setLocale] = useState<"en" | "vi">(getUILocale),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
@@ -324,21 +326,14 @@ function App() {
     setCertificate(null);
     setPreview(null);
   };
-  if (!ready) return <main>Loading Pear…</main>;
+  if (!ready) return <main>{translateUI("Loading Pear…")}</main>;
   if (!session)
     return (
       <main className="signin">
-        <div className="brand">◒ pear</div>
-        <p className="eyebrow">A little progress, every day</p>
-        <h1>
-          Your next
-          <br />
-          learning chapter.
-        </h1>
-        <p className="muted">
-          Self-authored courses. Real progress. An assistant through Lime when
-          you choose.
-        </p>
+        <div className="brand">{translateUI("◒ pear")}</div>
+        <p className="eyebrow">{translateUI("A little progress, every day")}</p>
+        <h1>{translateUI("Your next")}<br />{translateUI("learning chapter.")}</h1>
+        <p className="muted">{translateUI("Self-authored courses. Real progress. An assistant through Lime when you choose.")}</p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -355,18 +350,14 @@ function App() {
             });
           }}
         >
-          <label>
-            Account
-            <input
+          <label>{translateUI("Account")}<input
               name="username"
               defaultValue="learner-a"
               required
               autoComplete="username"
             />
           </label>
-          <label>
-            Password
-            <input
+          <label>{translateUI("Password")}<input
               name="password"
               type="password"
               defaultValue="learner-a-dev"
@@ -376,11 +367,7 @@ function App() {
           </label>
           <button disabled={busy}>{t.login}</button>
         </form>
-        <p className="dev">
-          Synthetic development portal. Accounts: learner-a, learner-b, manager,
-          admin, editor, assessor. Password: account name + “-dev”. Production
-          identity is not configured.
-        </p>
+        <p className="dev">{translateUI("Synthetic development portal. Accounts: learner-a, learner-b, manager, admin, editor, assessor. Password: account name + “-dev”. Production identity is not configured.")}</p>
         {error && <p role="alert">{error}</p>}
       </main>
     );
@@ -390,12 +377,10 @@ function App() {
   return (
     <div className="shell">
       <aside>
-        <div className="brand">◒ pear</div>
-        <p className="eyebrow">Learning workspace</p>
-        <label>
-          Assistant workspace
-          <select
-            aria-label="Assistant workspace"
+        <div className="brand">{translateUI("◒ pear")}</div>
+        <p className="eyebrow">{translateUI("Learning workspace")}</p>
+        <label>{translateUI("Assistant workspace")}<select
+            aria-label={translateUI("Assistant workspace")}
             value={assistantGroup}
             disabled={busy}
             onChange={(e) => setAssistantGroup(e.target.value as ToolGroup)}
@@ -445,18 +430,16 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <label>
-            Interface language
-            <select
+          <label>{translateUI("Interface language")}<select
               value={locale}
               onChange={(e) => {
                 const v = e.target.value as "en" | "vi";
+                setUILocale(v);
                 setLocale(v);
-                document.documentElement.lang = v;
               }}
             >
-              <option value="en">English</option>
-              <option value="vi">Tiếng Việt</option>
+              <option value="en">{translateUI("English")}</option>
+              <option value="vi">{translateUI("Tiếng Việt")}</option>
             </select>
           </label>
           <p>
@@ -481,7 +464,7 @@ function App() {
       <main>
         <header>
           <div>
-            <p className="eyebrow">Your learning, at your pace</p>
+            <p className="eyebrow">{translateUI("Your learning, at your pace")}</p>
             <h1>
               {view === "catalog"
                 ? "Make room for curiosity."
@@ -490,12 +473,9 @@ function App() {
                   : "Help your team grow."}
             </h1>
           </div>
-          <span className="badge">Synthetic demo · Originals only</span>
+          <span className="badge">{translateUI("Synthetic demo · Originals only")}</span>
         </header>
-        <p className="muted">
-          Lime can discover and explain permitted lessons. Assessment answers
-          and submissions stay with you.
-        </p>
+        <p className="muted">{translateUI("Lime can discover and explain permitted lessons. Assessment answers and submissions stay with you.")}</p>
         {error && (
           <p role="alert" className="error">
             {error}
@@ -526,7 +506,7 @@ function App() {
               <label className="search">
                 {t.search}
                 <input
-                  placeholder="Try systems, learning, security…"
+                  placeholder={translateUI("Try systems, learning, security…")}
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
@@ -535,44 +515,38 @@ function App() {
                   }}
                 />
               </label>
-              <label>
-                Content language
-                <select
+              <label>{translateUI("Content language")}<select
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                 >
-                  <option value="">All languages</option>
-                  <option value="en">English</option>
-                  <option value="vi">Tiếng Việt</option>
+                  <option value="">{translateUI("All languages")}</option>
+                  <option value="en">{translateUI("English")}</option>
+                  <option value="vi">{translateUI("Tiếng Việt")}</option>
                 </select>
               </label>
-              <label>
-                Time available
-                <select
+              <label>{translateUI("Time available")}<select
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                 >
-                  <option value="">Any duration</option>
-                  <option value="10">10 minutes</option>
-                  <option value="20">20 minutes</option>
+                  <option value="">{translateUI("Any duration")}</option>
+                  <option value="10">{translateUI("10 minutes")}</option>
+                  <option value="20">{translateUI("20 minutes")}</option>
                 </select>
               </label>
-              <label>
-                Topic
-                <select
+              <label>{translateUI("Topic")}<select
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                 >
-                  <option value="">All topics</option>
-                  <option>Distributed systems</option>
-                  <option>Learning skills</option>
-                  <option>Security</option>
+                  <option value="">{translateUI("All topics")}</option>
+                  <option>{translateUI("Distributed systems")}</option>
+                  <option>{translateUI("Learning skills")}</option>
+                  <option>{translateUI("Security")}</option>
                 </select>
               </label>
-              <button disabled={busy}>Search</button>
+              <button disabled={busy}>{translateUI("Search")}</button>
             </form>
             <div className="section-title">
-              <h2>Explore the collection</h2>
+              <h2>{translateUI("Explore the collection")}</h2>
               <span>{catalogTotal} courses</span>
             </div>
             <div className="cards">
@@ -601,9 +575,7 @@ function App() {
                             ),
                           )
                         }
-                      >
-                        Preview
-                      </button>
+                      >{translateUI("Preview")}</button>
                       <button
                         disabled={busy}
                         onClick={() =>
@@ -650,31 +622,27 @@ function App() {
                 onClick={() =>
                   setCatalogOffset(Math.max(0, catalogOffset - 20))
                 }
-              >
-                Previous courses
-              </button>
+              >{translateUI("Previous courses")}</button>
               <button
                 className="ghost"
                 disabled={catalogOffset + items.length >= catalogTotal}
                 onClick={() => setCatalogOffset(catalogOffset + items.length)}
-              >
-                Next courses
-              </button>
+              >{translateUI("Next courses")}</button>
             </div>
             {items.length === 0 && (
-              <p>No matching permitted content. Adjust your filters.</p>
+              <p>{translateUI("No matching permitted content. Adjust your filters.")}</p>
             )}
           </>
         )}
         {view === "catalog" && (
-          <section aria-label="Standalone discovery">
-            <h2>Standalone items</h2>
+          <section aria-label={translateUI("Standalone discovery")}>
+            <h2>{translateUI("Standalone items")}</h2>
             <p className="muted">
               Reading an item does not create course progress. Search keywords
               apply to both catalogs; course filters apply to courses only.
             </p>
             {standalone.length === 0 && (
-              <p>No published standalone items match.</p>
+              <p>{translateUI("No published standalone items match.")}</p>
             )}
             {standalone.map((item) => (
               <section className="learning-row" key={item.id}>
@@ -694,9 +662,7 @@ function App() {
                       if (sessionRef.current === session) setReadingItem(value);
                     })
                   }
-                >
-                  Read item
-                </button>
+                >{translateUI("Read item")}</button>
               </section>
             ))}
             <div className="actions">
@@ -706,16 +672,12 @@ function App() {
                 onClick={() =>
                   setStandaloneOffset(Math.max(0, standaloneOffset - 20))
                 }
-              >
-                Previous standalone
-              </button>
+              >{translateUI("Previous standalone")}</button>
               <button
                 className="ghost"
                 disabled={standaloneNext === null}
                 onClick={() => setStandaloneOffset(standaloneNext!)}
-              >
-                Next standalone
-              </button>
+              >{translateUI("Next standalone")}</button>
             </div>
           </section>
         )}
@@ -770,7 +732,7 @@ function App() {
             />
           )}
         {preview && (
-          <section className="panel" aria-label="Course preview">
+          <section className="panel" aria-label={translateUI("Course preview")}>
             <h2>{preview.title}</h2>
             <CourseRatings
               key={session.sessionEpoch + preview.id + preview.version}
@@ -788,16 +750,12 @@ function App() {
               {preview.quiz.questionCount} questions · Pass score{" "}
               {preview.quiz.passScore}% · {preview.quiz.maxAttempts} attempts
             </p>
-            <p>
-              Completion requires your lesson acknowledgement and a passing
-              backend-graded quiz.{" "}
+            <p>{translateUI("Completion requires your lesson acknowledgement and a passing backend-graded quiz.")}{" "}
               {preview.aiProcessingAllowed
                 ? "Lesson text may be shared with Lime after host consent."
                 : "Lesson text is withheld from Lime: model processing is not permitted."}
             </p>
-            <button className="ghost" onClick={() => setPreview(null)}>
-              Close preview
-            </button>
+            <button className="ghost" onClick={() => setPreview(null)}>{translateUI("Close preview")}</button>
           </section>
         )}
         {view === "learning" && (
@@ -810,13 +768,13 @@ function App() {
                       .length
                   }
                 </strong>
-                <span>In progress</span>
+                <span>{translateUI("In progress")}</span>
               </div>
               <div>
                 <strong>
                   {my.enrollments.filter((e: any) => e.overdue).length}
                 </strong>
-                <span>Overdue</span>
+                <span>{translateUI("Overdue")}</span>
               </div>
               <div>
                 <strong>
@@ -825,11 +783,11 @@ function App() {
                       .length
                   }
                 </strong>
-                <span>Completed</span>
+                <span>{translateUI("Completed")}</span>
               </div>
               <div>
                 <strong>{my.saved.length}</strong>
-                <span>Saved</span>
+                <span>{translateUI("Saved")}</span>
               </div>
             </div>
             <StandaloneLearning
@@ -845,13 +803,13 @@ function App() {
                 }
               }}
             />
-            <h2>Your next steps</h2>
+            <h2>{translateUI("Your next steps")}</h2>
             <p className="muted">
               Showing up to 20 enrollments. Counts above are for this page;
               saved lists are bounded.
             </p>
             {my.enrollments.length === 0 && (
-              <p>Choose a course from Explore to begin.</p>
+              <p>{translateUI("Choose a course from Explore to begin.")}</p>
             )}
             {my.enrollments.map((e: any) => (
               <section key={e.id} className="learning-row">
@@ -911,9 +869,7 @@ function App() {
                           ),
                         )
                       }
-                    >
-                      Certificate
-                    </button>
+                    >{translateUI("Certificate")}</button>
                   )}
                 </div>
               </section>
@@ -926,9 +882,7 @@ function App() {
                   clearLearning();
                   setLearningOffset(Math.max(0, learningOffset - 20));
                 }}
-              >
-                Previous learning
-              </button>
+              >{translateUI("Previous learning")}</button>
               <button
                 className="ghost"
                 disabled={my.nextOffset == null}
@@ -936,9 +890,7 @@ function App() {
                   clearLearning();
                   setLearningOffset(my.nextOffset);
                 }}
-              >
-                Next learning
-              </button>
+              >{translateUI("Next learning")}</button>
             </div>
             {active && (
               <section className="panel">
@@ -984,14 +936,12 @@ function App() {
                     )}
                     {lesson.url && (
                       <p>
-                        <a href={lesson.url} target="_blank" rel="noreferrer">
-                          Open learning resource
-                        </a>
+                        <a href={lesson.url} target="_blank" rel="noreferrer">{translateUI("Open learning resource")}</a>
                       </p>
                     )}
                     {lesson.transcript && (
                       <details>
-                        <summary>Transcript</summary>
+                        <summary>{translateUI("Transcript")}</summary>
                         <p>{lesson.transcript}</p>
                       </details>
                     )}
@@ -1061,7 +1011,7 @@ function App() {
                 </button>
                 {attempt && (
                   <div>
-                    <h3>Assessment · Attempt {attempt.number}</h3>
+                    <h3>{translateUI("Assessment · Attempt")}{" "}{attempt.number}</h3>
                     {attempt.questions.map((q: any) => (
                       <AssessmentQuestion
                         key={attempt.id + q.id}
@@ -1095,7 +1045,7 @@ function App() {
                     ))}
                     {attempt.feedback?.length > 0 && (
                       <details>
-                        <summary>Released answer feedback</summary>
+                        <summary>{translateUI("Released answer feedback")}</summary>
                         {attempt.feedback.map((f: any) => (
                           <p key={f.questionId}>
                             {f.questionId}:{" "}
@@ -1268,7 +1218,7 @@ function App() {
           <>
             {canEdit && (
               <>
-                <h2>Course library</h2>
+                <h2>{translateUI("Course library")}</h2>
                 <div className="admin-courses">
                   {drafts.map((d) => (
                     <section className="learning-row" key={d.id}>
@@ -1289,9 +1239,7 @@ function App() {
                             });
                             setEditorKey((n) => n + 1);
                           }}
-                        >
-                          Edit draft
-                        </button>
+                        >{translateUI("Edit draft")}</button>
                         <button
                           onClick={() =>
                             void run(async () => {
@@ -1303,9 +1251,7 @@ function App() {
                               );
                             })
                           }
-                        >
-                          Publish
-                        </button>
+                        >{translateUI("Publish")}</button>
                         <button
                           className="ghost"
                           onClick={() =>
@@ -1318,9 +1264,7 @@ function App() {
                               );
                             })
                           }
-                        >
-                          Retire
-                        </button>
+                        >{translateUI("Retire")}</button>
                       </div>
                     </section>
                   ))}
@@ -1332,16 +1276,12 @@ function App() {
                     onClick={() =>
                       setDraftOffset(Math.max(0, draftOffset - 20))
                     }
-                  >
-                    Previous courses
-                  </button>
+                  >{translateUI("Previous courses")}</button>
                   <button
                     className="ghost"
                     disabled={draftNext === null || busy}
                     onClick={() => setDraftOffset(draftNext!)}
-                  >
-                    Next courses
-                  </button>
+                  >{translateUI("Next courses")}</button>
                 </div>
                 <CourseEditor
                   key={String(editorKey) + ":" + session.sessionEpoch}
@@ -1413,7 +1353,7 @@ function App() {
             {["admin", "manager"].includes(role) && (
               <>
                 <section className="panel">
-                  <h2>Assign learning</h2>
+                  <h2>{translateUI("Assign learning")}</h2>
                   <form
                     className="filters"
                     onSubmit={(e) => {
@@ -1430,10 +1370,8 @@ function App() {
                       });
                     }}
                   >
-                    <label>
-                      Course
-                      <select
-                        aria-label="Course"
+                    <label>{translateUI("Course")}<select
+                        aria-label={translateUI("Course")}
                         value={selectedCourse}
                         onChange={(e) => setSelectedCourse(e.target.value)}
                       >
@@ -1444,10 +1382,8 @@ function App() {
                         ))}
                       </select>
                     </label>
-                    <label>
-                      Learner
-                      <select
-                        aria-label="Learner"
+                    <label>{translateUI("Learner")}<select
+                        aria-label={translateUI("Learner")}
                         value={learner}
                         onChange={(e) => setLearner(e.target.value)}
                       >
@@ -1458,27 +1394,25 @@ function App() {
                         ))}
                       </select>
                     </label>
-                    <label>
-                      Due date · your local time
-                      <input
+                    <label>{translateUI("Due date · your local time")}<input
                         type="datetime-local"
                         value={due}
                         onChange={(e) => setDue(e.target.value)}
                       />
                     </label>
-                    <button disabled={busy}>Assign course</button>
+                    <button disabled={busy}>{translateUI("Assign course")}</button>
                   </form>
                 </section>
-                <h2>Learning report</h2>
+                <h2>{translateUI("Learning report")}</h2>
                 <div className="table-wrap">
                   <table>
                     <thead>
                       <tr>
-                        <th>Learner</th>
-                        <th>Course</th>
-                        <th>Version</th>
-                        <th>Status</th>
-                        <th>Lessons</th>
+                        <th>{translateUI("Learner")}</th>
+                        <th>{translateUI("Course")}</th>
+                        <th>{translateUI("Version")}</th>
+                        <th>{translateUI("Status")}</th>
+                        <th>{translateUI("Lessons")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1494,8 +1428,7 @@ function App() {
                     </tbody>
                   </table>
                 </div>
-                <p className="muted">
-                  Server-enforced{" "}
+                <p className="muted">{translateUI("Server-enforced")}{" "}
                   {role === "manager" ? "direct-report" : "organization"} scope.
                   First 50 records.
                 </p>
@@ -1503,9 +1436,7 @@ function App() {
             )}
           </>
         )}
-        <footer>
-          Pear · A deterministic learning app, with an optional Lime assistant.
-        </footer>
+        <footer>{translateUI("Pear · A deterministic learning app, with an optional Lime assistant.")}</footer>
       </main>
     </div>
   );

@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState, useId } from "react";
 type Ops = {
   op: (name: string, args?: Record<string, unknown>) => Promise<any>;
@@ -40,9 +41,9 @@ export function CourseFeedback({
   }, [enrollmentId]);
   return (
     <details>
-      <summary>Rate this completed version</summary>
+      <summary>{translateUI("Rate this completed version")}</summary>
       <form
-        aria-label="Course feedback"
+        aria-label={translateUI("Course feedback")}
         onSubmit={(e) => {
           e.preventDefault();
           void ops.run(async () => {
@@ -57,10 +58,8 @@ export function CourseFeedback({
         }}
       >
         <fieldset disabled={ops.busy || loading}>
-          <legend>Voluntary feedback</legend>
-          <label>
-            Your rating
-            <select value={rating} onChange={(e) => setRating(e.target.value)}>
+          <legend>{translateUI("Voluntary feedback")}</legend>
+          <label>{translateUI("Your rating")}<select value={rating} onChange={(e) => setRating(e.target.value)}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <option key={n} value={n}>
                   {n} / 5
@@ -68,22 +67,17 @@ export function CourseFeedback({
               ))}
             </select>
           </label>
-          <label htmlFor={commentId}>Private feedback</label>
+          <label htmlFor={commentId}>{translateUI("Private feedback")}</label>
           <textarea
             id={commentId}
             value={comment}
             maxLength={1200}
             onChange={(e) => setComment(e.target.value)}
           />
-          <p>
-            Only you and your tenant administrator can read this comment.
-            Aggregate rating totals are visible for this course version.
-          </p>
+          <p>{translateUI("Only you and your tenant administrator can read this comment. Aggregate rating totals are visible for this course version.")}</p>
           <label className="choice">
-            <input type="checkbox" required />I confirm this rating and feedback
-            express my own opinion.
-          </label>
-          <button>Save course feedback</button>
+            <input type="checkbox" required />{translateUI("I confirm this rating and feedback express my own opinion.")}</label>
+          <button>{translateUI("Save course feedback")}</button>
         </fieldset>
         <p role="status">{notice}</p>
       </form>
@@ -147,27 +141,23 @@ export function FeedbackReview({ ops }: { ops: Ops }) {
       setNext(r.nextOffset);
     });
   return (
-    <section className="panel" aria-label="Private course feedback">
-      <h2>Private course feedback</h2>
-      <p>Tenant administrator view. Comments are withheld from assistants.</p>
+    <section className="panel" aria-label={translateUI("Private course feedback")}>
+      <h2>{translateUI("Private course feedback")}</h2>
+      <p>{translateUI("Tenant administrator view. Comments are withheld from assistants.")}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void load({ courseId, version: Number(version) }, 0);
         }}
       >
-        <label>
-          Feedback course ID
-          <input
+        <label>{translateUI("Feedback course ID")}<input
             required
             maxLength={64}
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
           />
         </label>
-        <label>
-          Feedback version
-          <input
+        <label>{translateUI("Feedback version")}<input
             required
             type="number"
             min={1}
@@ -176,7 +166,7 @@ export function FeedbackReview({ ops }: { ops: Ops }) {
             onChange={(e) => setVersion(e.target.value)}
           />
         </label>
-        <button disabled={ops.busy}>Load private feedback</button>
+        <button disabled={ops.busy}>{translateUI("Load private feedback")}</button>
       </form>
       {scope && (
         <>
@@ -198,16 +188,12 @@ export function FeedbackReview({ ops }: { ops: Ops }) {
             className="ghost"
             disabled={ops.busy || offset === 0}
             onClick={() => void load(scope, Math.max(0, offset - 20))}
-          >
-            Previous feedback
-          </button>
+          >{translateUI("Previous feedback")}</button>
           <button
             className="ghost"
             disabled={ops.busy || next === null}
             onClick={() => void load(scope, next!)}
-          >
-            Next feedback
-          </button>
+          >{translateUI("Next feedback")}</button>
         </>
       )}
     </section>

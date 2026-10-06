@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 export function completeResponse(q: any, a: any) {
   return (q.kind ?? "mcq") === "mcq"
@@ -52,10 +53,8 @@ export function AssessmentQuestion({
           </label>
         ))
       ) : q.kind === "long_answer" ? (
-        <label>
-          Your own written response
-          <textarea
-            aria-label="Your own written response"
+        <label>{translateUI("Your own written response")}<textarea
+            aria-label={translateUI("Your own written response")}
             maxLength={4000}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -77,7 +76,7 @@ export function AssessmentQuestion({
                   )
                 }
               >
-                <option value={-1}>Choose meaning</option>
+                <option value={-1}>{translateUI("Choose meaning")}</option>
                 {q.options.map((o: string, j: number) => (
                   <option value={j} key={j}>
                     {o}
@@ -103,9 +102,7 @@ export function AssessmentQuestion({
       )}
       {(q.kind ?? "mcq") !== "mcq" && (
         <>
-          <button className="ghost" onClick={() => save(draft)}>
-            Save response
-          </button>
+          <button className="ghost" onClick={() => save(draft)}>{translateUI("Save response")}</button>
           <p>
             {JSON.stringify(answer) === JSON.stringify(draft)
               ? "Response saved."

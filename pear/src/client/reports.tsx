@@ -1,3 +1,4 @@
+import {translateUI,formatUIDate} from "./i18n.ts";
 import { printView } from "./print.ts";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -63,7 +64,7 @@ function Table({ rows, columns }: { rows: any[]; columns: ReportColumn[] }) {
           <tr>
             {columns.map((c) => (
               <th key={c} scope="col">
-                {labels[c]}
+                {translateUI(labels[c])}
               </th>
             ))}
           </tr>
@@ -72,7 +73,7 @@ function Table({ rows, columns }: { rows: any[]; columns: ReportColumn[] }) {
           {rows.map((row) => (
             <tr key={row.id}>
               {columns.map((c) => (
-                <td key={c}>{display(row[c])}</td>
+                <td key={c}>{["kind","status","source","unit"].includes(c)?translateUI(display(row[c])):["dueDate","completedAt"].includes(c)&&row[c]?formatUIDate(row[c]):display(row[c])}</td>
               ))}
             </tr>
           ))}
@@ -215,7 +216,7 @@ export function Reports(p: Props) {
   return (
     <section
       className="reports"
-      aria-label={p.administrative ? "Report builder" : "Learning transcript"}
+      aria-label={translateUI(p.administrative ? "Report builder" : "Learning transcript")}
     >
       <h2>{p.administrative ? "Learning reports" : "Your transcript"}</h2>
       <p>
@@ -233,19 +234,16 @@ export function Reports(p: Props) {
           setRefresh((n) => n + 1);
           setPrintModel(null);
         }}
-      >
-        Refresh report
-      </button>
+      >{translateUI("Refresh report")}</button>
       {notice && <p role="status">{notice}</p>}
       {p.administrative && (
         <>
-          <h3>Saved reports</h3>
+          <h3>{translateUI("Saved reports")}</h3>
           {saved.map((r) => (
             <section className="learning-row" key={r.id}>
               <div>
                 <h4>{r.spec.title}</h4>
-                <p>
-                  ID {r.id} · Owner {r.owner} · Version {r.version}
+                <p>{translateUI("ID")}{" "}{r.id} · Owner {r.owner} · Version {r.version}
                 </p>
               </div>
               <button
@@ -254,9 +252,7 @@ export function Reports(p: Props) {
                   setReportId(r.id);
                   change(r.spec);
                 }}
-              >
-                Open saved report
-              </button>
+              >{translateUI("Open saved report")}</button>
               <button
                 className="ghost"
                 disabled={p.busy}
@@ -270,28 +266,22 @@ export function Reports(p: Props) {
                     );
                   })
                 }
-              >
-                Delete saved report
-              </button>
+              >{translateUI("Delete saved report")}</button>
             </section>
           ))}
           <button
             className="ghost"
             disabled={savedOffset === 0 || p.busy}
             onClick={() => setSavedOffset(Math.max(0, savedOffset - 20))}
-          >
-            Previous saved reports
-          </button>
+          >{translateUI("Previous saved reports")}</button>
           <button
             className="ghost"
             disabled={savedNext === null || p.busy}
             onClick={() => setSavedOffset(savedNext!)}
-          >
-            Next saved reports
-          </button>
+          >{translateUI("Next saved reports")}</button>
           <form
             className="panel"
-            aria-label="Report specification"
+            aria-label={translateUI("Report specification")}
             onSubmit={(e) => {
               e.preventDefault();
               void p.run(async () => {
@@ -303,9 +293,7 @@ export function Reports(p: Props) {
             }}
           >
             <fieldset disabled={p.busy}>
-              <label>
-                Report ID
-                <input
+              <label>{translateUI("Report ID")}<input
                   value={reportId}
                   required
                   maxLength={64}
@@ -313,19 +301,15 @@ export function Reports(p: Props) {
                   onChange={(e) => setReportId(e.target.value)}
                 />
               </label>
-              <label>
-                Report title
-                <input
+              <label>{translateUI("Report title")}<input
                   value={spec.title}
                   required
                   maxLength={160}
                   onChange={(e) => change({ ...spec, title: e.target.value })}
                 />
               </label>
-              <label>
-                Report template
-                <select
-                  aria-label="Report template"
+              <label>{translateUI("Report template")}<select
+                  aria-label={translateUI("Report template")}
                   value={spec.template}
                   onChange={(e) =>
                     change({ ...spec, template: e.target.value as any })
@@ -336,18 +320,14 @@ export function Reports(p: Props) {
                   ))}
                 </select>
               </label>
-              <label>
-                Report keywords
-                <input
+              <label>{translateUI("Report keywords")}<input
                   value={spec.query}
                   maxLength={200}
                   onChange={(e) => change({ ...spec, query: e.target.value })}
                 />
               </label>
-              <label>
-                Report type
-                <select
-                  aria-label="Report type"
+              <label>{translateUI("Report type")}<select
+                  aria-label={translateUI("Report type")}
                   value={spec.kind}
                   onChange={(e) =>
                     change({ ...spec, kind: e.target.value as any })
@@ -358,10 +338,8 @@ export function Reports(p: Props) {
                   ))}
                 </select>
               </label>
-              <label>
-                Report status
-                <select
-                  aria-label="Report status"
+              <label>{translateUI("Report status")}<select
+                  aria-label={translateUI("Report status")}
                   value={spec.status}
                   onChange={(e) =>
                     change({ ...spec, status: e.target.value as any })
@@ -379,10 +357,8 @@ export function Reports(p: Props) {
                   ))}
                 </select>
               </label>
-              <label>
-                Report origin
-                <select
-                  aria-label="Report origin"
+              <label>{translateUI("Report origin")}<select
+                  aria-label={translateUI("Report origin")}
                   value={spec.source}
                   onChange={(e) =>
                     change({ ...spec, source: e.target.value as any })
@@ -393,9 +369,7 @@ export function Reports(p: Props) {
                   ))}
                 </select>
               </label>
-              <label>
-                Filter learner ID · optional
-                <input
+              <label>{translateUI("Filter learner ID · optional")}<input
                   value={spec.learnerId}
                   maxLength={64}
                   onChange={(e) =>
@@ -403,9 +377,7 @@ export function Reports(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Filter content ID · optional
-                <input
+              <label>{translateUI("Filter content ID · optional")}<input
                   value={spec.contentId}
                   maxLength={64}
                   onChange={(e) =>
@@ -413,9 +385,7 @@ export function Reports(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Completed from · UTC date
-                <input
+              <label>{translateUI("Completed from · UTC date")}<input
                   type="date"
                   value={spec.completedFrom ?? ""}
                   onChange={(e) =>
@@ -423,9 +393,7 @@ export function Reports(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Completed through · UTC date
-                <input
+              <label>{translateUI("Completed through · UTC date")}<input
                   type="date"
                   value={spec.completedTo ?? ""}
                   onChange={(e) =>
@@ -433,10 +401,8 @@ export function Reports(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Sort column
-                <select
-                  aria-label="Sort column"
+              <label>{translateUI("Sort column")}<select
+                  aria-label={translateUI("Sort column")}
                   value={spec.sortBy}
                   onChange={(e) =>
                     change({ ...spec, sortBy: e.target.value as ReportColumn })
@@ -444,7 +410,7 @@ export function Reports(p: Props) {
                 >
                   {reportColumns.map((c) => (
                     <option value={c} key={c}>
-                      {labels[c]}
+                      {translateUI(labels[c])}
                     </option>
                   ))}
                 </select>
@@ -456,10 +422,8 @@ export function Reports(p: Props) {
                   onChange={(e) =>
                     change({ ...spec, descending: e.target.checked })
                   }
-                />
-                Descending order
-              </label>
-              <button>Save own report</button>
+                />{translateUI("Descending order")}</label>
+              <button>{translateUI("Save own report")}</button>
               <button
                 type="button"
                 className="ghost"
@@ -467,20 +431,18 @@ export function Reports(p: Props) {
                   setReportId("");
                   change(freshReport());
                 }}
-              >
-                New report
-              </button>
+              >{translateUI("New report")}</button>
             </fieldset>
           </form>
         </>
       )}
       <fieldset disabled={p.busy}>
-        <legend>Visible report columns</legend>
+        <legend>{translateUI("Visible report columns")}</legend>
         {reportColumns.map((c) => (
           <label className="choice" key={c}>
             <input
               type="checkbox"
-              aria-label={"Show column " + labels[c]}
+              aria-label={translateUI("Show column")+" "+translateUI(labels[c])}
               checked={spec.columns.includes(c)}
               disabled={spec.columns.length === 1 && spec.columns.includes(c)}
               onChange={(e) =>
@@ -492,7 +454,7 @@ export function Reports(p: Props) {
                 })
               }
             />
-            {labels[c]}
+            {translateUI(labels[c])}
           </label>
         ))}
       </fieldset>
@@ -507,41 +469,33 @@ export function Reports(p: Props) {
           className="ghost"
           disabled={p.busy || offset === 0}
           onClick={() => setOffset(Math.max(0, offset - 20))}
-        >
-          Previous report rows
-        </button>
+        >{translateUI("Previous report rows")}</button>
         <button
           className="ghost"
           disabled={p.busy || next === null}
           onClick={() => setOffset(next!)}
-        >
-          Next report rows
-        </button>
+        >{translateUI("Next report rows")}</button>
       </div>
       <section className="panel">
-        <h3>Export</h3>
+        <h3>{translateUI("Export")}</h3>
         {p.administrative && (
-          <label>
-            Export rows
-            <select
-              aria-label="Export rows"
+          <label>{translateUI("Export rows")}<select
+              aria-label={translateUI("Export rows")}
               value={rowMode}
               onChange={(e) => setRowMode(e.target.value as any)}
             >
-              <option value="filtered">Filtered rows</option>
-              <option value="all">All rows within current access</option>
+              <option value="filtered">{translateUI("Filtered rows")}</option>
+              <option value="all">{translateUI("All rows within current access")}</option>
             </select>
           </label>
         )}
-        <label>
-          Export columns
-          <select
-            aria-label="Export columns"
+        <label>{translateUI("Export columns")}<select
+            aria-label={translateUI("Export columns")}
             value={columnMode}
             onChange={(e) => setColumnMode(e.target.value as any)}
           >
-            <option value="visible">Visible columns</option>
-            <option value="all">All report columns</option>
+            <option value="visible">{translateUI("Visible columns")}</option>
+            <option value="all">{translateUI("All report columns")}</option>
           </select>
         </label>
         <button
@@ -561,8 +515,7 @@ export function Reports(p: Props) {
               setNotice("CSV exported from one authorized ledger snapshot.");
             })
           }
-        >
-          Download {p.administrative ? "report" : "transcript"} CSV
+        >{translateUI("Download")}{" "}{p.administrative ? "report" : "transcript"} CSV
         </button>
         <button
           className="ghost"
@@ -576,33 +529,23 @@ export function Reports(p: Props) {
               });
             })
           }
-        >
-          Print / save {p.administrative ? "report" : "transcript"} PDF
+        >{translateUI("Print / save")}{" "}{p.administrative ? "report" : "transcript"} PDF
         </button>
-        <p>
-          The print view contains the selected rows and columns. Choose Save as
-          PDF in your browser's print dialog.
-        </p>
+        <p>{translateUI("The print view contains the selected rows and columns. Choose Save as PDF in your browser's print dialog.")}</p>
       </section>
       {printModel && (
         <section
           ref={printRef}
           className="print-report"
-          aria-label="Export print view"
+          aria-label={translateUI("Export print view")}
         >
           <h2>{printModel.title}</h2>
-          <p>
-            Authorized ledger snapshot · {new Date().toISOString()} ·{" "}
+          <p>{translateUI("Authorized ledger snapshot ·")}{" "}{new Date().toISOString()} ·{" "}
             {printModel.rows.length} records
           </p>
           <Table rows={printModel.rows} columns={printModel.columns} />
-          <p>
-            Self-authored synthetic development learning. No accreditation
-            claim.
-          </p>
-          <button className="ghost" onClick={() => setPrintModel(null)}>
-            Close print view
-          </button>
+          <p>{translateUI("Self-authored synthetic development learning. No accreditation claim.")}</p>
+          <button className="ghost" onClick={() => setPrintModel(null)}>{translateUI("Close print view")}</button>
         </section>
       )}
     </section>

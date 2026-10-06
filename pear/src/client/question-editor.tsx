@@ -1,13 +1,12 @@
+import {translateUI} from "./i18n.ts";
 import React from "react";
 import type { Question } from "../shared/model.ts";
 type Props = { q: Question; update: (next: Question) => void };
 export function QuestionSettings({ q, update }: Props) {
   return (
     <>
-      <label>
-        Question type
-        <select
-          aria-label="Question type"
+      <label>{translateUI("Question type")}<select
+          aria-label={translateUI("Question type")}
           value={q.kind ?? "mcq"}
           onChange={(e) => {
             const kind = e.target.value as Question["kind"];
@@ -39,16 +38,14 @@ export function QuestionSettings({ q, update }: Props) {
             );
           }}
         >
-          <option value="mcq">Multiple choice</option>
-          <option value="matching">Matching</option>
-          <option value="blanks">Fill blanks</option>
-          <option value="long_answer">Long answer · human assessed</option>
+          <option value="mcq">{translateUI("Multiple choice")}</option>
+          <option value="matching">{translateUI("Matching")}</option>
+          <option value="blanks">{translateUI("Fill blanks")}</option>
+          <option value="long_answer">{translateUI("Long answer · human assessed")}</option>
         </select>
       </label>
-      <label>
-        Question points
-        <input
-          aria-label="Question points"
+      <label>{translateUI("Question points")}<input
+          aria-label={translateUI("Question points")}
           type="number"
           min={1}
           max={20}
@@ -63,10 +60,8 @@ export function ExtendedQuestion({ q, update }: Props) {
   const k = q.kind;
   if (k === "long_answer")
     return (
-      <label>
-        Assessment rubric
-        <textarea
-          aria-label="Assessment rubric"
+      <label>{translateUI("Assessment rubric")}<textarea
+          aria-label={translateUI("Assessment rubric")}
           required
           maxLength={600}
           value={q.rubric ?? ""}
@@ -129,8 +124,7 @@ export function ExtendedQuestion({ q, update }: Props) {
                 answers.filter((_, j) => j !== i),
               )
             }
-          >
-            Remove pair / blank {i + 1}
+          >{translateUI("Remove pair / blank")}{" "}{i + 1}
           </button>
         </div>
       ))}
@@ -138,8 +132,7 @@ export function ExtendedQuestion({ q, update }: Props) {
         type="button"
         disabled={prompts.length >= 8}
         onClick={() => rebuild([...prompts, ""], [...answers, ""])}
-      >
-        Add {k === "matching" ? "matching pair" : "blank"}
+      >{translateUI("Add")}{" "}{k === "matching" ? "matching pair" : "blank"}
       </button>
     </>
   );

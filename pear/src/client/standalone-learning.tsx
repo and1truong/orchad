@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 export function StandaloneLearning(p: {
   tick: number;
@@ -29,23 +30,19 @@ export function StandaloneLearning(p: {
     };
   }, [offset, p.tick]);
   return (
-    <section className="panel" aria-label="Standalone learning">
-      <h2>Your standalone learning</h2>
-      <p>
-        Completion records your confirmed reading of this version. It does not
-        grant a course score or certificate.
-      </p>
+    <section className="panel" aria-label={translateUI("Standalone learning")}>
+      <h2>{translateUI("Your standalone learning")}</h2>
+      <p>{translateUI("Completion records your confirmed reading of this version. It does not grant a course score or certificate.")}</p>
       {error && <p role="alert">{error}</p>}
-      {!rows.length && <p>No tracked standalone items on this page.</p>}
+      {!rows.length && <p>{translateUI("No tracked standalone items on this page.")}</p>}
       {rows.map((row) => (
         <section className="learning-row" key={row.id}>
           <div>
             <h3>{row.title}</h3>
-            <p>
-              Version {row.version} ·{" "}
+            <p>{translateUI("Version")}{" "}{row.version} ·{" "}
               {row.status === "completed" ? "Reading confirmed" : "In progress"}
             </p>
-            {row.completedAt && <p>Confirmed {row.completedAt}</p>}
+            {row.completedAt && <p>{translateUI("Confirmed")}{" "}{row.completedAt}</p>}
           </div>
           <button
             disabled={p.busy}
@@ -61,25 +58,19 @@ export function StandaloneLearning(p: {
                 });
               })
             }
-          >
-            Open tracked item
-          </button>
+          >{translateUI("Open tracked item")}</button>
         </section>
       ))}
       <button
         className="ghost"
         disabled={p.busy || offset === 0}
         onClick={() => setOffset(Math.max(0, offset - 20))}
-      >
-        Previous tracked items
-      </button>
+      >{translateUI("Previous tracked items")}</button>
       <button
         className="ghost"
         disabled={p.busy || next === null}
         onClick={() => setOffset(next!)}
-      >
-        Next tracked items
-      </button>
+      >{translateUI("Next tracked items")}</button>
     </section>
   );
 }

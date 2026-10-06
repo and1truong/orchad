@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 import type { UserInput, Group, Rule } from "../shared/people.ts";
 import { encodeCsv, parseCsv } from "../shared/csv.ts";
@@ -109,12 +110,12 @@ export function People(p: Props) {
   };
   if (!loaded && !loadError)
     return (
-      <section aria-label="People and groups">
-        <p>Loading authorized profiles…</p>
+      <section aria-label={translateUI("People and groups")}>
+        <p>{translateUI("Loading authorized profiles…")}</p>
       </section>
     );
   return (
-    <section className="people" aria-label="People and groups">
+    <section className="people" aria-label={translateUI("People and groups")}>
       <h2>{p.administrative ? "People and groups" : "Learning preferences"}</h2>
       {loadError && <p role="alert">{loadError}</p>}
       {!p.administrative && (
@@ -131,24 +132,20 @@ export function People(p: Props) {
             });
           }}
         >
-          <label>
-            Preferred content language
-            <select
-              aria-label="Preferred content language"
+          <label>{translateUI("Preferred content language")}<select
+              aria-label={translateUI("Preferred content language")}
               value={profile.preferredLanguage}
               onChange={(e) => (
                 setProfileSaved(false),
                 setProfile({ ...profile, preferredLanguage: e.target.value })
               )}
             >
-              <option value="en">English</option>
-              <option value="vi">Tiếng Việt</option>
+              <option value="en">{translateUI("English")}</option>
+              <option value="vi">{translateUI("Tiếng Việt")}</option>
             </select>
           </label>
-          <label>
-            Learning interests · one per line
-            <textarea
-              aria-label="Learning interests · one per line"
+          <label>{translateUI("Learning interests · one per line")}<textarea
+              aria-label={translateUI("Learning interests · one per line")}
               value={profile.interests.join("\n")}
               onChange={(e) => {
                 setProfileSaved(false);
@@ -160,16 +157,14 @@ export function People(p: Props) {
               maxLength={640}
             />
           </label>
-          <p>
-            Up to eight interests. Preferences never change your role or access.
-          </p>
-          <button disabled={p.busy}>Save learning preferences</button>
-          {profileSaved && <p role="status">Learning preferences saved.</p>}
+          <p>{translateUI("Up to eight interests. Preferences never change your role or access.")}</p>
+          <button disabled={p.busy}>{translateUI("Save learning preferences")}</button>
+          {profileSaved && <p role="status">{translateUI("Learning preferences saved.")}</p>}
         </form>
       )}
       {audience && (
         <>
-          <h3>Authorized users</h3>
+          <h3>{translateUI("Authorized users")}</h3>
           {users.map((row) => (
             <section key={row.id} className="learning-row">
               <div>
@@ -186,9 +181,7 @@ export function People(p: Props) {
                     const { createdAt, ...fields } = row;
                     setU(fields);
                   }}
-                >
-                  Edit user
-                </button>
+                >{translateUI("Edit user")}</button>
               )}
             </section>
           ))}
@@ -196,17 +189,13 @@ export function People(p: Props) {
             className="ghost"
             disabled={offset === 0 || p.busy}
             onClick={() => setOffset(Math.max(0, offset - 20))}
-          >
-            Previous users
-          </button>
+          >{translateUI("Previous users")}</button>
           <button
             className="ghost"
             disabled={next === null || p.busy}
             onClick={() => setOffset(next!)}
-          >
-            Next users
-          </button>
-          <h3>Groups</h3>
+          >{translateUI("Next users")}</button>
+          <h3>{translateUI("Groups")}</h3>
           {groups.map((row) => (
             <section className="learning-row" key={row.id}>
               <div>
@@ -226,32 +215,26 @@ export function People(p: Props) {
                     changeGroup(value.group);
                   })
                 }
-              >
-                Open group
-              </button>
+              >{translateUI("Open group")}</button>
             </section>
           ))}
           <button
             className="ghost"
             disabled={groupOffset === 0}
             onClick={() => setGroupOffset(Math.max(0, groupOffset - 20))}
-          >
-            Previous groups
-          </button>
+          >{translateUI("Previous groups")}</button>
           <button
             className="ghost"
             disabled={groupNext === null}
             onClick={() => setGroupOffset(groupNext!)}
-          >
-            Next groups
-          </button>
+          >{translateUI("Next groups")}</button>
         </>
       )}
       {manage && (
         <>
           <form
             className="panel"
-            aria-label="User editor"
+            aria-label={translateUI("User editor")}
             onSubmit={(e) => {
               e.preventDefault();
               void p.run(async () => {
@@ -261,11 +244,9 @@ export function People(p: Props) {
               });
             }}
           >
-            <h3>User editor</h3>
+            <h3>{translateUI("User editor")}</h3>
             <fieldset disabled={p.busy}>
-              <label>
-                User ID
-                <input
+              <label>{translateUI("User ID")}<input
                   value={u.id}
                   required
                   maxLength={64}
@@ -273,19 +254,15 @@ export function People(p: Props) {
                   onChange={(e) => setU({ ...u, id: e.target.value })}
                 />
               </label>
-              <label>
-                User name
-                <input
+              <label>{translateUI("User name")}<input
                   value={u.name}
                   required
                   maxLength={160}
                   onChange={(e) => setU({ ...u, name: e.target.value })}
                 />
               </label>
-              <label>
-                User role
-                <select
-                  aria-label="User role"
+              <label>{translateUI("User role")}<select
+                  aria-label={translateUI("User role")}
                   value={u.role}
                   onChange={(e) => setU({ ...u, role: e.target.value as any })}
                 >
@@ -296,7 +273,7 @@ export function People(p: Props) {
                     "admin",
                     "assessor",
                   ].map((role) => (
-                    <option key={role}>{role}</option>
+                    <option key={role} value={role}>{translateUI(role)}</option>
                   ))}
                 </select>
               </label>
@@ -305,12 +282,8 @@ export function People(p: Props) {
                   type="checkbox"
                   checked={u.active}
                   onChange={(e) => setU({ ...u, active: e.target.checked })}
-                />
-                Active account
-              </label>
-              <label>
-                Manager ID · optional
-                <input
+                />{translateUI("Active account")}</label>
+              <label>{translateUI("Manager ID · optional")}<input
                   value={u.managerId ?? ""}
                   maxLength={64}
                   onChange={(e) =>
@@ -318,23 +291,19 @@ export function People(p: Props) {
                   }
                 />
               </label>
-              <label>
-                User content language
-                <select
-                  aria-label="User content language"
+              <label>{translateUI("User content language")}<select
+                  aria-label={translateUI("User content language")}
                   value={u.preferredLanguage}
                   onChange={(e) =>
                     setU({ ...u, preferredLanguage: e.target.value as any })
                   }
                 >
-                  <option value="en">English</option>
-                  <option value="vi">Tiếng Việt</option>
+                  <option value="en">{translateUI("English")}</option>
+                  <option value="vi">{translateUI("Tiếng Việt")}</option>
                 </select>
               </label>
-              <label>
-                User interests · one per line
-                <textarea
-                  aria-label="User interests · one per line"
+              <label>{translateUI("User interests · one per line")}<textarea
+                  aria-label={translateUI("User interests · one per line")}
                   value={u.interests.join("\n")}
                   maxLength={640}
                   onChange={(e) =>
@@ -344,10 +313,8 @@ export function People(p: Props) {
               </label>
               {u.customFields.map((f, i) => (
                 <fieldset key={i}>
-                  <legend>Custom field {i + 1}</legend>
-                  <label>
-                    Field name
-                    <input
+                  <legend>{translateUI("Custom field")}{" "}{i + 1}</legend>
+                  <label>{translateUI("Field name")}<input
                       value={f.name}
                       required
                       maxLength={40}
@@ -362,9 +329,7 @@ export function People(p: Props) {
                       }
                     />
                   </label>
-                  <label>
-                    Field value
-                    <input
+                  <label>{translateUI("Field value")}<input
                       value={f.value}
                       maxLength={200}
                       onChange={(e) =>
@@ -386,9 +351,7 @@ export function People(p: Props) {
                         customFields: u.customFields.filter((_, n) => n !== i),
                       })
                     }
-                  >
-                    Remove field
-                  </button>
+                  >{translateUI("Remove field")}</button>
                 </fieldset>
               ))}
               <button
@@ -401,36 +364,21 @@ export function People(p: Props) {
                     customFields: [...u.customFields, { name: "", value: "" }],
                   })
                 }
-              >
-                Add custom field
-              </button>
-              <button>Save user</button>
+              >{translateUI("Add custom field")}</button>
+              <button>{translateUI("Save user")}</button>
               <button
                 type="button"
                 className="ghost"
                 onClick={() => setU(user())}
-              >
-                New user
-              </button>
+              >{translateUI("New user")}</button>
             </fieldset>
-            <p>
-              Synthetic accounts use their ID plus “-dev”. Production login
-              remains disabled until an identity adapter is configured.
-              Deactivation preserves records and revokes sessions.
-            </p>
+            <p>{translateUI("Synthetic accounts use their ID plus “-dev”. Production login remains disabled until an identity adapter is configured. Deactivation preserves records and revokes sessions.")}</p>
           </form>
           <section className="panel">
-            <h3>CSV user import</h3>
-            <p>
-              Header:
-              id,name,role,active,managerId,preferredLanguage,interests,customFields.
-              Interests and customFields are JSON arrays in CSV cells. Maximum
-              100 rows per reviewed batch.
-            </p>
-            <label>
-              User CSV
-              <textarea
-                aria-label="User CSV"
+            <h3>{translateUI("CSV user import")}</h3>
+            <p>{translateUI("Header: id,name,role,active,managerId,preferredLanguage,interests,customFields. Interests and customFields are JSON arrays in CSV cells. Maximum 100 rows per reviewed batch.")}</p>
+            <label>{translateUI("User CSV")}<textarea
+                aria-label={translateUI("User CSV")}
                 value={csv}
                 maxLength={16000}
                 onChange={(e) => {
@@ -448,9 +396,7 @@ export function People(p: Props) {
                   ),
                 )
               }
-            >
-              Dry-run user import
-            </button>
+            >{translateUI("Dry-run user import")}</button>
             {importReview && (
               <>
                 <p role="status">
@@ -458,8 +404,7 @@ export function People(p: Props) {
                   {importReview.total} users
                 </p>
                 {importReview.errors.map((r: any, i: number) => (
-                  <p key={i}>
-                    Row {r.row}: {r.message}
+                  <p key={i}>{translateUI("Row")}{" "}{r.row}: {r.message}
                   </p>
                 ))}
                 {importReview.changes.map((r: any) => (
@@ -479,9 +424,7 @@ export function People(p: Props) {
                       setImportReview(null);
                     })
                   }
-                >
-                  Import reviewed users
-                </button>
+                >{translateUI("Import reviewed users")}</button>
               </>
             )}
             <button
@@ -506,16 +449,14 @@ export function People(p: Props) {
                   download(encodeCsv(rows), "pear-users.csv");
                 })
               }
-            >
-              Export all authorized users CSV
-            </button>
+            >{translateUI("Export all authorized users CSV")}</button>
           </section>
         </>
       )}
       {audience && (
         <form
           className="panel"
-          aria-label="Group editor"
+          aria-label={translateUI("Group editor")}
           onSubmit={(e) => {
             e.preventDefault();
             void p.run(async () => {
@@ -531,9 +472,7 @@ export function People(p: Props) {
         >
           <h3>{manage ? "Group editor" : "Scoped group preview"}</h3>
           <fieldset disabled={p.busy}>
-            <label>
-              Group ID
-              <input
+            <label>{translateUI("Group ID")}<input
                 value={groupId}
                 onChange={(e) => {
                   setGroupId(e.target.value);
@@ -544,19 +483,15 @@ export function People(p: Props) {
                 pattern="[A-Za-z0-9_-]+"
               />
             </label>
-            <label>
-              Group name
-              <input
+            <label>{translateUI("Group name")}<input
                 value={g.name}
                 onChange={(e) => changeGroup({ ...g, name: e.target.value })}
                 required
                 maxLength={160}
               />
             </label>
-            <label>
-              Group kind
-              <select
-                aria-label="Group kind"
+            <label>{translateUI("Group kind")}<select
+                aria-label={translateUI("Group kind")}
                 value={g.kind}
                 onChange={(e) =>
                   changeGroup(
@@ -571,15 +506,13 @@ export function People(p: Props) {
                   )
                 }
               >
-                <option value="static">Static</option>
-                <option value="dynamic">Dynamic</option>
+                <option value="static">{translateUI("Static")}</option>
+                <option value="dynamic">{translateUI("Dynamic")}</option>
               </select>
             </label>
             {g.kind === "static" ? (
-              <label>
-                Member IDs · one per line
-                <textarea
-                  aria-label="Member IDs · one per line"
+              <label>{translateUI("Member IDs · one per line")}<textarea
+                  aria-label={translateUI("Member IDs · one per line")}
                   value={g.memberIds.join("\n")}
                   onChange={(e) =>
                     changeGroup({ ...g, memberIds: e.target.value.split("\n") })
@@ -588,26 +521,22 @@ export function People(p: Props) {
               </label>
             ) : (
               <>
-                <label>
-                  Rule combination
-                  <select
-                    aria-label="Rule combination"
+                <label>{translateUI("Rule combination")}<select
+                    aria-label={translateUI("Rule combination")}
                     value={g.mode}
                     onChange={(e) =>
                       changeGroup({ ...g, mode: e.target.value as any })
                     }
                   >
-                    <option>ALL</option>
-                    <option>ANY</option>
+                    <option>{translateUI("ALL")}</option>
+                    <option>{translateUI("ANY")}</option>
                   </select>
                 </label>
                 {g.rules.map((r, i) => (
                   <fieldset key={i}>
-                    <legend>Membership rule {i + 1}</legend>
-                    <label>
-                      Rule field
-                      <select
-                        aria-label="Rule field"
+                    <legend>{translateUI("Membership rule")}{" "}{i + 1}</legend>
+                    <label>{translateUI("Rule field")}<select
+                        aria-label={translateUI("Rule field")}
                         value={r.field}
                         onChange={(e) =>
                           changeGroup({
@@ -639,9 +568,7 @@ export function People(p: Props) {
                       </select>
                     </label>
                     {r.field === "customField" && (
-                      <label>
-                        Custom field name
-                        <input
+                      <label>{translateUI("Custom field name")}<input
                           value={r.customField}
                           required
                           maxLength={40}
@@ -658,10 +585,8 @@ export function People(p: Props) {
                         />
                       </label>
                     )}
-                    <label>
-                      Rule operator
-                      <select
-                        aria-label="Rule operator"
+                    <label>{translateUI("Rule operator")}<select
+                        aria-label={translateUI("Rule operator")}
                         value={r.operator}
                         onChange={(e) =>
                           changeGroup({
@@ -685,9 +610,7 @@ export function People(p: Props) {
                         ))}
                       </select>
                     </label>
-                    <label>
-                      Rule value
-                      <input
+                    <label>{translateUI("Rule value")}<input
                         value={r.value}
                         type={r.field === "createdAt" ? "date" : "text"}
                         required
@@ -712,9 +635,7 @@ export function People(p: Props) {
                           rules: g.rules.filter((_, n) => n !== i),
                         })
                       }
-                    >
-                      Remove rule
-                    </button>
+                    >{translateUI("Remove rule")}</button>
                   </fieldset>
                 ))}
                 <button
@@ -724,12 +645,10 @@ export function People(p: Props) {
                   onClick={() =>
                     changeGroup({ ...g, rules: [...g.rules, rule()] })
                   }
-                >
-                  Add membership rule
-                </button>
+                >{translateUI("Add membership rule")}</button>
               </>
             )}
-            <button>Preview membership</button>
+            <button>{translateUI("Preview membership")}</button>
             {members && (
               <>
                 <p role="status">
@@ -747,17 +666,13 @@ export function People(p: Props) {
                   onClick={() =>
                     setMemberOffset(Math.max(0, memberOffset - 20))
                   }
-                >
-                  Previous members · then preview
-                </button>
+                >{translateUI("Previous members · then preview")}</button>
                 <button
                   type="button"
                   className="ghost"
                   disabled={members.nextOffset === null}
                   onClick={() => setMemberOffset(members.nextOffset)}
-                >
-                  Next members · then preview
-                </button>
+                >{translateUI("Next members · then preview")}</button>
               </>
             )}
             {manage && (
@@ -773,9 +688,7 @@ export function People(p: Props) {
                     setReviewedGroup("");
                   })
                 }
-              >
-                Save reviewed group
-              </button>
+              >{translateUI("Save reviewed group")}</button>
             )}
           </fieldset>
         </form>

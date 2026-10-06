@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React from "react";
 import type { Lesson } from "../shared/model.ts";
 import type { EventSession } from "../shared/blended.ts";
@@ -23,11 +24,9 @@ export function LessonSettings({
   if (lesson.kind === "submission")
     return (
       <fieldset>
-        <legend>Assignment submission policy</legend>
-        <label>
-          Submission rubric
-          <textarea
-            aria-label="Submission rubric"
+        <legend>{translateUI("Assignment submission policy")}</legend>
+        <label>{translateUI("Submission rubric")}<textarea
+            aria-label={translateUI("Submission rubric")}
             required
             maxLength={600}
             value={lesson.submission?.rubric ?? ""}
@@ -38,10 +37,8 @@ export function LessonSettings({
             }
           />
         </label>
-        <label>
-          Submission maximum attempts
-          <input
-            aria-label="Submission maximum attempts"
+        <label>{translateUI("Submission maximum attempts")}<input
+            aria-label={translateUI("Submission maximum attempts")}
             type="number"
             min={1}
             max={10}
@@ -56,10 +53,8 @@ export function LessonSettings({
             }
           />
         </label>
-        <label>
-          Submission pass score
-          <input
-            aria-label="Submission pass score"
+        <label>{translateUI("Submission pass score")}<input
+            aria-label={translateUI("Submission pass score")}
             type="number"
             min={1}
             max={100}
@@ -85,7 +80,7 @@ export function LessonSettings({
     });
   return (
     <fieldset>
-      <legend>Instructor-led sessions</legend>
+      <legend>{translateUI("Instructor-led sessions")}</legend>
       <p>
         Use timestamps with Z or an explicit offset; timezone controls display.
         Published session IDs retain their time/capacity. Use a new ID to
@@ -93,7 +88,7 @@ export function LessonSettings({
       </p>
       {lesson.sessions?.map((s, i) => (
         <fieldset key={i}>
-          <legend>Session {i + 1}</legend>
+          <legend>{translateUI("Session")}{" "}{i + 1}</legend>
           {(
             [
               ["id", "Session ID", 64],
@@ -108,7 +103,7 @@ export function LessonSettings({
             <label key={k}>
               {label}
               <input
-                aria-label={label}
+                aria-label={translateUI(label)}
                 required={k !== "joinUrl"}
                 maxLength={max}
                 value={s[k] ?? ""}
@@ -116,10 +111,8 @@ export function LessonSettings({
               />
             </label>
           ))}
-          <label>
-            Session capacity
-            <input
-              aria-label="Session capacity"
+          <label>{translateUI("Session capacity")}<input
+              aria-label={translateUI("Session capacity")}
               type="number"
               min={1}
               max={500}
@@ -133,9 +126,7 @@ export function LessonSettings({
             onClick={() =>
               onChange({ sessions: lesson.sessions!.filter((_, n) => n !== i) })
             }
-          >
-            Remove session
-          </button>
+          >{translateUI("Remove session")}</button>
         </fieldset>
       ))}
       <button
@@ -144,9 +135,7 @@ export function LessonSettings({
         onClick={() =>
           onChange({ sessions: [...lesson.sessions!, newEventSession()] })
         }
-      >
-        Add session
-      </button>
+      >{translateUI("Add session")}</button>
     </fieldset>
   );
 }

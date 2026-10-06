@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 type Props = {
   role: string;
@@ -40,18 +41,14 @@ export function Assessments(p: Props) {
     };
   }, [p.role, p.tick, offset]);
   return (
-    <section aria-label="Assessment reviews" className="assessments">
-      <h2>Human assessment reviews</h2>
-      <p>
-        Objective responses are graded by the backend. Delegated assessors
-        evaluate long answers against the pinned rubric. No certificate is
-        issued until the whole assessment is graded and passes.
-      </p>
+    <section aria-label={translateUI("Assessment reviews")} className="assessments">
+      <h2>{translateUI("Human assessment reviews")}</h2>
+      <p>{translateUI("Objective responses are graded by the backend. Delegated assessors evaluate long answers against the pinned rubric. No certificate is issued until the whole assessment is graded and passes.")}</p>
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       {["admin", "content_admin"].includes(p.role) && (
         <form
-          aria-label="Course assessor delegation"
+          aria-label={translateUI("Course assessor delegation")}
           onSubmit={(e) => {
             e.preventDefault();
             void p.run(async () => {
@@ -69,21 +66,17 @@ export function Assessments(p: Props) {
           }}
         >
           <fieldset disabled={p.busy}>
-            <legend>Course assessor</legend>
-            <label>
-              Assessment course ID
-              <input
-                aria-label="Assessment course ID"
+            <legend>{translateUI("Course assessor")}</legend>
+            <label>{translateUI("Assessment course ID")}<input
+                aria-label={translateUI("Assessment course ID")}
                 required
                 maxLength={64}
                 value={courseId}
                 onChange={(e) => setCourseId(e.target.value)}
               />
             </label>
-            <label>
-              Course assessor ID
-              <input
-                aria-label="Course assessor ID"
+            <label>{translateUI("Course assessor ID")}<input
+                aria-label={translateUI("Course assessor ID")}
                 required
                 maxLength={64}
                 value={assessorId}
@@ -95,22 +88,19 @@ export function Assessments(p: Props) {
                 type="checkbox"
                 checked={enabled}
                 onChange={(e) => setEnabled(e.target.checked)}
-              />
-              Assessment permission enabled
-            </label>
-            <button>Save course assessor</button>
+              />{translateUI("Assessment permission enabled")}</label>
+            <button>{translateUI("Save course assessor")}</button>
           </fieldset>
         </form>
       )}
       {["admin", "assessor"].includes(p.role) && (
         <>
-          <h3>Submitted essays awaiting review</h3>
+          <h3>{translateUI("Submitted essays awaiting review")}</h3>
           {queue.map((row) => (
             <div className="learning-row" key={row.id}>
               <div>
                 <h4>{row.course_id}</h4>
-                <p>
-                  Learner {row.learner} · Version {row.version} · Attempt{" "}
+                <p>{translateUI("Learner")}{" "}{row.learner} · Version {row.version} · Attempt{" "}
                   {row.number}
                 </p>
               </div>
@@ -126,9 +116,7 @@ export function Assessments(p: Props) {
                     );
                   })
                 }
-              >
-                Review submitted essay
-              </button>
+              >{translateUI("Review submitted essay")}</button>
             </div>
           ))}
           <div className="actions">
@@ -136,26 +124,21 @@ export function Assessments(p: Props) {
               className="ghost"
               disabled={p.busy || offset === 0}
               onClick={() => setOffset(Math.max(0, offset - 20))}
-            >
-              Previous assessments
-            </button>
+            >{translateUI("Previous assessments")}</button>
             <button
               className="ghost"
               disabled={p.busy || next === null}
               onClick={() => setOffset(next!)}
-            >
-              Next assessments
-            </button>
+            >{translateUI("Next assessments")}</button>
           </div>
         </>
       )}
       {submission && (
-        <section className="panel" aria-label="Submitted essay">
+        <section className="panel" aria-label={translateUI("Submitted essay")}>
           <h3>
             {submission.courseId} · {submission.learnerId}
           </h3>
-          <p>
-            Version {submission.version} · {submission.state}
+          <p>{translateUI("Version")}{" "}{submission.version} · {submission.state}
           </p>
           {submission.questions.map((q: any) => {
             const reviewed = submission.reviews.find(
@@ -164,11 +147,10 @@ export function Assessments(p: Props) {
             return (
               <section key={q.id}>
                 <h4>{q.prompt}</h4>
-                <p>Rubric: {q.rubric}</p>
+                <p>{translateUI("Rubric:")}{" "}{q.rubric}</p>
                 <blockquote>{q.answer}</blockquote>
                 {reviewed ? (
-                  <p>
-                    Final review: {reviewed.points}/{q.points} ·{" "}
+                  <p>{translateUI("Final review:")}{" "}{reviewed.points}/{q.points} ·{" "}
                     {reviewed.reason}
                   </p>
                 ) : (
@@ -200,14 +182,12 @@ export function Assessments(p: Props) {
               </section>
             );
           })}
-          <button className="ghost" onClick={() => setSubmission(null)}>
-            Close essay review
-          </button>
+          <button className="ghost" onClick={() => setSubmission(null)}>{translateUI("Close essay review")}</button>
         </section>
       )}
       {p.role === "admin" && (
         <form
-          aria-label="Assessment retry allowance"
+          aria-label={translateUI("Assessment retry allowance")}
           onSubmit={(e) => {
             e.preventDefault();
             void p.run(async () => {
@@ -223,20 +203,16 @@ export function Assessments(p: Props) {
           }}
         >
           <fieldset disabled={p.busy}>
-            <legend>Reviewed retry allowance</legend>
-            <label>
-              Retry enrollment ID
-              <input
-                aria-label="Retry enrollment ID"
+            <legend>{translateUI("Reviewed retry allowance")}</legend>
+            <label>{translateUI("Retry enrollment ID")}<input
+                aria-label={translateUI("Retry enrollment ID")}
                 required
                 maxLength={64}
                 value={enrollmentId}
                 onChange={(e) => setEnrollmentId(e.target.value)}
               />
             </label>
-            <label>
-              Additional attempts
-              <input
+            <label>{translateUI("Additional attempts")}<input
                 type="number"
                 min={1}
                 max={10}
@@ -244,17 +220,15 @@ export function Assessments(p: Props) {
                 onChange={(e) => setExtra(Number(e.target.value))}
               />
             </label>
-            <label>
-              Retry reason
-              <textarea
-                aria-label="Retry reason"
+            <label>{translateUI("Retry reason")}<textarea
+                aria-label={translateUI("Retry reason")}
                 required
                 maxLength={600}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
             </label>
-            <button>Allow further attempts</button>
+            <button>{translateUI("Allow further attempts")}</button>
           </fieldset>
         </form>
       )}
@@ -274,17 +248,16 @@ function EssayReview({
     [reason, setReason] = useState("");
   return (
     <form
-      aria-label="Essay rubric review"
+      aria-label={translateUI("Essay rubric review")}
       onSubmit={(e) => {
         e.preventDefault();
         void grade(points, reason);
       }}
     >
       <fieldset disabled={busy}>
-        <label>
-          Rubric points · maximum {q.points}
+        <label>{translateUI("Rubric points · maximum")}{" "}{q.points}
           <input
-            aria-label="Rubric points"
+            aria-label={translateUI("Rubric points")}
             type="number"
             min={0}
             max={q.points}
@@ -292,21 +265,16 @@ function EssayReview({
             onChange={(e) => setPoints(Number(e.target.value))}
           />
         </label>
-        <label>
-          Assessment reason
-          <textarea
-            aria-label="Assessment reason"
+        <label>{translateUI("Assessment reason")}<textarea
+            aria-label={translateUI("Assessment reason")}
             required
             maxLength={600}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
           />
         </label>
-        <p>
-          A committed question review is final. Check the response and rubric
-          before saving.
-        </p>
-        <button>Commit human rubric review</button>
+        <p>{translateUI("A committed question review is final. Check the response and rubric before saving.")}</p>
+        <button>{translateUI("Commit human rubric review")}</button>
       </fieldset>
     </form>
   );

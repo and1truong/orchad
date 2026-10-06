@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 import { UploadField, UploadedMedia } from "./media.tsx";
 import type { Session } from "./api.ts";
@@ -47,11 +48,11 @@ export function BlendedPlayer(
   };
   if (!["submission", "event"].includes(p.lesson.kind)) return null;
   return (
-    <section aria-label="Blended lesson" className="panel">
+    <section aria-label={translateUI("Blended lesson")} className="panel">
       {error && <p role="alert">{error}</p>}
       {p.lesson.kind === "submission" ? (
         <>
-          <h4>Assignment upload and human review</h4>
+          <h4>{translateUI("Assignment upload and human review")}</h4>
           <p>{p.lesson.submission?.rubric}</p>
           <p>
             Upload a PDF; submission is pending until a delegated human assessor
@@ -79,19 +80,16 @@ export function BlendedPlayer(
                 setAsset("");
               })
             }
-          >
-            Submit assignment for review
-          </button>
+          >{translateUI("Submit assignment for review")}</button>
           {data?.submissions?.map((s: any) => (
-            <p key={s.id}>
-              Submission {s.number} · {s.state}
+            <p key={s.id}>{translateUI("Submission")}{" "}{s.number} · {s.state}
               {s.points !== null ? ` · ${s.points}%` : ""}
             </p>
           ))}
         </>
       ) : (
         <>
-          <h4>Instructor-led session</h4>
+          <h4>{translateUI("Instructor-led session")}</h4>
           {data?.sessions?.map((s: any) => (
             <section key={s.id} className="learning-row">
               <div>
@@ -108,9 +106,7 @@ export function BlendedPlayer(
                   {new Date(s.cutoffAt).toISOString()}
                 </p>
                 {s.joinUrl && (
-                  <a href={s.joinUrl} target="_blank" rel="noopener noreferrer">
-                    Open session meeting
-                  </a>
+                  <a href={s.joinUrl} target="_blank" rel="noopener noreferrer">{translateUI("Open session meeting")}</a>
                 )}
               </div>
               <button
@@ -130,14 +126,12 @@ export function BlendedPlayer(
                     });
                   })
                 }
-              >
-                Book session
-              </button>
+              >{translateUI("Book session")}</button>
             </section>
           ))}
           {data?.bookings?.map((b: any) => (
             <div key={b.id}>
-              <p>Booking · {b.state}</p>
+              <p>{translateUI("Booking ·")}{" "}{b.state}</p>
               {b.state === "booked" && (
                 <>
                   <button
@@ -149,15 +143,11 @@ export function BlendedPlayer(
                         });
                       })
                     }
-                  >
-                    Cancel booking
-                  </button>
+                  >{translateUI("Cancel booking")}</button>
                   <button
                     disabled={p.busy}
                     onClick={() => void p.run(() => calendar(b.id))}
-                  >
-                    Download calendar
-                  </button>
+                  >{translateUI("Download calendar")}</button>
                 </>
               )}
             </div>
@@ -195,8 +185,8 @@ export function BlendedReviews(p: Ops & { session: Session }) {
     };
   }, [p.tick, offset]);
   return (
-    <section aria-label="Submission and attendance reviews" className="panel">
-      <h2>Submission and attendance reviews</h2>
+    <section aria-label={translateUI("Submission and attendance reviews")} className="panel">
+      <h2>{translateUI("Submission and attendance reviews")}</h2>
       {error && <p role="alert">{error}</p>}
       {rows.map((row) => (
         <section className="learning-row" key={row.id}>
@@ -220,8 +210,7 @@ export function BlendedReviews(p: Ops & { session: Session }) {
                 }),
               );
             }}
-          >
-            Review {row.kind}
+          >{translateUI("Review")}{" "}{row.kind}
           </button>
         </section>
       ))}
@@ -229,19 +218,15 @@ export function BlendedReviews(p: Ops & { session: Session }) {
         <button
           disabled={p.busy || offset === 0}
           onClick={() => setOffset(Math.max(0, offset - 20))}
-        >
-          Previous reviews
-        </button>
+        >{translateUI("Previous reviews")}</button>
         <button
           disabled={p.busy || next === null}
           onClick={() => setOffset(next!)}
-        >
-          Next reviews
-        </button>
+        >{translateUI("Next reviews")}</button>
       </div>
       {detail && (
         <form
-          aria-label="Blended review"
+          aria-label={translateUI("Blended review")}
           onSubmit={(e) => {
             e.preventDefault();
             void p.run(async () => {
@@ -258,7 +243,7 @@ export function BlendedReviews(p: Ops & { session: Session }) {
           }}
         >
           <fieldset disabled={p.busy}>
-            <legend>Human review</legend>
+            <legend>{translateUI("Human review")}</legend>
             <p>
               {detail.learnerId} · {detail.lessonId}
             </p>
@@ -274,10 +259,8 @@ export function BlendedReviews(p: Ops & { session: Session }) {
                   }}
                   context={{ submissionId: detail.id }}
                 />
-                <label>
-                  Submission score
-                  <input
-                    aria-label="Submission score"
+                <label>{translateUI("Submission score")}<input
+                    aria-label={translateUI("Submission score")}
                     type="number"
                     min={0}
                     max={100}
@@ -292,21 +275,17 @@ export function BlendedReviews(p: Ops & { session: Session }) {
                   type="checkbox"
                   checked={present}
                   onChange={(e) => setPresent(e.target.checked)}
-                />
-                Learner actually attended this started session
-              </label>
+                />{translateUI("Learner actually attended this started session")}</label>
             )}
-            <label>
-              Review reason
-              <textarea
-                aria-label="Review reason"
+            <label>{translateUI("Review reason")}<textarea
+                aria-label={translateUI("Review reason")}
                 required
                 maxLength={600}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
             </label>
-            <button>Record human review</button>
+            <button>{translateUI("Record human review")}</button>
           </fieldset>
         </form>
       )}

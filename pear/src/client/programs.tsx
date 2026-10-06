@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import { Certificate } from "./certificate.tsx";
 import React, { useEffect, useState } from "react";
 import type { Session } from "./api.ts";
@@ -52,10 +53,8 @@ function References({
     <div>
       {refs.map((ref, i) => (
         <fieldset key={i} disabled={busy}>
-          <legend>Alternative {i + 1}</legend>
-          <label>
-            Reference type
-            <select
+          <legend>{translateUI("Alternative")}{" "}{i + 1}</legend>
+          <label>{translateUI("Reference type")}<select
               value={ref.kind}
               onChange={(e) =>
                 onChange(
@@ -72,9 +71,7 @@ function References({
               ))}
             </select>
           </label>
-          <label>
-            Published reference ID · external learning key
-            <input
+          <label>{translateUI("Published reference ID · external learning key")}<input
               value={ref.id}
               required
               maxLength={64}
@@ -93,9 +90,7 @@ function References({
             className="ghost"
             disabled={refs.length === 1}
             onClick={() => onChange(refs.filter((_, n) => n !== i))}
-          >
-            Remove reference
-          </button>
+          >{translateUI("Remove reference")}</button>
         </fieldset>
       ))}
       <button
@@ -103,9 +98,7 @@ function References({
         className="ghost"
         disabled={busy || refs.length >= 8}
         onClick={() => onChange([...refs, { kind: kinds[0], id: "" }])}
-      >
-        Add reference
-      </button>
+      >{translateUI("Add reference")}</button>
     </div>
   );
 }
@@ -158,9 +151,8 @@ function EvidenceForm({
           onUploaded={setAssetId}
           onUploading={setUploading}
         />
-        {assetId && <p role="status">Evidence PDF attached</p>}
-        <label>
-          Claimed {unit}
+        {assetId && <p role="status">{translateUI("Evidence PDF attached")}</p>}
+        <label>{translateUI("Claimed")}{" "}{unit}
           <input
             name="amount"
             type="number"
@@ -170,17 +162,11 @@ function EvidenceForm({
             required
           />
         </label>
-        <label>
-          Evidence · personal statement or reference
-          <textarea name="evidence" required maxLength={2000} />
+        <label>{translateUI("Evidence · personal statement or reference")}<textarea name="evidence" required maxLength={2000} />
         </label>
         <label className="choice">
-          <input type="checkbox" required />I confirm this evidence describes my
-          own external learning.
-        </label>
-        <button disabled={props.busy || !active || uploading}>
-          Submit external learning
-        </button>
+          <input type="checkbox" required />{translateUI("I confirm this evidence describes my own external learning.")}</label>
+        <button disabled={props.busy || !active || uploading}>{translateUI("Submit external learning")}</button>
       </fieldset>
     </form>
   );
@@ -209,8 +195,7 @@ function Progress({
             <div key={i}>
               {ref.kind === "award" ? (
                 <>
-                  <p>
-                    Nested award: {ref.title} · Version {ref.version}
+                  <p>{translateUI("Nested award:")}{" "}{ref.title} · Version {ref.version}
                   </p>
                   <Progress
                     progress={ref}
@@ -221,8 +206,7 @@ function Progress({
                 </>
               ) : ref.kind === "course" ? (
                 <div>
-                  <p>
-                    Course: {ref.id} ·{" "}
+                  <p>{translateUI("Course:")}{" "}{ref.id} ·{" "}
                     {ref.completed ? "Completed" : "In progress"}
                   </p>
                   {!ref.completed && (
@@ -237,15 +221,12 @@ function Progress({
                           props.studyCourse?.();
                         })
                       }
-                    >
-                      Study course for this award
-                    </button>
+                    >{translateUI("Study course for this award")}</button>
                   )}
                 </div>
               ) : (
                 <>
-                  <p>
-                    External learning: {ref.id} ·{" "}
+                  <p>{translateUI("External learning:")}{" "}{ref.id} ·{" "}
                     {ref.moderated
                       ? "Assessor approval required"
                       : "Self-attested credit"}
@@ -353,17 +334,14 @@ export function Programs(props: Props) {
       requirements: award.requirements.map((old, n) => (n === i ? r : old)),
     });
   return (
-    <section aria-label="Programs">
+    <section aria-label={translateUI("Programs")}>
       <h2>
         {administrative ? "Programs administration" : "Playlists and awards"}
       </h2>
       {loadError && <p role="alert">{loadError}</p>}
       {!administrative && (
         <>
-          <p>
-            Playlists are reading collections. Awards have their own required
-            learning and credit targets.
-          </p>
+          <p>{translateUI("Playlists are reading collections. Awards have their own required learning and credit targets.")}</p>
           {collections.map((c) => (
             <section className="learning-row" key={c.id}>
               <div>
@@ -385,9 +363,7 @@ export function Programs(props: Props) {
                       ),
                     )
                   }
-                >
-                  View collection
-                </button>
+                >{translateUI("View collection")}</button>
                 {c.kind === "award" && (
                   <button
                     disabled={busy}
@@ -398,9 +374,7 @@ export function Programs(props: Props) {
                         });
                       })
                     }
-                  >
-                    Enroll in award
-                  </button>
+                  >{translateUI("Enroll in award")}</button>
                 )}
               </div>
             </section>
@@ -430,9 +404,7 @@ export function Programs(props: Props) {
                       ),
                     )
                   }
-                >
-                  Previous references
-                </button>
+                >{translateUI("Previous references")}</button>
                 <button
                   className="ghost"
                   disabled={busy || detail.references.nextOffset === null}
@@ -447,22 +419,15 @@ export function Programs(props: Props) {
                       ),
                     )
                   }
-                >
-                  Next references
-                </button>
+                >{translateUI("Next references")}</button>
               </div>
               {detail.kind === "playlist" && (
-                <p>
-                  Open courses or standalone items through Explore. This
-                  playlist has no completion or certificate.
-                </p>
+                <p>{translateUI("Open courses or standalone items through Explore. This playlist has no completion or certificate.")}</p>
               )}
-              <button className="ghost" onClick={() => setDetail(null)}>
-                Close collection
-              </button>
+              <button className="ghost" onClick={() => setDetail(null)}>{translateUI("Close collection")}</button>
             </section>
           )}
-          <h3>My awards</h3>
+          <h3>{translateUI("My awards")}</h3>
           {awards.map((a) => (
             <section className="panel" key={a.id}>
               <h3>{a.title}</h3>
@@ -479,7 +444,7 @@ export function Programs(props: Props) {
                 · Required learning{" "}
                 {a.requiredComplete ? "satisfied" : "still needed"}
               </p>
-              {a.due_date && <p>Due {new Date(a.due_date).toLocaleString()}</p>}
+              {a.due_date && <p>{translateUI("Due")}{" "}{new Date(a.due_date).toLocaleString()}</p>}
               <Progress
                 progress={a}
                 enrollmentId={a.id}
@@ -494,9 +459,7 @@ export function Programs(props: Props) {
                       setCertificate(await props.certificate(a.certificate_id)),
                     )
                   }
-                >
-                  Award certificate
-                </button>
+                >{translateUI("Award certificate")}</button>
               )}
             </section>
           ))}
@@ -505,16 +468,12 @@ export function Programs(props: Props) {
               className="ghost"
               disabled={busy || awardOffset === 0}
               onClick={() => setAwardOffset(Math.max(0, awardOffset - 10))}
-            >
-              Previous awards
-            </button>
+            >{translateUI("Previous awards")}</button>
             <button
               className="ghost"
               disabled={busy || awardNext === null}
               onClick={() => setAwardOffset(awardNext!)}
-            >
-              Next awards
-            </button>
+            >{translateUI("Next awards")}</button>
           </div>
           {certificate && (
             <Certificate
@@ -527,11 +486,7 @@ export function Programs(props: Props) {
       )}
       {administrative && author && (
         <>
-          <p>
-            Published references: courses and nested awards must be published
-            before publishing this program. External keys identify self-authored
-            requirements.
-          </p>
+          <p>{translateUI("Published references: courses and nested awards must be published before publishing this program. External keys identify self-authored requirements.")}</p>
           {drafts.map((d) => (
             <section className="learning-row" key={d.id}>
               <div>
@@ -549,9 +504,7 @@ export function Programs(props: Props) {
                     if (d.kind === "award") setAward(structuredClone(d.draft));
                     else setPlaylist(structuredClone(d.draft));
                   }}
-                >
-                  Edit program
-                </button>
+                >{translateUI("Edit program")}</button>
                 <button
                   disabled={busy}
                   onClick={() =>
@@ -561,9 +514,7 @@ export function Programs(props: Props) {
                       });
                     })
                   }
-                >
-                  Publish program
-                </button>
+                >{translateUI("Publish program")}</button>
                 <button
                   className="ghost"
                   disabled={busy || d.state === "retired"}
@@ -574,15 +525,13 @@ export function Programs(props: Props) {
                       });
                     })
                   }
-                >
-                  Retire program
-                </button>
+                >{translateUI("Retire program")}</button>
               </div>
             </section>
           ))}
           <form
             className="panel"
-            aria-label="Program editor"
+            aria-label={translateUI("Program editor")}
             onSubmit={(e) => {
               e.preventDefault();
               void run(async () => {
@@ -595,11 +544,9 @@ export function Programs(props: Props) {
               });
             }}
           >
-            <h3>Program editor</h3>
+            <h3>{translateUI("Program editor")}</h3>
             <fieldset disabled={busy}>
-              <label>
-                Collection ID
-                <input
+              <label>{translateUI("Collection ID")}<input
                   value={id}
                   onChange={(e) => setId(e.target.value)}
                   required
@@ -607,42 +554,34 @@ export function Programs(props: Props) {
                   pattern="[A-Za-z0-9_-]+"
                 />
               </label>
-              <label>
-                Collection type
-                <select
+              <label>{translateUI("Collection type")}<select
                   value={kind}
                   onChange={(e) => setKind(e.target.value as any)}
                 >
-                  <option value="award">Award</option>
-                  <option value="playlist">Playlist</option>
+                  <option value="award">{translateUI("Award")}</option>
+                  <option value="playlist">{translateUI("Playlist")}</option>
                 </select>
               </label>
-              <label>
-                Program title
-                <input
+              <label>{translateUI("Program title")}<input
                   value={value.title}
                   onChange={(e) => metadata("title", e.target.value)}
                   required
                   maxLength={160}
                 />
               </label>
-              <label>
-                Program summary
-                <textarea
+              <label>{translateUI("Program summary")}<textarea
                   value={value.summary}
                   onChange={(e) => metadata("summary", e.target.value)}
                   required
                   maxLength={600}
                 />
               </label>
-              <label>
-                Access
-                <select
+              <label>{translateUI("Access")}<select
                   value={value.access}
                   onChange={(e) => metadata("access", e.target.value)}
                 >
-                  <option value="tenant">Organization</option>
-                  <option value="author">Author only</option>
+                  <option value="tenant">{translateUI("Organization")}</option>
+                  <option value="author">{translateUI("Author only")}</option>
                 </select>
               </label>
               {kind === "playlist" ? (
@@ -654,21 +593,17 @@ export function Programs(props: Props) {
                 />
               ) : (
                 <>
-                  <label>
-                    Credit unit
-                    <select
+                  <label>{translateUI("Credit unit")}<select
                       value={award.unit}
                       onChange={(e) =>
                         setAward({ ...award, unit: e.target.value as any })
                       }
                     >
-                      <option value="credits">Credits</option>
-                      <option value="hours">Hours</option>
+                      <option value="credits">{translateUI("Credits")}</option>
+                      <option value="hours">{translateUI("Hours")}</option>
                     </select>
                   </label>
-                  <label>
-                    Target
-                    <input
+                  <label>{translateUI("Target")}<input
                       type="number"
                       value={award.target}
                       min={1}
@@ -686,9 +621,7 @@ export function Programs(props: Props) {
                       onChange={(e) =>
                         setAward({ ...award, ongoing: e.target.checked })
                       }
-                    />
-                    Ongoing · never complete automatically
-                  </label>
+                    />{translateUI("Ongoing · never complete automatically")}</label>
                   <label className="choice">
                     <input
                       type="checkbox"
@@ -699,15 +632,11 @@ export function Programs(props: Props) {
                           moderatedExternal: e.target.checked,
                         })
                       }
-                    />
-                    Require assessor approval for external learning
-                  </label>
+                    />{translateUI("Require assessor approval for external learning")}</label>
                   {award.requirements.map((r, i) => (
                     <fieldset key={i}>
-                      <legend>Requirement {i + 1}</legend>
-                      <label>
-                        Criterion ID
-                        <input
+                      <legend>{translateUI("Requirement")}{" "}{i + 1}</legend>
+                      <label>{translateUI("Criterion ID")}<input
                           value={r.id}
                           required
                           maxLength={64}
@@ -717,9 +646,7 @@ export function Programs(props: Props) {
                           }
                         />
                       </label>
-                      <label>
-                        Criterion title
-                        <input
+                      <label>{translateUI("Criterion title")}<input
                           value={r.title}
                           required
                           maxLength={160}
@@ -741,12 +668,8 @@ export function Programs(props: Props) {
                               required: e.target.checked,
                             })
                           }
-                        />
-                        Required criterion
-                      </label>
-                      <label>
-                        Criterion credits or hours
-                        <input
+                        />{translateUI("Required criterion")}</label>
+                      <label>{translateUI("Criterion credits or hours")}<input
                           type="number"
                           min={1}
                           max={1000}
@@ -780,9 +703,7 @@ export function Programs(props: Props) {
                             ),
                           })
                         }
-                      >
-                        Remove criterion
-                      </button>
+                      >{translateUI("Remove criterion")}</button>
                     </fieldset>
                   ))}
                   <button
@@ -798,12 +719,10 @@ export function Programs(props: Props) {
                         ],
                       })
                     }
-                  >
-                    Add criterion
-                  </button>
+                  >{translateUI("Add criterion")}</button>
                 </>
               )}
-              <button>Save program draft</button>
+              <button>{translateUI("Save program draft")}</button>
               <button
                 className="ghost"
                 type="button"
@@ -817,9 +736,7 @@ export function Programs(props: Props) {
                     items: [{ kind: "course", id: "systems-basics" }],
                   });
                 }}
-              >
-                New program
-              </button>
+              >{translateUI("New program")}</button>
             </fieldset>
           </form>
         </>
@@ -829,16 +746,12 @@ export function Programs(props: Props) {
           className="ghost"
           disabled={busy || offset === 0}
           onClick={() => setOffset(Math.max(0, offset - 10))}
-        >
-          Previous programs
-        </button>
+        >{translateUI("Previous programs")}</button>
         <button
           className="ghost"
           disabled={busy || next === null}
           onClick={() => setOffset(next!)}
-        >
-          Next programs
-        </button>
+        >{translateUI("Next programs")}</button>
       </div>
       {administrative && ["admin", "manager"].includes(role) && (
         <form
@@ -854,16 +767,12 @@ export function Programs(props: Props) {
             });
           }}
         >
-          <h3>Assign an award</h3>
-          <label>
-            Award ID
-            <input name="award" required maxLength={64} />
+          <h3>{translateUI("Assign an award")}</h3>
+          <label>{translateUI("Award ID")}<input name="award" required maxLength={64} />
           </label>
-          <label>
-            Award learner ID
-            <input name="learner" required maxLength={128} />
+          <label>{translateUI("Award learner ID")}<input name="learner" required maxLength={128} />
           </label>
-          <button disabled={busy}>Assign award</button>
+          <button disabled={busy}>{translateUI("Assign award")}</button>
         </form>
       )}
       {administrative && role === "admin" && (
@@ -881,25 +790,19 @@ export function Programs(props: Props) {
             });
           }}
         >
-          <h3>Assessor permissions</h3>
-          <label>
-            Assessed award ID
-            <input name="award" required />
+          <h3>{translateUI("Assessor permissions")}</h3>
+          <label>{translateUI("Assessed award ID")}<input name="award" required />
           </label>
-          <label>
-            Assessor account ID
-            <input name="assessor" required />
+          <label>{translateUI("Assessor account ID")}<input name="assessor" required />
           </label>
           <label className="choice">
-            <input type="checkbox" name="enabled" defaultChecked />
-            Grant award scope · uncheck to revoke
-          </label>
-          <button disabled={busy}>Save assessor scope</button>
+            <input type="checkbox" name="enabled" defaultChecked />{translateUI("Grant award scope · uncheck to revoke")}</label>
+          <button disabled={busy}>{translateUI("Save assessor scope")}</button>
         </form>
       )}
       {administrative && ["admin", "assessor"].includes(role) && (
         <section className="panel">
-          <h3>External learning moderation</h3>
+          <h3>{translateUI("External learning moderation")}</h3>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -914,9 +817,7 @@ export function Programs(props: Props) {
               });
             }}
           >
-            <label>
-              Moderation award ID
-              <input
+            <label>{translateUI("Moderation award ID")}<input
                 value={scope}
                 required
                 onChange={(e) => {
@@ -927,7 +828,7 @@ export function Programs(props: Props) {
                 }}
               />
             </label>
-            <button disabled={busy}>Load submissions</button>
+            <button disabled={busy}>{translateUI("Load submissions")}</button>
           </form>
           {records.map((r) => (
             <form
@@ -965,18 +866,14 @@ export function Programs(props: Props) {
               )}
               {r.state === "pending" && (
                 <>
-                  <label>
-                    Decision
-                    <select name="decision">
-                      <option value="accept">Accept</option>
-                      <option value="reject">Reject</option>
+                  <label>{translateUI("Decision")}<select name="decision">
+                      <option value="accept">{translateUI("Accept")}</option>
+                      <option value="reject">{translateUI("Reject")}</option>
                     </select>
                   </label>
-                  <label>
-                    Decision reason
-                    <textarea name="reason" required maxLength={600} />
+                  <label>{translateUI("Decision reason")}<textarea name="reason" required maxLength={600} />
                   </label>
-                  <button disabled={busy}>Record moderation decision</button>
+                  <button disabled={busy}>{translateUI("Record moderation decision")}</button>
                 </>
               )}
             </form>
@@ -985,16 +882,12 @@ export function Programs(props: Props) {
             className="ghost"
             disabled={recordOffset === 0}
             onClick={() => setRecordOffset(Math.max(0, recordOffset - 10))}
-          >
-            Previous submissions · then load
-          </button>
+          >{translateUI("Previous submissions · then load")}</button>
           <button
             className="ghost"
             disabled={recordNext === null}
             onClick={() => setRecordOffset(recordNext!)}
-          >
-            Next submissions · then load
-          </button>
+          >{translateUI("Next submissions · then load")}</button>
         </section>
       )}
     </section>

@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { LessonSettings, newEventSession } from "./lesson-settings.tsx";
 import { QuestionSettings, ExtendedQuestion } from "./question-editor.tsx";
@@ -105,12 +106,9 @@ export function CourseEditor({
       m.lessonIds = m.lessonIds.filter((x) => x !== lessonId);
   };
   return (
-    <section className="panel" aria-label="Course authoring">
+    <section className="panel" aria-label={translateUI("Course authoring")}>
       <h2>{selection.exists ? "Edit course draft" : "Create course draft"}</h2>
-      <p className="muted">
-        Save edits to the draft, then publish a new immutable version. Existing
-        learners retain their enrolled version.
-      </p>
+      <p className="muted">{translateUI("Save edits to the draft, then publish a new immutable version. Existing learners retain their enrolled version.")}</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -118,12 +116,10 @@ export function CourseEditor({
         }}
       >
         <fieldset disabled={busy}>
-          <legend>Course metadata</legend>
+          <legend>{translateUI("Course metadata")}</legend>
           <DiscoveryMetadataEditor value={course.discovery} onChange={value=>update(c=>{if(value)c.discovery=value;else delete c.discovery;})} />
           <div className="editor">
-            <label>
-              Course ID
-              <input
+            <label>{translateUI("Course ID")}<input
                 required
                 maxLength={64}
                 disabled={selection.exists}
@@ -131,9 +127,7 @@ export function CourseEditor({
                 onChange={(e) => setId(e.target.value)}
               />
             </label>
-            <label>
-              Title
-              <input
+            <label>{translateUI("Title")}<input
                 required
                 maxLength={160}
                 value={course.title}
@@ -144,9 +138,7 @@ export function CourseEditor({
                 }
               />
             </label>
-            <label>
-              Summary
-              <textarea
+            <label>{translateUI("Summary")}<textarea
                 required
                 maxLength={600}
                 value={course.summary}
@@ -157,9 +149,7 @@ export function CourseEditor({
                 }
               />
             </label>
-            <label>
-              Topic
-              <input
+            <label>{translateUI("Topic")}<input
                 required
                 maxLength={80}
                 value={course.topic}
@@ -170,9 +160,7 @@ export function CourseEditor({
                 }
               />
             </label>
-            <label>
-              Course language
-              <select
+            <label>{translateUI("Course language")}<select
                 value={course.language}
                 onChange={(e) =>
                   update((c) => {
@@ -180,13 +168,11 @@ export function CourseEditor({
                   })
                 }
               >
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
+                <option value="en">{translateUI("English")}</option>
+                <option value="vi">{translateUI("Tiếng Việt")}</option>
               </select>
             </label>
-            <label>
-              Duration in minutes
-              <input
+            <label>{translateUI("Duration in minutes")}<input
                 required
                 type="number"
                 min={1}
@@ -199,9 +185,7 @@ export function CourseEditor({
                 }
               />
             </label>
-            <label>
-              Level
-              <select
+            <label>{translateUI("Level")}<select
                 value={course.level}
                 onChange={(e) =>
                   update((c) => {
@@ -209,14 +193,12 @@ export function CourseEditor({
                   })
                 }
               >
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
+                <option value="beginner">{translateUI("Beginner")}</option>
+                <option value="intermediate">{translateUI("Intermediate")}</option>
+                <option value="advanced">{translateUI("Advanced")}</option>
               </select>
             </label>
-            <label>
-              Provider
-              <input
+            <label>{translateUI("Provider")}<input
                 required
                 maxLength={100}
                 value={course.provider}
@@ -236,9 +218,7 @@ export function CourseEditor({
                     c.aiProcessingAllowed = e.target.checked;
                   })
                 }
-              />
-              Allow model processing of self-authored course content
-            </label>
+              />{translateUI("Allow model processing of self-authored course content")}</label>
           </div>
         </fieldset>
         {course.modules!.map((module, moduleIndex) => (
@@ -247,10 +227,8 @@ export function CourseEditor({
             disabled={busy}
             aria-label={`Module ${moduleIndex + 1}`}
           >
-            <legend>Module {moduleIndex + 1}</legend>
-            <label>
-              Module title
-              <input
+            <legend>{translateUI("Module")}{" "}{moduleIndex + 1}</legend>
+            <label>{translateUI("Module title")}<input
                 required
                 maxLength={160}
                 value={module.title}
@@ -261,10 +239,10 @@ export function CourseEditor({
                 }
               />
             </label>
-            <p className="muted">Module ID: {module.id}</p>
+            <p className="muted">{translateUI("Module ID:")}{" "}{module.id}</p>
             {moduleIndex > 0 && (
               <fieldset>
-                <legend>Complete these modules first</legend>
+                <legend>{translateUI("Complete these modules first")}</legend>
                 {course.modules!.slice(0, moduleIndex).map((previous) => (
                   <label className="choice" key={previous.id}>
                     <input
@@ -291,10 +269,8 @@ export function CourseEditor({
                 overallIndex = course.lessons.indexOf(l);
               return (
                 <fieldset key={l.id} aria-label={`Lesson ${overallIndex + 1}`}>
-                  <legend>Lesson {overallIndex + 1}</legend>
-                  <label>
-                    Content source
-                    <select
+                  <legend>{translateUI("Lesson")}{" "}{overallIndex + 1}</legend>
+                  <label>{translateUI("Content source")}<select
                       value={
                         l.contentRef
                           ? `${l.contentRef.itemId}:${l.contentRef.version}`
@@ -333,7 +309,7 @@ export function CourseEditor({
                         })
                       }
                     >
-                      <option value="inline">Inline lesson</option>
+                      <option value="inline">{translateUI("Inline lesson")}</option>
                       {l.contentRef &&
                         !reusableItems.some(
                           (item) =>
@@ -343,8 +319,7 @@ export function CourseEditor({
                         ) && (
                           <option
                             value={`${l.contentRef.itemId}:${l.contentRef.version}`}
-                          >
-                            Pinned {l.contentRef.itemId} · v
+                          >{translateUI("Pinned")}{" "}{l.contentRef.itemId} · v
                             {l.contentRef.version}
                           </option>
                         )}
@@ -364,16 +339,13 @@ export function CourseEditor({
                     </select>
                   </label>
                   {l.contentRef && (
-                    <p className="muted">
-                      Pinned to {l.contentRef.itemId} version{" "}
+                    <p className="muted">{translateUI("Pinned to")}{" "}{l.contentRef.itemId} version{" "}
                       {l.contentRef.version}. Updating the source does not
                       update this draft automatically. Select the new version
                       explicitly.
                     </p>
                   )}
-                  <label>
-                    Lesson title
-                    <input
+                  <label>{translateUI("Lesson title")}<input
                       required
                       maxLength={160}
                       disabled={!!l.contentRef}
@@ -385,9 +357,7 @@ export function CourseEditor({
                       }
                     />
                   </label>
-                  <label>
-                    Lesson format
-                    <select
+                  <label>{translateUI("Lesson format")}<select
                       disabled={!!l.contentRef}
                       value={l.kind}
                       onChange={(e) =>
@@ -410,11 +380,11 @@ export function CourseEditor({
                         })
                       }
                     >
-                      <option value="text">Text</option>
-                      <option value="video">HTTPS video</option>
-                      <option value="link">HTTPS link</option>
-                      <option value="submission">Assignment submission</option>
-                      <option value="event">Instructor-led event</option>
+                      <option value="text">{translateUI("Text")}</option>
+                      <option value="video">{translateUI("HTTPS video")}</option>
+                      <option value="link">{translateUI("HTTPS link")}</option>
+                      <option value="submission">{translateUI("Assignment submission")}</option>
+                      <option value="event">{translateUI("Instructor-led event")}</option>
                       {["audio", "document", "interactive"].includes(
                         l.kind,
                       ) && (
@@ -443,9 +413,7 @@ export function CourseEditor({
                     />
                   </label>
                   {["video", "link"].includes(l.kind) && !l.assetId && (
-                    <label>
-                      HTTPS media URL
-                      <input
+                    <label>{translateUI("HTTPS media URL")}<input
                         required
                         disabled={!!l.contentRef}
                         type="url"
@@ -460,9 +428,7 @@ export function CourseEditor({
                     </label>
                   )}
                   {["video", "audio", "interactive"].includes(l.kind) && (
-                    <label>
-                      Video transcript
-                      <textarea
+                    <label>{translateUI("Video transcript")}<textarea
                         required
                         disabled={!!l.contentRef}
                         maxLength={2500}
@@ -477,7 +443,7 @@ export function CourseEditor({
                   )}
                   {overallIndex > 0 && (
                     <fieldset>
-                      <legend>Complete these lessons first</legend>
+                      <legend>{translateUI("Complete these lessons first")}</legend>
                       {course.lessons.slice(0, overallIndex).map((previous) => (
                         <label className="choice" key={previous.id}>
                           <input
@@ -513,9 +479,7 @@ export function CourseEditor({
                           sequence(c);
                         })
                       }
-                    >
-                      Move lesson up
-                    </button>
+                    >{translateUI("Move lesson up")}</button>
                     <button
                       type="button"
                       className="ghost"
@@ -530,17 +494,13 @@ export function CourseEditor({
                           sequence(c);
                         })
                       }
-                    >
-                      Move lesson down
-                    </button>
+                    >{translateUI("Move lesson down")}</button>
                     <button
                       type="button"
                       className="ghost"
                       disabled={module.lessonIds.length === 1}
                       onClick={() => update((c) => removeLesson(c, l.id))}
-                    >
-                      Remove lesson
-                    </button>
+                    >{translateUI("Remove lesson")}</button>
                   </div>
                 </fieldset>
               );
@@ -563,9 +523,7 @@ export function CourseEditor({
                     sequence(c);
                   })
                 }
-              >
-                Add lesson
-              </button>
+              >{translateUI("Add lesson")}</button>
               <button
                 type="button"
                 className="ghost"
@@ -579,9 +537,7 @@ export function CourseEditor({
                     sequence(c);
                   })
                 }
-              >
-                Move module up
-              </button>
+              >{translateUI("Move module up")}</button>
               <button
                 type="button"
                 className="ghost"
@@ -597,9 +553,7 @@ export function CourseEditor({
                       );
                   })
                 }
-              >
-                Remove module and lessons
-              </button>
+              >{translateUI("Remove module and lessons")}</button>
             </div>
           </fieldset>
         ))}
@@ -625,15 +579,11 @@ export function CourseEditor({
               });
             })
           }
-        >
-          Add module
-        </button>
+        >{translateUI("Add module")}</button>
         <fieldset disabled={busy}>
-          <legend>Backend-graded MCQ</legend>
+          <legend>{translateUI("Backend-graded MCQ")}</legend>
           <div className="editor">
-            <label>
-              Pass score percentage
-              <input
+            <label>{translateUI("Pass score percentage")}<input
                 required
                 type="number"
                 min={1}
@@ -646,9 +596,7 @@ export function CourseEditor({
                 }
               />
             </label>
-            <label>
-              Maximum attempts
-              <input
+            <label>{translateUI("Maximum attempts")}<input
                 required
                 type="number"
                 min={1}
@@ -671,9 +619,7 @@ export function CourseEditor({
                   c.quiz.shuffleQuestions = e.target.checked;
                 })
               }
-            />
-            Shuffle question order per attempt
-          </label>
+            />{translateUI("Shuffle question order per attempt")}</label>
           <label className="choice">
             <input
               type="checkbox"
@@ -683,13 +629,9 @@ export function CourseEditor({
                   c.quiz.shuffleOptions = e.target.checked;
                 })
               }
-            />
-            Shuffle choices per attempt
-          </label>
-          <label>
-            Answer release
-            <select
-              aria-label="Answer release"
+            />{translateUI("Shuffle choices per attempt")}</label>
+          <label>{translateUI("Answer release")}<select
+              aria-label={translateUI("Answer release")}
               value={course.quiz.answerRelease ?? "never"}
               onChange={(e) =>
                 update((c) => {
@@ -697,18 +639,14 @@ export function CourseEditor({
                 })
               }
             >
-              <option value="never">Never release answer keys</option>
-              <option value="after_pass">
-                After passing · human player only
-              </option>
-              <option value="after_exhausted">
-                After all allowed attempts · human player only
-              </option>
+              <option value="never">{translateUI("Never release answer keys")}</option>
+              <option value="after_pass">{translateUI("After passing · human player only")}</option>
+              <option value="after_exhausted">{translateUI("After all allowed attempts · human player only")}</option>
             </select>
           </label>
           {course.quiz.questions.map((q, qi) => (
             <fieldset key={q.id} aria-label={`Question ${qi + 1}`}>
-              <legend>Question {qi + 1}</legend>
+              <legend>{translateUI("Question")}{" "}{qi + 1}</legend>
               <label>
                 {qi === 0 ? "First quiz question" : "Quiz question"}
                 <textarea
@@ -736,8 +674,7 @@ export function CourseEditor({
                 <>
                   {q.options.map((option, oi) => (
                     <div className="option-row" key={oi}>
-                      <label>
-                        Option {String.fromCharCode(65 + oi)}
+                      <label>{translateUI("Option")}{" "}{String.fromCharCode(65 + oi)}
                         <input
                           required
                           maxLength={240}
@@ -764,14 +701,11 @@ export function CourseEditor({
                                   : next.correct;
                           })
                         }
-                      >
-                        Remove option {String.fromCharCode(65 + oi)}
+                      >{translateUI("Remove option")}{" "}{String.fromCharCode(65 + oi)}
                       </button>
                     </div>
                   ))}
-                  <label>
-                    Correct option
-                    <select
+                  <label>{translateUI("Correct option")}<select
                       value={q.correct}
                       onChange={(e) =>
                         updateQuestion(q.id, (next) => {
@@ -810,9 +744,7 @@ export function CourseEditor({
                       next.options.push("");
                     })
                   }
-                >
-                  Add option
-                </button>
+                >{translateUI("Add option")}</button>
                 <button
                   type="button"
                   className="ghost"
@@ -824,9 +756,7 @@ export function CourseEditor({
                       );
                     })
                   }
-                >
-                  Remove question
-                </button>
+                >{translateUI("Remove question")}</button>
               </div>
             </fieldset>
           ))}
@@ -843,32 +773,23 @@ export function CourseEditor({
                 });
               })
             }
-          >
-            Add question
-          </button>
+          >{translateUI("Add question")}</button>
         </fieldset>
         <div className="actions">
-          <button disabled={busy}>Save draft</button>
+          <button disabled={busy}>{translateUI("Save draft")}</button>
           <button
             type="button"
             className="ghost"
             onClick={() => setPreview(!preview)}
-          >
-            Preview draft
-          </button>
-          <button type="button" className="ghost" onClick={onNew}>
-            New course
-          </button>
+          >{translateUI("Preview draft")}</button>
+          <button type="button" className="ghost" onClick={onNew}>{translateUI("New course")}</button>
         </div>
       </form>
       {preview && (
-        <section aria-label="Draft preview" className="panel">
+        <section aria-label={translateUI("Draft preview")} className="panel">
           <h3>{course.title || "Untitled draft"}</h3>
           <p>{course.summary}</p>
-          <p>
-            This unsaved preview never creates enrollment, progress or a quiz
-            attempt.
-          </p>
+          <p>{translateUI("This unsaved preview never creates enrollment, progress or a quiz attempt.")}</p>
           {course.modules!.map((m) => (
             <section key={m.id}>
               <h4>{m.title}</h4>
@@ -878,8 +799,7 @@ export function CourseEditor({
                   <div key={l.id}>
                     <h5>{l.title}</h5>
                     <p className="lesson-text">{l.text}</p>
-                    <p>
-                      Requires:{" "}
+                    <p>{translateUI("Requires:")}{" "}
                       {requiredLessonIds(course, l).join(", ") || "none"}
                     </p>
                     {l.kind !== "text" && (

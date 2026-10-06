@@ -1,0 +1,28 @@
+import {test,expect} from "@playwright/test";
+test("EN/VI labels switch and persist without resetting an author draft, changing source text or mutating bridge authority",async({page})=>{
+ await page.goto("/");await page.getByLabel("Account",{exact:true}).fill("editor");
+ await page.getByLabel("Password",{exact:true}).fill("editor-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();
+ await page.getByRole("button",{name:"Administration",exact:true}).click();
+ const author=page.getByRole("region",{name:"Course authoring",exact:true});
+ await author.getByLabel("Course ID",{exact:true}).fill("locale-unsaved");
+ await author.getByLabel("Title",{exact:true}).fill("Save draft");
+ const before=await page.evaluate(()=>window.agentBridgeV1!.getContext());
+ await page.getByLabel("Interface language",{exact:true}).selectOption("vi");
+ const vietnamese=page.getByRole("region",{name:"Biên soạn khóa học",exact:true});
+ await expect(vietnamese.getByLabel("Tên",{exact:true})).toHaveValue("Save draft");
+ await expect(vietnamese.getByLabel("Mã khóa học",{exact:true})).toHaveValue("locale-unsaved");
+ await expect(vietnamese.getByRole("button",{name:"Lưu bản nháp",exact:true})).toBeVisible();
+ const after=await page.evaluate(()=>window.agentBridgeV1!.getContext());
+ expect(after.documentId).toBe(before.documentId);expect(after.sessionEpoch).toBe(before.sessionEpoch);expect(after.revision).toBe(before.revision);
+ await page.getByLabel("Ngôn ngữ giao diện",{exact:true}).selectOption("en");
+ await expect(author.getByLabel("Title",{exact:true})).toHaveValue("Save draft");
+ await page.getByLabel("Interface language",{exact:true}).selectOption("vi");
+ await page.reload();await expect(page.locator("html")).toHaveAttribute("lang","vi");
+ await expect(page.getByRole("button",{name:"Quản trị",exact:true})).toBeVisible();
+ const discovery=page.getByRole("region",{name:"Khám phá khóa học nâng cao",exact:true});
+ await discovery.getByLabel("Nhà cung cấp chính xác",{exact:true}).fill("Pear Originals");
+ await discovery.getByRole("button",{name:"Tìm với bộ lọc đã xem xét",exact:true}).click();
+ await expect(discovery.getByRole("heading",{name:"Reliable systems basics",exact:true})).toBeVisible();
+ await expect(discovery.getByRole("heading",{name:"Học tập có chủ đích",exact:true})).toBeVisible();
+ await page.screenshot({path:"artifacts/vietnamese-source-preservation.png",fullPage:true});
+});

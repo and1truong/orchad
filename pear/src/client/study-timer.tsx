@@ -1,3 +1,4 @@
+import {translateUI} from "./i18n.ts";
 import React, {useEffect,useRef,useState} from "react";
 import {request,type Session} from "./api.ts";
 type Result={totalSeconds:number;token?:string|null;active?:boolean};
@@ -48,10 +49,9 @@ export function StudyTimer({session,kind,targetId,busy=false}:{
     }catch(e){if(live.current){token.current=null;setActive(false);setError((e as Error).message);}}
     finally{if(live.current)setPending(false);}
   };
-  return <section aria-label="Optional study timer" className="panel">
-    <p>Study timer: {seconds} seconds · {active?"Running":"Paused"}</p>
-    <p>Opt in to record connected timer intervals. Hidden tabs and gaps over 30 seconds are excluded.
-      This does not verify attention or change completion, quiz scores or certificates.</p>
+  return <section aria-label={translateUI("Optional study timer")} className="panel">
+    <p>{translateUI("Study timer:")}{" "}{seconds} seconds · {active?"Running":"Paused"}</p>
+    <p>{translateUI("Opt in to record connected timer intervals. Hidden tabs and gaps over 30 seconds are excluded. This does not verify attention or change completion, quiz scores or certificates.")}</p>
     <button type="button" disabled={pending||busy} onClick={()=>void toggle()}>
       {active?"Pause study timer":"Start study timer"}
     </button>
