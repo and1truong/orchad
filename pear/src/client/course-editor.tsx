@@ -588,7 +588,7 @@ export function CourseEditor({
             <label>{translateUI("Pass score percentage")}<input
                 required
                 type="number"
-                min={1}
+                min={0}
                 max={100}
                 value={course.quiz.passScore}
                 onChange={(e) =>
@@ -602,7 +602,8 @@ export function CourseEditor({
                 required
                 type="number"
                 min={1}
-                max={10}
+                max={1000}
+                disabled={!!course.quiz.unlimitedAttempts}
                 value={course.quiz.maxAttempts}
                 onChange={(e) =>
                   update((c) => {
@@ -612,6 +613,10 @@ export function CourseEditor({
               />
             </label>
           </div>
+          <label><input type="checkbox" checked={!!course.quiz.unlimitedAttempts} onChange={e=>update(c=>{c.quiz.unlimitedAttempts=e.target.checked;})}/>{translateUI("Unlimited quiz attempts")}</label>
+          <p>{translateUI("Unlimited removes the configured quiz limit. The service retains an operational quota of 2500 attempts per enrollment. Existing versions and official history remain pinned.")}</p>
+          <label>{translateUI("Custom pass message")}<textarea maxLength={600} value={course.quiz.passMessage??""} onChange={e=>update(c=>{c.quiz.passMessage=e.target.value;})}/></label>
+          <label>{translateUI("Custom fail message")}<textarea maxLength={600} value={course.quiz.failMessage??""} onChange={e=>update(c=>{c.quiz.failMessage=e.target.value;})}/></label>
           <label className="choice">
             <input
               type="checkbox"
@@ -642,6 +647,7 @@ export function CourseEditor({
               }
             >
               <option value="never">{translateUI("Never release answer keys")}</option>
+              <option value="after_submission">{translateUI("After grading submission · human player only")}</option>
               <option value="after_pass">{translateUI("After passing · human player only")}</option>
               <option value="after_exhausted">{translateUI("After all allowed attempts · human player only")}</option>
             </select>
@@ -765,7 +771,7 @@ export function CourseEditor({
           ))}
           <button
             type="button"
-            disabled={course.quiz.questions.length >= 8||!!course.quiz.questionBankRef}
+            disabled={course.quiz.questions.length >= 50||!!course.quiz.questionBankRef}
             onClick={() =>
               update((c) => {
                 c.quiz.questions.push({
@@ -818,7 +824,7 @@ export function CourseEditor({
           ))}
           <p>
             {course.quiz.questions.length} questions · Pass{" "}
-            {course.quiz.passScore}% · {course.quiz.maxAttempts} attempts
+            {course.quiz.passScore}% · {course.quiz.unlimitedAttempts?translateUI("Unlimited quiz attempts"):course.quiz.maxAttempts+" "+translateUI("attempts")}
           </p>
           {course.quiz.questions.map((q) => (
             <div key={q.id}>

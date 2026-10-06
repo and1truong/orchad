@@ -1,5 +1,11 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Unlimited quiz attempts":"Không giới hạn lượt thử quiz",
+"Unlimited removes the configured quiz limit. The service retains an operational quota of 2500 attempts per enrollment. Existing versions and official history remain pinned.":"Không giới hạn loại bỏ giới hạn lượt thử được cấu hình cho quiz. Dịch vụ giữ hạn mức vận hành 2500 lượt thử cho mỗi enrollment. Phiên bản và lịch sử chính thức hiện có vẫn được giữ nguyên.",
+"Custom pass message":"Thông điệp khi đạt",
+"Custom fail message":"Thông điệp khi chưa đạt",
+"After grading submission · human player only":"Sau khi chấm bài nộp · chỉ trong trình học của người dùng",
+"Choose one to fifty bank questions":"Chọn từ một đến năm mươi câu hỏi trong ngân hàng",
 "Scheduled in-app digest":"Digest theo lịch trong ứng dụng",
 "Review your own schedule before enabling it. Digests stay in this app and never change official learning. Missed runs older than six hours are skipped; at most three deliveries occur in 24 hours.":"Xem lại lịch của bạn trước khi bật. Digest chỉ ở trong ứng dụng và không thay đổi kết quả học chính thức. Bỏ qua lịch trễ hơn sáu giờ; tối đa ba lần gửi trong 24 giờ.",
 "Digest schedule enabled":"Đã bật lịch digest",

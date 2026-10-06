@@ -270,8 +270,9 @@ export class AssessmentService {
         passed === null ? null : passed ? 1 : 0,
         pending ? "pending_manual" : "graded",
         !pending &&
-          ((v.quiz.answerRelease === "after_pass" && passed) ||
-            (v.quiz.answerRelease === "after_exhausted" &&
+          ((v.quiz.answerRelease === "after_submission") ||
+          (v.quiz.answerRelease === "after_pass" && passed) ||
+            (v.quiz.answerRelease === "after_exhausted" && !v.quiz.unlimitedAttempts &&
               at.number >= v.quiz.maxAttempts + this.extra(at.enrollment_id)))
           ? 1
           : 0,
@@ -293,6 +294,7 @@ export class AssessmentService {
       score,
       passed,
       gradingState: pending ? "pending_manual" : "graded",
+      resultMessage: pending ? null : passed ? v.quiz.passMessage ?? null : v.quiz.failMessage ?? null,
     };
   }
   read(p: Principal, name: string, a: any, source: string) {

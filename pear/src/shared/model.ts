@@ -112,10 +112,13 @@ export interface Course {
     questionBankRef?:{bankId:string;version:number;questionIds:string[]};
     passScore: number;
     maxAttempts: number;
+    unlimitedAttempts?: boolean;
+    passMessage?: string;
+    failMessage?: string;
     questions: Question[];
     shuffleQuestions?: boolean;
     shuffleOptions?: boolean;
-    answerRelease?: "never" | "after_pass" | "after_exhausted";
+    answerRelease?: "never" | "after_pass" | "after_exhausted" | "after_submission";
   };
 }
 export interface Bridge {

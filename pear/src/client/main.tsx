@@ -788,7 +788,7 @@ function App() {
             </ul>
             <p>
               {preview.quiz.questionCount} questions · Pass score{" "}
-              {preview.quiz.passScore}% · {preview.quiz.maxAttempts} attempts
+              {preview.quiz.passScore}% · {preview.quiz.unlimitedAttempts?translateUI("Unlimited quiz attempts"):preview.quiz.maxAttempts+" "+translateUI("attempts")}
             </p>
             <p>{translateUI("Completion requires your lesson acknowledgement and a passing backend-graded quiz.")}{" "}
               {preview.aiProcessingAllowed
@@ -1106,6 +1106,7 @@ function App() {
                         ))}
                       </details>
                     )}
+                    {attempt.resultMessage&&<p className="notice">{attempt.resultMessage}</p>}
                     {attempt.submitted ? (
                       <p role="status">
                         {attempt.gradingState === "pending_manual" ? (

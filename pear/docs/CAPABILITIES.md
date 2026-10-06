@@ -1,6 +1,6 @@
 # Go1 parity register
 
-Baseline: [epic #49](https://github.com/and1truong/orchad/issues/49), public-source research 2026-10-05. Implementation snapshot: 2026-10-06, stacked delivery through #107. Sources below retain the epic baseline; this is not a new reference-account or plan audit. Exact Go1 offering/portal/plan entitlements remain NOT VERIFIED. No paid provider, reference catalog, actual IdP/channel account, deployment or scope exception has been authorized or verified.
+Baseline: [epic #49](https://github.com/and1truong/orchad/issues/49), public-source research 2026-10-05. Implementation snapshot: 2026-10-06, stacked delivery through #108. Sources below retain the epic baseline; this is not a new reference-account or plan audit. Exact Go1 offering/portal/plan entitlements remain NOT VERIFIED. No paid provider, reference catalog, actual IdP/channel account, deployment or scope exception has been authorized or verified.
 
 Full parity remains the target. OPEN means a required internal sub-capability or validation is unfinished; BLOCKED names an external dependency; NOT VERIFIED means evidence is insufficient. TESTED applies only to the named baseline fixture/profile. Implemented code with CI pending/failing is not PASS. Scripted Mango validates transport/policy, not model inference quality. Every row retains its unfinished scope.
 
@@ -137,3 +137,8 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## Reviewed own scheduled in-app digest extension
 
 #107 adds opt-in own timezone/weekday/DST/retention preferences, independent bounded restart-safe delivery, current group rights at generation/history read, notification read/delete controls and whole-row pagination. Seven domain/actual SQLite restart/HTTP and one EN/VI mobile browser regression authored; exact-head CI pending. This does not install or send external channels, run an assistant loop, or change official learning. Operational retention/model quality/external channel parity remain OPEN/BLOCKED/NOT VERIFIED. See ADR-048.
+
+
+## G06 reviewed quiz settings extension
+
+#108 adds bounded 50-question quizzes/banks, zero pass threshold, explicit unlimited configuration with a separate 2500-attempt operational quota, human-only graded-submission key release and literal custom result messages. Four domain/actual HTTP and one EN/VI mobile browser regression authored; exact-head CI pending. 16 KiB quiz and canonical envelope caps remain unchanged. Current 2026-10-06 guide review identifies still-open multiple-correct choices/option feedback, correct-before-continuing, incorrect-only retries, dropdown blanks, interactive preview and latest-quiz migration. See ADR-049; current source review supplements the retained 2026-10-05 baseline without declaring any missing feature unsupported by Go1.

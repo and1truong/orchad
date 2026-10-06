@@ -508,6 +508,7 @@ export class LearningService {
       quiz: {
         passScore: quiz.passScore,
         maxAttempts: quiz.maxAttempts,
+        unlimitedAttempts: !!quiz.unlimitedAttempts,
         questionCount: quiz.questions.length,
       },
     };
@@ -723,6 +724,7 @@ export class LearningService {
           score: at.score,
           passed: at.passed === null ? null : !!at.passed,
           gradingState: at.grading_state,
+          resultMessage: source === "human" && at.submitted && at.grading_state === "graded" ? (at.passed ? v.quiz.passMessage ?? null : v.quiz.failMessage ?? null) : null,
           questions: visibleQuestions(v, at),
           answers: source === "human" ? decode(at.answers) : {},
           responsesWithheld: source === "bridge",
@@ -1187,7 +1189,8 @@ export class LearningService {
             "FORBIDDEN",
             "Wait for human assessment review before retrying",
           );
-        if (n > v.quiz.maxAttempts + this.assessments.extra(e.id))
+        if (n > 2500) reject("INVALID_ARGUMENT", "Operational quota of 2500 attempts per enrollment reached");
+        if (!v.quiz.unlimitedAttempts && n > v.quiz.maxAttempts + this.assessments.extra(e.id))
           reject("FORBIDDEN", "Assessment attempt limit reached");
         const id = randomUUID();
         this.db
