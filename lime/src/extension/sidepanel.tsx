@@ -9,6 +9,7 @@ import {
   APP_PROVENANCE,
   APP_REQUEST_FORWARD,
   finalAssistantText,
+  makeAppResult,
 } from "./app-request.js";
 import {
   BindingSchema,
@@ -214,7 +215,7 @@ function App() {
         void chrome.tabs
           .sendMessage(
             page.tabId,
-            { type: "lime:agentResult", requestId, ...result },
+            makeAppResult(requestId, result),
             { documentId: page.documentId },
           )
           .catch(() => {});
