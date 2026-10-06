@@ -110,6 +110,6 @@ try{
  check("old MCP pairing cannot read after native identity switch",old?.ok===false);
  const ledger=await state();
  check("native flow never fabricates scores, completion or certificates",ledger.enrollments.length===1&&ledger.enrollments[0].learner==="learner-a"&&ledger.attempts===0&&ledger.certificates===0);
- await close();check("native Pear fixture shuts down cleanly",exitCode===0);
+ await close();check("native Pear fixture shuts down cleanly",exitCode===0&&fixtureExit===0);
  console.log(`[${lane}] ${checks.length}/${checks.length} checks passed`);
 }catch(e){console.error("["+lane+"] FAILED: "+e.message);console.error(stderr.slice(-2000));console.error(fixtureError.slice(-1000));await close();process.exitCode=1;}
