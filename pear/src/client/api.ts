@@ -63,7 +63,11 @@ export function createBridge(
   onMutation: () => void,
 ): Bridge {
   return Object.freeze({
-    describe: () => request<Description>("/api/describe", session),
+    describe: () =>
+      request<Description>(
+        "/api/describe?documentId=" + encodeURIComponent(currentDocument()),
+        session,
+      ),
     getContext: () =>
       request<Context>(
         "/api/context?documentId=" + encodeURIComponent(currentDocument()),

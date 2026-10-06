@@ -492,7 +492,7 @@ test("admin user deactivation through HTTP revokes a live session and keeps lear
       headers: admin.headers,
       payload: {
         requestId: "deactivate",
-        documentId: "library:demo",
+        documentId: "library:demo::people",
         toolName: "learning_save_user",
         arguments: {
           user: {
@@ -538,7 +538,7 @@ test("admin user deactivation through HTTP revokes a live session and keeps lear
       headers: manager.headers,
       payload: {
         requestId: "denied",
-        documentId: "library:demo",
+        documentId: "library:demo::people",
         toolName: "learning_save_user",
         arguments: {
           user: {
@@ -593,7 +593,7 @@ test("assignment jobs use server time, deduplicate HTTP retries and keep notific
       manager = await login(app, "manager");
     const payload = {
       requestId: "run",
-      documentId: "library:demo",
+      documentId: "library:demo::assignments",
       toolName: "learning_run_assignment_jobs",
       arguments: {},
       expectedRevision: f.service.context("admin", "library:demo").revision,
@@ -651,7 +651,7 @@ test("assignment jobs use server time, deduplicate HTTP retries and keep notific
       other = await login(app, "learner-b");
     const read = {
       requestId: "notifications",
-      documentId: "learning:demo:learner-a",
+      documentId: "learning:demo:learner-a::assignments",
       toolName: "learning_get_notifications",
       arguments: {},
       expectedRevision: null,
@@ -724,7 +724,7 @@ test("report HTTP exports retain direct-report scope and revoked session denial"
     const { freshReport } = await import("../src/shared/reports.ts");
     const payload = {
       requestId: "report-http",
-      documentId: "library:demo",
+      documentId: "library:demo::reports",
       toolName: "learning_export_report",
       arguments: { spec: freshReport(), rows: "all", columns: "all" },
       expectedRevision: null,

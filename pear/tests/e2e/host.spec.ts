@@ -55,7 +55,7 @@ test("shared Pi client + fake Mango -> real Lime HostPolicy -> browser Pear brid
       clientId: "fixture",
       sessionId: "fixture-session",
       target: { ...target },
-      sessionEpoch: context.sessionEpoch,
+      sessionEpoch: context.sessionEpoch ?? null,
       reads: new Set(
         description.tools
           .filter((t: any) => t.effect === "read")
@@ -134,4 +134,102 @@ test("shared Pi client + fake Mango -> real Lime HostPolicy -> browser Pear brid
   } finally {
     await gateway.close();
   }
+});
+
+test("changing assistant workspace revokes an in-flight host approval before any dispatch", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Account", { exact: true }).fill("admin");
+  await page.getByLabel("Password", { exact: true }).fill("admin-dev");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Sign out", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Administration", exact: true })
+    .click();
+  await page
+    .getByLabel("Assistant workspace", { exact: true })
+    .selectOption("reports");
+  const context = await page.evaluate(() => window.agentBridgeV1!.getContext()),
+    description = await page.evaluate(() => window.agentBridgeV1!.describe());
+  expect(context.documentId).toBe("library:demo::reports");
+  expect(description.tools.some((t) => t.name === "learning_save_report")).toBe(
+    true,
+  );
+  expect(description.tools.some((t) => t.name === "learning_save_user")).toBe(
+    false,
+  );
+  let dispatches = 0,
+    release!: (v: boolean) => void,
+    ready!: () => void;
+  const approvalReady = new Promise<void>((r) => (ready = r));
+  const target = {
+    targetId: "group-target",
+    pageInstanceId: "group-page",
+    origin: new URL(page.url()).origin,
+    appId: context.appId,
+    documentId: context.documentId,
+    title: "Pear reports",
+  };
+  const adapter = {
+    target,
+    current: async () => target,
+    describe: () => page.evaluate(() => window.agentBridgeV1!.describe()),
+    getContext: () => page.evaluate(() => window.agentBridgeV1!.getContext()),
+    invoke: (call: Call) => {
+      dispatches++;
+      return page.evaluate((c) => window.agentBridgeV1!.invoke(c), call);
+    },
+  };
+  const policy = new HostPolicy(
+    adapter,
+    {
+      clientId: "groups",
+      sessionId: "groups-session",
+      target,
+      sessionEpoch: context.sessionEpoch ?? null,
+      reads: new Set(),
+    },
+    () => {
+      ready();
+      return new Promise<boolean>((r) => (release = r));
+    },
+    new AbortController().signal,
+  );
+  const { freshReport } = await import("../../src/shared/reports.ts");
+  const pending = policy.call({
+    requestId: "pending-group",
+    documentId: target.documentId,
+    toolName: "learning_save_report",
+    arguments: { reportId: "pending-group", spec: freshReport() },
+    expectedRevision: context.revision,
+    idempotencyKey: "pending-group",
+  });
+  await approvalReady;
+  await page.evaluate(() => {
+    const select = document.querySelector(
+      'select[aria-label="Assistant workspace"]',
+    ) as HTMLSelectElement;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      "value",
+    )!.set!;
+    setter.call(select, "people");
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.agentBridgeV1!.getContext().then((c) => c.documentId),
+      ),
+    )
+    .toBe("library:demo::people");
+  release(true);
+  expect((await pending).error?.code).toBe("STALE_CONTEXT");
+  expect(dispatches).toBe(0);
+  const next = await page.evaluate(() => window.agentBridgeV1!.describe());
+  expect(next.tools.some((t) => t.name === "learning_save_user")).toBe(true);
+  expect(next.tools.some((t) => t.name === "learning_save_report")).toBe(false);
 });

@@ -93,6 +93,10 @@ try{
   const denied=await deniedP;
   check('consent: unconsented read needs trusted approval (denied path)',denied.ok===false&&denied.error?.code==='APPROVAL_DENIED',JSON.stringify(denied.error));
 
+  // The sidebar revokes old grants when it first observes the binding.
+  // Wait for that real UI effect before granting through the smoke surface.
+  // Otherwise a late first heartbeat can revoke this test's new grant.
+  await waitMarker(/^COCONUT_SMOKE:ui-response:consent$/,15000);
   // explicit consent -> consented read.
   await request({action:'consent',targetId,readTools:['demo_read']});
   const read=await tool('host_call_tool',{targetId,pageInstanceId,call:{toolName:'demo_read',arguments:{},documentId,expectedRevision:null,idempotencyKey:null,requestId:randomUUID()}});

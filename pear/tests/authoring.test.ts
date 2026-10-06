@@ -476,7 +476,7 @@ test("content writes use library CAS, atomic retry-before-revision, conflict che
         "learning_publish_content_item",
         { itemId: "dedup" },
         "bridge",
-        { documentId: "learning:demo:editor" },
+        { documentId: "learning:demo:editor::content" },
       ).error?.code,
       "STALE_CONTEXT",
     );

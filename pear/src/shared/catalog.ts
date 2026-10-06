@@ -1,3 +1,4 @@
+import type { ToolGroup } from "./tool-groups.ts";
 import { reportTools, reportLibraryWrites } from "./reports.ts";
 import { assignmentTools, assignmentLibraryWrites } from "./assignments.ts";
 import { peopleTools, peopleLibraryWrites } from "./people.ts";
@@ -277,7 +278,7 @@ const report = tool(
   "Read bounded learning records in current administrator or direct-report scope. No arbitrary SQL.",
   [],
 );
-export function catalog(role: Role): Tool[] {
+export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
     ...programTools(role),
@@ -287,6 +288,40 @@ export function catalog(role: Role): Tool[] {
     ...(["admin", "content_admin"].includes(role) ? adminTools : []),
     ...(["admin", "manager"].includes(role) ? [assignment, report] : []),
   ];
+}
+// Each descriptor is a complete bounded domain catalog, never an arbitrary slice.
+export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
+  const common = learnerTools.filter((t) =>
+    [
+      "learning_search",
+      "learning_get_item",
+      "learning_get_my_learning",
+    ].includes(t.name),
+  );
+  const domain =
+    group === "learning"
+      ? learnerTools
+      : group === "content"
+        ? [
+            ...learnerTools.filter(
+              (t) => t.name.includes("item") || t.name === "learning_search",
+            ),
+            ...(["admin", "content_admin"].includes(role) ? adminTools : []),
+          ]
+        : group === "programs"
+          ? programTools(role)
+          : group === "people"
+            ? peopleTools(role)
+            : group === "assignments"
+              ? [
+                  ...assignmentTools(role),
+                  ...(["admin", "manager"].includes(role) ? [assignment] : []),
+                ]
+              : [
+                  ...reportTools(role),
+                  ...(["admin", "manager"].includes(role) ? [report] : []),
+                ];
+  return [...new Map([...common, ...domain].map((t) => [t.name, t])).values()];
 }
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.

@@ -209,12 +209,17 @@ async fn host_request(
 ) -> Result<Value, String> {
     trusted(&webview)?;
     let host = webview.window();
-    dispatch_request(
+    let action = request["action"].as_str().unwrap_or("").to_owned();
+    let result = dispatch_request(
         &state,
         request,
         host.is_visible().unwrap_or(false) && !host.is_minimized().unwrap_or(true),
     )
-    .await
+    .await;
+    if result.is_ok() {
+        smoke_note("ui-response", &action);
+    }
+    result
 }
 #[tauri::command]
 fn guest_reply(

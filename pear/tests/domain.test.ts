@@ -687,3 +687,94 @@ test("all restricted assessment/draft text stays out of model results; bounded d
     f.db.close();
   }
 });
+
+test("contextual catalogs cover every authorized tool with bounded descriptors and share canonical CAS across groups", async () => {
+  const { allCatalog } = await import("../src/shared/catalog.ts"),
+    { toolGroups, scopedWorkspace } = await import(
+      "../src/shared/tool-groups.ts"
+    );
+  const f = fixture();
+  try {
+    for (const user of [
+      "admin",
+      "manager",
+      "editor",
+      "assessor",
+      "learner-a",
+    ]) {
+      const role = f.service.principal(user).role,
+        covered = new Set<string>();
+      for (const group of toolGroups) {
+        const desc = f.service.description(
+          user,
+          scopedWorkspace(f.service.personal(f.service.principal(user)), group),
+        );
+        assert.ok(desc.tools.length <= 64);
+        assert.ok(withinMessageCap(desc));
+        for (const t of desc.tools) {
+          assert.ok(hostSafeSchema(t.inputSchema));
+          assert.ok(!t.name.startsWith("human_"));
+          covered.add(t.name);
+        }
+      }
+      assert.deepEqual(
+        [...covered].sort(),
+        allCatalog(role)
+          .map((t) => t.name)
+          .sort(),
+      );
+    }
+    const doc = "library:demo::reports",
+      before = f.service.context("admin", doc).revision;
+    const result = f.service.invoke("admin", {
+      requestId: "group-save",
+      documentId: doc,
+      toolName: "learning_save_report",
+      arguments: {
+        reportId: "group-report",
+        spec: (await import("../src/shared/reports.ts")).freshReport(),
+      },
+      expectedRevision: before,
+      idempotencyKey: "group-key",
+    });
+    data(result);
+    assert.equal(
+      f.service.context("admin", "library:demo").revision,
+      before + 1,
+    );
+    assert.equal(
+      f.service.context("admin", "library:demo::people").revision,
+      before + 1,
+    );
+    assert.equal(
+      (
+        f.db
+          .prepare("SELECT COUNT(*) n FROM workspaces WHERE id LIKE ?")
+          .get("%::%") as any
+      ).n,
+      0,
+    );
+    assert.equal(
+      f.service.invoke("admin", {
+        requestId: "hidden",
+        documentId: "library:demo",
+        toolName: "learning_save_report",
+        arguments: {
+          reportId: "hidden",
+          spec: (await import("../src/shared/reports.ts")).freshReport(),
+        },
+        expectedRevision: before + 1,
+        idempotencyKey: "hidden",
+      }).error?.code,
+      "FORBIDDEN",
+    );
+    assert.throws(() =>
+      f.service.description("admin", "library:demo::unknown"),
+    );
+    assert.throws(() =>
+      f.service.description("learner-a", "learning:demo:learner-b::reports"),
+    );
+  } finally {
+    f.db.close();
+  }
+});

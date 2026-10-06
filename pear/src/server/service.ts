@@ -1,3 +1,4 @@
+import { splitWorkspace } from "../shared/tool-groups.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import {
@@ -12,6 +13,7 @@ import {
 import {
   catalog,
   humanTools,
+  allCatalog,
   object,
   courseSchema,
   itemSchema,
@@ -73,14 +75,20 @@ export class LearningService {
     return `library:${p.tenant}`;
   }
   workspace(p: Principal, id: string) {
+    let base: string;
+    try {
+      base = splitWorkspace(id).base;
+    } catch {
+      reject("FORBIDDEN", "Invalid assistant workspace");
+    }
     const w = this.db
       .prepare("SELECT * FROM workspaces WHERE id=? AND tenant=?")
-      .get(id, p.tenant) as any;
+      .get(base!, p.tenant) as any;
     if (
       !w ||
       (w.owner !== p.id &&
         !(
-          id === this.library(p) &&
+          base! === this.library(p) &&
           ["admin", "content_admin", "manager", "assessor"].includes(p.role)
         ))
     )
@@ -96,14 +104,17 @@ export class LearningService {
       documentId: doc,
       revision: w.revision,
       selectionIds: [],
-      summary: `Pear synthetic learning workspace for ${p.name}. Official progress is authoritative; practice does not change completion.`,
+      summary: `Pear synthetic learning workspace for ${p.name}; assistant domain ${splitWorkspace(doc).group}. Official progress is authoritative; practice does not change completion.`,
     };
   }
-  description(id: string) {
+  description(id: string, documentId?: string) {
+    const p = this.principal(id),
+      doc = documentId ?? this.personal(p);
+    this.workspace(p, doc);
     return {
       protocolVersion: "0.1" as const,
       appId,
-      tools: catalog(this.principal(id).role),
+      tools: catalog(p.role, splitWorkspace(doc).group),
     };
   }
   private course(p: Principal, id: string) {
@@ -216,7 +227,9 @@ export class LearningService {
         p = this.principal(principalId),
         w = this.workspace(p, c.documentId);
       const t = [
-        ...catalog(p.role),
+        ...(source === "human"
+          ? allCatalog(p.role)
+          : catalog(p.role, splitWorkspace(c.documentId).group)),
         ...(source === "human" ? humanTools : []),
       ].find((t) => t.name === c.toolName);
       if (!t)
@@ -233,7 +246,8 @@ export class LearningService {
       const admin = libraryWrites.has(c.toolName);
       if (
         write &&
-        c.documentId !== (admin ? this.library(p) : this.personal(p))
+        splitWorkspace(c.documentId).base !==
+          (admin ? this.library(p) : this.personal(p))
       )
         reject("STALE_CONTEXT", "Mutation targets the wrong aggregate");
       if (!write) {
@@ -307,7 +321,7 @@ export class LearningService {
       }
       this.db
         .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
-        .run(c.documentId);
+        .run(w.id);
       const result = success(data, current + 1);
       if (!withinMessageCap(result))
         reject("INVALID_ARGUMENT", "Result exceeds envelope limit");

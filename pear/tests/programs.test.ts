@@ -589,7 +589,7 @@ test("award enrollment, moderated evidence and certificate survive database reop
     const progress = data(
       service.invoke("learner-a", {
         requestId: "read",
-        documentId: "learning:demo:learner-a",
+        documentId: "learning:demo:learner-a::programs",
         toolName: "learning_get_my_awards",
         arguments: {},
         expectedRevision: null,

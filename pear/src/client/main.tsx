@@ -1,3 +1,8 @@
+import {
+  availableGroups,
+  scopedWorkspace,
+  type ToolGroup,
+} from "../shared/tool-groups.ts";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createBridge, invoke, request, type Session } from "./api.ts";
@@ -52,6 +57,7 @@ function App() {
   const [session, setSessionState] = useState<Session | null>(null),
     [ready, setReady] = useState(false),
     [view, setView] = useState("catalog"),
+    [assistantGroup, setAssistantGroup] = useState<ToolGroup>("learning"),
     [locale, setLocale] = useState<"en" | "vi">("en"),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -91,6 +97,7 @@ function App() {
   const sessionRef = useRef<Session | null>(null);
   const refreshGeneration = useRef(0);
   const setSession = (next: Session | null) => {
+    setAssistantGroup("learning");
     sessionRef.current = next;
     if (!next) delete window.agentBridgeV1;
     setSessionState(next);
@@ -115,11 +122,12 @@ function App() {
     setDraftOffset(0);
   };
   const t = labels[locale],
-    doc = session
+    baseDoc = session
       ? view === "admin"
         ? `library:${session.principal.tenant}`
         : personal(session)
-      : "";
+      : "",
+    doc = baseDoc ? scopedWorkspace(baseDoc, assistantGroup) : "";
   const docRef = useRef(doc);
   docRef.current = doc;
   useEffect(() => {
@@ -366,6 +374,21 @@ function App() {
       <aside>
         <div className="brand">◒ pear</div>
         <p className="eyebrow">Learning workspace</p>
+        <label>
+          Assistant workspace
+          <select
+            aria-label="Assistant workspace"
+            value={assistantGroup}
+            disabled={busy}
+            onChange={(e) => setAssistantGroup(e.target.value as ToolGroup)}
+          >
+            {availableGroups(role).map((group) => (
+              <option value={group} key={group}>
+                {group}
+              </option>
+            ))}
+          </select>
+        </label>
         <nav>
           {[
             ["catalog", t.catalog],
@@ -384,6 +407,17 @@ function App() {
               className={view === id ? "selected" : "ghost"}
               onClick={() => {
                 clearLearning();
+                setAssistantGroup(
+                  (
+                    {
+                      admin: "content",
+                      programs: "programs",
+                      notifications: "assignments",
+                      transcript: "reports",
+                      profile: "people",
+                    } as Record<string, ToolGroup>
+                  )[id] ?? "learning",
+                );
                 setView(id);
               }}
             >

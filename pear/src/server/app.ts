@@ -196,9 +196,18 @@ export async function createApp(opts: {
         .all(p.tenant, p.role, p.id),
     };
   });
-  app.get("/api/describe", async (req) =>
-    service.description((req as any).session.principal),
-  );
+  app.get("/api/describe", async (req, reply) => {
+    try {
+      return service.description(
+        (req as any).session.principal,
+        (req.query as any).documentId,
+      );
+    } catch {
+      return reply
+        .code(403)
+        .send(failure("FORBIDDEN", "Workspace access denied"));
+    }
+  });
   app.get("/api/context", async (req, reply) => {
     const s = (req as any).session;
     try {
