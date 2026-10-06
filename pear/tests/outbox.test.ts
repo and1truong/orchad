@@ -50,7 +50,7 @@ test("domain enrollment/completion/content transactions append minimal ordered e
   for(const [questionId,answer] of [["q-retry",1],["q-write",2]])data(s.call("learner-a","human_save_answer",{attemptId:at.attemptId,questionId,answer},"human"));
   const submitRevision=s.service.context("learner-a","learning:demo:learner-a").revision;
   const submitted=data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human",{idempotencyKey:"completion-exact",expectedRevision:submitRevision}));assert.equal(submitted.progress.status,"completed");
-  data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId},"human",{idempotencyKey:"completion-exact",expectedRevision:submitRevision}));
+  data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human",{idempotencyKey:"completion-exact",expectedRevision:submitRevision}));
   assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM integration_events WHERE topic='enrollment.completed'").get()!.n,1);
   const before=s.db.prepare("SELECT COUNT(*) AS n FROM integration_events").get()!.n;
   s.db.exec("CREATE TRIGGER reject_outbox_audit BEFORE INSERT ON audit BEGIN SELECT RAISE(ABORT,'audit failed'); END");
