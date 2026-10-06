@@ -28,6 +28,7 @@ import {
   programLibraryWrites,
   programHumanTools,
 } from "./programs.ts";
+export const captionSchema = array(object({assetId:string(64),language:enumeration("en","vi"),label:string(80)}),2,1);
 const lesson = object(
   {
     id: string(64),
@@ -43,6 +44,7 @@ const lesson = object(
       "submission",
       "event",
     ),
+    captions: captionSchema,
     assetId: string(64),
     submission: submissionSchema,
     sessions: sessionsSchema,
@@ -70,6 +72,7 @@ export const itemSchema = object(
       "document",
       "interactive",
     ),
+    captions: captionSchema,
     assetId: string(64),
     text: string(2500),
     url: { type: "string", maxLength: 2048 },

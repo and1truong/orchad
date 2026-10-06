@@ -68,7 +68,7 @@ export class StandaloneService {
       );
     const e = this.enrollment(p, a.itemEnrollmentId),
       item = JSON.parse(e.content) as ContentItem;
-    const { text, url, transcript, assetId, ...metadata } = item;
+    const { text, url, transcript, assetId, captions, ...metadata } = item;
     if(source==="bridge"&&!item.aiProcessingAllowed&&metadata.discovery)metadata.discovery={...metadata.discovery,outcomes:[]};
     return {
       ...this.summary(e),
@@ -83,6 +83,7 @@ export class StandaloneService {
               ...(url ? { url } : {}),
               ...(transcript ? { transcript } : {}),
               ...(source === "human" && assetId ? { assetId } : {}),
+              ...(source === "human" && captions ? { captions } : {}),
             }),
       },
     };

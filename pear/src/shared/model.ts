@@ -32,7 +32,9 @@ export interface Principal {
   active: number;
   auth_version: number;
 }
+export interface CaptionTrack { assetId:string; language:"en"|"vi"; label:string; }
 export interface Lesson {
+  captions?: CaptionTrack[];
   id: string;
   title: string;
   text: string;
@@ -54,6 +56,7 @@ export interface Lesson {
   contentRef?: { itemId: string; version: number };
 }
 export interface ContentItem {
+  captions?: CaptionTrack[];
   discovery?: DiscoveryMetadata;
   title: string;
   summary: string;

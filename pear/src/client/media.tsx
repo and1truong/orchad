@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { request, type Session } from "./api.ts";
+import {parseCaptions} from "../shared/captions.ts";
+import type {CaptionTrack} from "../shared/model.ts";
 import type { Lesson } from "../shared/model.ts";
 export function UploadField({
   session,
@@ -9,7 +11,7 @@ export function UploadField({
   onUploading,
 }: {
   session: Session;
-  kind: Lesson["kind"];
+  kind: Lesson["kind"] | "caption";
   onUploaded: (id: string) => void;
   onUploading?: (busy: boolean) => void;
   scope?:
@@ -27,6 +29,7 @@ export function UploadField({
     };
   }, []);
   const types: Record<string, string> = {
+    caption: "text/vtt,.vtt",
     audio: "audio/wav,audio/mpeg",
     video: "video/mp4",
     document: "application/pdf",
@@ -67,7 +70,7 @@ export function UploadField({
                   session,
                 );
               const mime =
-                file.type === "audio/x-wav" ? "audio/wav" : file.type;
+                kind==="caption" ? "text/vtt" : file.type === "audio/x-wav" ? "audio/wav" : file.type;
               const q = new URLSearchParams({
                 filename: file.name,
                 mime,
@@ -119,7 +122,7 @@ export function UploadedMedia({
   context,
 }: {
   session: Session;
-  content: { assetId?: string; kind: string; title: string };
+  content: { assetId?: string; kind: string; title: string; captions?:CaptionTrack[] };
   context: {
     itemEnrollmentId?: string;
     recordId?: string;
@@ -130,9 +133,26 @@ export function UploadedMedia({
     lessonId?: string;
   };
 }) {
+  const [tracks,setTracks]=useState<Array<CaptionTrack&{url:string;text:string}>>([]);
   const [url, setUrl] = useState(""),
     [error, setError] = useState("");
-  const contextKey = JSON.stringify(context);
+  const contextKey = JSON.stringify(context),tracksKey=JSON.stringify(content.captions??[]);
+  useEffect(()=>{
+    let active=true;const urls:string[]=[];setTracks([]);
+    void (async()=>{
+      const query=new URLSearchParams(Object.entries(context).map(([k,v])=>[k,String(v)]));
+      const loaded=[];
+      for(const track of content.captions??[]){
+        const r=await fetch("/api/assets/"+encodeURIComponent(track.assetId)+"?"+query,{credentials:"same-origin",headers:{"X-Pear-Epoch":session.sessionEpoch}});
+        if(!r.ok)throw new Error("Caption access denied; refresh your session");
+        const text=await r.text();const cues=parseCaptions(text);
+        if(!active)return;const url=URL.createObjectURL(new Blob([text],{type:"text/vtt"}));urls.push(url);
+        loaded.push({...track,url,text:cues.map(c=>c.text).join("\n")});
+      }
+      if(active)setTracks(loaded);
+    })().catch(e=>{if(active)setError(e.message);});
+    return()=>{active=false;for(const url of urls)URL.revokeObjectURL(url);};
+  },[session.sessionEpoch,tracksKey,contextKey]);
   useEffect(() => {
     let active = true,
       blobUrl = "";
@@ -189,19 +209,20 @@ export function UploadedMedia({
             src={url}
             controls
             preload="metadata"
-          />
+          >{tracks.map((t,i)=><track key={t.assetId} kind="captions" src={t.url} srcLang={t.language} label={t.label} default={i===0}/>)}</audio>
         ) : content.kind === "video" ? (
           <video
             aria-label={content.title}
             src={url}
             controls
             preload="metadata"
-          />
+          >{tracks.map((t,i)=><track key={t.assetId} kind="captions" src={t.url} srcLang={t.language} label={t.label} default={i===0}/>)}</video>
         ) : (
           <a href={url} download={content.title + ".pdf"}>
             Download document
           </a>
         ))}
+      {tracks.map(t=><details key={t.assetId}><summary>Caption transcript · {t.label}</summary><p style={{whiteSpace:"pre-wrap"}}>{t.text}</p></details>)}
     </section>
   );
 }

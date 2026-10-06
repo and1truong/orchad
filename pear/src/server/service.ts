@@ -179,7 +179,7 @@ export class LearningService {
   }
   private itemPreview(row: any, value: ContentItem, source="bridge") {
     const { text, url, transcript, ...metadata } = value;
-    if(source==="bridge")delete metadata.assetId;
+    if(source==="bridge"){delete metadata.assetId;delete metadata.captions;}
     if(source==="bridge" && !value.aiProcessingAllowed && metadata.discovery)
       metadata.discovery={...metadata.discovery,outcomes:[]};
     return {
@@ -649,6 +649,7 @@ export class LearningService {
           submission: source === "human" ? (l.submission ?? null) : null,
           sessions: source === "human" ? (l.sessions ?? null) : null,
           assetId: source==="human" ? (l.assetId ?? null) : null,
+          ...(source==="human"&&l.captions?{captions:l.captions}:{}),
           url: l.url ?? null,
           transcript: l.transcript ?? null,
           completed: complete.includes(l.id),
@@ -785,8 +786,13 @@ export class LearningService {
   }
   private validateMedia(
     p: Principal,
-    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId">,
+    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId" | "captions">,
   ) {
+    if(l.captions){
+      if(!["audio","video"].includes(l.kind)||!l.assetId)reject("INVALID_ARGUMENT","Captions require uploaded audio/video");
+      if(new Set(l.captions.map(t=>t.language)).size!==l.captions.length)reject("INVALID_ARGUMENT","Use distinct caption languages");
+      for(const track of l.captions){if(!track.label.trim())reject("INVALID_ARGUMENT","Caption label required");this.media.validate(p,track.assetId,"caption");}
+    }
     if (["submission", "event"].includes(l.kind)) return;
     if (l.assetId) {
       if (l.url)
@@ -858,6 +864,8 @@ export class LearningService {
       l.kind = item.kind;
       delete l.assetId;
       if (item.assetId) l.assetId = item.assetId;
+      delete l.captions;
+      if(item.captions)l.captions=structuredClone(item.captions);
       delete l.url;
       delete l.transcript;
       if (item.url) l.url = item.url;

@@ -324,6 +324,8 @@ export function CourseEditor({
                           delete next.url;
                           delete next.assetId;
                           if (content.assetId) next.assetId = content.assetId;
+                          delete next.captions;
+                          if(content.captions)next.captions=structuredClone(content.captions);
                           delete next.transcript;
                           if (content.url) next.url = content.url;
                           if (content.transcript)
@@ -391,6 +393,7 @@ export function CourseEditor({
                       onChange={(e) =>
                         updateLesson(l.id, (next) => {
                           next.kind = e.target.value as Lesson["kind"];
+                          delete next.captions;
                           delete next.assetId;
                           delete next.url;
                           delete next.transcript;

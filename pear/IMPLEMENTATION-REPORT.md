@@ -146,4 +146,9 @@ Corrected native PR #76 head fd186f143a42dceda48f9ca284b48e70ef3258f9 passed all
 
 ## Bounded course discovery — stacked on PR #76
 
-Migration 015 records actual publication timestamps with unknown legacy dates. Versioned author metadata powers intersected filters, whole-row paging, explicit comparison and declared-profile recommendations. Controlled concepts provide transparent metadata paraphrases without claiming full semantic AI parity. Bridge egress withholds human-only outcomes and uploaded file identifiers; due unfinished work leads the learning list. Six domain fixtures and one browser journey require exact-head CI; local execution remains unavailable. See ADR-018. Provider content, taxonomy, language coverage and accessibility audit remain open.
+Migration 015 records actual publication timestamps with unknown legacy dates. Versioned author metadata powers intersected filters, whole-row paging, explicit comparison and declared-profile recommendations. Controlled concepts provide transparent metadata paraphrases without claiming full semantic AI parity. Bridge egress withholds human-only outcomes and uploaded file identifiers; due unfinished work leads the learning list. Seven domain/HTTP fixtures and one browser journey require exact-head CI; local execution remains unavailable. See ADR-018. Provider content, taxonomy, language coverage and accessibility audit remain open.
+
+
+## Original timed captions — stacked on discovery
+
+No migration: optional versioned metadata references bounded validated text/vtt files, preserving media authority/quota/audit and existing production gates. Reusable source captions are pinned; bridge excludes file identifiers. Six domain/HTTP fixtures and one browser journey exercise malformed files, live read scope, source snapshot integrity and actual native cue/keyboard transcript behavior. Exact-head CI is required; no general WebVTT or WCAG conformance claim. ADR-019 records the frozen profile.

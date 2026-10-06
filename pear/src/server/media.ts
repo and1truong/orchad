@@ -4,6 +4,7 @@ import type { Principal, Course, ContentItem } from "../shared/model.ts";
 import { requiredLessonIds } from "../shared/progression.ts";
 import { reject } from "./errors.ts";
 import { ProgramService } from "./programs.ts";
+import {parseCaptions} from "../shared/captions.ts";
 export const uploadLimit = 8 * 1024 * 1024;
 export type MediaContext = {
   itemEnrollmentId?: string;
@@ -122,7 +123,9 @@ export class MediaService {
                 (bytes[0] === 255 && (bytes[1]! & 224) === 224)
               : mime === "video/mp4"
                 ? prefix.subarray(4, 8).toString() === "ftyp"
-                : mime === "text/html"
+                : mime === "text/vtt"
+                  ? bytes.length<=65536 && !bytes.includes(0) && Buffer.from(bytes.toString("utf8")).equals(bytes)
+                  : mime === "text/html"
                   ? bytes.length <= 64 * 1024 &&
                     !bytes.includes(0) &&
                     Buffer.from(bytes.toString("utf8")).equals(bytes)
@@ -132,6 +135,7 @@ export class MediaService {
           "INVALID_ARGUMENT",
           "Unsupported file or format signature mismatch",
         );
+      if(mime==="text/vtt") { try { parseCaptions(bytes.toString("utf8")); } catch(e) { reject("INVALID_ARGUMENT",(e as Error).message); } }
       const sha256 = createHash("sha256").update(bytes).digest("hex"),
         payloadHash = createHash("sha256")
           .update(
@@ -226,6 +230,7 @@ export class MediaService {
     if (!row || row.purpose !== "content")
       reject("FORBIDDEN", "Asset unavailable in this tenant");
     const allowed: Record<string, string[]> = {
+      caption: ["text/vtt"],
       audio: ["audio/wav", "audio/mpeg"],
       video: ["video/mp4"],
       document: ["application/pdf"],
@@ -284,7 +289,7 @@ export class MediaService {
         return row;
       reject("FORBIDDEN", "Submission file review scope denied");
     }
-    let content: { assetId?: string } | undefined;
+    let content: { assetId?: string; captions?: {assetId:string}[] } | undefined;
     if (c.itemEnrollmentId) {
       const e = this.db
         .prepare(
@@ -316,7 +321,7 @@ export class MediaService {
           content = lesson;
       }
     }
-    if (content?.assetId !== id)
+    if (content?.assetId !== id && !content?.captions?.some(track=>track.assetId===id))
       reject(
         "FORBIDDEN",
         "Read an authorized published item or unlocked lesson",

@@ -2,6 +2,7 @@ import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { StudyTimer } from "./study-timer.tsx";
 import { UploadField, UploadedMedia } from "./media.tsx";
 import type { Session } from "./api.ts";
+import {CaptionEditor} from "./caption-editor.tsx";
 import React, { useState } from "react";
 import type { ContentItem } from "../shared/model.ts";
 export interface ContentDraft {
@@ -176,6 +177,7 @@ export function ContentLibrary({
                   setItem({
                     ...item,
                     kind: e.target.value as ContentItem["kind"],
+                    captions: undefined,
                     assetId: undefined,
                     url: undefined,
                     transcript: undefined,
@@ -214,6 +216,9 @@ export function ContentLibrary({
                 {item.assetId && <p>Stored asset: {item.assetId}</p>}
               </>
             )}
+            {["audio","video"].includes(item.kind)&&item.assetId&&<CaptionEditor session={session} tracks={item.captions} onChange={captions=>setItem(current=>{
+              const next={...current};if(captions)next.captions=captions;else delete next.captions;return next;
+            })}/>}
             {["video", "link"].includes(item.kind) && !item.assetId && (
               <label>
                 Item HTTPS URL
