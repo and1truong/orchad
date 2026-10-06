@@ -2,7 +2,7 @@ import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 export function completeResponse(q: any, a: any) {
   return (q.kind ?? "mcq") === "mcq"
-    ? Number.isInteger(a)
+    ? q.multiple ? Array.isArray(a)&&a.length>0&&a.every(Number.isInteger) : Number.isInteger(a)
     : q.kind === "long_answer"
       ? typeof a === "string" && !!a.trim()
       : Array.isArray(a) &&
@@ -44,10 +44,10 @@ export function AssessmentQuestion({
         q.options.map((o: string, i: number) => (
           <label className="choice" key={i}>
             <input
-              type="radio"
+              type={q.multiple?"checkbox":"radio"}
               name={q.id}
-              checked={answer === i}
-              onChange={() => save(i)}
+              checked={q.multiple?(answer??[]).includes(i):answer === i}
+              onChange={event => save(q.multiple?(event.target.checked?[...(answer??[]),i].sort((a,b)=>a-b):(answer??[]).filter((index:number)=>index!==i)):i)}
             />
             {o}
           </label>
@@ -82,6 +82,10 @@ export function AssessmentQuestion({
                     {o}
                   </option>
                 ))}
+              </select>
+            ) : q.blankChoices?.[i]?.length ? (
+              <select aria-label={prompt} value={draft[i]} onChange={e=>setDraft(draft.map((value:any,n:number)=>n===i?e.target.value:value))}>
+               <option value="">{translateUI("Choose an answer")}</option>{q.blankChoices[i].map((choice:string)=><option key={choice} value={choice}>{choice}</option>)}
               </select>
             ) : (
               <input

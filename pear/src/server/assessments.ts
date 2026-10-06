@@ -6,6 +6,13 @@ const norm = (v: string) => v.normalize("NFKC").trim().toLocaleLowerCase("en");
 const kind = (q: Question) => q.kind ?? "mcq";
 export function validateQuestion(q: Question) {
   const k = kind(q);
+  if(k!=="mcq"&&(q.correctIndices||q.partialCredit!==undefined||q.optionFeedback))reject("INVALID_ARGUMENT","Choice settings require MCQ");
+  if(k!=="blanks"&&q.blankChoices)reject("INVALID_ARGUMENT","Dropdown choices require blanks");
+  if(k!=="long_answer"&&q.passRate!==undefined)reject("INVALID_ARGUMENT","Question pass rate requires manual long answer");
+  if(q.correctIndices&&(new Set(q.correctIndices).size!==q.correctIndices.length||q.correctIndices.some(i=>i>=q.options.length)))reject("INVALID_ARGUMENT","Distinct correct choice indices required");
+  if(q.partialCredit&&!((q.correctIndices?.length??0)>=2))reject("INVALID_ARGUMENT","Partial credit requires at least two correct choices");
+  if(q.optionFeedback&&q.optionFeedback.length!==q.options.length)reject("INVALID_ARGUMENT","Feedback requires one entry per option");
+  if(q.blankChoices&&(q.blankChoices.length!==q.prompts?.length||q.blankChoices.some((choices,i)=>choices.length>0&&(choices.length<2||new Set(choices.map(norm)).size!==choices.length||choices.some(value=>!norm(value))||!choices.some(value=>norm(value)===norm(q.correctAnswers?.[i]??""))))))reject("INVALID_ARGUMENT","Dropdown blanks require distinct options including the accepted answer");
   if (!q.prompt.trim()) reject("INVALID_ARGUMENT", "Question prompt required");
   if (
     q.prompts &&
@@ -83,6 +90,7 @@ export function presentation(course: Course) {
     questions: course.quiz.shuffleQuestions
       ? shuffled(course.quiz.questions.map((q) => q.id))
       : course.quiz.questions.map((q) => q.id),
+    blanks: Object.fromEntries(course.quiz.questions.map(q=>[q.id,(q.blankChoices??[]).map(choices=>shuffled(choices.map((_,i)=>i)))])),
     options: Object.fromEntries(
       course.quiz.questions.map((q) => [
         q.id,
@@ -102,10 +110,12 @@ export function visibleQuestions(v: Course, at: any) {
       });
   return p.questions.map((id: string) => {
     const q = v.quiz.questions.find((q) => q.id === id)!;
-    const { correct, matches, correctAnswers, rubric, ...safe } = q;
+    const { correct, correctIndices, optionFeedback, matches, correctAnswers, rubric, ...safe } = q;
     return {
       ...safe,
       kind: kind(q),
+      multiple: !!correctIndices,
+      ...(q.blankChoices?{blankChoices:q.blankChoices.map((choices,i)=>(p.blanks?.[q.id]?.[i]??choices.map((_,n)=>n)).map((n:number)=>choices[n]))}:{}),
       options: p.options[id].map((i: number) => q.options[i]),
     };
   });
@@ -114,7 +124,7 @@ export function validateAnswer(q: Question, answer: any, complete = false) {
   const k = kind(q);
   const valid =
     k === "mcq"
-      ? Number.isInteger(answer) && answer >= 0 && answer < q.options.length
+      ? q.correctIndices ? Array.isArray(answer)&&answer.length<=q.options.length&&(!complete||answer.length>0)&&new Set(answer).size===answer.length&&answer.every(i=>Number.isInteger(i)&&i>=0&&i<q.options.length) : Number.isInteger(answer) && answer >= 0 && answer < q.options.length
       : k === "matching"
         ? Array.isArray(answer) &&
           answer.length === q.prompts!.length &&
@@ -130,16 +140,33 @@ export function validateAnswer(q: Question, answer: any, complete = false) {
           ? Array.isArray(answer) &&
             answer.length === q.prompts!.length &&
             answer.every(
-              (s) =>
+              (s,i) =>
                 typeof s === "string" &&
                 (!complete || s.trim().length > 0) &&
-                s.length <= 200,
+                s.length <= 200 && (!q.blankChoices?.[i]?.length || !s && !complete || q.blankChoices[i]!.includes(s)),
             )
           : typeof answer === "string" &&
             (!complete || answer.trim().length > 0) &&
             answer.length <= 4000;
   if (!valid)
     reject("INVALID_ARGUMENT", "Answer does not match the question type");
+}
+export function objectiveFraction(q:Question,answer:any,p:any){
+ const k=kind(q),order=p.options[q.id];
+ if(k==="mcq"){
+  if(!q.correctIndices)return order[answer]===q.correct?1:0;
+  const selected=(answer as number[]).map(index=>order[index]);
+  if(q.partialCredit)return selected.filter(index=>q.correctIndices!.includes(index)).length/q.correctIndices.length;
+  return selected.length===q.correctIndices.length&&selected.every(index=>q.correctIndices!.includes(index))?1:0;
+ }
+ if(k==="matching")return (answer as number[]).filter((x,i)=>order[x]===q.matches![i]).length/answer.length;
+ if(k==="blanks")return (answer as string[]).filter((x,i)=>norm(x)===norm(q.correctAnswers![i])).length/answer.length;
+ throw new RangeError("Manual question requires authorized review");
+}
+export function releasedOptionFeedback(q:Question,answer:any,p:any){
+ if(!q.optionFeedback)return [];
+ const selected=Array.isArray(answer)?answer.map(index=>p.options[q.id][index]):[p.options[q.id][answer]];
+ return q.optionFeedback.map((feedback,index)=>({optionIndex:index,selected:selected.includes(index),message:selected.includes(index)?feedback.selected:feedback.notSelected}));
 }
 export class AssessmentService {
   constructor(readonly db: DatabaseSync) {}
@@ -235,24 +262,7 @@ export class AssessmentService {
         k = kind(q),
         a = answers[q.id];
       total += max;
-      if (k === "mcq")
-        earned += p.options[q.id][a] === q.correct ? max * 840 : 0;
-      else if (k === "matching")
-        earned +=
-          (max *
-            840 *
-            a.filter(
-              (x: number, i: number) => p.options[q.id][x] === q.matches![i],
-            ).length) /
-          a.length;
-      else if (k === "blanks")
-        earned +=
-          (max *
-            840 *
-            a.filter(
-              (x: string, i: number) => norm(x) === norm(q.correctAnswers![i]),
-            ).length) /
-          a.length;
+      if (k !== "long_answer") earned += max * 840 * objectiveFraction(q,a,p);
       else {
         const r = reviews.find((r) => r.question_id === q.id);
         if (!r) pending = true;
@@ -296,6 +306,11 @@ export class AssessmentService {
       gradingState: pending ? "pending_manual" : "graded",
       resultMessage: pending ? null : passed ? v.quiz.passMessage ?? null : v.quiz.failMessage ?? null,
     };
+  }
+  results(at:any,v:Course){
+   const answers=JSON.parse(at.answers),p=at.presentation?JSON.parse(at.presentation):presentation({...v,quiz:{...v.quiz,shuffleOptions:false,shuffleQuestions:false}}),reviews=this.db.prepare("SELECT * FROM essay_reviews WHERE attempt_id=?").all(at.id) as any[];
+   return v.quiz.questions.map(q=>{const review=reviews.find(r=>r.question_id===q.id),fraction=kind(q)==="long_answer"?(review?review.points/(q.points??1):null):objectiveFraction(q,answers[q.id],p);
+    return {questionId:q.id,scorePercent:fraction===null?null:Math.floor(fraction*100),correct:fraction===null?null:kind(q)==="long_answer"?fraction*100>=(q.passRate??100):fraction===1};});
   }
   read(p: Principal, name: string, a: any, source: string) {
     if (name === "learning_get_assessment_queue") {

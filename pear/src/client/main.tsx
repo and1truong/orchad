@@ -1090,6 +1090,7 @@ function App() {
                         }}
                       />
                     ))}
+                    {attempt.questionResults?.length>0&&<ul aria-label={translateUI("Released question results")}>{attempt.questionResults.map((result:any)=><li key={result.questionId}>{result.questionId} · {result.scorePercent}% · {translateUI(result.correct?"Correct":"Incorrect")}</li>)}</ul>}
                     {attempt.feedback?.length > 0 && (
                       <details>
                         <summary>{translateUI("Released answer feedback")}</summary>

@@ -60,25 +60,25 @@ export function ExtendedQuestion({ q, update }: Props) {
   const k = q.kind;
   if (k === "long_answer")
     return (
-      <label>{translateUI("Assessment rubric")}<textarea
+      <><label>{translateUI("Essay score required to mark correct")}<input type="number" required min={0} max={100} value={q.passRate??100} onChange={e=>update({...q,passRate:Number(e.target.value)})}/></label><label>{translateUI("Assessment rubric")}<textarea
           aria-label={translateUI("Assessment rubric")}
           required
           maxLength={600}
           value={q.rubric ?? ""}
           onChange={(e) => update({ ...q, rubric: e.target.value })}
         />
-      </label>
+      </label></>
     );
   const prompts = q.prompts ?? [],
     answers =
       k === "matching"
         ? prompts.map((_, i) => q.options[q.matches![i]])
         : (q.correctAnswers ?? []);
-  const rebuild = (ps: string[], as: string[]) =>
+  const rebuild = (ps: string[], as: string[],choices=q.blankChoices) =>
     update(
       k === "matching"
         ? { ...q, prompts: ps, options: as, matches: ps.map((_, i) => i) }
-        : { ...q, prompts: ps, correctAnswers: as },
+        : { ...q, prompts: ps, correctAnswers: as,...(choices?{blankChoices:choices}:{}) },
     );
   return (
     <>
@@ -114,6 +114,8 @@ export function ExtendedQuestion({ q, update }: Props) {
               }
             />
           </label>
+          {k==="blanks"&&<><label><input type="checkbox" checked={!!q.blankChoices?.[i]?.length} onChange={e=>{const choices=q.blankChoices??prompts.map(()=>[]);rebuild(prompts,answers,choices.map((values,n)=>n===i?(e.target.checked?[answers[i]??"",""]:[]):values));}}/>{translateUI("Use dropdown blank")} {i+1}</label>
+          {!!q.blankChoices?.[i]?.length&&<label>{translateUI("Dropdown choices, one per line")} {i+1}<textarea aria-label={translateUI("Dropdown choices, one per line")+" "+(i+1)} required maxLength={1608} value={q.blankChoices[i]!.join("\n")} onChange={e=>{const choices=q.blankChoices!;rebuild(prompts,answers,choices.map((values,n)=>n===i?e.target.value.split("\n"):values));}}/></label>}</>}
           <button
             type="button"
             className="ghost"
@@ -122,6 +124,7 @@ export function ExtendedQuestion({ q, update }: Props) {
               rebuild(
                 prompts.filter((_, j) => j !== i),
                 answers.filter((_, j) => j !== i),
+                q.blankChoices?.filter((_,j)=>j!==i),
               )
             }
           >{translateUI("Remove pair / blank")}{" "}{i + 1}
@@ -131,7 +134,7 @@ export function ExtendedQuestion({ q, update }: Props) {
       <button
         type="button"
         disabled={prompts.length >= 8}
-        onClick={() => rebuild([...prompts, ""], [...answers, ""])}
+        onClick={() => rebuild([...prompts, ""], [...answers, ""],q.blankChoices?[...q.blankChoices,[]]:undefined)}
       >{translateUI("Add")}{" "}{k === "matching" ? "matching pair" : "blank"}
       </button>
     </>

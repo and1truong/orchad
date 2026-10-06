@@ -20,6 +20,7 @@ import {
   validateQuestion,
   presentation,
   visibleQuestions,
+  releasedOptionFeedback,
   validateAnswer,
 } from "./assessments.ts";
 import { splitWorkspace } from "../shared/tool-groups.ts";
@@ -728,6 +729,7 @@ export class LearningService {
           questions: visibleQuestions(v, at),
           answers: source === "human" ? decode(at.answers) : {},
           responsesWithheld: source === "bridge",
+          questionResults:source === "human"&&!!at.feedback_released?this.assessments.results(at,v):[],
           feedback:
             source === "human" && !!at.feedback_released
               ? v.quiz.questions
@@ -735,6 +737,8 @@ export class LearningService {
                   .map((q) => ({
                     questionId: q.id,
                     correct: q.correct,
+                    correctIndices:q.correctIndices,
+                    optionFeedback:releasedOptionFeedback(q,decode(at.answers)[q.id],at.presentation?decode(at.presentation):presentation({...v,quiz:{...v.quiz,shuffleOptions:false,shuffleQuestions:false}})),
                     matches: q.matches,
                     correctAnswers: q.correctAnswers,
                     options: q.options,

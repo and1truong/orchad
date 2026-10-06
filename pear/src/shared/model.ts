@@ -82,6 +82,11 @@ export interface Question {
   id: string;
   kind?: "mcq" | "matching" | "blanks" | "long_answer";
   points?: number;
+  correctIndices?: number[];
+  partialCredit?: boolean;
+  optionFeedback?: {selected:string;notSelected:string}[];
+  blankChoices?: string[][];
+  passRate?: number;
   prompts?: string[];
   matches?: number[];
   correctAnswers?: string[];
