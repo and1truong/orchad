@@ -27,5 +27,6 @@ test("human reschedules and cancels a published session; learner reads own notic
   const downloaded=page.waitForEvent("download");await player.getByRole("button",{name:"Download cancelled calendar",exact:true}).last().click();expect((await downloaded).suggestedFilename()).toBe("pear-session.ics");
   await page.getByLabel("Interface language",{exact:true}).selectOption("vi");await expect(page.getByRole("button",{name:"Tải lịch đã hủy",exact:true}).last()).toBeVisible();
   await page.screenshot({path:"artifacts/session-change-cancelled.png",fullPage:true});expect(f.db.prepare("SELECT COUNT(*) AS n FROM event_session_changes").get()!.n).toBe(2);expect(f.db.prepare("SELECT completed_lessons FROM enrollments WHERE id=?").get(enrollmentId)!.completed_lessons).toBe("[]");
- }finally{await app.close();f.db.close();}
+  console.log("session lifecycle assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();console.log("session lifecycle cleanup: complete");}
 });

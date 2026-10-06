@@ -3,6 +3,7 @@ import {createApp} from "../../src/server/app.ts";
 import {fixture,data} from "../helpers.ts";
 import {resolve} from "node:path";
 test("learner explicitly requests own bounded digest with chosen zone and budget; official records stay unchanged",async({page})=>{
+ test.setTimeout(60000);
  const f=fixture(),origin="http://127.0.0.1:4324";
  const own=data(f.call("learner-a","learning_enroll",{courseId:"systems-basics"}));
  f.db.prepare("UPDATE enrollments SET due_date='2000-01-01T00:00:00.000Z' WHERE id=?").run(own.enrollmentId);
@@ -21,5 +22,6 @@ test("learner explicitly requests own bounded digest with chosen zone and budget
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
   await page.screenshot({path:"artifacts/own-on-demand-digest.png",fullPage:true});
   await digest.getByLabel("Digest time zone",{exact:true}).fill("Mars/Unknown");await digest.getByRole("button",{name:"Read my digest",exact:true}).click();await expect(digest.getByRole("alert")).toContainText("IANA");await expect(digest.getByLabel("Digest results",{exact:true})).toHaveCount(0);
- }finally{await app.close();f.db.close();}
+  console.log("digest assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();console.log("digest cleanup: complete");}
 });

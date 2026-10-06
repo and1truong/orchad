@@ -15,5 +15,5 @@ test("learner requests own explained insight metrics and pinned sources; account
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:"artifacts/own-learning-insights.png",fullPage:true});
   await page.getByRole("button",{name:"Sign out",exact:true}).click();await login("learner-b");await page.getByRole("button",{name:"My learning",exact:true}).click();await expect(insights.getByLabel("Own insight results",{exact:true})).toHaveCount(0);await insights.getByRole("button",{name:"Read my learning insights",exact:true}).click();await expect(insights.getByLabel("Own insight results",{exact:true})).not.toContainText("Original insight source");
   await page.getByLabel("Interface language",{exact:true}).selectOption("vi");await expect(page.getByRole("heading",{name:"Thông tin việc học của tôi",exact:true})).toBeVisible();expect(f.db.prepare("SELECT * FROM enrollments").all()).toEqual(before);
- }finally{await app.close();f.db.close();}
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();}
 });
