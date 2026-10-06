@@ -399,17 +399,10 @@ export class ProgramService {
         let earned = 0,nestedComplete=false,nestedCapacity=0;
         const alternatives = r.alternatives.map((ref) => {
           if (ref.kind === "course") {
-            const completed = !!this.db
-              .prepare(
-                "SELECT 1 FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND status='completed' AND (? IS NULL OR completed_at>=?)",
-              )
-              .get(
-                enrollment.learner,
-                enrollment.tenant,
-                ref.id,
-                cycleStart,
-                cycleStart,
-              );
+            const recipient=this.db.prepare("SELECT id,tenant,name,role,manager_id,active,auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(enrollment.learner,enrollment.tenant) as unknown as Principal;
+            let permitted=false;
+            if(recipient){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"course",ref.id,ref.version!);access.current(recipient,"course",ref.id);permitted=true;}catch{}}
+            const completed=permitted&&!!this.db.prepare("SELECT 1 FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND version=? AND status='completed' AND (? IS NULL OR completed_at>=?)").get(enrollment.learner,enrollment.tenant,ref.id,ref.version!,cycleStart,cycleStart);
             if (completed) earned = r.credits;
             return { ...ref, completed };
           }

@@ -236,3 +236,7 @@ ADR-070 adds exact versioned item alternatives and derives only real human-confi
 
 ## #130 fresh original same-version standalone reading candidate
 ADR-071/Migration 041 adds a separately confirmed new reading record with no copied completion/time/proof, preserving original IDs/history/FKs. Ordinary tracking resumes the current successor; current rights and exact-source receipts remain enforced. Real new confirmation can satisfy a later award cycle's chronological freshness policy. CI PENDING. Exact reference item assessment/accreditation/reset/recertification semantics remain OPEN/NOT VERIFIED.
+
+
+## #131 exact course award proof candidate
+ADR-072 closes the internal course-ID-only proof defect: pinned course version, own completed authoritative ledger, active learner, pinned/current audiences and existing cycle freshness are required. Four real domain regressions authored; exact-head CI PENDING. Existing original course/award history is preserved. G08 reference equivalence/recertification and external dependencies remain OPEN/NOT VERIFIED.
