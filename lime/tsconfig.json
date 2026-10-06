@@ -7,9 +7,20 @@
     "jsx": "react-jsx",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node", "chrome"],
-    "lib": ["ES2022", "DOM"],
+    "types": [
+      "node",
+      "chrome"
+    ],
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
     "noEmit": true
   },
-  "include": ["src", "tests", "fixtures"]
+  "include": [
+    "src",
+    "tests",
+    "fixtures",
+    "demo"
+  ]
 }

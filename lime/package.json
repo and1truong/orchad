@@ -11,9 +11,10 @@
     "test:browser": "node --import tsx tests/browser.ts",
     "gateway:mock": "node --import tsx fixtures/gateway.ts",
     "vendor:client": "npm --prefix ../mango run build -w @orchard/agent-client",
-    "prebuild": "npm run vendor:contract && npm run vendor:client",
-    "pretest": "npm run vendor:contract && npm run vendor:client",
-    "vendor:contract": "npm --prefix ../packages/bridge-contract run build"
+    "prebuild": "npm run vendor:contract && npm run vendor:client && npm run vendor:durable",
+    "pretest": "npm run vendor:contract && npm run vendor:client && npm run vendor:durable",
+    "vendor:contract": "npm --prefix ../packages/bridge-contract run build",
+    "vendor:durable": "npm --prefix ../packages/agent-durable ci --no-audit --no-fund && npm --prefix ../packages/agent-durable run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",
@@ -22,7 +23,8 @@
     "react-dom": "19.3.0",
     "ws": "8.18.3",
     "zod": "3.25.76",
-    "@orchard/bridge-contract": "file:../packages/bridge-contract"
+    "@orchard/bridge-contract": "file:../packages/bridge-contract",
+    "@orchard/agent-durable": "file:../packages/agent-durable"
   },
   "devDependencies": {
     "@types/chrome": "0.1.32",

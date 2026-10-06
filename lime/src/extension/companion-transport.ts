@@ -25,10 +25,34 @@ export interface Paired {
   bridgeToken: string;
   mcpToken: string;
 }
+export interface DurableStatus {
+  phase: string;
+  conversationId: string;
+  submissions: unknown[];
+  ops: {
+    opId: string;
+    toolName: string;
+    status: string;
+    attempts: number;
+    error: string | null;
+  }[];
+  tasks: { name: string; state: string }[];
+  reason?: string;
+  detail?: string;
+}
 export class CompanionTransport {
   private ws: WebSocket | null = null;
   private credentials: Paired | null = null;
   private cancelled = new Map<string, AbortController>();
+  private durablePending = new Map<
+    string,
+    {
+      resolve: (v: unknown) => void;
+      reject: (e: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
+  >();
+  private durableListeners = new Set<(s: DurableStatus) => void>();
   constructor(
     private onState: (s: string) => void,
     private onConfirmation: (confirm: () => void, deny: () => void) => void,
@@ -115,6 +139,37 @@ export class CompanionTransport {
           c?.abort();
           return;
         }
+        // Trusted durable ops ride the same paired socket — companion pushes
+        // status; replies resolve durable() calls by id.
+        if (m.type === "durable_status") {
+          const s = z
+            .object({ type: z.literal("durable_status"), status: z.unknown() })
+            .strict()
+            .parse(m);
+          for (const cb of this.durableListeners)
+            cb(s.status as DurableStatus);
+          return;
+        }
+        if (m.type === "durable_result") {
+          const r = z
+            .object({
+              type: z.literal("durable_result"),
+              id: z.string().max(64),
+              ok: z.boolean(),
+              data: z.unknown().optional(),
+              error: z.string().max(1024).optional(),
+            })
+            .strict()
+            .parse(m);
+          const p = this.durablePending.get(r.id);
+          if (p) {
+            clearTimeout(p.timer);
+            this.durablePending.delete(r.id);
+            if (r.ok) p.resolve(r.data);
+            else p.reject(new Error(r.error ?? "durable op failed"));
+          }
+          return;
+        }
         const r = Request.parse(m);
         if (r.clientId !== this.credentials?.clientId)
           throw new Error("Wrong paired client");
@@ -147,12 +202,20 @@ export class CompanionTransport {
         this.onState("error");
       }
     };
+    const dropDurable = () => {
+      for (const [, p] of this.durablePending) {
+        clearTimeout(p.timer);
+        p.reject(new Error("Bridge disconnected"));
+      }
+      this.durablePending.clear();
+    };
     ws.onclose = () => {
       // A superseded socket's late close must not abort requests already
       // routed over its replacement.
       if (this.ws !== ws) return;
       for (const c of this.cancelled.values()) c.abort();
       this.cancelled.clear();
+      dropDurable();
       this.ws = null;
       this.onState(
         "disconnected — reconnect required; pending calls discarded",
@@ -170,9 +233,44 @@ export class CompanionTransport {
     this.credentials = null;
     this.disconnect();
   }
+  /** Trusted durable-runner op; resolves with the op result or rejects. */
+  durable(
+    op:
+      | "submit"
+      | "status"
+      | "resume"
+      | "cancel"
+      | "transcript"
+      | "reconcile"
+      | "resolve",
+    params: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN)
+      return Promise.reject(new Error("Bridge disconnected"));
+    const id = crypto.randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.durablePending.delete(id);
+        reject(new Error("Durable op timed out"));
+      }, 30_000);
+      this.durablePending.set(id, { resolve, reject, timer });
+      ws.send(JSON.stringify({ type: "durable", id, op, ...params }));
+    });
+  }
+  /** Subscribe to durable status pushes; returns an unsubscribe fn. */
+  onDurableStatus(cb: (s: DurableStatus) => void): () => void {
+    this.durableListeners.add(cb);
+    return () => this.durableListeners.delete(cb);
+  }
   disconnect() {
     for (const c of this.cancelled.values()) c.abort();
     this.cancelled.clear();
+    for (const [, p] of this.durablePending) {
+      clearTimeout(p.timer);
+      p.reject(new Error("Bridge disconnected"));
+    }
+    this.durablePending.clear();
     this.ws?.close();
     this.ws = null;
     this.onState("disconnected");

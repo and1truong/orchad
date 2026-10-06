@@ -13,6 +13,7 @@ import {
   isInitializeRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { DurableBridge, type DurableOptions } from "./durable.js";
 import {
   BindingSchema,
   HostCallSchema,
@@ -108,6 +109,8 @@ export interface CompanionOptions {
   port?: number;
   extensionOrigins: string[];
   requestTimeoutMs?: number;
+  /** Trusted durable-runner config; omit to run companion without it. */
+  durable?: DurableOptions;
 }
 export async function startCompanion(options: CompanionOptions) {
   if (
@@ -138,8 +141,14 @@ export async function startCompanion(options: CompanionOptions) {
     pending.delete(id);
     p.resolve(result);
   }
+  const durable = options.durable
+    ? new DurableBridge(options.durable, (p, n, a, s) =>
+        route(p as Pair, n, a, s),
+      )
+    : null;
   function disconnected(pair: Pair) {
     pair.socket = null;
+    if (durable) void durable.unbind(pair);
     for (const [id, p] of pending)
       if (p.pair === pair)
         complete(
@@ -443,6 +452,7 @@ export async function startCompanion(options: CompanionOptions) {
               revoked: false,
             };
             pairs.set(pair.clientId, pair);
+            if (durable) void durable.bind(pair);
             clearTimeout(deadline);
             ws.send(
               JSON.stringify({
@@ -472,10 +482,18 @@ export async function startCompanion(options: CompanionOptions) {
           }
           pair = found;
           pair.socket = ws;
+          if (durable) void durable.bind(pair);
           clearTimeout(deadline);
           ws.send(
             JSON.stringify({ type: "authenticated", clientId: pair.clientId }),
           );
+          return;
+        }
+        if (m.type === "durable" && durable) {
+          void durable.handle(pair, m).then((res) => {
+            if (res && ws.readyState === WebSocket.OPEN)
+              ws.send(JSON.stringify({ type: "durable_result", ...res }));
+          });
           return;
         }
         if (m.type === "revoke") {
@@ -518,6 +536,7 @@ export async function startCompanion(options: CompanionOptions) {
     },
     revoke,
     close: async () => {
+      if (durable) await durable.close();
       for (const id of pairs.keys()) revoke(id);
       for (const s of sessions.values()) await s.server.close();
       for (const ws of wss.clients) ws.terminate();

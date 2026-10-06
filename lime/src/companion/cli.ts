@@ -6,7 +6,28 @@ const origins = (process.env.LIME_EXTENSION_ORIGINS || "")
 const port = Number(process.env.LIME_COMPANION_PORT || 4312);
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error("Invalid loopback port");
-const companion = await startCompanion({ extensionOrigins: origins, port });
+// Durable runner: off unless all three gateway fields are provided. Token
+// comes from the environment only — it is handed to the runner in memory and
+// never written anywhere.
+const gateway = {
+  baseUrl: process.env.LIME_GATEWAY_URL || "",
+  token: process.env.LIME_GATEWAY_TOKEN || "",
+  model: process.env.LIME_GATEWAY_MODEL || "",
+};
+const storagePath =
+  process.env.LIME_DURABLE_DB ||
+  `${process.env.HOME}/.local/share/lime/runs.db`;
+const idempotentTools = (process.env.LIME_IDEMPOTENT_TOOLS || "")
+  .split(",")
+  .filter(Boolean);
+const companion = await startCompanion({
+  extensionOrigins: origins,
+  port,
+  durable:
+    gateway.baseUrl && gateway.token && gateway.model
+      ? { storagePath, gateway, idempotentTools }
+      : undefined,
+});
 console.log(
   `Lime companion listening on http://127.0.0.1:${companion.port}/mcp. Type pair to initiate pairing; revoke CLIENT_ID to revoke.`,
 );
