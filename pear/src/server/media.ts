@@ -3,8 +3,10 @@ import { createHash, randomUUID } from "node:crypto";
 import type { Principal, Course, ContentItem } from "../shared/model.ts";
 import { requiredLessonIds } from "../shared/progression.ts";
 import { reject } from "./errors.ts";
+import { ProgramService } from "./programs.ts";
 export const uploadLimit = 8 * 1024 * 1024;
 export type MediaContext = {
+  recordId?: string;
   submissionId?: string;
   itemId?: string;
   version?: number;
@@ -43,7 +45,9 @@ export class MediaService {
         Object.keys(input).sort().join(",") !==
           (purpose === "content"
             ? "confirmed,filename,key,mime,revision"
-            : "confirmed,enrollmentId,filename,key,lessonId,mime,purpose,revision") ||
+            : purpose === "award_evidence"
+              ? "awardEnrollmentId,confirmed,criterionPath,filename,key,mime,purpose,revision"
+              : "confirmed,enrollmentId,filename,key,lessonId,mime,purpose,revision") ||
         input.confirmed !== "true" ||
         typeof input.filename !== "string" ||
         !/^[\p{L}\p{N} _.-]{1,120}$/u.test(input.filename) ||
@@ -54,7 +58,26 @@ export class MediaService {
           "INVALID_ARGUMENT",
           "Invalid upload metadata; confirm self-authored content",
         );
-      if (purpose !== "content") {
+      if (purpose === "award_evidence") {
+        if (
+          typeof input.awardEnrollmentId !== "string" ||
+          input.awardEnrollmentId.length > 128 ||
+          typeof input.criterionPath !== "string" ||
+          input.criterionPath.length > 768 ||
+          input.mime !== "application/pdf"
+        )
+          reject("INVALID_ARGUMENT", "Award evidence requires a scoped PDF");
+        const { e } = new ProgramService(this.db).evidenceScope(
+          p,
+          input.awardEnrollmentId,
+          input.criterionPath,
+          true,
+        );
+        context = {
+          awardEnrollmentId: e.id,
+          criterionPath: input.criterionPath,
+        };
+      } else if (purpose !== "content") {
         if (
           purpose !== "submission" ||
           typeof input.enrollmentId !== "string" ||
@@ -176,7 +199,9 @@ export class MediaService {
           doc,
           purpose === "content"
             ? "human_upload_content"
-            : "human_upload_submission",
+            : purpose === "award_evidence"
+              ? "human_upload_award_evidence"
+              : "human_upload_submission",
           JSON.stringify({
             assetId: id,
             filename: input.filename,
@@ -220,6 +245,25 @@ export class MediaService {
       (row.purpose === "content" && ["admin", "content_admin"].includes(a.role))
     )
       return row;
+    if (row.purpose === "award_evidence") {
+      const e = this.db
+        .prepare(
+          "SELECT e.* FROM external_records r JOIN award_enrollments e ON e.id=r.enrollment_id WHERE r.id=? AND r.asset_id=? AND e.tenant=?",
+        )
+        .get(c.recordId ?? "", id, p.tenant) as any;
+      if (
+        e &&
+        (a.role === "admin" ||
+          (a.role === "assessor" &&
+            this.db
+              .prepare(
+                "SELECT 1 FROM award_assessors WHERE award_id=? AND assessor_id=?",
+              )
+              .get(e.award_id, p.id)))
+      )
+        return row;
+      reject("FORBIDDEN", "Award evidence review scope denied");
+    }
     if (row.purpose === "submission") {
       const e = this.db
         .prepare(

@@ -1167,6 +1167,7 @@ function App() {
         )}
         {["programs", "admin"].includes(view) && (
           <Programs
+            session={session}
             key={"programs:" + session.sessionEpoch + view}
             role={role}
             administrative={view === "admin"}

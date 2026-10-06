@@ -6,11 +6,15 @@ export function UploadField({
   kind,
   onUploaded,
   scope,
+  onUploading,
 }: {
   session: Session;
   kind: Lesson["kind"];
   onUploaded: (id: string) => void;
-  scope?: { enrollmentId: string; lessonId: string };
+  onUploading?: (busy: boolean) => void;
+  scope?:
+    | { enrollmentId: string; lessonId: string }
+    | { awardEnrollmentId: string; criterionPath: string };
 }) {
   const [status, setStatus] = useState(""),
     [uploading, setUploading] = useState(false),
@@ -50,6 +54,7 @@ export function UploadField({
             if (!file) return;
             const key = crypto.randomUUID();
             setUploading(true);
+            onUploading?.(true);
             setStatus("Uploading…");
             void (async () => {
               if (!file.size || file.size > 8 * 1024 * 1024)
@@ -69,7 +74,15 @@ export function UploadField({
                 key,
                 revision: String(ctx.revision),
                 confirmed: "true",
-                ...(scope ? { purpose: "submission", ...scope } : {}),
+                ...(scope
+                  ? {
+                      purpose:
+                        "awardEnrollmentId" in scope
+                          ? "award_evidence"
+                          : "submission",
+                      ...scope,
+                    }
+                  : {}),
               });
               const r = await fetch("/api/uploads?" + q, {
                 method: "POST",
@@ -89,7 +102,10 @@ export function UploadField({
               setStatus(`Stored ${result.filename} (${result.size} bytes)`);
             })()
               .catch((e) => setStatus(e.message))
-              .finally(() => setUploading(false));
+              .finally(() => {
+                setUploading(false);
+                onUploading?.(false);
+              });
           }}
         />
       </label>
@@ -105,6 +121,7 @@ export function UploadedMedia({
   session: Session;
   content: { assetId?: string; kind: string; title: string };
   context: {
+    recordId?: string;
     submissionId?: string;
     itemId?: string;
     version?: number;

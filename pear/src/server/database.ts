@@ -103,6 +103,22 @@ export function openDatabase(path: string, seed = false) {
       throw e;
     }
   }
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=10").get()) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      db.exec(
+        readFileSync(
+          new URL("../../migrations/010.sql", import.meta.url),
+          "utf8",
+        ),
+      );
+      db.exec("COMMIT");
+    } catch (e) {
+      db.exec("ROLLBACK");
+      db.close();
+      throw e;
+    }
+  }
   if (seed) {
     db.exec("BEGIN IMMEDIATE");
     try {

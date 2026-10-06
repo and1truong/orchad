@@ -847,12 +847,22 @@ test("v4 migration preserves real submitted attempts, course/award certificates 
     reopened = fixture(path);
     assert.deepEqual(reopened.db.prepare("PRAGMA foreign_key_check").all(), []);
     assert.equal(
-      JSON.stringify(reopened.db.prepare("SELECT id,enrollment_id,number,answers,submitted,score,passed FROM attempts").all()),
+      JSON.stringify(
+        reopened.db
+          .prepare(
+            "SELECT id,enrollment_id,number,answers,submitted,score,passed FROM attempts",
+          )
+          .all(),
+      ),
       attempt,
     );
     assert.equal(
       JSON.stringify(
-        reopened.db.prepare("SELECT * FROM external_records").all(),
+        reopened.db
+          .prepare(
+            "SELECT id,enrollment_id,criterion_path,amount,evidence,evidence_hash,state,assessed_by,reason,created_at FROM external_records",
+          )
+          .all(),
       ),
       evidence,
     );

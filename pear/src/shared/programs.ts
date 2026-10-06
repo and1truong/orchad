@@ -186,8 +186,10 @@ export const programHumanTools = [
       criterionPath: string(768),
       amount: integer(1000, 1),
       evidence: string(2000),
+      assetId: string(64),
       confirmed: { type: "boolean", enum: [true] },
     },
     "Learner-confirmed external learning evidence; moderation or explicit self-attestation policy determines credit.",
+    ["awardEnrollmentId", "criterionPath", "amount", "evidence", "confirmed"],
   ),
 ];

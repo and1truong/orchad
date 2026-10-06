@@ -608,3 +608,336 @@ test("award enrollment, moderated evidence and certificate survive database reop
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("award evidence PDFs stay scoped, withheld from bridge, digest-deduplicated and human-confirmed", () => {
+  const f = fixture(),
+    pdf = Buffer.from("%PDF-1.4\nOriginal personal evidence\n%%EOF");
+  try {
+    publish(f, "files", award());
+    const id = enroll(f, "files"),
+      p = f.service.principal("learner-a");
+    const upload = (
+      key: string,
+      path = "evidence",
+      enrollmentId = id,
+      bytes = pdf,
+    ) =>
+      f.service.media.upload(
+        p,
+        {
+          filename: "practice.pdf",
+          mime: "application/pdf",
+          confirmed: "true",
+          purpose: "award_evidence",
+          awardEnrollmentId: enrollmentId,
+          criterionPath: path,
+          key,
+          revision: String(
+            f.service.context("learner-a", "learning:demo:learner-a").revision,
+          ),
+        },
+        bytes,
+      );
+    const asset = upload("proof-file");
+    assert.equal(upload("proof-file").id, asset.id);
+    assert.equal(own(f)[0].earned, 0);
+    assert.throws(() => upload("outside", "missing"), /criterion outside/);
+    assert.throws(
+      () => upload("outside-user", "evidence", enroll(f, "files", "learner-b")),
+      /enrollment access/,
+    );
+    assert.throws(
+      () =>
+        f.service.media.validate(
+          f.service.principal("editor"),
+          asset.id,
+          "document",
+        ),
+      /Asset unavailable/,
+    );
+    const args = {
+      awardEnrollmentId: id,
+      criterionPath: "evidence",
+      amount: 2,
+      evidence: "My own original evidence",
+      assetId: asset.id,
+      confirmed: true,
+    };
+    assert.equal(
+      f.call("learner-a", "human_submit_external_record", args).error?.code,
+      "FORBIDDEN",
+    );
+    const record = data(
+      f.call("learner-a", "human_submit_external_record", args, "human"),
+    );
+    assert.equal(record.state, "pending");
+    assert.equal(own(f)[0].earned, 0);
+    const renamed = upload("renamed-proof");
+    assert.equal(
+      f.call(
+        "learner-a",
+        "human_submit_external_record",
+        { ...args, evidence: "Different description", assetId: renamed.id },
+        "human",
+      ).error?.code,
+      "INVALID_ARGUMENT",
+    );
+    for (const user of [
+      "editor",
+      "manager",
+      "assessor",
+      "learner-b",
+      "outsider",
+    ])
+      assert.throws(
+        () =>
+          f.service.media.read(f.service.principal(user), asset.id, {
+            recordId: record.recordId,
+          }),
+        /denied/,
+      );
+    data(
+      f.call("admin", "learning_set_award_assessor", {
+        collectionId: "files",
+        assessorId: "assessor",
+        enabled: true,
+      }),
+    );
+    const human = data(
+      f.call(
+        "assessor",
+        "learning_get_external_records",
+        { collectionId: "files" },
+        "human",
+      ),
+    ).items[0];
+    assert.equal(human.assetId, asset.id);
+    const bridge = data(
+      f.call("assessor", "learning_get_external_records", {
+        collectionId: "files",
+      }),
+    ).items[0];
+    assert.equal(bridge.evidenceAttached, true);
+    assert.equal(bridge.assetId, undefined);
+    assert.equal(bridge.asset_id, undefined);
+    assert.equal(bridge.evidence, undefined);
+    assert.equal(bridge.evidence_hash, undefined);
+    assert.ok(
+      Buffer.from(
+        f.service.media.read(f.service.principal("assessor"), asset.id, {
+          recordId: record.recordId,
+        }).bytes,
+      ).equals(pdf),
+    );
+    assert.throws(
+      () =>
+        f.service.media.read(f.service.principal("assessor"), asset.id, {
+          recordId: "wrong",
+        }),
+      /scope denied/,
+    );
+    data(
+      f.call(
+        "assessor",
+        "learning_assess_external_record",
+        {
+          recordId: record.recordId,
+          accepted: true,
+          reason: "Read original PDF",
+        },
+        "human",
+      ),
+    );
+    assert.equal(own(f)[0].completed, true);
+    assert.throws(() => upload("after-completion"), /Open own award/);
+    data(
+      f.call("admin", "learning_set_award_assessor", {
+        collectionId: "files",
+        assessorId: "assessor",
+        enabled: false,
+      }),
+    );
+    assert.throws(
+      () =>
+        f.service.media.read(f.service.principal("assessor"), asset.id, {
+          recordId: record.recordId,
+        }),
+      /scope denied/,
+    );
+    assert.deepEqual(f.db.prepare("PRAGMA foreign_key_check").all(), []);
+  } finally {
+    f.db.close();
+  }
+});
+
+test("nested and ongoing evidence uses the root enrollment and exact pinned criterion", () => {
+  const f = fixture();
+  try {
+    publish(f, "child-files", award({ moderatedExternal: false }));
+    publish(
+      f,
+      "root-files",
+      award({
+        ongoing: true,
+        requirements: [
+          {
+            id: "nested",
+            title: "Nested",
+            required: true,
+            credits: 2,
+            alternatives: [{ kind: "award", id: "child-files" }],
+          },
+        ],
+      }),
+    );
+    const id = enroll(f, "root-files"),
+      path = "nested/child-files@1/evidence",
+      p = f.service.principal("learner-a");
+    const asset = f.service.media.upload(
+      p,
+      {
+        filename: "proof.pdf",
+        mime: "application/pdf",
+        confirmed: "true",
+        purpose: "award_evidence",
+        awardEnrollmentId: id,
+        criterionPath: path,
+        key: "nested-file",
+        revision: String(
+          f.service.context(p.id, "learning:demo:learner-a").revision,
+        ),
+      },
+      Buffer.from("%PDF-nested"),
+    );
+    assert.equal(
+      f.call(
+        p.id,
+        "human_submit_external_record",
+        {
+          awardEnrollmentId: id,
+          criterionPath: "evidence",
+          amount: 2,
+          evidence: "Wrong nested path",
+          assetId: asset.id,
+          confirmed: true,
+        },
+        "human",
+      ).error?.code,
+      "INVALID_ARGUMENT",
+    );
+    const record = data(
+      f.call(
+        p.id,
+        "human_submit_external_record",
+        {
+          awardEnrollmentId: id,
+          criterionPath: path,
+          amount: 2,
+          evidence: "Original nested practice",
+          assetId: asset.id,
+          confirmed: true,
+        },
+        "human",
+      ),
+    );
+    assert.equal(record.state, "accepted");
+    assert.equal(own(f)[0].earned, 2);
+    assert.equal(own(f)[0].completed, false);
+    assert.equal(
+      f.db.prepare("SELECT COUNT(*) AS n FROM award_enrollments").get()!.n,
+      1,
+    );
+  } finally {
+    f.db.close();
+  }
+});
+
+test("award file mutation rollback, live session revocation and disk reopen preserve exact evidence", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs"),
+    { tmpdir } = await import("node:os"),
+    { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "pear-proof-")),
+    path = join(dir, "proof.sqlite");
+  let f = fixture(path);
+  try {
+    publish(f, "durable-files", award());
+    const id = enroll(f, "durable-files"),
+      p = f.service.principal("learner-a");
+    const bytes = Buffer.from("%PDF-durable-personal-proof");
+    const input = {
+      filename: "proof.pdf",
+      mime: "application/pdf",
+      purpose: "award_evidence",
+      awardEnrollmentId: id,
+      criterionPath: "evidence",
+      confirmed: "true",
+      key: "durable-file",
+      revision: String(
+        f.service.context(p.id, "learning:demo:learner-a").revision,
+      ),
+    };
+    f.db.exec(
+      "CREATE TRIGGER fail_proof_audit BEFORE INSERT ON audit BEGIN SELECT RAISE(ABORT,'audit unavailable'); END;",
+    );
+    assert.throws(
+      () => f.service.media.upload(p, input, bytes),
+      /audit unavailable/,
+    );
+    assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM assets").get()!.n, 0);
+    assert.equal(
+      String(f.service.context(p.id, "learning:demo:learner-a").revision),
+      input.revision,
+    );
+    f.db.exec("DROP TRIGGER fail_proof_audit");
+    const asset = f.service.media.upload(p, input, bytes);
+    const record = data(
+      f.call(
+        p.id,
+        "human_submit_external_record",
+        {
+          awardEnrollmentId: id,
+          criterionPath: "evidence",
+          amount: 2,
+          evidence: "Durable proof",
+          assetId: asset.id,
+          confirmed: true,
+        },
+        "human",
+      ),
+    );
+    f.db.close();
+    f = fixture(path);
+    assert.equal(
+      f.service.media.upload(f.service.principal(p.id), input, bytes).id,
+      asset.id,
+    );
+    assert.ok(
+      Buffer.from(
+        f.service.media.read(f.service.principal("admin"), asset.id, {
+          recordId: record.recordId,
+        }).bytes,
+      ).equals(bytes),
+    );
+    assert.equal(
+      f.db
+        .prepare("SELECT asset_id FROM external_records WHERE id=?")
+        .get(record.recordId)!.asset_id,
+      asset.id,
+    );
+    f.db
+      .prepare("UPDATE accounts SET auth_version=auth_version+1 WHERE id=?")
+      .run(p.id);
+    assert.throws(
+      () => f.service.media.upload(p, input, bytes),
+      /Active account/,
+    );
+    assert.throws(
+      () => f.service.media.read(p, asset.id, {}),
+      /Active account/,
+    );
+    assert.deepEqual(f.db.prepare("PRAGMA foreign_key_check").all(), []);
+  } finally {
+    f.db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

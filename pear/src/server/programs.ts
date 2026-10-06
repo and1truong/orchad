@@ -51,6 +51,37 @@ export class ProgramService {
     if (!row) reject("FORBIDDEN", "Award enrollment access denied");
     return row;
   }
+  evidenceScope(p: Principal, id: string, path: string, file = false) {
+    const e = this.enrollment(p, id);
+    const root = this.version(e.award_id, e.version) as Award;
+    if (
+      e.assignment_state !== "active" ||
+      (file && e.completed_at && !root.ongoing)
+    )
+      reject("FORBIDDEN", "Open own award required");
+    const find = (progress: any): any => {
+      for (const r of progress.requirements) {
+        if (
+          r.criterionPath === path &&
+          r.alternatives.some((ref: any) => ref.kind === "external")
+        )
+          return r;
+        for (const ref of r.alternatives)
+          if (ref.kind === "award") {
+            const value = find(ref);
+            if (value) return value;
+          }
+      }
+    };
+    const criterion = find(this.evaluation(e));
+    if (!criterion)
+      reject("INVALID_ARGUMENT", "External criterion outside enrolled award");
+    return {
+      e,
+      policy: criterion.alternatives.find((ref: any) => ref.kind === "external")
+        .moderated,
+    };
+  }
   private assessor(p: Principal, awardId: string) {
     this.collection(p, awardId);
     if (p.role === "admin") return;
@@ -308,11 +339,11 @@ export class ProgramService {
       return { ...ref, state: "unavailable", title: ref.id };
     return { ...ref, state: row.state, title: json(version.content).title };
   }
-  private evaluation(enrollment: any) {
+  private evaluation(enrollment: any, files = false) {
     const root = this.version(enrollment.award_id, enrollment.version) as Award;
     const records = this.db
       .prepare(
-        "SELECT id,criterion_path,amount,state FROM external_records WHERE enrollment_id=? ORDER BY created_at,id",
+        "SELECT id,criterion_path,amount,state,asset_id FROM external_records WHERE enrollment_id=? ORDER BY created_at,id",
       )
       .all(enrollment.id) as any[];
     const cycleStart = enrollment.assignment_cycle_id
@@ -371,7 +402,11 @@ export class ProgramService {
           return {
             ...ref,
             earned: external,
-            records: summaries,
+            records: summaries.map(({ asset_id, ...record }) => ({
+              ...record,
+              ...(files && asset_id ? { assetId: asset_id } : {}),
+              evidenceAttached: !!asset_id,
+            })),
             recordCount: evidence.length,
             pendingCount: evidence.filter(
               (record) => record.state === "pending",
@@ -537,7 +572,7 @@ export class ProgramService {
                 "SELECT * FROM award_enrollments WHERE learner=? AND tenant=? ORDER BY id",
               )
               .all(p.id, p.tenant) as any[]
-          ).map((row) => this.evaluation(row)),
+          ).map((row) => this.evaluation(row, source === "human")),
           a.offset ?? 0,
           a.limit ?? 20,
         );
@@ -549,10 +584,14 @@ export class ProgramService {
                 "SELECT r.*,e.learner,e.award_id FROM external_records r JOIN award_enrollments e ON e.id=r.enrollment_id WHERE e.award_id=? AND e.tenant=? ORDER BY r.created_at,r.id",
               )
               .all(a.collectionId, p.tenant) as any[]
-          ).map(({ evidence, evidence_hash, ...row }) =>
+          ).map(({ evidence, evidence_hash, asset_id, ...row }) =>
             source === "human"
-              ? { ...row, evidence }
-              : { ...row, evidenceWithheld: true },
+              ? { ...row, evidence, ...(asset_id ? { assetId: asset_id } : {}) }
+              : {
+                  ...row,
+                  evidenceWithheld: true,
+                  evidenceAttached: !!asset_id,
+                },
           ),
           a.offset ?? 0,
           a.limit ?? 20,
@@ -642,34 +681,33 @@ export class ProgramService {
         };
       }
       case "human_submit_external_record": {
-        const e = this.enrollment(p, a.awardEnrollmentId),
-          evaluation = this.evaluation(e);
-        const find = (progress: any): any => {
-          for (const r of progress.requirements) {
-            if (
-              r.criterionPath === a.criterionPath &&
-              r.alternatives.some((ref: any) => ref.kind === "external")
+        const { e, policy } = this.evidenceScope(
+          p,
+          a.awardEnrollmentId,
+          a.criterionPath,
+          !!a.assetId,
+        );
+        let asset: any;
+        if (a.assetId) {
+          asset = this.db
+            .prepare(
+              "SELECT * FROM assets WHERE id=? AND tenant=? AND owner=? AND purpose='award_evidence'",
             )
-              return r;
-            for (const ref of r.alternatives)
-              if (ref.kind === "award") {
-                const value = find(ref);
-                if (value) return value;
-              }
-          }
-        };
-        const criterion = find(evaluation);
-        if (!criterion)
-          reject(
-            "INVALID_ARGUMENT",
-            "External criterion outside enrolled award",
-          );
-        const policy = criterion.alternatives.find(
-          (ref: any) => ref.kind === "external",
-        ).moderated;
-        const digest = createHash("sha256")
-          .update(a.evidence.trim())
-          .digest("hex");
+            .get(a.assetId, p.tenant, p.id);
+          const context = asset && JSON.parse(asset.context_json);
+          if (
+            !asset ||
+            context.awardEnrollmentId !== e.id ||
+            context.criterionPath !== a.criterionPath
+          )
+            reject(
+              "FORBIDDEN",
+              "Evidence file must belong to this learner and criterion",
+            );
+        }
+        const digest = asset
+          ? asset.sha256
+          : createHash("sha256").update(a.evidence.trim()).digest("hex");
         if (
           !a.evidence.trim() ||
           this.db
@@ -686,7 +724,7 @@ export class ProgramService {
           state = policy ? "pending" : "accepted";
         this.db
           .prepare(
-            "INSERT INTO external_records(id,enrollment_id,criterion_path,amount,evidence,evidence_hash,state,created_at) VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO external_records(id,enrollment_id,criterion_path,amount,evidence,evidence_hash,state,created_at,asset_id) VALUES(?,?,?,?,?,?,?,?,?)",
           )
           .run(
             id,
@@ -697,6 +735,7 @@ export class ProgramService {
             digest,
             state,
             new Date().toISOString(),
+            a.assetId ?? null,
           );
         this.refreshLearner(p.tenant, p.id);
         return { recordId: id, state, selfAttested: !policy };

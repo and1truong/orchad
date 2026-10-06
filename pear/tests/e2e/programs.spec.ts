@@ -75,6 +75,21 @@ test("human program authoring, external evidence, scoped assessor moderation and
   await card
     .getByRole("button", { name: "Enroll in award", exact: true })
     .click();
+  // A real browser-generated PDF, retained as private evidence.
+  const bytes = await page.pdf({ format: "A4" });
+  await page
+    .getByLabel("I own this content and may upload it", { exact: true })
+    .check();
+  await page
+    .getByLabel("Content file", { exact: true })
+    .setInputFiles({
+      name: "personal-practice.pdf",
+      mimeType: "application/pdf",
+      buffer: bytes,
+    });
+  await expect(
+    page.getByRole("status").filter({ hasText: "Evidence PDF attached" }),
+  ).toBeVisible();
   await page
     .getByLabel("Evidence · personal statement or reference", { exact: true })
     .fill("I completed one hour of original practice.");
@@ -112,6 +127,16 @@ test("human program authoring, external evidence, scoped assessor moderation and
   await expect(
     page.getByRole("region", { name: "Programs", exact: true }),
   ).toContainText("I completed one hour of original practice.");
+  const downloaded = page.waitForEvent("download");
+  await page
+    .getByRole("link", { name: "Download document", exact: true })
+    .click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe("Award evidence.pdf");
+  const stream = await download.createReadStream();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  expect(Buffer.concat(chunks).equals(bytes)).toBe(true);
   await page
     .getByLabel("Decision reason", { exact: true })
     .fill("Verified original practice evidence.");

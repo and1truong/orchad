@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import type { Session } from "./api.ts";
+import { UploadField, UploadedMedia } from "./media.tsx";
 import type {
   Award,
   Playlist,
@@ -6,6 +8,7 @@ import type {
   Requirement,
 } from "../shared/programs.ts";
 type Props = {
+  session: Session;
   role: string;
   administrative: boolean;
   tick: number;
@@ -105,6 +108,82 @@ function References({
     </div>
   );
 }
+function EvidenceForm({
+  props,
+  enrollmentId,
+  criterionPath,
+  credits,
+  unit,
+  active,
+}: {
+  props: Props;
+  enrollmentId: string;
+  criterionPath: string;
+  credits: number;
+  unit: string;
+  active: boolean;
+}) {
+  const [assetId, setAssetId] = useState(""),
+    [uploading, setUploading] = useState(false),
+    [generation, setGeneration] = useState(0);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (uploading) return;
+        const form = e.currentTarget,
+          d = new FormData(form);
+        void props.run(async () => {
+          await props.mutate("human_submit_external_record", {
+            awardEnrollmentId: enrollmentId,
+            criterionPath: criterionPath,
+            amount: Number(d.get("amount")),
+            evidence: d.get("evidence"),
+            confirmed: true,
+            ...(assetId ? { assetId } : {}),
+          });
+          form.reset();
+          setAssetId("");
+          setGeneration((n) => n + 1);
+        });
+      }}
+    >
+      <fieldset disabled={props.busy || !active}>
+        <UploadField
+          key={generation}
+          session={props.session}
+          kind="document"
+          scope={{ awardEnrollmentId: enrollmentId, criterionPath }}
+          onUploaded={setAssetId}
+          onUploading={setUploading}
+        />
+        {assetId && <p role="status">Evidence PDF attached</p>}
+        <label>
+          Claimed {unit}
+          <input
+            name="amount"
+            type="number"
+            min={1}
+            max={credits}
+            defaultValue={1}
+            required
+          />
+        </label>
+        <label>
+          Evidence · personal statement or reference
+          <textarea name="evidence" required maxLength={2000} />
+        </label>
+        <label className="choice">
+          <input type="checkbox" required />I confirm this evidence describes my
+          own external learning.
+        </label>
+        <button disabled={props.busy || !active || uploading}>
+          Submit external learning
+        </button>
+      </fieldset>
+    </form>
+  );
+}
 function Progress({
   progress,
   enrollmentId,
@@ -171,50 +250,31 @@ function Progress({
                       : "Self-attested credit"}
                   </p>
                   {ref.records.map((record: any) => (
-                    <p key={record.id}>
-                      {record.amount} claimed · {record.state}
-                    </p>
+                    <div key={record.id}>
+                      <p>
+                        {record.amount} claimed · {record.state}
+                      </p>
+                      {record.assetId && (
+                        <UploadedMedia
+                          session={props.session}
+                          content={{
+                            assetId: record.assetId,
+                            kind: "document",
+                            title: "Award evidence",
+                          }}
+                          context={{ recordId: record.id }}
+                        />
+                      )}
+                    </div>
                   ))}
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const form = e.currentTarget,
-                        d = new FormData(form);
-                      void props.run(async () => {
-                        await props.mutate("human_submit_external_record", {
-                          awardEnrollmentId: enrollmentId,
-                          criterionPath: r.criterionPath,
-                          amount: Number(d.get("amount")),
-                          evidence: d.get("evidence"),
-                          confirmed: true,
-                        });
-                        form.reset();
-                      });
-                    }}
-                  >
-                    <label>
-                      Claimed {progress.unit}
-                      <input
-                        name="amount"
-                        type="number"
-                        min={1}
-                        max={r.credits}
-                        defaultValue={1}
-                        required
-                      />
-                    </label>
-                    <label>
-                      Evidence · personal statement or reference
-                      <textarea name="evidence" required maxLength={2000} />
-                    </label>
-                    <label className="choice">
-                      <input type="checkbox" required />I confirm this evidence
-                      describes my own external learning.
-                    </label>
-                    <button disabled={props.busy || !active}>
-                      Submit external learning
-                    </button>
-                  </form>
+                  <EvidenceForm
+                    props={props}
+                    enrollmentId={enrollmentId}
+                    criterionPath={r.criterionPath}
+                    credits={r.credits}
+                    unit={progress.unit}
+                    active={active}
+                  />
                 </>
               )}
             </div>
@@ -903,6 +963,17 @@ export function Programs(props: Props) {
                 {r.amount} claimed · {r.state}
               </p>
               <p>{r.evidence}</p>
+              {r.assetId && (
+                <UploadedMedia
+                  session={props.session}
+                  content={{
+                    assetId: r.assetId,
+                    kind: "document",
+                    title: "Award evidence",
+                  }}
+                  context={{ recordId: r.id }}
+                />
+              )}
               {r.state === "pending" && (
                 <>
                   <label>
