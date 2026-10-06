@@ -520,7 +520,7 @@ export async function openRunner(
           status: outcome.status === "reconciled" ? "reconciled" : "failed",
           result:
             outcome.status === "reconciled"
-              ? (outcome.result as OpRecord["result"])
+              ? ((outcome.result ?? op.result ?? null) as OpRecord["result"])
               : op.result,
           error: outcome.status === "failed" ? outcome.error : op.error,
         };
