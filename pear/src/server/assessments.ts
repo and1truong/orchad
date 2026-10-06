@@ -1,3 +1,4 @@
+import {dropdownChoices} from "../shared/assessments.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomInt, randomUUID } from "node:crypto";
 import type { Principal, Course, Question } from "../shared/model.ts";
@@ -6,13 +7,15 @@ const norm = (v: string) => v.normalize("NFKC").trim().toLocaleLowerCase("en");
 const kind = (q: Question) => q.kind ?? "mcq";
 export function validateQuestion(q: Question) {
   const k = kind(q);
-  if(k!=="mcq"&&(q.correctIndices||q.partialCredit!==undefined||q.optionFeedback))reject("INVALID_ARGUMENT","Choice settings require MCQ");
-  if(k!=="blanks"&&q.blankChoices)reject("INVALID_ARGUMENT","Dropdown choices require blanks");
+  if(k!=="mcq"&&(q.correctIndices||q.partialCredit!==undefined||q.feedbackSelected||q.feedbackNotSelected))reject("INVALID_ARGUMENT","Choice settings require MCQ");
+  if(k!=="blanks"&&(q.blankChoiceCounts||q.blankChoiceOptions))reject("INVALID_ARGUMENT","Dropdown choices require blanks");
   if(k!=="long_answer"&&q.passRate!==undefined)reject("INVALID_ARGUMENT","Question pass rate requires manual long answer");
   if(q.correctIndices&&(new Set(q.correctIndices).size!==q.correctIndices.length||q.correctIndices.some(i=>i>=q.options.length)))reject("INVALID_ARGUMENT","Distinct correct choice indices required");
   if(q.partialCredit&&!((q.correctIndices?.length??0)>=2))reject("INVALID_ARGUMENT","Partial credit requires at least two correct choices");
-  if(q.optionFeedback&&q.optionFeedback.length!==q.options.length)reject("INVALID_ARGUMENT","Feedback requires one entry per option");
-  if(q.blankChoices&&(q.blankChoices.length!==q.prompts?.length||q.blankChoices.some((choices,i)=>choices.length>0&&(choices.length<2||new Set(choices.map(norm)).size!==choices.length||choices.some(value=>!norm(value))||!choices.some(value=>norm(value)===norm(q.correctAnswers?.[i]??""))))))reject("INVALID_ARGUMENT","Dropdown blanks require distinct options including the accepted answer");
+  if((q.feedbackSelected||q.feedbackNotSelected)&&(!q.feedbackSelected||!q.feedbackNotSelected||q.feedbackSelected.length!==q.options.length||q.feedbackNotSelected.length!==q.options.length))reject("INVALID_ARGUMENT","Feedback requires both branches per option");
+  const choices=dropdownChoices(q);
+  if((q.blankChoiceCounts||q.blankChoiceOptions)&&(!q.blankChoiceCounts||!q.blankChoiceOptions||q.blankChoiceCounts.length!==q.prompts?.length||q.blankChoiceCounts.reduce((a,b)=>a+b,0)!==q.blankChoiceOptions.length))reject("INVALID_ARGUMENT","Dropdown layout requires exact bounded counts");
+  if(choices&&(choices.length!==q.prompts?.length||choices.some((choices,i)=>choices.length>0&&(choices.length<2||new Set(choices.map(norm)).size!==choices.length||choices.some(value=>!norm(value))||!choices.some(value=>norm(value)===norm(q.correctAnswers?.[i]??""))))))reject("INVALID_ARGUMENT","Dropdown blanks require distinct options including the accepted answer");
   if (!q.prompt.trim()) reject("INVALID_ARGUMENT", "Question prompt required");
   if (
     q.prompts &&
@@ -90,7 +93,7 @@ export function presentation(course: Course) {
     questions: course.quiz.shuffleQuestions
       ? shuffled(course.quiz.questions.map((q) => q.id))
       : course.quiz.questions.map((q) => q.id),
-    blanks: Object.fromEntries(course.quiz.questions.map(q=>[q.id,(q.blankChoices??[]).map(choices=>shuffled(choices.map((_,i)=>i)))])),
+    blanks: Object.fromEntries(course.quiz.questions.map(q=>[q.id,(dropdownChoices(q)??[]).map(choices=>shuffled(choices.map((_,i)=>i)))])),
     options: Object.fromEntries(
       course.quiz.questions.map((q) => [
         q.id,
@@ -110,12 +113,12 @@ export function visibleQuestions(v: Course, at: any) {
       });
   return p.questions.map((id: string) => {
     const q = v.quiz.questions.find((q) => q.id === id)!;
-    const { correct, correctIndices, optionFeedback, matches, correctAnswers, rubric, ...safe } = q;
+    const { correct, correctIndices, feedbackSelected, feedbackNotSelected, blankChoiceCounts, blankChoiceOptions, matches, correctAnswers, rubric, ...safe } = q;
     return {
       ...safe,
       kind: kind(q),
       multiple: !!correctIndices,
-      ...(q.blankChoices?{blankChoices:q.blankChoices.map((choices,i)=>(p.blanks?.[q.id]?.[i]??choices.map((_,n)=>n)).map((n:number)=>choices[n]))}:{}),
+      ...(q.blankChoiceCounts?{blankChoices:dropdownChoices(q)!.map((choices,i)=>(p.blanks?.[q.id]?.[i]??choices.map((_,n)=>n)).map((n:number)=>choices[n]))}:{}),
       options: p.options[id].map((i: number) => q.options[i]),
     };
   });
@@ -143,7 +146,7 @@ export function validateAnswer(q: Question, answer: any, complete = false) {
               (s,i) =>
                 typeof s === "string" &&
                 (!complete || s.trim().length > 0) &&
-                s.length <= 200 && (!q.blankChoices?.[i]?.length || !s && !complete || q.blankChoices[i]!.includes(s)),
+                s.length <= 200 && (!dropdownChoices(q)?.[i]?.length || !s && !complete || dropdownChoices(q)![i]!.includes(s)),
             )
           : typeof answer === "string" &&
             (!complete || answer.trim().length > 0) &&
@@ -164,9 +167,9 @@ export function objectiveFraction(q:Question,answer:any,p:any){
  throw new RangeError("Manual question requires authorized review");
 }
 export function releasedOptionFeedback(q:Question,answer:any,p:any){
- if(!q.optionFeedback)return [];
+ if(!q.feedbackSelected||!q.feedbackNotSelected)return [];
  const selected=Array.isArray(answer)?answer.map(index=>p.options[q.id][index]):[p.options[q.id][answer]];
- return q.optionFeedback.map((feedback,index)=>({optionIndex:index,selected:selected.includes(index),message:selected.includes(index)?feedback.selected:feedback.notSelected}));
+ return q.feedbackSelected.map((feedback,index)=>({optionIndex:index,selected:selected.includes(index),message:selected.includes(index)?feedback:q.feedbackNotSelected![index]}));
 }
 export class AssessmentService {
   constructor(readonly db: DatabaseSync) {}

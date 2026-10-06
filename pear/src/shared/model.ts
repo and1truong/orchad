@@ -84,8 +84,10 @@ export interface Question {
   points?: number;
   correctIndices?: number[];
   partialCredit?: boolean;
-  optionFeedback?: {selected:string;notSelected:string}[];
-  blankChoices?: string[][];
+  feedbackSelected?: string[];
+  feedbackNotSelected?: string[];
+  blankChoiceOptions?: string[];
+  blankChoiceCounts?: number[];
   passRate?: number;
   prompts?: string[];
   matches?: number[];

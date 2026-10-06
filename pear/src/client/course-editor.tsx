@@ -703,7 +703,7 @@ export function CourseEditor({
                           updateQuestion(q.id, (next) => {
                             next.options.splice(oi, 1);
                             if(next.correctIndices){next.correctIndices=next.correctIndices.filter(index=>index!==oi).map(index=>index>oi?index-1:index);if(!next.correctIndices.length)next.correctIndices=[0];if(next.correctIndices.length<2)next.partialCredit=false;}
-                            if(next.optionFeedback)next.optionFeedback.splice(oi,1);
+                            if(next.feedbackSelected)next.feedbackSelected.splice(oi,1);if(next.feedbackNotSelected)next.feedbackNotSelected.splice(oi,1);
                             next.correct =
                               next.correct === oi
                                 ? 0
@@ -720,8 +720,8 @@ export function CourseEditor({
                   {q.correctIndices&&<><fieldset><legend>{translateUI("Correct choices")}</legend>{q.options.map((_,index)=><label key={index}><input type="checkbox" checked={q.correctIndices!.includes(index)} onChange={e=>updateQuestion(q.id,next=>{next.correctIndices=e.target.checked?[...next.correctIndices!,index].sort((a,b)=>a-b):next.correctIndices!.filter(n=>n!==index);if(next.correctIndices.length<2)next.partialCredit=false;})}/>{translateUI("Correct choice")} {String.fromCharCode(65+index)}</label>)}</fieldset>
                   <label><input type="checkbox" disabled={q.correctIndices.length<2} checked={!!q.partialCredit} onChange={e=>updateQuestion(q.id,next=>{next.partialCredit=e.target.checked;})}/>{translateUI("Allow partial choice credit")}</label>
                   <p>{translateUI("Exact mode requires every correct choice and no incorrect choice. Partial mode awards selected correct choices divided by all correct choices; incorrect selections do not subtract points.")}</p></>}
-                  <label><input type="checkbox" checked={!!q.optionFeedback} onChange={e=>updateQuestion(q.id,next=>{if(e.target.checked)next.optionFeedback=next.options.map(()=>({selected:"",notSelected:""}));else delete next.optionFeedback;})}/>{translateUI("Add option feedback")}</label>
-                  {q.optionFeedback&&q.options.map((_,index)=><fieldset key={index}><legend>{translateUI("Option feedback")} {String.fromCharCode(65+index)}</legend><label>{translateUI("Feedback when selected")}<textarea maxLength={160} value={q.optionFeedback![index]!.selected} onChange={e=>updateQuestion(q.id,next=>{next.optionFeedback![index]!.selected=e.target.value;})}/></label><label>{translateUI("Feedback when not selected")}<textarea maxLength={160} value={q.optionFeedback![index]!.notSelected} onChange={e=>updateQuestion(q.id,next=>{next.optionFeedback![index]!.notSelected=e.target.value;})}/></label></fieldset>)}
+                  <label><input type="checkbox" checked={!!q.feedbackSelected} onChange={e=>updateQuestion(q.id,next=>{if(e.target.checked){next.feedbackSelected=next.options.map(()=>"");next.feedbackNotSelected=next.options.map(()=>"");}else{delete next.feedbackSelected;delete next.feedbackNotSelected;}})}/>{translateUI("Add option feedback")}</label>
+                  {q.feedbackSelected&&q.options.map((_,index)=><fieldset key={index}><legend>{translateUI("Option feedback")} {String.fromCharCode(65+index)}</legend><label>{translateUI("Feedback when selected")}<textarea maxLength={160} value={q.feedbackSelected![index]!} onChange={e=>updateQuestion(q.id,next=>{next.feedbackSelected![index]!=e.target.value;})}/></label><label>{translateUI("Feedback when not selected")}<textarea maxLength={160} value={q.feedbackNotSelected![index]!} onChange={e=>updateQuestion(q.id,next=>{next.feedbackNotSelected![index]!=e.target.value;})}/></label></fieldset>)}
                   {!q.correctIndices&&<label>{translateUI("Correct option")}<select aria-label={translateUI("Correct option")}
                       value={q.correct}
                       onChange={(e) =>
@@ -759,7 +759,7 @@ export function CourseEditor({
                   onClick={() =>
                     updateQuestion(q.id, (next) => {
                       next.options.push("");
-                      if(next.optionFeedback)next.optionFeedback.push({selected:"",notSelected:""});
+                      if(next.feedbackSelected)next.feedbackSelected.push("");if(next.feedbackNotSelected)next.feedbackNotSelected.push("");
                     })
                   }
                 >{translateUI("Add option")}</button>

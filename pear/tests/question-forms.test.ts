@@ -1,3 +1,5 @@
+import {hostSafeSchema} from "@orchard/bridge-contract";
+import {allCatalog,humanTools} from "../src/shared/catalog.ts";
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {fixture,data} from "./helpers.ts";
@@ -5,25 +7,26 @@ import {courses} from "../src/server/seed.ts";
 import type {Course,Question} from "../src/shared/model.ts";
 import {objectiveFraction,validateQuestion,validateAnswer,presentation,visibleQuestions} from "../src/server/assessments.ts";
 import {createApp} from "../src/server/app.ts";
-const multi:Question={id:"multi",prompt:"Select original correct choices",options:["Alpha","Beta","Gamma","Delta"],correct:0,correctIndices:[0,2],optionFeedback:[{selected:"Alpha selected",notSelected:"Alpha not selected"},{selected:"Beta selected",notSelected:"Beta not selected"},{selected:"Gamma selected",notSelected:"Gamma not selected"},{selected:"Delta selected",notSelected:"Delta not selected"}]};
-const blanks:Question={id:"blanks",kind:"blanks",prompt:"Choose a city and write a word",options:[],correct:0,prompts:["Original city","Original word"],correctAnswers:["Paris","Áp dụng"],blankChoices:[["Paris","London","Berlin"],[]]};
+const multi:Question={id:"multi",prompt:"Select original correct choices",options:["Alpha","Beta","Gamma","Delta"],correct:0,correctIndices:[0,2],feedbackSelected:["Alpha selected","Beta selected","Gamma selected","Delta selected"],feedbackNotSelected:["Alpha not selected","Beta not selected","Gamma not selected","Delta not selected"]};
+const blanks:Question={id:"blanks",kind:"blanks",prompt:"Choose a city and write a word",options:[],correct:0,prompts:["Original city","Original word"],correctAnswers:["Paris","Áp dụng"],blankChoiceOptions:["Paris","London","Berlin"],blankChoiceCounts:[3,0]};
 function course(qs:Question[],quiz:Partial<Course["quiz"]>={}):Course{return {...structuredClone(courses["learning-vi"]),title:"Original question forms",language:"en",quiz:{passScore:100,maxAttempts:3,shuffleOptions:true,answerRelease:"after_submission",questions:qs,...quiz}};}
 function setup(qs:Question[],quiz:Partial<Course["quiz"]>={}){
  const f=fixture(),value=course(qs,quiz);data(f.call("editor","learning_create_course",{courseId:"forms-course",course:value}));data(f.call("editor","learning_publish_course",{courseId:"forms-course"}));const e=data(f.call("learner-a","learning_enroll",{courseId:"forms-course"}));for(const l of value.lessons)data(f.call("learner-a","human_complete_lesson",{enrollmentId:e.enrollmentId,lessonId:l.id},"human"));const at=data(f.call("learner-a","learning_start_attempt",{enrollmentId:e.enrollmentId}));return {...f,value,e,at};
 }
 test("multi-choice exact versus explicit correct-selection fraction follows stored shuffled indices; free/dropdown blanks preserve accepted text and randomized presentation",()=>{
+ for(const role of ["admin","content_admin","manager","assessor","learner"] as const)for(const descriptor of [...allCatalog(role),...humanTools])assert.equal(hostSafeSchema(descriptor.inputSchema),true,descriptor.name);
  const value=course([multi,blanks]);
  for(let i=0;i<30;i++){
   const p=presentation(value),order=p.options.multi!,good=multi.correctIndices!.map(index=>order.indexOf(index)),wrong=order.indexOf(1);
   assert.equal(objectiveFraction(multi,good,p),1);assert.equal(objectiveFraction(multi,[good[0]],p),0);assert.equal(objectiveFraction(multi,[...good,wrong],p),0);
   assert.equal(objectiveFraction({...multi,partialCredit:true},[good[0]],p),0.5);assert.equal(objectiveFraction({...multi,partialCredit:true},[good[0],wrong],p),0.5);assert.equal(objectiveFraction({...multi,partialCredit:true},[...good,wrong],p),1);
   assert.equal(objectiveFraction(blanks,["Paris"," áp DỤNG "],p),1);assert.equal(objectiveFraction(blanks,["London","Áp dụng"],p),0.5);
-  const visible=visibleQuestions(value,{presentation:JSON.stringify(p)});assert.equal(visible[0].multiple,true);assert.deepEqual(new Set(visible[1].blankChoices[0]),new Set(blanks.blankChoices![0]));
-  for(const key of ["correctIndices","optionFeedback","correctAnswers","rubric"])assert.equal(JSON.stringify(visible).includes('"'+key+'":'),false);
+  const visible=visibleQuestions(value,{presentation:JSON.stringify(p)});assert.equal(visible[0].multiple,true);assert.deepEqual(new Set(visible[1].blankChoices[0]),new Set(blanks.blankChoiceOptions));
+  for(const key of ["correctIndices","optionFeedback","feedbackSelected","feedbackNotSelected","correctAnswers","rubric"])assert.equal(JSON.stringify(visible).includes('"'+key+'":'),false);
  }
  for(const answer of [[0,0],[4],["0"]])assert.throws(()=>validateAnswer(multi,answer,true));
  assert.throws(()=>validateAnswer(multi,[],true));assert.throws(()=>validateAnswer(blanks,["Unknown","word"],true));
- for(const bad of [{...multi,correctIndices:[0,0]},{...multi,correctIndices:[0],partialCredit:true},{...multi,optionFeedback:multi.optionFeedback!.slice(1)},{...blanks,blankChoices:[["Paris","PARIS"],[]]},{...blanks,blankChoices:[["London","Berlin"],[]]},{...multi,passRate:50}])assert.throws(()=>validateQuestion(bad));
+ for(const bad of [{...multi,correctIndices:[0,0]},{...multi,correctIndices:[0],partialCredit:true},{...multi,feedbackSelected:multi.feedbackSelected!.slice(1)},{...blanks,blankChoiceOptions:["Paris","PARIS"],blankChoiceCounts:[2,0]},{...blanks,blankChoiceOptions:["London","Berlin"],blankChoiceCounts:[2,0]},{...multi,passRate:50}])assert.throws(()=>validateQuestion(bad));
 });
 test("human multi/dropdown responses grade from immutable presentation and release only configured selected/not-selected feedback; learner bridge remains restricted",()=>{
  const f=setup([{...multi,partialCredit:true},blanks]);try{

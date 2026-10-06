@@ -10,8 +10,10 @@ export const questionSchema = object(
     points: integer(20, 1),
     correctIndices: array(integer(7),8,1),
     partialCredit: {type:"boolean"},
-    optionFeedback: array(object({selected:{type:"string",maxLength:160},notSelected:{type:"string",maxLength:160}}),8,2),
-    blankChoices: array(array(string(200),8),8,1),
+    feedbackSelected: array({type:"string",maxLength:160},8,2),
+    feedbackNotSelected: array({type:"string",maxLength:160},8,2),
+    blankChoiceOptions: array(string(200),64),
+    blankChoiceCounts: array(integer(8),8,1),
     passRate: integer(100),
     prompts: array(string(240), 8, 1),
     matches: array(integer(7), 8, 1),
@@ -96,3 +98,6 @@ export const assessmentHumanTools = [
     "Admin grants bounded further attempts after a failed assessment; preserve all prior attempts.",
   ),
 ];
+
+export function dropdownChoices(q: {blankChoiceCounts?:number[];blankChoiceOptions?:string[]}) { let offset=0; return q.blankChoiceCounts?.map(count=>{const row=(q.blankChoiceOptions??[]).slice(offset,offset+count);offset+=count;return row;}); }
+export function dropdownFields(rows:string[][]) { return {blankChoiceCounts:rows.map(row=>row.length),blankChoiceOptions:rows.flat()}; }

@@ -1,3 +1,4 @@
+import {dropdownChoices,dropdownFields} from "../shared/assessments.ts";
 import {translateUI} from "./i18n.ts";
 import React from "react";
 import type { Question } from "../shared/model.ts";
@@ -69,16 +70,17 @@ export function ExtendedQuestion({ q, update }: Props) {
         />
       </label></>
     );
+  const blankChoices=dropdownChoices(q);
   const prompts = q.prompts ?? [],
     answers =
       k === "matching"
         ? prompts.map((_, i) => q.options[q.matches![i]])
         : (q.correctAnswers ?? []);
-  const rebuild = (ps: string[], as: string[],choices=q.blankChoices) =>
+  const rebuild = (ps: string[], as: string[],choices=blankChoices) =>
     update(
       k === "matching"
         ? { ...q, prompts: ps, options: as, matches: ps.map((_, i) => i) }
-        : { ...q, prompts: ps, correctAnswers: as,...(choices?{blankChoices:choices}:{}) },
+        : { ...q, prompts: ps, correctAnswers: as,...(choices?dropdownFields(choices):{}) },
     );
   return (
     <>
@@ -114,8 +116,8 @@ export function ExtendedQuestion({ q, update }: Props) {
               }
             />
           </label>
-          {k==="blanks"&&<><label><input type="checkbox" checked={!!q.blankChoices?.[i]?.length} onChange={e=>{const choices=q.blankChoices??prompts.map(()=>[]);rebuild(prompts,answers,choices.map((values,n)=>n===i?(e.target.checked?[answers[i]??"",""]:[]):values));}}/>{translateUI("Use dropdown blank")} {i+1}</label>
-          {!!q.blankChoices?.[i]?.length&&<label>{translateUI("Dropdown choices, one per line")} {i+1}<textarea aria-label={translateUI("Dropdown choices, one per line")+" "+(i+1)} required maxLength={1608} value={q.blankChoices[i]!.join("\n")} onChange={e=>{const choices=q.blankChoices!;rebuild(prompts,answers,choices.map((values,n)=>n===i?e.target.value.split("\n"):values));}}/></label>}</>}
+          {k==="blanks"&&<><label><input type="checkbox" checked={!!blankChoices?.[i]?.length} onChange={e=>{const choices=blankChoices??prompts.map(()=>[]);rebuild(prompts,answers,choices.map((values,n)=>n===i?(e.target.checked?[answers[i]??"",""]:[]):values));}}/>{translateUI("Use dropdown blank")} {i+1}</label>
+          {!!blankChoices?.[i]?.length&&<label>{translateUI("Dropdown choices, one per line")} {i+1}<textarea aria-label={translateUI("Dropdown choices, one per line")+" "+(i+1)} required maxLength={1608} value={blankChoices[i]!.join("\n")} onChange={e=>{const choices=blankChoices!;rebuild(prompts,answers,choices.map((values,n)=>n===i?e.target.value.split("\n"):values));}}/></label>}</>}
           <button
             type="button"
             className="ghost"
@@ -124,7 +126,7 @@ export function ExtendedQuestion({ q, update }: Props) {
               rebuild(
                 prompts.filter((_, j) => j !== i),
                 answers.filter((_, j) => j !== i),
-                q.blankChoices?.filter((_,j)=>j!==i),
+                blankChoices?.filter((_,j)=>j!==i),
               )
             }
           >{translateUI("Remove pair / blank")}{" "}{i + 1}
@@ -134,7 +136,7 @@ export function ExtendedQuestion({ q, update }: Props) {
       <button
         type="button"
         disabled={prompts.length >= 8}
-        onClick={() => rebuild([...prompts, ""], [...answers, ""],q.blankChoices?[...q.blankChoices,[]]:undefined)}
+        onClick={() => rebuild([...prompts, ""], [...answers, ""],blankChoices?[...blankChoices,[]]:undefined)}
       >{translateUI("Add")}{" "}{k === "matching" ? "matching pair" : "blank"}
       </button>
     </>
