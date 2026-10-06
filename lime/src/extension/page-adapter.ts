@@ -14,7 +14,6 @@ export async function dispatcher(
   method: "describe" | "getContext" | "invoke",
   payload: unknown = null,
 ): Promise<unknown> {
-  try {
   if (window !== window.top) throw new Error("Only top frame supported");
   if (!["describe", "getContext", "invoke"].includes(method))
     throw new Error("Invalid method");
@@ -36,6 +35,13 @@ export async function dispatcher(
   )
     return { unsupported: true };
   if (method === "invoke") {
+    // Chrome API argument conversion may strip null object properties.
+    // Encode the complete validated envelope as data, then parse it here;
+    // never evaluate strings or relax the six-field Bridge call shape.
+    if (typeof payload === "string") {
+      if(new TextEncoder().encode(payload).length>65536)throw new Error("Oversized request");
+      payload=JSON.parse(payload);
+    }
     if (!payload || typeof payload !== "object" || Array.isArray(payload))
       throw new Error("Invalid invoke");
     const p = payload as Record<string, unknown>,
@@ -120,10 +126,6 @@ export async function dispatcher(
   if (!serialized || new TextEncoder().encode(serialized).length > 65536)
     throw new Error("Oversized or non-JSON page output");
   return JSON.parse(serialized);
-  } catch (error) {
-    console.error("Lime MAIN dispatcher rejected:", error instanceof Error ? error.message : String(error));
-    throw error;
-  }
 }
 // Fixed MAIN-world installer for the opt-in app-initiated prompt channel
 // (issue #50). Chrome serializes this function; like the dispatcher it takes
@@ -292,7 +294,7 @@ export class ChromePageAdapter implements PageAdapter {
         target: { tabId: this.tabId, documentIds: [this.documentId] },
         world: "MAIN",
         func: dispatcher,
-        args: [method, call],
+        args: [method, call===null?null:JSON.stringify(call)],
       });
       const r = results[0];
       if (!r || r.frameId !== 0 || r.documentId !== this.documentId)
