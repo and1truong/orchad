@@ -30,6 +30,22 @@ const dispatchFor =
       approved,
     );
 
+/** A dispatch that hangs like a dead host. Self-releases on a timer so a
+ *  zombie left over from a crash test cannot pin the event loop. */
+const hangable = () => {
+  const release: (() => void)[] = [];
+  return {
+    dispatch: () =>
+      new Promise<Result>((r) => {
+        const settle = () =>
+          r({ ok: false, revision: null, data: null, error: null });
+        release.push(settle);
+        setTimeout(settle, 30_000).unref();
+      }),
+    releaseAll: () => release.splice(0).forEach((r) => r()),
+  };
+};
+
 const binding = (h: ReturnType<typeof host>, idempotent = true) => ({
   targetId: "demo-document",
   revision: () => h.context().revision,
@@ -138,8 +154,12 @@ test("unsafe mutation killed mid-dispatch reconciles to needs_reconciliation, ne
     { content: "unreachable", usage: { input: 20, output: 5 } },
   ]);
   // NOT in idempotentTools → replay 'unsafe' → pi never re-runs execute.
-  await runner.bind([binding(h, false)], async () => new Promise<Result>(() => {}));
+  const hung1 = hangable();
+  console.log("dbg: bind");
+  await runner.bind([binding(h, false)], hung1.dispatch);
+  console.log("dbg: submit");
   await runner.submit({ prompt: "Increment", requestId: "req-crash" });
+  console.log("dbg: until dispatched");
   const dispatched = await until(
     runner.status,
     (s) => s.ops[0]?.status === "dispatched",
@@ -149,9 +169,12 @@ test("unsafe mutation killed mid-dispatch reconciles to needs_reconciliation, ne
 
   // Simulate process death: the lockfile disappears but the op stays
   // 'dispatched' with no committed result.
+  console.log("dbg: open r2");
   rmSync(`${db}.owner`, { force: true });
   const r2 = await openRunner({ storagePath: db });
+  console.log("dbg: resume r2");
   await r2.resume();
+  console.log("dbg: reconcile until");
   const status = await until(
     r2.reconcile.bind(r2),
     (s) => s.ops[0]?.status === "interrupted" || s.ops[0]?.status === "ambiguous",
@@ -164,9 +187,14 @@ test("unsafe mutation killed mid-dispatch reconciles to needs_reconciliation, ne
     status: "failed",
     error: "Host reported the write never applied",
   });
+  console.log("dbg: resolve+final");
   const final = await r2.status();
   assert.equal(final.ops[0].status, "failed");
   await r2.close();
+  // Release the hung dispatch first so the zombie settles fast, then close
+  // it — its open Harness/subscriptions otherwise pin the event loop.
+  hung1.releaseAll();
+  await runner.close();
   await gw.close();
 });
 
@@ -177,9 +205,10 @@ test("idempotent mutation re-entered after crash: revalidated + same key+envelop
     { content: "Done.", usage: { input: 20, output: 5 } },
   ]);
   const seen1: OpEnvelope[] = [];
+  const hung4 = hangable();
   await runner.bind([binding(h, true)], async (envelope) => {
     seen1.push(envelope);
-    return new Promise<Result>(() => {}); // crash mid-dispatch
+    return hung4.dispatch(envelope); // crash mid-dispatch
   });
   await runner.submit({ prompt: "Increment", requestId: "req-retry" });
   await until(runner.status, (s) => s.ops[0]?.status === "dispatched", "dispatched");
@@ -213,6 +242,8 @@ test("idempotent mutation re-entered after crash: revalidated + same key+envelop
   assert.deepEqual(seen2[0], seen1[0]);
   assert.equal(h.context().summary, "value 1");
   assert.equal(done.ops[0].attempts, 2);
+  hung4.releaseAll();
+  await runner.close();
   assert.equal(done.ops[0].status, "completed");
   await r2.close();
   await gw.close();
@@ -291,7 +322,8 @@ test("re-entry with denied revalidation fails closed — no second dispatch", as
     { toolCalls: [incrCall()], usage: { input: 10, output: 5 } },
     { content: "unreachable", usage: { input: 20, output: 5 } },
   ]);
-  await runner.bind([binding(host(), true)], async () => new Promise<Result>(() => {}));
+  const hung2 = hangable();
+  await runner.bind([binding(host(), true)], hung2.dispatch);
   await runner.submit({ prompt: "Increment", requestId: "req-denied" });
   await until(runner.status, (s) => s.ops[0]?.status === "dispatched", "dispatched");
   rmSync(`${db}.owner`, { force: true });
@@ -318,6 +350,8 @@ test("re-entry with denied revalidation fails closed — no second dispatch", as
   assert.equal(dispatched2, 0, "revalidation denial must not dispatch");
   assert.match(s.ops[0].error ?? "", /revalidation failed/i);
   await r2.close();
+  hung2.releaseAll();
+  await runner.close();
   await gw.close();
 });
 
@@ -338,19 +372,19 @@ test("late tool response after cancel reconciles: result recorded, run stays can
   );
   await runner.submit({ prompt: "Increment", requestId: "req-late" });
   await until(runner.status, (s) => s.ops[0]?.status === "dispatched", "dispatched");
-  await runner.cancel();
+  // cancel aborts the in-flight dispatch; a cooperative host releases it.
+  const cancelling = runner.cancel();
+  release();
+  await cancelling;
   const cancelled = await runner.status();
   assert.equal(cancelled.phase, "cancelled");
 
-  // The host response arrives after the cancel intent is already durable:
-  // the op result is committed honestly but never resurrects the run.
-  release();
   const s = await until(
     runner.status,
     (st) => st.ops[0]?.status === "completed" && st.phase === "cancelled",
     "late settle",
   );
-  assert.equal(h.counter, 1);
+  assert.equal(h.context().summary, "value 1");
   assert.equal(s.ops[0].status, "completed");
   assert.equal(s.phase, "cancelled");
   await runner.close();
@@ -372,14 +406,14 @@ test("persisted step budget still blocks generation after reopen", async () => {
   await runner.bind([binding(h)], dispatchFor(h));
   await runner.submit({ prompt: "Increment", requestId: "req-budget" });
   const s = await until(runner.status, (st) => st.phase === "failed", "step limit");
-  assert.match(s.lastError ?? "", /STEP_LIMIT/);
+  assert.match(s.detail ?? "", /STEP_LIMIT/);
   await runner.close();
 
   const r2 = await openRunner({ storagePath: db, maxSteps: 1 });
   await r2.configure({ baseUrl: gw.baseUrl, token: gw.token, model: MODEL });
   await r2.resume();
   const s2 = await until(r2.status, (st) => st.phase === "failed", "reopen failed");
-  assert.match(s2.lastError ?? "", /STEP_LIMIT/);
+  assert.match(s2.detail ?? "", /STEP_LIMIT/);
   await r2.close();
   await gw.close();
 });

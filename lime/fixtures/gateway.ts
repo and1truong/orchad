@@ -10,7 +10,7 @@ export async function startMockGateway(
   scripted = false,
   // The scripted tool call — demo_increment for the fixture counter; durable
   // demos point this at guava's canvas_apply_patch instead.
-  tool: { name: string; arguments: string } = {
+  tool: { name: string; arguments: string | ((callNo: number) => string) } = {
     name: "demo_increment",
     arguments: '{"amount":1}',
   },
@@ -46,7 +46,7 @@ export async function startMockGateway(
           // Fresh id per call: the client rejects ids already in history.
           const id = "mock-call-" + ++calls;
           res.write(
-            `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"${id}","type":"function","function":{"name":"${tool.name}","arguments":${JSON.stringify(tool.arguments)}}}]},"finish_reason":"tool_calls"}]}\n\n`,
+            `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"${id}","type":"function","function":{"name":"${tool.name}","arguments":${JSON.stringify(typeof tool.arguments === "function" ? tool.arguments(calls) : tool.arguments)}}}]},"finish_reason":"tool_calls"}]}\n\n`,
           );
         }
         res.write("data: [DONE]\n\n");

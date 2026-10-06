@@ -104,6 +104,8 @@ export class DurableBridge {
   }
 
   /** Rebind all paired targets; safe to call on every connect/op. */
+  #log = (...a: unknown[]) =>
+    process.stderr.write("[durable] " + a.map(String).join(" ") + "\n");
   async bind(pair: PairLike): Promise<void> {
     if (!pair.socket || pair.socket.readyState !== OPEN || pair.revoked) return;
     const r = await this.runner();
@@ -115,7 +117,7 @@ export class DurableBridge {
         { targetId: t.targetId, pageInstanceId: t.pageInstanceId },
         new AbortController().signal,
       );
-      if (!ctx.ok) continue; // consent/consentee not ready — ops park instead
+      if (!ctx.ok) { this.#log("bind: get_context failed", ctx.error?.code); continue; }
       const context = ContextSchema.safeParse(ctx.data);
       if (!context.success) continue;
       const tools = await this.route(
@@ -124,11 +126,11 @@ export class DurableBridge {
         { targetId: t.targetId, pageInstanceId: t.pageInstanceId },
         new AbortController().signal,
       );
+      // host_list_tools returns the full Description; pull the catalog out.
       const listed = z
         .object({ tools: z.array(ToolSchema).max(64) })
-        .strict()
         .safeParse(tools.ok ? tools.data : null);
-      if (!listed.success) continue;
+      if (!listed.success) { this.#log("bind: list_tools failed", tools.ok ? "bad shape" : tools.error?.code); continue; }
       const target = t;
       const epoch = context.data.sessionEpoch ?? null;
       this.#epochs.set(t.targetId, epoch);
@@ -163,7 +165,8 @@ export class DurableBridge {
         },
       });
     }
-    if (bindings.length === 0) return;
+    if (bindings.length === 0) { this.#log("bind: no usable targets"); return; }
+    this.#log("bind: binding", bindings.map((b) => b.targetId).join(","));
     this.#bound = pair;
     await r.bind(
       bindings,
@@ -221,6 +224,7 @@ export class DurableBridge {
     try {
       // Rebind lazily — a sidepanel reopen/refresh lands here after
       // `authenticated`; parked ops wake inside bind().
+      this.#log("op", m.op);
       await this.bind(pair);
       const r = await this.runner();
       switch (m.op) {
@@ -254,6 +258,7 @@ export class DurableBridge {
         }
       }
     } catch (e) {
+      this.#log("op failed", m.op, String(e));
       return reply(
         false,
         undefined,

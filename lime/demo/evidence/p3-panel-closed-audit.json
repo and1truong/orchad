@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "revision": null,
+  "data": null,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Endpoint not found",
+    "retryable": false
+  }
+}

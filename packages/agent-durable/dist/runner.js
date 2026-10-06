@@ -82,14 +82,30 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
         getGatewayBaseUrl: () => gateway.current?.baseUrl ?? "",
         fetcher: options.fetcher,
         modelIds: () => [gateway.current?.model ?? "orchard-model"],
-        tools: () => [...knownTargets.values()].flatMap((b) => b.tools),
+        tools: () => uniqueTools(() => true).flatMap((b) => b.tools),
         maxSteps: options.maxSteps ?? 8,
         maxToolCalls: options.maxToolCalls ?? 16,
     });
     const models = createModels({ credentials });
     models.setProvider(provider);
     const registry = createRegistry();
-    const buildTools = () => [...knownTargets.values()].flatMap((binding) => binding.tools.map((descriptor) => orchardTool(descriptor, {
+    // Several bindings may expose the same tool (re-pin after a panel reopen
+    // creates a fresh targetId for the same document). First binding wins per
+    // tool name — the model has no way to disambiguate two anyway.
+    const uniqueTools = (pick) => {
+        const seen = new Set();
+        const out = [];
+        for (const b of knownTargets.values())
+            if (pick(b)) {
+                const fresh = b.tools.filter((t) => !seen.has(t.name));
+                for (const t of fresh)
+                    seen.add(t.name);
+                if (fresh.length)
+                    out.push({ ...b, tools: fresh });
+            }
+        return out;
+    };
+    const buildTools = () => uniqueTools(() => true).flatMap((binding) => binding.tools.map((descriptor) => orchardTool(descriptor, {
         targetId: binding.targetId,
         idempotent: binding.idempotentTools?.includes(descriptor.name) ?? false,
         getRevision: () => revisionByTarget.get(binding.targetId) ?? null,
