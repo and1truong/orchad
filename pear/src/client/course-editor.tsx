@@ -638,6 +638,9 @@ export function CourseEditor({
                 })
               }
             />{translateUI("Shuffle choices per attempt")}</label>
+          <label><input type="checkbox" checked={!!course.quiz.showPreviousResponses} onChange={e=>update(c=>{c.quiz.showPreviousResponses=e.target.checked;})}/>{translateUI("Show previous responses in human player")}</label>
+          <label><input type="checkbox" checked={!!course.quiz.retryIncorrectOnly} onChange={e=>update(c=>{c.quiz.retryIncorrectOnly=e.target.checked;})}/>{translateUI("Retry only incorrect objective questions")}</label>
+          <p>{translateUI("Incorrect-only retries retain earlier correct responses until you explicitly submit. They cannot use objective progression or essays.")}</p>
           <label><input type="checkbox" checked={!!course.quiz.requireCorrectToContinue} onChange={e=>update(c=>{c.quiz.requireCorrectToContinue=e.target.checked;})}/>{translateUI("Require correct objective response before continuing")}</label>
           <p>{translateUI("Question checks do not submit, grade or complete learning. Essays need final human assessment.")}</p>
           <label>{translateUI("Answer release")}<select

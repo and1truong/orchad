@@ -136,6 +136,8 @@ const courseProperties = {
       passMessage: {type:"string",maxLength:600},
       failMessage: {type:"string",maxLength:600},
       questions: array(questionSchema, 50, 1),
+      showPreviousResponses:{type:"boolean"},
+      retryIncorrectOnly:{type:"boolean"},
       requireCorrectToContinue:{type:"boolean"},
       shuffleQuestions: { type: "boolean" },
       shuffleOptions: { type: "boolean" },

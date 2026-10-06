@@ -60,7 +60,7 @@ test("audit failure rolls catalog, entitlement, receipt and revisions back; rest
   assert.throws(()=>f.s.write(f.header,f.policy.id,up));assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM provider_items").get()!.n,0);assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM provider_events").get()!.n,0);assert.equal(f.service.context("learner-a").revision,revision);
   f.db.exec("DROP TRIGGER reject_provider");const result=f.s.write(f.header,f.policy.id,up);
   const policy={...f.policy};f.policy.clientId=randomUUID();assert.deepEqual(f.s.write(f.header,policy.id,up),result);f.db.close();closed=true;
-  const reopened=fixture(join(dir,"store.sqlite"));try{const s=new ProviderCatalogService(reopened.db,[policy]);assert.deepEqual(s.write(f.header,policy.id,up),result);assert.equal(reopened.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,33);}finally{reopened.db.close();}
+  const reopened=fixture(join(dir,"store.sqlite"));try{const s=new ProviderCatalogService(reopened.db,[policy]);assert.deepEqual(s.write(f.header,policy.id,up),result);assert.equal(reopened.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,34);}finally{reopened.db.close();}
  }finally{if(!closed)f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
 test("owner role/client scope/tenant and license bounds gate even replay; invalid grants never consume a sequence",()=>{

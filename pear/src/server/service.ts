@@ -1,3 +1,4 @@
+import {QuizRetries} from "./quiz-retries.ts";
 import {QuestionProgression} from "./question-progression.ts";
 import {DigestSubscriptionService} from "./digest-subscriptions.ts";
 import {ProviderCatalogService,type ProviderAdapter} from "./provider-catalog.ts";
@@ -278,7 +279,7 @@ export class LearningService {
       scopedEnrollment.assignment_state !== "active"
     )
       reject("FORBIDDEN", "Assignment obligation is no longer active");
-    if(c.toolName==="human_save_answer"){const {a:at,e}=this.attempt(p,a.attemptId);new QuestionProgression(this.db).authorizeSave(at,this.version(e.course_id,e.version),a.questionId);}
+    if(c.toolName==="human_save_answer"){const {a:at,e}=this.attempt(p,a.attemptId);new QuestionProgression(this.db).authorizeSave(at,this.version(e.course_id,e.version),a.questionId);new QuizRetries(this.db).authorizeSave(at,a.questionId);}
     if(c.toolName==="human_check_question"){const {a:at,e}=this.attempt(p,a.attemptId);new QuestionProgression(this.db).authorize(at,this.version(e.course_id,e.version),a);}
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
     if (a.courseId && c.toolName !== "learning_create_course") {
@@ -711,7 +712,7 @@ export class LearningService {
       case "learning_get_attempt": {
         const { a: at, e } = this.attempt(p, a.attemptId),
           v = this.version(e.course_id, e.version);
-        if (source === "bridge" && !v.aiProcessingAllowed)
+        if (source === "bridge" && (!v.aiProcessingAllowed || new QuizRetries(this.db).carried(at).length>0))
           return {
             id: at.id,
             enrollmentId: e.id,
@@ -720,7 +721,7 @@ export class LearningService {
             passed: at.passed === null ? null : !!at.passed,
             contentWithheld: true,
             reason:
-              "Assessment content does not permit model processing; use the human player.",
+              "This assessment requires the human player due to content rights or retained retry responses.",
           };
         return {
           id: at.id,
@@ -731,9 +732,10 @@ export class LearningService {
           passed: at.passed === null ? null : !!at.passed,
           gradingState: at.grading_state,
           resultMessage: source === "human" && at.submitted && at.grading_state === "graded" ? (at.passed ? v.quiz.passMessage ?? null : v.quiz.failMessage ?? null) : null,
-          questions: visibleQuestions(v, at).filter((q:any)=>new QuestionProgression(this.db).eligible(at,v).includes(q.id)),
+          questions: visibleQuestions(v, at).filter((q:any)=>new QuestionProgression(this.db).eligible(at,v).includes(q.id)&&(at.submitted||!new QuizRetries(this.db).carried(at).includes(q.id))),
           answers: source === "human" ? Object.fromEntries(Object.entries(decode(at.answers)).filter(([id])=>new QuestionProgression(this.db).eligible(at,v).includes(id))) : {},
           ...(source==="human"?new QuestionProgression(this.db).human(at,v):{}),
+          ...(source==="human"?{carriedQuestionCount:new QuizRetries(this.db).carried(at).length,previousResponses:new QuizRetries(this.db).previous(at,v)}:{}),
           responsesWithheld: source === "bridge",
           questionResults:source === "human"&&!!at.feedback_released?this.assessments.results(at,v):[],
           feedback:
@@ -979,6 +981,7 @@ export class LearningService {
     }
     new QuestionBankService(this.db).resolve(p,c,courseId);
     for (const q of c.quiz.questions) validateQuestion(q);
+    if(c.quiz.retryIncorrectOnly&&(c.quiz.requireCorrectToContinue||c.quiz.questions.some(q=>q.kind==="long_answer")))reject("INVALID_ARGUMENT","Incorrect-only retries require objective questions without correct-before-continuing");
     if(c.quiz.requireCorrectToContinue&&c.quiz.questions.some(q=>q.kind==="long_answer"))reject("INVALID_ARGUMENT","Correct-before-continuing requires objective questions; essays need human final assessment");
     if (Buffer.byteLength(JSON.stringify(c.quiz)) > 16 * 1024)
       reject("INVALID_ARGUMENT", "Assessment content exceeds 16 KiB budget");
@@ -1209,6 +1212,7 @@ export class LearningService {
             "INSERT INTO attempts(id,enrollment_id,number,presentation) VALUES(?,?,?,?)",
           )
           .run(id, e.id, n, JSON.stringify(presentation(v)));
+        new QuizRetries(this.db).initialize(this.db.prepare("SELECT * FROM attempts WHERE id=?").get(id),v);
         return { attemptId: id, number: n };
       }
       case "human_check_question": {const {a:at,e}=this.attempt(p,a.attemptId);return new QuestionProgression(this.db).check(at,this.version(e.course_id,e.version),a);}
@@ -1220,6 +1224,7 @@ export class LearningService {
           reject("FORBIDDEN", "Submitted answers are immutable");
         if (!q) reject("INVALID_ARGUMENT", "Invalid question");
         validateAnswer(q!, a.answer);
+        new QuizRetries(this.db).authorizeSave(at,q.id);
         new QuestionProgression(this.db).save(at,v,q.id,a.answer);
         const answers = decode(at.answers);
         answers[q.id] = a.answer;

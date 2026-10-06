@@ -1,3 +1,4 @@
+import {PreviousResponse} from "./previous-response.tsx";
 import {DigestSubscriptions} from "./digest-subscriptions.tsx";
 import {ProviderConnections} from "./provider-connections.tsx";
 import {ProviderContent} from "./provider-catalog.tsx";
@@ -1059,8 +1060,9 @@ function App() {
                 {attempt && (
                   <div>
                     <h3>{translateUI("Assessment · Attempt")}{" "}{attempt.number}</h3>
+                    {attempt.carriedQuestionCount>0&&<p>{attempt.carriedQuestionCount} · {translateUI("Earlier correct responses are retained unchanged; complete the remaining questions and explicitly submit this new attempt.")}</p>}
                     {attempt.questions.map((q: any) => (
-                      <React.Fragment key={attempt.id+q.id}><AssessmentQuestion
+                      <React.Fragment key={attempt.id+q.id}><PreviousResponse q={q} previous={attempt.previousResponses}/><AssessmentQuestion
                         key={attempt.id + q.id}
                         q={q}
                         answer={attempt.answers[q.id]}

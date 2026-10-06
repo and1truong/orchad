@@ -123,6 +123,8 @@ export interface Course {
     passMessage?: string;
     failMessage?: string;
     questions: Question[];
+    showPreviousResponses?: boolean;
+    retryIncorrectOnly?: boolean;
     requireCorrectToContinue?: boolean;
     shuffleQuestions?: boolean;
     shuffleOptions?: boolean;

@@ -1,5 +1,11 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Attempt":"Lượt",
+"Show previous responses in human player":"Hiển thị câu trả lời trước trong giao diện người học",
+"Retry only incorrect objective questions":"Chỉ làm lại câu khách quan trả lời chưa đúng",
+"Incorrect-only retries retain earlier correct responses until you explicitly submit. They cannot use objective progression or essays.":"Lượt làm lại giữ nguyên câu trả lời đúng trước đó cho đến khi bạn chủ động nộp bài. Không kết hợp với tiến trình câu khách quan hay bài viết.",
+"Previous response":"Câu trả lời trước",
+"Earlier correct responses are retained unchanged; complete the remaining questions and explicitly submit this new attempt.":"Giữ nguyên câu trả lời đúng trước đó; hãy hoàn thành các câu còn lại và chủ động nộp lượt làm bài mới.",
 "Interactive quiz preview":"Xem thử câu hỏi tương tác",
 "Practice with this unsaved snapshot. No enrollment, attempt, official score or certificate is created.":"Thực hành với bản nháp chưa lưu này. Không tạo đăng ký học, lượt thi, điểm chính thức hay chứng chỉ.",
 "Restart preview with current draft":"Bắt đầu lại với bản nháp hiện tại",
