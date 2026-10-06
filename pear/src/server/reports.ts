@@ -188,6 +188,16 @@ export class ReportService {
         observedSeconds: row.kind==="award" ? null : Math.floor((measured?.elapsed_ms ?? 0)/1000)};
     });
   }
+  pdfRows(p:Principal,a:any){
+    const live=this.db.prepare("SELECT tenant,role,active,auth_version FROM accounts WHERE id=?").get(p.id) as any;
+    if(!live?.active||live.tenant!==p.tenant||live.role!==p.role||live.auth_version!==p.auth_version)reject("UNAUTHORIZED","Report authority changed");
+    if(!["admin","manager"].includes(p.role))reject("FORBIDDEN","Report export role required");
+    if(!["filtered","all"].includes(a.rows)||!["visible","all"].includes(a.columns)||!/^[a-f0-9]{64}$/.test(a.snapshotHash??""))reject("INVALID_ARGUMENT","Review exact report export scope before PDF download");
+    const spec=this.validate(p,a.spec),scoped=this.rows(p),rows=this.ordered(a.rows==="filtered"?this.filtered(scoped,spec):scoped,spec),columns=a.columns==="visible"?spec.columns:[...reportColumns];
+    this.snapshot(p,rows,spec,a.rows+":"+a.columns,a.snapshotHash);
+    if(rows.length>500)reject("INVALID_ARGUMENT","Report exceeds server PDF row bounds; use CSV or browser print");
+    return {title:spec.title,rows,columns,snapshotHash:a.snapshotHash};
+  }
   ownLedger(p:Principal){
     const live=this.db.prepare("SELECT tenant,active,auth_version FROM accounts WHERE id=?").get(p.id) as any;
     if(!live?.active||live.tenant!==p.tenant||live.auth_version!==p.auth_version)reject("UNAUTHORIZED","Own insight authority changed");

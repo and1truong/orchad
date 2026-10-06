@@ -211,3 +211,7 @@ ADR-063 closes the bounded internal expired/cancelled same-version review renewa
 
 ## #123 authenticated original own-transcript server PDF candidate
 ADR-064: current own-ledger snapshot, bounded multi-page PDF with Latin/Vietnamese trusted font, epoch/owner/no-store checks and guarded real download. Existing CSV/browser-print export remains available. Exact-head CI PENDING. G10 original PDF is implemented but reference layout/production font and unrestricted admin PDF remain NOT VERIFIED/OPEN; G14 accreditation/PDF/A/tagged conformance remains NOT VERIFIED.
+
+
+## #124 scoped original administrator/direct-report server PDF candidate
+ADR-065: the four filtered/all-within-current-access × visible/all columns export modes use the original authoritative report snapshot and current roles/relationship/tenant checks, with CSRF/epoch guarded real downloads. CI PENDING. This closes the bounded internal admin server-download gap; document limits, production font, reference layout/PDF conformance and real delivery remain OPEN/NOT VERIFIED.

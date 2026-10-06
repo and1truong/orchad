@@ -11,6 +11,7 @@ export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
 "Collection offer expiry":"Thời điểm hết hạn đề nghị",
 "Original collection sharing":"Chia sẻ cấu hình chương trình gốc",
 "Incoming original collection offer":"Đề nghị nhận cấu hình gốc",
+"Download original server report PDF":"Tải PDF báo cáo gốc từ máy chủ",
 "Download original server transcript PDF":"Tải PDF bảng ghi học tập gốc từ máy chủ",
 "Cancel assigned quiz restart review":"Hủy đề xuất làm lại quiz được giao",
 "Assigned quiz versions":"Các phiên bản quiz được giao",

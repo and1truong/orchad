@@ -498,6 +498,7 @@ export function Reports(p: Props) {
         {p.administrative && (
           <label>{translateUI("Export rows")}<select
               aria-label={translateUI("Export rows")}
+              disabled={p.busy}
               value={rowMode}
               onChange={(e) => setRowMode(e.target.value as any)}
             >
@@ -508,6 +509,7 @@ export function Reports(p: Props) {
         )}
         <label>{translateUI("Export columns")}<select
             aria-label={translateUI("Export columns")}
+            disabled={p.busy}
             value={columnMode}
             onChange={(e) => setColumnMode(e.target.value as any)}
           >
@@ -534,6 +536,11 @@ export function Reports(p: Props) {
           }
         >{translateUI("Download")}{" "}{p.administrative ? "report" : "transcript"} CSV
         </button>
+        {p.administrative&&p.session&&<button disabled={p.busy||!!loadError} onClick={()=>void p.run(async()=>{
+          current();const reviewed=await p.op("learning_export_report",{spec,rows:rowMode,columns:columnMode,offset:0,limit:1});current();
+          await downloadOriginalPDF("/api/reports/pdf","pear-report.pdf",p.session!,current,{spec,rows:rowMode,columns:columnMode,snapshotHash:reviewed.snapshotHash});
+          current();setNotice("Original server report PDF exported from one authorized ledger snapshot.");
+        })}>{translateUI("Download original server report PDF")}</button>}
         {!p.administrative&&p.session&&<button disabled={p.busy||!!loadError||!snapshot.current} onClick={()=>void p.run(async()=>{
           current();if(!snapshot.current)throw Error("Review current transcript before PDF export");
           await downloadOriginalPDF("/api/transcript/pdf?snapshotHash="+encodeURIComponent(snapshot.current),"pear-transcript.pdf",p.session!,current);

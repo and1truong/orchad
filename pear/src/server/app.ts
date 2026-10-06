@@ -1,3 +1,5 @@
+import {reportPDF} from "./report-pdf.ts";
+import {reportSchema} from "../shared/reports.ts";
 import {transcriptPDF} from "./transcript-pdf.ts";
 import {readFileSync} from "node:fs";
 import {CertificateFont,certificatePDF,certificatePDFSupported} from "./certificate-pdf.ts";
@@ -529,6 +531,14 @@ export async function createApp(opts: {
     } catch (e) {
       return mediaFailure(e, reply);
     }
+  });
+  app.post("/api/reports/pdf",{schema:{body:object({
+    spec:reportSchema,rows:{type:"string",enum:["filtered","all"]},columns:{type:"string",enum:["visible","all"]},snapshotHash:{type:"string",pattern:"^[a-f0-9]{64}$"}
+  })}},async(req,reply)=>{
+    const p=service.principal((req as any).session.principal);
+    if(!certificateFont)throw new DomainError("FORBIDDEN","Server PDF font is not configured; original text and browser print remain available");
+    const bytes=reportPDF(p,service.reports,req.body,certificateFont);
+    return reply.header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Disposition",'attachment; filename="pear-report.pdf"').type("application/pdf").send(bytes);
   });
   app.get("/api/transcript/pdf",async(req,reply)=>{
     const p=service.principal((req as any).session.principal);
