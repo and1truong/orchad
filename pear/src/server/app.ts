@@ -368,6 +368,7 @@ export async function createApp(opts: {
               version: { type: "integer", minimum: 1 },
               enrollmentId: { type: "string", maxLength: 64 },
               lessonId: { type: "string", maxLength: 64 },
+              itemEnrollmentId: { type: "string", minLength: 1, maxLength: 64 },
             },
             [],
           ),

@@ -1,3 +1,4 @@
+import { createApp } from "../src/server/app.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture, data } from "./helpers.ts";
@@ -386,4 +387,35 @@ test("standalone mutations preserve exact CAS/retry, atomic audit rollback and d
     f.db.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("retired tracked interactive item launches through an owner/session-bound opaque sandbox, without changing reading",async()=>{
+ const f=fixture(),origin="http://127.0.0.1:4314",{app}=await createApp({db:f.db,origin,developmentAuth:true});
+ try{
+  const html=Buffer.from("<!doctype html><html><body><p>Original isolated practice</p></body></html>");
+  const asset=f.service.media.upload(f.service.principal("editor"),{
+   filename:"practice.html",mime:"text/html",key:"standalone-html",confirmed:"true",
+   revision:String(f.service.context("editor","library:demo").revision)
+  },html);
+  publish(f,"interactive-item",item("Human practice",{kind:"interactive",assetId:asset.id,transcript:"Original isolated practice transcript"}));
+  const id=enroll(f,"learner-a","interactive-item");
+  data(f.call("editor","learning_retire_content_item",{itemId:"interactive-item"}));
+  const login=async(user:string)=>{
+   const r=await app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4314",origin},payload:{username:user,password:user+"-dev"}});
+   assert.equal(r.statusCode,200);const v=r.json();
+   return {host:"127.0.0.1:4314",origin,cookie:String(r.headers["set-cookie"]).split(";")[0],"x-csrf-token":v.csrf,"x-pear-epoch":v.sessionEpoch};
+  };
+  const headers=await login("learner-a"),payload={assetId:asset.id,context:{itemEnrollmentId:id}};
+  const launch=await app.inject({method:"POST",url:"/api/launch",headers,payload});
+  assert.equal(launch.statusCode,200);
+  const read=await app.inject({url:launch.json().url,headers});
+  assert.equal(read.statusCode,200);assert.ok(read.body.includes("Original isolated practice"));
+  assert.ok(String(read.headers["content-security-policy"]).includes("sandbox allow-scripts"));
+  assert.equal(String(read.headers["content-security-policy"]).includes("allow-same-origin"),false);
+  assert.equal((await app.inject({method:"POST",url:"/api/launch",headers:await login("learner-b"),payload})).statusCode,403);
+  const changed=await login("learner-a");
+  assert.equal((await app.inject({url:launch.json().url,headers:changed})).statusCode,403);
+  assert.equal(get(f,id).status,"in_progress");
+  assert.equal(get(f,id,"learner-a","bridge").item.assetId,undefined);
+ }finally{await app.close();f.db.close();}
 });
