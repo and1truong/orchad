@@ -1,4 +1,11 @@
 import {
+  blendedTools,
+  blendedHumanTools,
+  blendedLibraryWrites,
+  submissionSchema,
+  sessionsSchema,
+} from "./blended.ts";
+import {
   questionSchema,
   answerSchema,
   assessmentTools,
@@ -29,8 +36,12 @@ const lesson = object(
       "audio",
       "document",
       "interactive",
+      "submission",
+      "event",
     ),
     assetId: string(64),
+    submission: submissionSchema,
+    sessions: sessionsSchema,
     url: { type: "string", maxLength: 2048 },
     transcript: { type: "string", maxLength: 2500 },
     prerequisiteIds: array(string(64), 8),
@@ -80,7 +91,10 @@ const courseProperties = {
   provider: string(100),
   aiProcessingAllowed: { type: "boolean" },
   license: enumeration("self-authored"),
-  completionPolicy: enumeration("human_attestation_and_quiz"),
+  completionPolicy: enumeration(
+    "human_attestation_and_quiz",
+    "human_attestation_review_and_quiz",
+  ),
   lessons: array(lesson, 8, 1),
   modules: array(
     object({
@@ -110,6 +124,7 @@ export const courseSchema = object(
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
+  ...blendedLibraryWrites,
   ...assessmentLibraryWrites,
   ...programLibraryWrites,
   ...peopleLibraryWrites,
@@ -305,6 +320,7 @@ const report = tool(
 export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
+    ...blendedTools(role),
     ...assessmentTools(role),
     ...programTools(role),
     ...peopleTools(role),
@@ -324,37 +340,40 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
     ].includes(t.name),
   );
   const domain =
-    group === "learning"
-      ? learnerTools
-      : group === "content"
-        ? [
-            ...learnerTools.filter(
-              (t) => t.name.includes("item") || t.name === "learning_search",
-            ),
-            ...(["admin", "content_admin"].includes(role) ? adminTools : []),
-          ]
-        : group === "assessments"
-          ? assessmentTools(role)
-          : group === "programs"
-            ? programTools(role)
-            : group === "people"
-              ? peopleTools(role)
-              : group === "assignments"
-                ? [
-                    ...assignmentTools(role),
-                    ...(["admin", "manager"].includes(role)
-                      ? [assignment]
-                      : []),
-                  ]
-                : [
-                    ...reportTools(role),
-                    ...(["admin", "manager"].includes(role) ? [report] : []),
-                  ];
+    group === "operations"
+      ? blendedTools(role)
+      : group === "learning"
+        ? learnerTools
+        : group === "content"
+          ? [
+              ...learnerTools.filter(
+                (t) => t.name.includes("item") || t.name === "learning_search",
+              ),
+              ...(["admin", "content_admin"].includes(role) ? adminTools : []),
+            ]
+          : group === "assessments"
+            ? assessmentTools(role)
+            : group === "programs"
+              ? programTools(role)
+              : group === "people"
+                ? peopleTools(role)
+                : group === "assignments"
+                  ? [
+                      ...assignmentTools(role),
+                      ...(["admin", "manager"].includes(role)
+                        ? [assignment]
+                        : []),
+                    ]
+                  : [
+                      ...reportTools(role),
+                      ...(["admin", "manager"].includes(role) ? [report] : []),
+                    ];
   return [...new Map([...common, ...domain].map((t) => [t.name, t])).values()];
 }
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  ...blendedHumanTools,
   ...programHumanTools,
   ...assessmentHumanTools,
   tool(

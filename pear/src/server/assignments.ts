@@ -1,3 +1,4 @@
+import { releaseInactiveBookings } from "./blended.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import { validateArgs } from "@orchard/bridge-contract";
@@ -235,6 +236,7 @@ export class AssignmentService {
               "UPDATE enrollments SET assignment_state=? WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL",
             )
             .run(state, cycle.id, d.learner);
+          releaseInactiveBookings(this.db, p.tenant);
           this.notify(
             p,
             cycle.id,
@@ -766,6 +768,7 @@ export class AssignmentService {
                 "UPDATE enrollments SET assignment_state='cancelled' WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL",
               )
               .run(d.cycle_id, d.learner);
+            releaseInactiveBookings(this.db, p.tenant);
             this.notify(
               p,
               d.cycle_id,

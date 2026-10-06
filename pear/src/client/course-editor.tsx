@@ -1,3 +1,4 @@
+import { LessonSettings, newEventSession } from "./lesson-settings.tsx";
 import { QuestionSettings, ExtendedQuestion } from "./question-editor.tsx";
 import React, { useState } from "react";
 import type { ContentItem, Course, Lesson, Question } from "../shared/model.ts";
@@ -314,6 +315,8 @@ export function CourseEditor({
                           };
                           next.title = content.title;
                           next.kind = content.kind;
+                          delete next.submission;
+                          delete next.sessions;
                           next.text = content.text;
                           delete next.url;
                           delete next.assetId;
@@ -388,22 +391,37 @@ export function CourseEditor({
                           delete next.assetId;
                           delete next.url;
                           delete next.transcript;
+                          delete next.submission;
+                          delete next.sessions;
+                          if (next.kind === "submission")
+                            next.submission = {
+                              rubric: "",
+                              maxAttempts: 2,
+                              passScore: 70,
+                            };
+                          if (next.kind === "event")
+                            next.sessions = [newEventSession()];
                         })
                       }
                     >
                       <option value="text">Text</option>
                       <option value="video">HTTPS video</option>
                       <option value="link">HTTPS link</option>
-                      {l.contentRef &&
-                        ["audio", "document", "interactive"].includes(
-                          l.kind,
-                        ) && (
-                          <option value={l.kind}>
-                            {l.kind} (uploaded item)
-                          </option>
-                        )}
+                      <option value="submission">Assignment submission</option>
+                      <option value="event">Instructor-led event</option>
+                      {["audio", "document", "interactive"].includes(
+                        l.kind,
+                      ) && (
+                        <option value={l.kind}>{l.kind} (uploaded item)</option>
+                      )}
                     </select>
                   </label>
+                  <LessonSettings
+                    lesson={l}
+                    onChange={(patch) =>
+                      updateLesson(l.id, (next) => Object.assign(next, patch))
+                    }
+                  />
                   <label>
                     {overallIndex === 0 ? "First lesson text" : "Lesson text"}
                     <textarea

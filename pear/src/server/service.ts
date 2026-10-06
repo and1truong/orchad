@@ -1,3 +1,4 @@
+import { BlendedService, releaseInactiveBookings } from "./blended.ts";
 import { MediaService } from "./media.ts";
 import {
   AssessmentService,
@@ -57,6 +58,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly blended: BlendedService;
   readonly media: MediaService;
   readonly programs: ProgramService;
   readonly people: PeopleService;
@@ -64,6 +66,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
+    this.blended = new BlendedService(db);
     this.media = new MediaService(db);
     this.programs = new ProgramService(db);
     this.people = new PeopleService(db);
@@ -200,6 +203,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    this.blended.authorize(p, c.toolName, a);
     this.programs.authorize(p, c.toolName, a);
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
@@ -317,6 +321,7 @@ export class LearningService {
           "Workspace changed; refresh before proposing another mutation",
         );
       const data = this.write(p, c.toolName, c.arguments);
+      releaseInactiveBookings(this.db, p.tenant);
       if (c.toolName === "human_submit_attempt")
         this.programs.refreshLearner(p.tenant, p.id);
       if (
@@ -375,12 +380,17 @@ export class LearningService {
                   awardEnrollmentId: c.arguments.awardEnrollmentId,
                   criterionPath: c.arguments.criterionPath,
                 }
-              : ["human_save_answer", "human_assess_answer"].includes(
-                    c.toolName,
-                  )
+              : [
+                    "human_save_answer",
+                    "human_assess_answer",
+                    "human_assess_submission",
+                    "human_mark_attendance",
+                  ].includes(c.toolName)
                 ? {
                     attemptId: c.arguments.attemptId,
                     questionId: c.arguments.questionId,
+                    submissionId: c.arguments.submissionId,
+                    bookingId: c.arguments.bookingId,
                   }
                 : c.toolName === "learning_set_course_assessor"
                   ? {
@@ -595,6 +605,10 @@ export class LearningService {
           bounded: true,
         };
       }
+      case "learning_get_blended_lesson":
+      case "learning_get_blended_queue":
+      case "human_get_submission":
+        return this.blended.read(p, name, a, source);
       case "learning_get_assessment_queue":
       case "human_get_assessment_submission":
         return this.assessments.read(p, name, a, source);
@@ -621,6 +635,8 @@ export class LearningService {
           title: l.title,
           kind: l.kind,
           text: l.text,
+          submission: source === "human" ? (l.submission ?? null) : null,
+          sessions: source === "human" ? (l.sessions ?? null) : null,
           assetId: l.assetId ?? null,
           url: l.url ?? null,
           transcript: l.transcript ?? null,
@@ -760,6 +776,7 @@ export class LearningService {
     p: Principal,
     l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId">,
   ) {
+    if (["submission", "event"].includes(l.kind)) return;
     if (l.assetId) {
       if (l.url)
         reject("INVALID_ARGUMENT", "Choose one immutable asset or HTTPS URL");
@@ -801,6 +818,11 @@ export class LearningService {
     )
       reject("INVALID_ARGUMENT", "Invalid course structure");
     const c = structuredClone(value) as Course;
+    c.completionPolicy = c.lessons.some((l) =>
+      ["submission", "event"].includes(l.kind),
+    )
+      ? "human_attestation_review_and_quiz"
+      : "human_attestation_and_quiz";
     // Server snapshots the explicitly pinned item version. Caller-supplied text,
     // URL or license flags cannot override the authoritative source item.
     for (const l of c.lessons) {
@@ -838,6 +860,7 @@ export class LearningService {
           "Prerequisites must reference distinct earlier lessons",
         );
       prior.add(l.id);
+      this.blended.validate(l);
       this.validateMedia(p, l);
     }
     if (c.modules) {
@@ -929,6 +952,12 @@ export class LearningService {
   ): any {
     const a = args as any;
     switch (name) {
+      case "learning_book_session":
+      case "learning_cancel_booking":
+      case "human_submit_submission":
+      case "human_assess_submission":
+      case "human_mark_attendance":
+        return this.blended.write(p, name, a);
       case "learning_set_course_assessor":
       case "human_assess_answer":
       case "human_reset_assessment":
@@ -1000,6 +1029,11 @@ export class LearningService {
           v = this.version(e.course_id, e.version),
           l = v.lessons.find((l) => l.id === a.lessonId);
         if (!l) reject("NOT_FOUND", "Lesson unavailable");
+        if (["submission", "event"].includes(l.kind))
+          reject(
+            "FORBIDDEN",
+            "Submission or attendance requires an authorized human review",
+          );
         const completed = decode(e.completed_lessons);
         if (requiredLessonIds(v, l).some((id) => !completed.includes(id)))
           reject("FORBIDDEN", "Complete prerequisites first");
@@ -1109,6 +1143,7 @@ export class LearningService {
         const c = this.course(p, a.courseId),
           draft = this.validateCourse(p, decode(c.draft)),
           v = c.latest_version + 1;
+        this.blended.pin(p, a.courseId, draft);
         this.db
           .prepare("INSERT INTO course_versions VALUES(?,?,?)")
           .run(c.id, v, JSON.stringify(draft));

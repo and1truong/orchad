@@ -934,3 +934,35 @@ test("essay details and grading use authenticated human channel and live scoped 
     f.db.close();
   }
 });
+
+test("synthetic login separates valid shared-IP requests from failed guesses without resetting brute-force limits", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  const now = Date.now;
+  let clock = now();
+  Date.now = () => clock;
+  const signin = (password: string) =>
+    app.inject({
+      method: "POST",
+      url: "/api/login",
+      headers: { host: "127.0.0.1:4314", origin },
+      payload: { username: "learner-a", password },
+    });
+  try {
+    for (let i = 0; i < 31; i++)
+      assert.equal((await signin("learner-a-dev")).statusCode, 200);
+    for (let i = 0; i < 29; i++)
+      assert.equal((await signin("wrong")).statusCode, 401);
+    assert.equal((await signin("learner-a-dev")).statusCode, 200);
+    assert.equal((await signin("wrong")).statusCode, 401);
+    const blocked = await signin("learner-a-dev");
+    assert.equal(blocked.statusCode, 429);
+    assert.equal(blocked.headers["retry-after"], "60");
+    clock += 60001;
+    assert.equal((await signin("learner-a-dev")).statusCode, 200);
+  } finally {
+    Date.now = now;
+    await app.close();
+    f.db.close();
+  }
+});

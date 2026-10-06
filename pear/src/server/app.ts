@@ -45,7 +45,10 @@ export async function createApp(opts: {
   const service = new LearningService(opts.db),
     name = opts.secureCookies ? "__Host-pear-session" : "pear-session";
   const launchSecret = randomBytes(32);
-  const loginBudget = new Map<string, { count: number; until: number }>();
+  const loginBudget = new Map<
+    string,
+    { requests: number; failures: number; until: number }
+  >();
   app.addHook("onSend", async (req, reply) => {
     if (req.url.split("?")[0].startsWith("/api/interactive/")) {
       reply
@@ -148,11 +151,17 @@ export async function createApp(opts: {
       let b = loginBudget.get(key);
       if (!b || b.until < now) {
         if (loginBudget.size >= 1024) loginBudget.clear();
-        b = { count: 0, until: now + 60_000 };
+        b = { requests: 0, failures: 0, until: now + 60_000 };
         loginBudget.set(key, b);
       }
-      if (++b.count > 30)
-        return reply.code(429).send(failure("FORBIDDEN", "Login rate limit"));
+      if (++b.requests > 120 || b.failures >= 30)
+        return reply
+          .header(
+            "Retry-After",
+            String(Math.max(1, Math.ceil((b.until - now) / 1000))),
+          )
+          .code(429)
+          .send(failure("FORBIDDEN", "Login rate limit"));
       const { username, password } = req.body as any,
         a = opts.db
           .prepare("SELECT * FROM accounts WHERE id=?")
@@ -161,12 +170,14 @@ export async function createApp(opts: {
       if (
         !a?.active ||
         !timingSafeEqual(candidate, Buffer.from(a.password_hash, "hex"))
-      )
+      ) {
+        b.failures++;
         return reply
           .code(401)
           .send(
             failure("UNAUTHORIZED", "Invalid synthetic account credentials"),
           );
+      }
       if (req.cookies[name])
         opts.db
           .prepare("DELETE FROM sessions WHERE token_hash=?")
@@ -414,6 +425,23 @@ export async function createApp(opts: {
       return reply
         .code(403)
         .send(failure("FORBIDDEN", "Interactive launch denied"));
+    }
+  });
+  app.get("/api/bookings/:id/calendar", async (req, reply) => {
+    try {
+      const text = service.blended.calendar(
+        service.principal((req as any).session.principal),
+        (req.params as any).id,
+      );
+      return reply
+        .header(
+          "Content-Disposition",
+          'attachment; filename="pear-session.ics"',
+        )
+        .type("text/calendar; charset=utf-8")
+        .send(text);
+    } catch (e) {
+      return mediaFailure(e, reply);
     }
   });
   app.get("/api/certificates/:id", async (req, reply) => {

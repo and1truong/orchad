@@ -1,3 +1,4 @@
+import type { EventSession } from "./blended.ts";
 import type {
   Context,
   Description,
@@ -34,10 +35,20 @@ export interface Lesson {
   id: string;
   title: string;
   text: string;
-  kind: "text" | "video" | "link" | "audio" | "document" | "interactive";
+  kind:
+    | "text"
+    | "video"
+    | "link"
+    | "audio"
+    | "document"
+    | "interactive"
+    | "submission"
+    | "event";
   assetId?: string;
   url?: string;
   transcript?: string;
+  submission?: { rubric: string; maxAttempts: number; passScore: number };
+  sessions?: EventSession[];
   prerequisiteIds: string[];
   contentRef?: { itemId: string; version: number };
 }
@@ -82,7 +93,9 @@ export interface Course {
   provider: string;
   aiProcessingAllowed: boolean;
   license: "self-authored";
-  completionPolicy: "human_attestation_and_quiz";
+  completionPolicy:
+    | "human_attestation_and_quiz"
+    | "human_attestation_review_and_quiz";
   lessons: Lesson[];
   modules?: CourseModule[];
   quiz: {

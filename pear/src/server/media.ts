@@ -5,6 +5,7 @@ import { requiredLessonIds } from "../shared/progression.ts";
 import { reject } from "./errors.ts";
 export const uploadLimit = 8 * 1024 * 1024;
 export type MediaContext = {
+  submissionId?: string;
   itemId?: string;
   version?: number;
   enrollmentId?: string;
@@ -33,12 +34,16 @@ export class MediaService {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       const a = this.live(p);
-      if (!["admin", "content_admin"].includes(a.role))
+      const purpose = input?.purpose ?? "content";
+      let context: Record<string, string> = {};
+      if (purpose === "content" && !["admin", "content_admin"].includes(a.role))
         reject("FORBIDDEN", "Content author required");
       if (
         !input ||
         Object.keys(input).sort().join(",") !==
-          "confirmed,filename,key,mime,revision" ||
+          (purpose === "content"
+            ? "confirmed,filename,key,mime,revision"
+            : "confirmed,enrollmentId,filename,key,lessonId,mime,purpose,revision") ||
         input.confirmed !== "true" ||
         typeof input.filename !== "string" ||
         !/^[\p{L}\p{N} _.-]{1,120}$/u.test(input.filename) ||
@@ -49,6 +54,35 @@ export class MediaService {
           "INVALID_ARGUMENT",
           "Invalid upload metadata; confirm self-authored content",
         );
+      if (purpose !== "content") {
+        if (
+          purpose !== "submission" ||
+          typeof input.enrollmentId !== "string" ||
+          input.enrollmentId.length > 128 ||
+          typeof input.lessonId !== "string" ||
+          input.lessonId.length > 64 ||
+          input.mime !== "application/pdf"
+        )
+          reject("INVALID_ARGUMENT", "Assignment upload requires a scoped PDF");
+        const e = this.db
+          .prepare(
+            "SELECT e.*,v.content FROM enrollments e JOIN course_versions v ON v.course_id=e.course_id AND v.version=e.version WHERE e.id=? AND e.tenant=? AND e.learner=?",
+          )
+          .get(input.enrollmentId, p.tenant, p.id) as any;
+        if (!e || e.assignment_state !== "active" || e.status === "completed")
+          reject("FORBIDDEN", "Open own assignment required");
+        const course = JSON.parse(e.content) as Course,
+          l = course.lessons.find((l) => l.id === input.lessonId);
+        if (
+          !l ||
+          l.kind !== "submission" ||
+          requiredLessonIds(course, l).some(
+            (id) => !JSON.parse(e.completed_lessons).includes(id),
+          )
+        )
+          reject("FORBIDDEN", "Submission lesson must be unlocked");
+        context = { enrollmentId: e.id, lessonId: l.id };
+      }
       if (!bytes.length || bytes.length > uploadLimit)
         reject("INVALID_ARGUMENT", "File must contain 1 byte to 8 MiB");
       const mime = input.mime,
@@ -76,7 +110,13 @@ export class MediaService {
         );
       const sha256 = createHash("sha256").update(bytes).digest("hex"),
         payloadHash = createHash("sha256")
-          .update(JSON.stringify([input.filename, mime, sha256]))
+          .update(
+            JSON.stringify(
+              purpose === "content"
+                ? [input.filename, mime, sha256]
+                : [input.filename, mime, sha256, purpose, context],
+            ),
+          )
           .digest("hex");
       const old = this.db
         .prepare("SELECT * FROM assets WHERE owner=? AND operation_key=?")
@@ -87,7 +127,10 @@ export class MediaService {
         this.db.exec("COMMIT");
         return this.metadata(old);
       }
-      const doc = `library:${p.tenant}`,
+      const doc =
+          purpose === "content"
+            ? `library:${p.tenant}`
+            : `learning:${p.tenant}:${p.id}`,
         w = this.db
           .prepare("SELECT revision FROM workspaces WHERE id=?")
           .get(doc) as any;
@@ -103,7 +146,9 @@ export class MediaService {
       const id = randomUUID(),
         now = new Date().toISOString();
       this.db
-        .prepare("INSERT INTO assets VALUES(?,?,?,?,?,?,?,?,?,?)")
+        .prepare(
+          "INSERT INTO assets(id,tenant,owner,filename,mime,sha256,bytes,created_at,operation_key,payload_hash,purpose,context_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        )
         .run(
           id,
           p.tenant,
@@ -115,6 +160,8 @@ export class MediaService {
           now,
           input.key,
           payloadHash,
+          purpose,
+          JSON.stringify(context),
         );
       this.db
         .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
@@ -127,7 +174,9 @@ export class MediaService {
           p.tenant,
           p.id,
           doc,
-          "human_upload_content",
+          purpose === "content"
+            ? "human_upload_content"
+            : "human_upload_submission",
           JSON.stringify({
             assetId: id,
             filename: input.filename,
@@ -148,7 +197,8 @@ export class MediaService {
     const row = this.db
       .prepare("SELECT * FROM assets WHERE id=? AND tenant=?")
       .get(id, p.tenant) as any;
-    if (!row) reject("FORBIDDEN", "Asset unavailable in this tenant");
+    if (!row || row.purpose !== "content")
+      reject("FORBIDDEN", "Asset unavailable in this tenant");
     const allowed: Record<string, string[]> = {
       audio: ["audio/wav", "audio/mpeg"],
       video: ["video/mp4"],
@@ -165,8 +215,30 @@ export class MediaService {
         .prepare("SELECT * FROM assets WHERE id=? AND tenant=?")
         .get(id, p.tenant) as any;
     if (!row) reject("FORBIDDEN", "Asset access denied");
-    if (row.owner === p.id || ["admin", "content_admin"].includes(a.role))
+    if (
+      row.owner === p.id ||
+      (row.purpose === "content" && ["admin", "content_admin"].includes(a.role))
+    )
       return row;
+    if (row.purpose === "submission") {
+      const e = this.db
+        .prepare(
+          "SELECT e.* FROM submissions s JOIN enrollments e ON e.id=s.enrollment_id WHERE s.id=? AND s.asset_id=? AND e.tenant=?",
+        )
+        .get(c.submissionId ?? "", id, p.tenant) as any;
+      if (
+        e &&
+        (a.role === "admin" ||
+          (a.role === "assessor" &&
+            this.db
+              .prepare(
+                "SELECT 1 FROM course_assessors WHERE course_id=? AND assessor_id=?",
+              )
+              .get(e.course_id, p.id)))
+      )
+        return row;
+      reject("FORBIDDEN", "Submission file review scope denied");
+    }
     let content: { assetId?: string } | undefined;
     if (c.itemId && !c.enrollmentId && Number.isInteger(c.version)) {
       const item = this.db

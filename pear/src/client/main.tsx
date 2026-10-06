@@ -1,3 +1,4 @@
+import { BlendedPlayer, BlendedReviews } from "./blended.tsx";
 import { UploadedMedia } from "./media.tsx";
 import { Assessments } from "./assessments.tsx";
 import { AssessmentQuestion, completeResponse } from "./assessment-player.tsx";
@@ -250,6 +251,12 @@ function App() {
     setCatalogTotal(result.total);
     setDraftNext(draftContinuation);
     setMy(learning);
+    setActive((current: any) =>
+      current
+        ? (learning.enrollments.find((e: any) => e.id === current.id) ??
+          current)
+        : null,
+    );
     setDrafts(draftRows);
     setReport(reportRows);
     setAudience(users);
@@ -880,7 +887,7 @@ function App() {
                     <h3>{lesson.title}</h3>
                     <p className="lesson-text">{lesson.text}</p>
                     <UploadedMedia
-                      key={active.id + ":" + lesson.id}
+                      key={"media:" + active.id + ":" + lesson.id}
                       session={session}
                       content={lesson}
                       context={{ enrollmentId: active.id, lessonId: lesson.id }}
@@ -901,14 +908,29 @@ function App() {
                         <p>{lesson.transcript}</p>
                       </details>
                     )}
+                    {["submission", "event"].includes(lesson.kind) && (
+                      <BlendedPlayer
+                        key={"blended:" + active.id + ":" + lesson.id}
+                        session={session}
+                        enrollmentId={active.id}
+                        lesson={lesson}
+                        busy={busy}
+                        tick={tick}
+                        op={op}
+                        mutate={mutate}
+                        run={run}
+                      />
+                    )}
                     <p className="muted">
-                      Completion policy: personal acknowledgement plus a passing
-                      quiz.
+                      {["submission", "event"].includes(lesson.kind)
+                        ? "Completion policy: authorized human review or attendance, followed by a passing quiz."
+                        : "Completion policy: personal acknowledgement plus a passing quiz."}
                     </p>
                     <button
                       disabled={
                         busy ||
                         lesson.completed ||
+                        ["submission", "event"].includes(lesson.kind) ||
                         active.assignment_state !== "active"
                       }
                       onClick={() =>
@@ -927,7 +949,13 @@ function App() {
                 )}
                 <button
                   className="ghost"
-                  disabled={busy || active.assignment_state !== "active"}
+                  disabled={
+                    busy ||
+                    active.assignment_state !== "active" ||
+                    active.course.lessons.some(
+                      (l: any) => !active.completed_lessons.includes(l.id),
+                    )
+                  }
                   onClick={() =>
                     void run(async () => {
                       const r = await mutate("learning_start_attempt", {
@@ -1070,15 +1098,28 @@ function App() {
         )}
         {view === "admin" &&
           ["admin", "content_admin", "assessor"].includes(role) && (
-            <Assessments
-              key={"assessments:" + session.sessionEpoch + view}
-              role={role}
-              tick={tick}
-              busy={busy}
-              op={op}
-              mutate={mutate}
-              run={run}
-            />
+            <>
+              {["admin", "assessor"].includes(role) && (
+                <BlendedReviews
+                  key={"blended:" + session.sessionEpoch + view}
+                  session={session}
+                  busy={busy}
+                  tick={tick}
+                  op={op}
+                  mutate={mutate}
+                  run={run}
+                />
+              )}
+              <Assessments
+                key={"assessments:" + session.sessionEpoch + view}
+                role={role}
+                tick={tick}
+                busy={busy}
+                op={op}
+                mutate={mutate}
+                run={run}
+              />
+            </>
           )}
         {(view === "transcript" ||
           (view === "admin" && ["admin", "manager"].includes(role))) && (

@@ -5,10 +5,12 @@ export function UploadField({
   session,
   kind,
   onUploaded,
+  scope,
 }: {
   session: Session;
   kind: Lesson["kind"];
   onUploaded: (id: string) => void;
+  scope?: { enrollmentId: string; lessonId: string };
 }) {
   const [status, setStatus] = useState(""),
     [uploading, setUploading] = useState(false),
@@ -52,7 +54,9 @@ export function UploadField({
             void (async () => {
               if (!file.size || file.size > 8 * 1024 * 1024)
                 throw new Error("File must contain 1 byte to 8 MiB");
-              const doc = "library:" + session.principal.tenant,
+              const doc = scope
+                  ? `learning:${session.principal.tenant}:${session.principal.id}`
+                  : "library:" + session.principal.tenant,
                 ctx = await request<any>(
                   "/api/context?documentId=" + encodeURIComponent(doc),
                   session,
@@ -65,6 +69,7 @@ export function UploadField({
                 key,
                 revision: String(ctx.revision),
                 confirmed: "true",
+                ...(scope ? { purpose: "submission", ...scope } : {}),
               });
               const r = await fetch("/api/uploads?" + q, {
                 method: "POST",
@@ -100,6 +105,7 @@ export function UploadedMedia({
   session: Session;
   content: { assetId?: string; kind: string; title: string };
   context: {
+    submissionId?: string;
     itemId?: string;
     version?: number;
     enrollmentId?: string;
