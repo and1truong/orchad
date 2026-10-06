@@ -25,6 +25,9 @@ test("human report builder saves owner definition, exports reviewed columns, and
     })
     .getByRole("button", { name: "Enroll", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "Your next steps", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Transcript", exact: true }).click();
   const transcript = page.getByRole("region", {
     name: "Learning transcript",

@@ -404,6 +404,7 @@ function App() {
           ].map(([id, text]) => (
             <button
               key={id}
+              disabled={busy}
               className={view === id ? "selected" : "ghost"}
               onClick={() => {
                 clearLearning();
