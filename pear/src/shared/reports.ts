@@ -76,6 +76,7 @@ export const reportLibraryWrites = [
 ];
 export function reportTools(role: Role): Tool[] {
   return [
+    tool("learning_get_my_insights","read",{offset:integer(100000),limit:integer(20,1),snapshotHash:string(64)},"Read own ledger counts and declared skill-tag exposure with exact-version sources. Completion, intended duration and observed timer totals are separate; no mastery or market benchmark is inferred.",[]),
     tool(
       "learning_get_transcript",
       "read",

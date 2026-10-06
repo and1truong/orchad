@@ -188,6 +188,11 @@ export class ReportService {
         observedSeconds: row.kind==="award" ? null : Math.floor((measured?.elapsed_ms ?? 0)/1000)};
     });
   }
+  ownLedger(p:Principal){
+    const live=this.db.prepare("SELECT tenant,active,auth_version FROM accounts WHERE id=?").get(p.id) as any;
+    if(!live?.active||live.tenant!==p.tenant||live.auth_version!==p.auth_version)reject("UNAUTHORIZED","Own insight authority changed");
+    return this.rows(p,true);
+  }
   private filtered(rows: any[], s: ReportSpec) {
     const q = s.query.normalize("NFKC").toLowerCase();
     return rows.filter(
