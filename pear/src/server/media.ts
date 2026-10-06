@@ -169,7 +169,8 @@ export class MediaService {
           "SELECT COALESCE(SUM(length(bytes)),0) AS total,COUNT(*) AS count FROM assets WHERE tenant=?",
         )
         .get(p.tenant) as any;
-      if (used.total + bytes.length > 128 * 1024 * 1024 || used.count >= 512)
+      const packages=this.db.prepare("SELECT COALESCE(SUM(length(bytes)+length(CAST(html AS BLOB))),0) AS total,COUNT(*) AS count FROM scorm_packages WHERE tenant=?").get(p.tenant) as any;
+      if (Number(used.total)+Number(packages.total)+bytes.length > 128 * 1024 * 1024 || Number(used.count)+Number(packages.count) >= 512)
         reject("INVALID_ARGUMENT", "Tenant upload quota reached");
       const id = randomUUID(),
         now = new Date().toISOString();

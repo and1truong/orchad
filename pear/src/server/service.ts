@@ -1,3 +1,4 @@
+import {SCORMService} from "./scorm.ts";
 import {XAPIService} from "./xapi.ts";
 import {TranslationService} from "./translations.ts";
 import { DiscoveryService } from "./discovery.ts";
@@ -64,6 +65,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly scorm:SCORMService;
   readonly xapi:XAPIService;
   readonly translations:TranslationService;
   readonly discovery: DiscoveryService;
@@ -78,6 +80,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync,origin="http://127.0.0.1:4314") {
+    this.scorm=new SCORMService(db);
     this.xapi=new XAPIService(db,origin);
     this.translations=new TranslationService(db);
     this.discovery = new DiscoveryService(db);
@@ -497,6 +500,8 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="learning_search_packages")return this.scorm.list(p,false,a.offset??0,a.limit??20);
+    if(name==="learning_get_my_package_records"){const value=this.scorm.records(p,a.offset??0,a.limit??20);return {...value,items:value.items.map((r:any)=>({id:r.id,packageId:r.packageId,title:r.title,language:r.language,packageState:r.packageState,revision:r.revision,reportedStatus:r.state["cmi.core.lesson_status"],reportedScore:r.state["cmi.core.score.raw"],reportedSeconds:r.reportedSeconds,updatedAt:r.updatedAt,officialLearningChanged:false}))};}
     if(name==="learning_get_external_activity")return this.xapi.learning(p,a.offset??0,a.limit??20);
     if(name==="learning_get_language_variants")return this.translations.read(p,a.kind,a.sourceId,a.preferredLanguage,source);
     if (["learning_compare_courses","learning_get_recommendations"].includes(name)) return this.discovery.read(p,name,a,source);

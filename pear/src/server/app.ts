@@ -1,3 +1,4 @@
+import {registerSCORM} from "./scorm-routes.ts";
 import {registerXAPI} from "./xapi-routes.ts";
 import {registerTranslations} from "./translations-routes.ts";
 import {OutboxService,type WebhookEndpoint} from "./outbox.ts";
@@ -69,7 +70,7 @@ export async function createApp(opts: {
     { requests: number; failures: number; until: number }
   >();
   app.addHook("onSend", async (req, reply) => {
-    if (req.url.split("?")[0].startsWith("/api/interactive/")) {
+    if ((req.url.split("?")[0].startsWith("/api/interactive/")||req.url.split("?")[0].startsWith("/api/scorm/launch/"))) {
       reply
         .header(
           "Content-Security-Policy",
@@ -131,7 +132,7 @@ export async function createApp(opts: {
       req.url.split("?")[0] !== "/api/session" &&
       !(
         req.method === "GET" &&
-        req.url.split("?")[0].startsWith("/api/interactive/")
+        (req.url.split("?")[0].startsWith("/api/interactive/")||req.url.split("?")[0].startsWith("/api/scorm/launch/"))
       ) &&
       req.headers["x-pear-epoch"] !==
         hash("binding:" + s.token_hash + ":" + s.auth_version)
@@ -539,6 +540,7 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  await registerSCORM(app,service.scorm,opts.origin,!!opts.developmentAuth||!!opts.identityFixture,req=>service.principal(req.session.principal));
   await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
   registerTranslations(app,service.translations,req=>service.principal(req.session.principal));
   registerOutbox(app,outbox,opts.origin,req=>service.principal(req.session.principal));

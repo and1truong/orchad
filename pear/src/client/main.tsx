@@ -1,4 +1,5 @@
 import {ExternalActivity} from "./external-activity.tsx";
+import {PackageLearning} from "./scorm.tsx";
 import {LanguageVariants,TranslationSettings} from "./translations.tsx";
 import {WebhookSettings} from "./webhooks.tsx";
 import {ProvisioningClients} from "./provisioning.tsx";
@@ -408,6 +409,7 @@ function App() {
           {[
             ["catalog", t.catalog],
             ["learning", t.learning],
+            ["packages",translateUI("Imported packages")],
             ["programs", locale === "vi" ? "Chương trình" : "Programs"],
             ["notifications", locale === "vi" ? "Thông báo" : "Notifications"],
             ["transcript", locale === "vi" ? "Bảng học tập" : "Transcript"],
@@ -773,6 +775,7 @@ function App() {
             <button className="ghost" onClick={() => setPreview(null)}>{translateUI("Close preview")}</button>
           </section>
         )}
+        {view==="packages"&&<PackageLearning key={"packages:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view === "learning" && (
           <>
             <ExternalActivity key={"external:"+session.sessionEpoch} session={session} busy={busy} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
@@ -1129,6 +1132,7 @@ function App() {
         )}
         {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<ProvisioningClients key={"provisioning:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
+        {view==="admin"&&canEdit&&<PackageLearning author key={"package-admin:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&canEdit&&<TranslationSettings key={"translations:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<WebhookSettings key={"webhooks:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view === "admin" && canEdit && (
