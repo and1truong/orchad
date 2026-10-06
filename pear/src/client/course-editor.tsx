@@ -651,7 +651,7 @@ export function CourseEditor({
               <legend>{translateUI("Question")}{" "}{qi + 1}</legend>
               <label>
                 {qi === 0 ? "First quiz question" : "Quiz question"}
-                <textarea
+                <textarea aria-label={qi === 0 ? "First quiz question" : "Quiz question"}
                   required
                   maxLength={400}
                   value={q.prompt}
