@@ -39,7 +39,7 @@ export function Discovery(p:Props){
     {text("query","Advanced search keywords")}
     {select("queryMode","Retrieval mode",["keyword","concepts"],false)}
     {text("topic","Exact topic")}{text("provider","Exact provider")}
-    {select("language","Advanced content language",["en","vi"])}{select("level","Advanced level",["beginner","intermediate","advanced"])}
+    {select("language","Discovery language",["en","vi"])}{select("level","Advanced level",["beginner","intermediate","advanced"])}
     {text("minDuration","Minimum intended minutes","number")}{text("maxDuration","Maximum intended minutes","number")}
     <label>Required skills · one per line<textarea aria-label="Required skills · one per line" maxLength={640} value={filters.skills??""}
      onChange={e=>setFilters({...filters,skills:e.target.value})}/></label>

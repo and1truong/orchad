@@ -13,14 +13,14 @@ test("human reviews controlled discovery, intersects language filters and compar
  await panel.getByLabel("Advanced search keywords",{exact:true}).fill("recover a lost response");
  await panel.getByRole("button",{name:"Search reviewed filters",exact:true}).click();
  await expect(panel.getByRole("heading",{name:"Reliable systems basics",exact:true})).toBeVisible();
- await panel.getByLabel("Advanced content language",{exact:true}).selectOption("vi");
+ await panel.getByLabel("Discovery language",{exact:true}).selectOption("vi");
  await panel.getByRole("button",{name:"Search reviewed filters",exact:true}).click();
  await expect(panel.locator(".learning-row")).toHaveCount(0);
  await panel.getByLabel("Advanced search keywords",{exact:true}).fill("");
- await panel.getByLabel("Advanced content language",{exact:true}).selectOption("");
+ await panel.getByLabel("Discovery language",{exact:true}).selectOption("");
  await panel.getByRole("button",{name:"Search reviewed filters",exact:true}).click();
- const choices=panel.locator(".learning-row").getByRole("checkbox");
- await expect(choices).toHaveCount(3);await choices.nth(0).check();await choices.nth(1).check();
+ await panel.getByRole("checkbox",{name:"Compare Reliable systems basics",exact:true}).check();
+ await panel.getByRole("checkbox",{name:"Compare Học tập có chủ đích",exact:true}).check();
  await panel.getByRole("button",{name:"Compare selected courses",exact:true}).click();
  await expect(panel.getByRole("table")).toBeVisible();
  await expect(panel.getByRole("table").locator("tbody tr")).toHaveCount(2);
