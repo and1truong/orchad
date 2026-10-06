@@ -4,7 +4,7 @@ import {SCIMService,SCIMError,userURN,groupURN} from "./scim.ts";
 import {DomainError} from "./errors.ts";
 import {failure} from "@orchard/bridge-contract";
 const messages="urn:ietf:params:scim:api:messages:2.0:",core="urn:ietf:params:scim:schemas:core:2.0:";
-export function registerSCIM(app:FastifyInstance,db:DatabaseSync,origin:string,enabled:boolean,principal:(req:any)=>any){
+export function registerSCIM(app:FastifyInstance,db:DatabaseSync,origin:string,enabled:boolean,principal:(req:any)=>any,catalogEnabled=false){
  const service=new SCIMService(db,origin),host=new URL(origin).host;
  function error(e:any,reply:any){
   const status=e instanceof SCIMError?e.status:e instanceof DomainError?e.code==="UNAUTHORIZED"?401:e.code==="FORBIDDEN"?403:400:500;
@@ -13,11 +13,13 @@ export function registerSCIM(app:FastifyInstance,db:DatabaseSync,origin:string,e
  app.addContentTypeParser("application/scim+json",{parseAs:"string"},(_req,body,done)=>{try{done(null,JSON.parse(String(body)));}catch{const e:any=Error("Invalid SCIM JSON");e.statusCode=400;done(e);}});
  app.get("/api/provisioning-clients",async(req,reply)=>{
   try{const p=principal(req);const query=req.query as any;const offset=Number(query.offset??0);if(!Number.isSafeInteger(offset)||offset<0)throw new SCIMError(400,"Invalid offset");
-   return {...service.credentials.list(p,offset),enabled};
+   return {...service.credentials.list(p,offset),enabled:enabled||catalogEnabled,provisioningEnabled:enabled,catalogEnabled};
   }catch(e){return reply.code(e instanceof DomainError&&e.code==="FORBIDDEN"?403:400).send(failure(e instanceof DomainError?e.code:"INVALID_ARGUMENT",(e as Error).message));}
  });
  app.post("/api/provisioning-clients",async(req,reply)=>{
-  try{if(!enabled)throw new SCIMError(403,"Provisioning is not configured");return service.credentials.mutate(principal(req),req.body);}
+  try{if(!enabled&&!catalogEnabled)throw new SCIMError(403,"Integration credentials are not configured");const body=req.body as any;
+   if(body?.action==="issue"&&Array.isArray(body.scopes)&&body.scopes.some((scope:any)=>typeof scope!=="string"||(scope.startsWith("catalog.")?!catalogEnabled:!enabled)))throw new SCIMError(403,"Requested integration channel is not configured");
+   return service.credentials.mutate(principal(req),req.body);}
   catch(e){return reply.code(e instanceof SCIMError?e.status:e instanceof DomainError?e.code==="FORBIDDEN"?403:e.code==="UNAUTHORIZED"?401:e.code==="STALE_CONTEXT"?409:400:500).send(failure(e instanceof DomainError?e.code:e instanceof SCIMError?"FORBIDDEN":"INTERNAL",e instanceof DomainError||e instanceof SCIMError?(e as Error).message:"Internal credential error"));}
  });
  const guard=async(req:any,reply:any)=>{

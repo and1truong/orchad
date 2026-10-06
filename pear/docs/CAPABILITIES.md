@@ -116,3 +116,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## Provider discovery and human launch extension
 
 #103 adds own live-entitled metadata discovery, model metadata egress gates, separate launch history and a confirmed human-only exact-version 60-second launch with an explicit second-click link. Cookie/auth-version and live rights revalidate the local redirect; external provider session handling is not controlled. Three domain/actual HTTP and one mobile EN/VI browser regression are authored, exact-head CI pending. No official learning or actual commercial provider conformance is inferred. Reviewed configuration/binding UI and actual contract remain open. See ADR-044.
+
+## Reviewed provider settings and channel isolation extension
+
+#104 makes the configured provider disabled until explicit same-owner tenant-admin human review, bound to current auth-version and exact server policy. It adds settings UI, catalog-only credential issuance without enabling SCIM and secure startup configuration. Four domain/actual HTTP and one mobile EN/VI admin/learner browser regression are authored; exact-head CI pending. Actual contracted provider connection/launch/conformance and retention remain BLOCKED/NOT VERIFIED. See ADR-045.

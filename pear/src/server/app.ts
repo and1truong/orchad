@@ -555,7 +555,7 @@ export async function createApp(opts: {
   await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
   registerTranslations(app,service.translations,req=>service.principal(req.session.principal));
   registerOutbox(app,outbox,opts.origin,req=>service.principal(req.session.principal));
-  registerSCIM(app,opts.db,opts.origin,!!opts.scimEnabled,req=>service.principal(req.session.principal));
+  registerSCIM(app,opts.db,opts.origin,!!opts.scimEnabled,req=>service.principal(req.session.principal),!!opts.catalogAdapters?.length);
   app.get("/health", async () => ({ ok: true }));
   app.setErrorHandler((e:any,req,reply)=>{
     if(req.url.startsWith("/scim/"))return reply.code(e.statusCode===413?413:e.statusCode===400?400:500).type("application/scim+json").send({schemas:["urn:ietf:params:scim:api:messages:2.0:Error"],status:String(e.statusCode===413?413:e.statusCode===400?400:500),detail:"Invalid or unavailable provisioning request"});

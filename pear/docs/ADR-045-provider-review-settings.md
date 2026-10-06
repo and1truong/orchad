@@ -1,0 +1,10 @@
+# ADR-045: current human review of configured provider rights
+Epic #49 G02/G03/G04. Extends ADR-043/044.
+
+A configured provider is disabled until its current same-owner tenant administrator explicitly confirms the configured client, license, model metadata permission and launch origin with a bounded review reason. Reviews bind the exact canonical trusted server policy hash and administrator auth-version. Config/rights/origin/client changes, owner changes, expiry, deactivation, role loss or explicit disable withhold both feed/replay and learner reads/launches. A replay of an original approval returns its historical receipt and never reenables a subsequently disabled connection; UI reloads current settings.
+
+Human settings tools are absent from bridge catalogs. Core live ACL/key/CAS/atomic domain+idempotency+audit+revision applies. Review cannot edit the server allowlist, client ID, license or model rights. The review panel displays no credential secret and labels model rights explicitly. Own active reviewed credentials can be revoked even when the connection's channel is disabled.
+
+Credential issuance separately gates configured channels. Catalog-only configuration can issue catalog.read/write while SCIM remains disabled; it cannot issue provisioning/events/xAPI scopes. Provisioning-only configuration cannot issue catalog scopes. New catalog credentials are not automatically bound: an operator must review/update the trusted provider/client config, then an own current administrator reviews it again. `PEAR_CATALOG_ADAPTERS` is an optional trusted server JSON config; no fixture switch is exposed in startup and secure HTTPS cookies are required. Default remains empty and no production config is supplied.
+
+Four domain/actual HTTP and one admin/learner EN/VI mobile browser regression are authored. Earlier provider fixtures explicitly establish synthetic review before feeds; real review paths are tested independently. No licensed partner connection, actual commercial wire protocol or remote session revocation is claimed. Retention/operator deployment and partner contract/account/conformance remain open or blocked.

@@ -11,6 +11,7 @@ import {createApp} from "../src/server/app.ts";
 function setup(path=":memory:",models=true){
  const f=fixture(path),p=f.service.principal("admin"),credentials=new IntegrationCredentials(f.db),issued=credentials.mutate(p,{action:"issue",reason:"Synthetic metadata fixture only",key:randomUUID(),revision:f.service.context("admin","library:demo").revision,name:"Fixture feed",scopes:["catalog.read","catalog.write"],ttlDays:2});
  const policy:ProviderAdapter={id:"fixture-provider",tenant:"demo",clientId:issued.id,licenseUntil:new Date(Date.now()+86400000).toISOString(),metadataForModels:models,launchOrigin:"https://provider-fixture.invalid"},s=new ProviderCatalogService(f.db,[policy]),header="Bearer "+issued.token;
+ s.review(p,{providerId:policy.id,enabled:true,rightsConfirmed:true,reason:"Synthetic reviewed fixture only"});
  const sourceTime=new Date(Date.now()-1000).toISOString();
  const event=(sequence:number,action:string,data:any)=>({profile:"pear-provider-metadata/1",id:randomUUID(),sequence,sourceTime,action,data});
  const metadata={sourceId:"synthetic-item",version:1,title:"Synthetic provider metadata",summary:"No licensed lesson body",language:"en",topic:"Reliability",intendedMinutes:15};
@@ -59,7 +60,7 @@ test("audit failure rolls catalog, entitlement, receipt and revisions back; rest
   assert.throws(()=>f.s.write(f.header,f.policy.id,up));assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM provider_items").get()!.n,0);assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM provider_events").get()!.n,0);assert.equal(f.service.context("learner-a").revision,revision);
   f.db.exec("DROP TRIGGER reject_provider");const result=f.s.write(f.header,f.policy.id,up);
   const policy={...f.policy};f.policy.clientId=randomUUID();assert.deepEqual(f.s.write(f.header,policy.id,up),result);f.db.close();closed=true;
-  const reopened=fixture(join(dir,"store.sqlite"));try{const s=new ProviderCatalogService(reopened.db,[policy]);assert.deepEqual(s.write(f.header,policy.id,up),result);assert.equal(reopened.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,30);}finally{reopened.db.close();}
+  const reopened=fixture(join(dir,"store.sqlite"));try{const s=new ProviderCatalogService(reopened.db,[policy]);assert.deepEqual(s.write(f.header,policy.id,up),result);assert.equal(reopened.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,31);}finally{reopened.db.close();}
  }finally{if(!closed)f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
 test("owner role/client scope/tenant and license bounds gate even replay; invalid grants never consume a sequence",()=>{

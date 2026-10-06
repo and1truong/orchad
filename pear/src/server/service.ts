@@ -528,6 +528,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="human_get_provider_connections")return this.providerCatalog.settings(p);
     if(name==="learning_search_provider_content")return this.providerCatalog.search(p,a,source as "human"|"bridge");
     if(name==="learning_get_provider_item")return this.providerCatalog.item(p,a.providerId,a.sourceId,source as "human"|"bridge");
     if(name==="learning_get_my_provider_launches")return this.providerCatalog.history(p,a.offset??0,source as "human"|"bridge");
@@ -1022,6 +1023,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(name==="human_review_provider_connection")return this.providerCatalog.review(p,a);
     if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);
     if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);
     if(name==="human_retake_completed_course")return new RetakeService(this.db).write(p,a);

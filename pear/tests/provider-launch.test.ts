@@ -11,6 +11,7 @@ import type {Call} from "../src/shared/model.ts";
 function setup(){
  const f=fixture(),credentials=new IntegrationCredentials(f.db),issued=credentials.mutate(f.service.principal("admin"),{action:"issue",name:"Synthetic provider",reason:"No commercial connection",scopes:["catalog.write","catalog.read"],ttlDays:1,key:randomUUID(),revision:0});
  const policy:ProviderAdapter={id:"fixture-provider",tenant:"demo",clientId:issued.id,licenseUntil:new Date(Date.now()+86400000).toISOString(),metadataForModels:false,launchOrigin:"https://provider-fixture.invalid"},service=new LearningService(f.db,undefined,[policy]);
+ data(service.invoke("admin",{requestId:randomUUID(),documentId:"library:demo",toolName:"human_review_provider_connection",arguments:{providerId:policy.id,enabled:true,rightsConfirmed:true,reason:"Synthetic reviewed fixture"},expectedRevision:service.context("admin","library:demo").revision,idempotencyKey:randomUUID()},"human"));
  let sequence=0;const event=(action:string,d:any)=>service.providerCatalog.write("Bearer "+issued.token,policy.id,{profile:"pear-provider-metadata/1",id:randomUUID(),sequence:++sequence,sourceTime:new Date().toISOString(),action,data:d});
  const metadata={sourceId:"synthetic-source",version:1,title:"Synthetic entitled content",summary:"Metadata only, no lesson body",language:"en",topic:"Reliability",intendedMinutes:15};
  event("upsert",metadata);event("grant",{sourceId:metadata.sourceId,learnerId:"learner-a",validUntil:new Date(Date.now()+3600000).toISOString()});

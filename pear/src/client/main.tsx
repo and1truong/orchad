@@ -1,3 +1,4 @@
+import {ProviderConnections} from "./provider-connections.tsx";
 import {ProviderContent} from "./provider-catalog.tsx";
 import {defaultPortal,portalPalettes,type PortalBranding} from "../shared/portal.ts";
 import {PortalSettings} from "./portal.tsx";
@@ -1155,6 +1156,7 @@ function App() {
             )}
           </>
         )}
+        {view==="admin"&&role==="admin"&&<ProviderConnections key={"provider-review:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<PortalSettings key={"portal:"+session.sessionEpoch} value={portal.branding} version={portal.version} busy={busy} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onSaved={branding=>setPortal(previous=>({...previous,branding}))}/>}
         {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<ProvisioningClients key={"provisioning:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}

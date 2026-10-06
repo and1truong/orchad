@@ -26,10 +26,44 @@ export class ProviderCatalogService {
   }));
   this.credentials=new IntegrationCredentials(db);
  }
+ private reviewed(policy:ProviderAdapter,owner:string,authVersion:number){
+  const r=this.db.prepare("SELECT * FROM provider_reviews WHERE tenant=? AND provider=?").get(policy.tenant,policy.id) as any;
+  if(!r?.enabled||r.owner!==owner||r.auth_version!==authVersion||r.policy_hash!==tokenHash(canonical(policy)))reject("FORBIDDEN","Current human-reviewed provider connection required");
+ }
+ private admin(p:Principal){
+  const row=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(p.id,p.tenant) as any;
+  if(!row||row.auth_version!==p.auth_version)reject("UNAUTHORIZED","Current administrator required");
+  if(row.role!=="admin")reject("FORBIDDEN","Tenant administrator required");
+ }
+ private reviewPolicy(p:Principal,a:any){
+  this.admin(p);
+  const policy=this.adapters.find(v=>v.tenant===p.tenant&&v.id===a.providerId);
+  if(!policy)reject("FORBIDDEN","Trusted configured provider required");
+  const client=this.db.prepare("SELECT * FROM integration_clients WHERE id=? AND tenant=? AND owner=?").get(policy!.clientId,p.tenant,p.id) as any;
+  if(!client)reject("FORBIDDEN","Own configured provider client required");
+  if(a.enabled&&(!client.active||client.expires<=Date.now()||client.auth_version!==p.auth_version||!JSON.parse(client.scopes).includes("catalog.write")||Date.parse(policy!.licenseUntil)<=Date.now()))reject("FORBIDDEN","Current own scoped client and license required");
+  return policy!;
+ }
+ settings(p:Principal){
+  this.admin(p);
+  return {items:this.adapters.filter(v=>v.tenant===p.tenant).map(policy=>{
+   const client=this.db.prepare("SELECT id,name,owner,scopes,active,auth_version,expires FROM integration_clients WHERE id=? AND tenant=? AND owner=?").get(policy.clientId,p.tenant,p.id) as any;
+   const review=this.db.prepare("SELECT * FROM provider_reviews WHERE tenant=? AND provider=?").get(p.tenant,policy.id) as any;
+   let enabled=false;try{this.reviewed(policy,p.id,p.auth_version);enabled=!!client?.active&&client.expires>Date.now()&&client.auth_version===p.auth_version&&JSON.parse(client.scopes).includes("catalog.write")&&Date.parse(policy.licenseUntil)>Date.now();}catch{}
+   return {providerId:policy.id,launchOrigin:policy.launchOrigin,licenseUntil:policy.licenseUntil,metadataForModels:policy.metadataForModels,clientId:client?.id??null,clientName:client?.name??null,clientActive:!!client?.active,canEnable:!!client?.active&&client.expires>Date.now()&&client.auth_version===p.auth_version&&JSON.parse(client.scopes).includes("catalog.write")&&Date.parse(policy.licenseUntil)>Date.now(),enabled,reviewedAt:review?.owner===p.id?review.reviewed_at:null};
+  }),configurationRequired:this.adapters.every(v=>v.tenant!==p.tenant)};
+ }
+ review(p:Principal,a:any){
+  const policy=this.reviewPolicy(p,a);
+  if(typeof a.enabled!=="boolean"||a.rightsConfirmed!==true||!text(a.reason,300))reject("INVALID_ARGUMENT","Explicit provider rights confirmation and reason required");
+  this.db.prepare("INSERT INTO provider_reviews VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(tenant,provider) DO UPDATE SET owner=excluded.owner,auth_version=excluded.auth_version,policy_hash=excluded.policy_hash,enabled=excluded.enabled,reason=excluded.reason,reviewed_at=excluded.reviewed_at").run(p.tenant,policy.id,p.id,p.auth_version,tokenHash(canonical(policy)),Number(a.enabled),a.reason,new Date().toISOString());
+  return {providerId:policy.id,enabled:a.enabled,clientId:policy.clientId,officialLearning:false};
+ }
  private connection(header:string|undefined,provider:string,scope:string){
   if(!id.test(provider))reject("INVALID_ARGUMENT","Invalid provider identity");
   const auth=this.credentials.authenticate(header,scope),p=this.adapters.find(v=>v.id===provider&&v.tenant===auth.principal.tenant&&v.clientId===auth.client.id);
   if(!p||Date.parse(p.licenseUntil)<=Date.now())reject("FORBIDDEN","Current reviewed provider license and client binding required");
+  this.reviewed(p!,auth.principal.id,auth.principal.auth_version);
   return {...auth,policy:p!};
  }
  private live(p:Principal,provider:string){
@@ -39,6 +73,7 @@ export class ProviderCatalogService {
   if(!policy||Date.parse(policy.licenseUntil)<=Date.now())reject("FORBIDDEN","Current reviewed provider license required");
   const c=this.db.prepare("SELECT c.*,a.active AS owner_active,a.role,a.auth_version AS current_version FROM integration_clients c JOIN accounts a ON a.id=c.owner AND a.tenant=c.tenant WHERE c.id=? AND c.tenant=?").get(policy!.clientId,p.tenant) as any;
   if(!c||!c.active||c.expires<=Date.now()||!c.owner_active||c.role!=="admin"||c.auth_version!==c.current_version||!JSON.parse(c.scopes).includes("catalog.write"))reject("FORBIDDEN","Reviewed provider connection revoked");
+  this.reviewed(policy!,c.owner,c.current_version);
   return policy!;
  }
  private validate(b:any){
@@ -101,6 +136,8 @@ export class ProviderCatalogService {
   return boundedPage(rows.map(r=>({sequence:r.sequence,eventId:r.event_id,sourceTime:r.source_time,receivedAt:r.received_at,...JSON.parse(r.result)})),offset,20);
  }
  authorize(p:Principal,name:string,a:any,source:"human"|"bridge"="human"){
+  if(name==="human_get_provider_connections")this.admin(p);
+  if(name==="human_review_provider_connection")this.reviewPolicy(p,a);
   if(name==="learning_get_provider_item")this.item(p,a.providerId,a.sourceId,source);
   if(name==="human_open_provider_content"){
    const row=this.item(p,a.providerId,a.sourceId,"human");
