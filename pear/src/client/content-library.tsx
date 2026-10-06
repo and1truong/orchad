@@ -1,3 +1,4 @@
+import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { StudyTimer } from "./study-timer.tsx";
 import { UploadField, UploadedMedia } from "./media.tsx";
 import type { Session } from "./api.ts";
@@ -142,6 +143,7 @@ export function ContentLibrary({
                 onChange={(e) => setItem({ ...item, summary: e.target.value })}
               />
             </label>
+            <DiscoveryMetadataEditor value={item.discovery} onChange={value=>setItem(current=>{if(value)return {...current,discovery:value};const {discovery,...rest}=current;return rest;})} />
             <label>
               Item language
               <select

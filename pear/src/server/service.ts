@@ -1,3 +1,4 @@
+import { DiscoveryService } from "./discovery.ts";
 import { CurationService } from "./curation.ts";
 import { BlendedService, releaseInactiveBookings } from "./blended.ts";
 import { FeedbackService } from "./feedback.ts";
@@ -61,6 +62,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly discovery: DiscoveryService;
   readonly curation: CurationService;
   readonly standalone: StandaloneService;
   readonly feedback: FeedbackService;
@@ -72,6 +74,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
+    this.discovery = new DiscoveryService(db);
     this.curation = new CurationService(db);
     this.standalone = new StandaloneService(db);
     this.feedback = new FeedbackService(db);
@@ -174,8 +177,11 @@ export class LearningService {
     if (!row) reject("NOT_FOUND", "Published content version unavailable");
     return decode(row.content);
   }
-  private itemPreview(row: any, value: ContentItem) {
+  private itemPreview(row: any, value: ContentItem, source="bridge") {
     const { text, url, transcript, ...metadata } = value;
+    if(source==="bridge")delete metadata.assetId;
+    if(source==="bridge" && !value.aiProcessingAllowed && metadata.discovery)
+      metadata.discovery={...metadata.discovery,outcomes:[]};
     return {
       id: row.id,
       state: row.state,
@@ -444,6 +450,7 @@ export class LearningService {
   }
   private preview(row: any, content: Course) {
     const { lessons, quiz, ...metadata } = content;
+    if(!content.aiProcessingAllowed && metadata.discovery)metadata.discovery={...metadata.discovery,outcomes:[]};
     return {
       id: row.id,
       state: row.state,
@@ -484,6 +491,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if (["learning_compare_courses","learning_get_recommendations"].includes(name)) return this.discovery.read(p,name,a,source);
     if (["learning_get_curated_content","learning_get_retirement_alternative","learning_get_curation","learning_preview_retirement"].includes(name)) return this.curation.read(p,name,a);
     if (
       ["learning_get_my_items", "learning_get_item_enrollment"].includes(name)
@@ -526,7 +534,7 @@ export class LearningService {
         if (row.state !== "published")
           reject("NOT_FOUND", "Content item is not available for discovery");
         const item = this.itemVersion(p, row.id, row.latest_version);
-        const preview = this.itemPreview(row, item);
+        const preview = this.itemPreview(row, item, source);
         return source === "bridge" && !item.aiProcessingAllowed
           ? {
               ...preview,
@@ -567,34 +575,7 @@ export class LearningService {
           a.offset ?? 0,
           a.limit ?? 20,
         );
-      case "learning_search": {
-        const candidates = this.db
-          .prepare(
-            "SELECT * FROM courses WHERE tenant=? AND state='published' ORDER BY id",
-          )
-          .all(p.tenant) as any[];
-        const result = candidates
-          .map((c) => this.preview(c, this.version(c.id, c.latest_version)))
-          .filter(
-            (c) =>
-              (!a.query ||
-                (c.title + " " + c.summary + " " + c.topic)
-                  .toLocaleLowerCase()
-                  .includes(a.query.toLocaleLowerCase())) &&
-              (!a.topic || c.topic === a.topic) &&
-              (!a.language || c.language === a.language) &&
-              (!a.level || c.level === a.level) &&
-              (!a.provider || c.provider === a.provider) &&
-              (!a.maxDuration || c.duration <= a.maxDuration),
-          );
-        const offset = a.offset ?? 0,
-          limit = a.limit ?? 10;
-        return {
-          items: result.slice(offset, offset + limit),
-          total: result.length,
-          offset,
-        };
-      }
+      case "learning_search": return this.discovery.search(p,a,source);
       case "learning_get_item": {
         const c = this.course(p, a.courseId);
         if (c.state !== "published")
@@ -604,7 +585,7 @@ export class LearningService {
       case "learning_get_my_learning": {
         const rows = this.db
           .prepare(
-            "SELECT e.*,c.id AS content_id FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.learner=? AND e.tenant=? ORDER BY e.status,COALESCE(e.due_date,'9999'),e.id",
+            "SELECT e.*,c.id AS content_id FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.learner=? AND e.tenant=? ORDER BY CASE WHEN e.completed_at IS NOT NULL THEN 3 WHEN e.assignment_state!='active' THEN 4 WHEN e.due_date IS NOT NULL THEN 0 ELSE 1 END,COALESCE(e.due_date,'9999'),e.id",
           )
           .all(p.id, p.tenant) as any[];
         const page = pageRows(
@@ -667,7 +648,7 @@ export class LearningService {
           text: l.text,
           submission: source === "human" ? (l.submission ?? null) : null,
           sessions: source === "human" ? (l.sessions ?? null) : null,
-          assetId: l.assetId ?? null,
+          assetId: source==="human" ? (l.assetId ?? null) : null,
           url: l.url ?? null,
           transcript: l.transcript ?? null,
           completed: complete.includes(l.id),
@@ -837,8 +818,17 @@ export class LearningService {
     )
       reject("INVALID_ARGUMENT", "Invalid standalone content structure");
     const item = structuredClone(value) as ContentItem;
+    this.validateDiscovery(item.discovery);
     this.validateMedia(p, item);
     return item;
+  }
+  private validateDiscovery(value: any) {
+    if (!value) return;
+    for (const values of [value.skills,value.industries,value.outcomes,value.accessibility.features]) {
+      const cleaned=values.map((v:string)=>v.trim().toLocaleLowerCase());
+      if(cleaned.some((v:string)=>!v)||new Set(cleaned).size!==cleaned.length)
+        reject("INVALID_ARGUMENT","Discovery metadata must have distinct nonblank entries");
+    }
   }
   private validateCourse(p: Principal, value: unknown): Course {
     if (
@@ -848,6 +838,7 @@ export class LearningService {
     )
       reject("INVALID_ARGUMENT", "Invalid course structure");
     const c = structuredClone(value) as Course;
+    this.validateDiscovery(c.discovery);
     c.completionPolicy = c.lessons.some((l) =>
       ["submission", "event"].includes(l.kind),
     )
@@ -1024,6 +1015,7 @@ export class LearningService {
         this.db
           .prepare("INSERT INTO content_item_versions VALUES(?,?,?)")
           .run(row.id, version, JSON.stringify(item));
+        this.db.prepare("INSERT INTO content_publications VALUES(?,'item',?,?,NULL,?,?)").run(p.tenant,row.id,version,row.id,new Date().toISOString());
         this.db
           .prepare(
             "UPDATE content_items SET state='published',latest_version=? WHERE id=?",
@@ -1181,6 +1173,7 @@ export class LearningService {
         this.db
           .prepare("INSERT INTO course_versions VALUES(?,?,?)")
           .run(c.id, v, JSON.stringify(draft));
+        this.db.prepare("INSERT INTO content_publications VALUES(?,'course',?,?,?,NULL,?)").run(p.tenant,c.id,v,c.id,new Date().toISOString());
         this.db
           .prepare(
             "UPDATE courses SET state='published',latest_version=? WHERE id=?",

@@ -1,3 +1,4 @@
+import { discoveryFilters, discoveryMetadataSchema, discoveryTools } from "./discovery.ts";
 import { curationTools, curationLibraryWrites } from "./curation.ts";
 import {
   blendedTools,
@@ -54,6 +55,7 @@ const lesson = object(
 );
 export const itemSchema = object(
   {
+    discovery: discoveryMetadataSchema,
     title: string(160),
     summary: string(600),
     language: enumeration("en", "vi"),
@@ -85,12 +87,13 @@ export const itemSchema = object(
   ],
 );
 const courseProperties = {
+  discovery: discoveryMetadataSchema,
   title: string(160),
   summary: string(600),
   topic: string(80),
   language: enumeration("en", "vi"),
   duration: integer(600, 1),
-  level: enumeration("beginner", "intermediate"),
+  level: enumeration("beginner", "intermediate", "advanced"),
   provider: string(100),
   aiProcessingAllowed: { type: "boolean" },
   license: enumeration("self-authored"),
@@ -123,7 +126,7 @@ const courseProperties = {
 };
 export const courseSchema = object(
   courseProperties,
-  Object.keys(courseProperties).filter((k) => k !== "modules"),
+  Object.keys(courseProperties).filter((k) => !["modules","discovery"].includes(k)),
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
@@ -147,6 +150,7 @@ export const libraryWrites = new Set([
 const id = { courseId: string() };
 const enrollment = { enrollmentId: string() };
 export const learnerTools: Tool[] = [
+  ...discoveryTools,
   tool(
     "learning_search_items",
     "read",
@@ -168,16 +172,9 @@ export const learnerTools: Tool[] = [
     "learning_search",
     "read",
     {
-      query: { type: "string", maxLength: 160 },
-      topic: string(80),
-      language: enumeration("en", "vi"),
-      level: enumeration("beginner", "intermediate"),
-      provider: string(100),
-      maxDuration: integer(600, 1),
-      offset: integer(100000),
-      limit: integer(20, 1),
+      ...discoveryFilters,
     },
-    "Search permitted published courses using keyword and explicit metadata filters. Does not perform semantic search.",
+    "Search permitted published metadata with bounded filters/sort. Optional controlled-concept retrieval is a transparent local rule system, not embedding/LLM semantic parity.",
     [],
   ),
   tool(

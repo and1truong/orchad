@@ -1,3 +1,4 @@
+import type { DiscoveryMetadata } from "./discovery.ts";
 import type { EventSession } from "./blended.ts";
 import type {
   Context,
@@ -53,6 +54,7 @@ export interface Lesson {
   contentRef?: { itemId: string; version: number };
 }
 export interface ContentItem {
+  discovery?: DiscoveryMetadata;
   title: string;
   summary: string;
   language: "en" | "vi";
@@ -84,12 +86,13 @@ export interface Question {
   correct: number;
 }
 export interface Course {
+  discovery?: DiscoveryMetadata;
   title: string;
   summary: string;
   topic: string;
   language: "en" | "vi";
   duration: number;
-  level: "beginner" | "intermediate";
+  level: "beginner" | "intermediate" | "advanced";
   provider: string;
   aiProcessingAllowed: boolean;
   license: "self-authored";

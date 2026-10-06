@@ -1,3 +1,4 @@
+import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { LessonSettings, newEventSession } from "./lesson-settings.tsx";
 import { QuestionSettings, ExtendedQuestion } from "./question-editor.tsx";
 import React, { useState } from "react";
@@ -118,6 +119,7 @@ export function CourseEditor({
       >
         <fieldset disabled={busy}>
           <legend>Course metadata</legend>
+          <DiscoveryMetadataEditor value={course.discovery} onChange={value=>update(c=>{if(value)c.discovery=value;else delete c.discovery;})} />
           <div className="editor">
             <label>
               Course ID
@@ -209,6 +211,7 @@ export function CourseEditor({
               >
                 <option value="beginner">Beginner</option>
                 <option value="intermediate">Intermediate</option>
+                <option value="advanced">Advanced</option>
               </select>
             </label>
             <label>

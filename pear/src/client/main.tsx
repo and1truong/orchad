@@ -1,3 +1,4 @@
+import { Discovery } from "./discovery.tsx";
 import { CurationPanel, CuratedContent } from "./curation.tsx";
 import { StudyTimer } from "./study-timer.tsx";
 import { StandaloneLearning } from "./standalone-learning.tsx";
@@ -503,6 +504,9 @@ function App() {
         {notice && <p role="status">{notice}</p>}
         {view === "catalog" && (
           <>
+            <Discovery key={"discovery:"+session.sessionEpoch} tick={tick} busy={busy} op={op} run={run}
+              isCurrent={()=>sessionRef.current===session && docRef.current===doc}
+              onChoose={id=>void run(async()=>setPreview(await op("learning_get_item",{courseId:id})))} />
             <CuratedContent key={"curated:"+session.sessionEpoch} tick={tick} busy={busy} op={op} mutate={mutate} run={run}
               isCurrent={()=>sessionRef.current===session && docRef.current===doc}
               onChoose={(kind,id)=>void run(async()=>{
