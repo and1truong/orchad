@@ -101,11 +101,13 @@ export function BlendedPlayer(
                   }).format(new Date(s.startsAt))}{" "}
                   · {s.timezone}
                 </p>
+                {s.state==="cancelled"&&<p role="status">{translateUI("Session cancelled")} · {s.changeReason}</p>}
+                {s.sessionRevision>0&&s.state!=="cancelled"&&<p role="status">{translateUI("Session schedule changed")} · {s.changeReason}</p>}
                 <p>
                   {s.location} · {s.available} seats available · Cutoff{" "}
                   {new Date(s.cutoffAt).toISOString()}
                 </p>
-                {s.joinUrl && (
+                {s.joinUrl && s.state!=="cancelled" && (
                   <a href={s.joinUrl} target="_blank" rel="noopener noreferrer">{translateUI("Open session meeting")}</a>
                 )}
               </div>
@@ -132,6 +134,7 @@ export function BlendedPlayer(
           {data?.bookings?.map((b: any) => (
             <div key={b.id}>
               <p>{translateUI("Booking ·")}{" "}{b.state}</p>
+              {b.reason&&<p>{b.reason}</p>}
               {b.state === "booked" && (
                 <>
                   <button
@@ -144,12 +147,10 @@ export function BlendedPlayer(
                       })
                     }
                   >{translateUI("Cancel booking")}</button>
-                  <button
-                    disabled={p.busy}
-                    onClick={() => void p.run(() => calendar(b.id))}
-                  >{translateUI("Download calendar")}</button>
+
                 </>
               )}
+              {["booked","present","cancelled"].includes(b.state)&&<button disabled={p.busy} onClick={()=>void p.run(()=>calendar(b.id))}>{translateUI(b.state==="cancelled"?"Download cancelled calendar":"Download calendar")}</button>}
             </div>
           ))}
         </>

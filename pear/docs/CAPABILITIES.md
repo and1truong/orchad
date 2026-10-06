@@ -73,3 +73,7 @@ Bridge 0.1 remains canonical and byte-identical across applications, with bounde
 ADRs 001–035 record each implementation layer, its bounded profile and remaining limits. In particular: ADR-021/022 identity/provisioning, ADR-023/030 signed events, ADR-024/029 reviewed language identity, ADR-025 xAPI, ADR-026 SCORM, ADR-027 keyboard/reflow evidence, ADR-028 trusted Lime workflows, ADR-031 unpublish, ADR-032 own digest and ADR-033 durable Pear recovery, ADR-034 settings/channel matrix and ADR-035 content audience.
 
 P0 register/architecture and substantial P1/P2 domain layers exist. P3/P4 remain partly implemented, partly blocked and partly unverified. No automatic epic closure, production release or full-parity declaration follows from this register.
+
+## G07 session lifecycle extension
+
+Future sessions support scoped explicit cancellation/rescheduling through human controls and the bounded operations catalog. Existing bookings are cancelled with retained history and own in-app notices; learners explicitly rebook. Attendance and immutable published course versions remain unchanged. Own cancelled calendar records are downloadable; external calendar update/delivery remains NOT VERIFIED. See ADR-036. Exact-head verification is pending.

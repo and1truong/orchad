@@ -262,7 +262,8 @@ export class LearningService {
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
     if (a.courseId && c.toolName !== "learning_create_course") {
       const row=this.course(p,a.courseId);
-      if(["learning_update_course","learning_publish_course","learning_unpublish_course","learning_retire_course","learning_get_course_draft","learning_set_course_assessor"].includes(c.toolName))
+      if(c.toolName==="learning_get_session_changes"){ /* Delegated author/instructor scope checked above. */ }
+      else if(["learning_update_course","learning_publish_course","learning_unpublish_course","learning_retire_course","learning_get_course_draft","learning_set_course_assessor"].includes(c.toolName))
         new ContentAccess(this.db).author(p,"course",row.id,decode(row.draft));
       else if(row.latest_version&&!(c.toolName==="learning_set_bookmark"&&a.saved===false))new ContentAccess(this.db).requireVisible(p,"course",row.id,this.version(row.id,row.latest_version));
     }
@@ -627,6 +628,8 @@ export class LearningService {
           bounded: true,
         };
       }
+      case "learning_get_session_changes":
+      case "learning_get_session_notices":
       case "learning_get_blended_lesson":
       case "learning_get_blended_queue":
       case "human_get_submission":
@@ -1003,6 +1006,8 @@ export class LearningService {
       case "human_submit_submission":
       case "human_assess_submission":
       case "human_mark_attendance":
+      case "learning_change_session":
+      case "learning_read_session_notice":
         return this.blended.write(p, name, a);
       case "learning_set_course_assessor":
       case "human_assess_answer":

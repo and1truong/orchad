@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import type { Principal, Course, Lesson } from "../shared/model.ts";
@@ -29,12 +30,55 @@ export function releaseInactiveBookings(db: DatabaseSync, tenant: string) {
     .all(tenant) as any[];
   for (const row of rows)
     db.prepare(
-      "UPDATE bookings SET state='cancelled',reason='Obligation withdrawn/cancelled or learner inactive' WHERE id=?",
+      "UPDATE bookings SET state='cancelled',reason='Obligation withdrawn/cancelled or learner inactive',cancelled_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),cancellation_session_revision=session_revision+1 WHERE id=?",
     ).run(row.id);
   return rows.length;
 }
 export class BlendedService {
   constructor(readonly db: DatabaseSync) {}
+
+  private manageCourse(p:Principal,id:string){
+    const course=this.db.prepare("SELECT * FROM courses WHERE id=? AND tenant=?").get(id,p.tenant) as any;
+    if(!course)reject("NOT_FOUND","Session course unavailable");
+    if(["admin","content_admin"].includes(p.role))new ContentAccess(this.db).author(p,"course",id,JSON.parse(course.draft));
+    else if(p.role!=="assessor"||!this.db.prepare("SELECT 1 FROM course_assessors WHERE course_id=? AND assessor_id=?").get(id,p.id))reject("FORBIDDEN","Session instructor scope denied");
+    return course;
+  }
+  private managedSession(p:Principal,id:string){
+    const row=this.db.prepare("SELECT * FROM event_sessions WHERE id=? AND tenant=?").get(id,p.tenant) as any;
+    if(!row)reject("NOT_FOUND","Scoped session unavailable");
+    this.manageCourse(p,row.course_id);return row;
+  }
+  private effective(s:EventSession,revision?:number){
+    const row=revision===0?null:revision===undefined?this.db.prepare("SELECT * FROM event_session_changes WHERE session_id=? ORDER BY revision DESC LIMIT 1").get(s.id) as any:this.db.prepare("SELECT * FROM event_session_changes WHERE session_id=? AND revision=?").get(s.id,revision) as any;
+    if(revision&& !row)reject("NOT_FOUND","Session booking history unavailable");
+    return {session:row?JSON.parse(row.definition) as EventSession:s,revision:row?.revision??0,state:row?.kind==="cancel"?"cancelled":"scheduled",reason:row?.reason??null,changedAt:row?.changed_at??null};
+  }
+  private changeSession(p:Principal,a:any){
+    const row=this.managedSession(p,a.sessionId),current=this.effective(JSON.parse(row.definition));
+    if(!a.reason.trim())reject("INVALID_ARGUMENT","Explain the session change");
+    if(Date.now()>=instant(current.session.startsAt))reject("FORBIDDEN","Past or started sessions cannot be changed");
+    if(current.revision>=100)reject("INVALID_ARGUMENT","Session change history limit reached");
+    if(a.action==="cancel"&&(a.session!==undefined||current.state==="cancelled"))reject("INVALID_ARGUMENT","Cancel a scheduled session without a replacement definition");
+    const next=a.action==="reschedule"?a.session:current.session;
+    if(!next||next.id!==row.id)reject("INVALID_ARGUMENT","Reschedule requires the same explicit session identity");
+    this.validate({id:row.lesson_id,title:"Operational session",text:"",kind:"event",prerequisiteIds:[],sessions:[next]});
+    if(a.action==="reschedule"&&(instant(next.startsAt)<=Date.now()||instant(next.cutoffAt)<=Date.now()))reject("INVALID_ARGUMENT","New session and rebooking cutoff must be in the future");
+    const revision=current.revision+1,now=new Date(Date.now()).toISOString();
+    this.db.prepare("INSERT INTO event_session_changes VALUES(?,?,?,?,?,?,?)").run(row.id,revision,a.action,JSON.stringify(next),a.reason.trim(),p.id,now);
+    const bookings=this.db.prepare("SELECT b.*,e.tenant,e.version,e.course_id FROM bookings b JOIN enrollments e ON e.id=b.enrollment_id WHERE b.session_id=? AND b.state='booked' ORDER BY b.id").all(row.id) as any[];
+    if(bookings.length>500)reject("INVALID_ARGUMENT","Session booking population exceeds capacity bounds");
+    const affected=new Set<string>();
+    for(const b of bookings){
+      this.db.prepare("UPDATE bookings SET state='cancelled',reason=?,cancelled_at=?,cancellation_session_revision=? WHERE id=? AND state='booked'").run("Session "+a.action+": "+a.reason.trim(),now,revision,b.id);
+      const course=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(b.course_id,b.version) as any).content),lesson=course.lessons.find((v:any)=>v.id===row.lesson_id);
+      this.db.prepare("INSERT INTO session_notices VALUES(?,?,?,?,?,?,?,?,?,NULL)").run(randomUUID(),b.tenant,b.learner,b.enrollment_id,row.id,revision,a.action,JSON.stringify({courseId:b.course_id,lessonId:row.lesson_id,title:lesson?.title??"Session",sessionId:row.id,sessionRevision:revision,kind:a.action,previousBookingId:b.id,...(a.action==="reschedule"?{startsAt:next.startsAt,timezone:next.timezone}:{}),automaticRebooking:false,officialLearningChanged:false}),now);
+      affected.add(b.learner);
+    }
+    for(const id of affected)this.db.prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?").run("learning:"+p.tenant+":"+id);
+    return {sessionId:row.id,sessionRevision:revision,state:a.action==="cancel"?"cancelled":"scheduled",cancelledBookings:bookings.length,automaticRebooking:false,officialLearningChanged:false};
+  }
+
   validate(lesson: Lesson) {
     if (lesson.kind === "submission") {
       if (
@@ -185,9 +229,12 @@ export class BlendedService {
       ),
       s = result.l.sessions?.find((x) => x.id === row.session_id);
     if (!s) reject("FORBIDDEN", "Pinned session unavailable");
-    return { row, s: s!, ...result };
+    return { row, s: this.effective(s!,row.session_revision).session, ...result };
   }
   authorize(p: Principal, name: string, a: any) {
+    if(name==="learning_change_session")this.managedSession(p,a.sessionId);
+    if(name==="learning_get_session_changes")this.manageCourse(p,a.courseId);
+    if(name==="learning_read_session_notice"&&!this.db.prepare("SELECT 1 FROM session_notices WHERE id=? AND tenant=? AND learner=?").get(a.noticeId,p.tenant,p.id))reject("FORBIDDEN","Own session notice required");
     if (
       [
         "learning_get_blended_lesson",
@@ -224,6 +271,16 @@ export class BlendedService {
       .run(`learning:${e.tenant}:${e.learner}`);
   }
   read(p: Principal, name: string, a: any, source: string) {
+    if(name==="learning_get_session_notices")return boundedPage((this.db.prepare("SELECT id,enrollment_id AS enrollmentId,session_id AS sessionId,session_revision AS sessionRevision,kind,data,created_at AS createdAt,read_at AS readAt FROM session_notices WHERE tenant=? AND learner=? ORDER BY created_at DESC,id").all(p.tenant,p.id) as any[]).map(({data,...r})=>({...r,data:JSON.parse(data)})),a.offset??0,a.limit??20);
+    if(name==="learning_get_session_changes"){
+      this.manageCourse(p,a.courseId);
+      const rows=(this.db.prepare("SELECT * FROM event_sessions WHERE tenant=? AND course_id=? ORDER BY lesson_id,id").all(p.tenant,a.courseId) as any[]).map(row=>{
+        const effective=this.effective(JSON.parse(row.definition)),definition=effective.session;
+        const booked=Number((this.db.prepare("SELECT COUNT(*) AS n FROM bookings WHERE session_id=? AND state='booked'").get(row.id) as any).n);
+        return {courseId:row.course_id,lessonId:row.lesson_id,...effective,session:source==="human"?definition:{id:definition.id,startsAt:definition.startsAt,endsAt:definition.endsAt,cutoffAt:definition.cutoffAt,timezone:definition.timezone,capacity:definition.capacity},booked};
+      });
+      return boundedPage(rows,a.offset??0,a.limit??8);
+    }
     if (name === "human_get_submission") {
       const row = this.db
         .prepare(
@@ -257,7 +314,8 @@ export class BlendedService {
             )
             .all(e.id, l.id),
         };
-      const sessions = l.sessions!.map((s) => {
+      const sessions = l.sessions!.map((original) => {
+        const effective=this.effective(original),s=effective.session;
         const n = this.db
           .prepare(
             "SELECT COUNT(*) AS n FROM bookings WHERE session_id=? AND state IN ('booked','present')",
@@ -275,7 +333,8 @@ export class BlendedService {
                 capacity: s.capacity,
               }),
           available: Math.max(0, s.capacity - n.n),
-          bookingOpen: Date.now() < instant(s.cutoffAt),
+          sessionRevision:effective.revision,state:effective.state,changeReason:effective.reason,changedAt:effective.changedAt,
+          bookingOpen: effective.state==="scheduled" && Date.now() < instant(s.cutoffAt),
         };
       });
       return {
@@ -283,7 +342,7 @@ export class BlendedService {
         sessions,
         bookings: this.db
           .prepare(
-            "SELECT id,session_id AS sessionId,state,booked_at AS bookedAt FROM bookings WHERE enrollment_id=? AND lesson_id=? ORDER BY booked_at",
+            "SELECT id,session_id AS sessionId,state,booked_at AS bookedAt,session_revision AS sessionRevision,reason,cancelled_at AS cancelledAt,cancellation_session_revision AS cancellationSessionRevision FROM bookings WHERE enrollment_id=? AND lesson_id=? ORDER BY booked_at",
           )
           .all(e.id, l.id),
       };
@@ -312,6 +371,13 @@ export class BlendedService {
     reject("UNSUPPORTED", "Unknown learning operation");
   }
   write(p: Principal, name: string, a: any) {
+    if(name==="learning_change_session")return this.changeSession(p,a);
+    if(name==="learning_read_session_notice"){
+      const notice=this.db.prepare("SELECT * FROM session_notices WHERE id=? AND tenant=? AND learner=?").get(a.noticeId,p.tenant,p.id) as any;
+      if(!notice)reject("FORBIDDEN","Own session notice required");
+      if(!notice.read_at)this.db.prepare("UPDATE session_notices SET read_at=? WHERE id=?").run(new Date(Date.now()).toISOString(),notice.id);
+      return {noticeId:notice.id,read:true};
+    }
     if (name === "human_submit_submission") {
       const { e, l } = this.lesson(p, a);
       this.active(e);
@@ -376,8 +442,10 @@ export class BlendedService {
     if (name === "learning_book_session") {
       const { e, l } = this.lesson(p, a);
       this.active(e);
-      const s = l.sessions?.find((s) => s.id === a.sessionId);
-      if (!s) reject("INVALID_ARGUMENT", "Unknown pinned session");
+      const original = l.sessions?.find((s) => s.id === a.sessionId);
+      if (!original) reject("INVALID_ARGUMENT", "Unknown pinned session");
+      const effective=this.effective(original!),s=effective.session;
+      if(effective.state!=="scheduled")reject("FORBIDDEN","Session cancelled; choose an available session explicitly");
       if (Date.now() >= instant(s!.cutoffAt))
         reject("FORBIDDEN", "Booking cutoff has passed");
       const previous = this.db
@@ -410,10 +478,10 @@ export class BlendedService {
       const id = randomUUID();
       this.db
         .prepare(
-          "INSERT INTO bookings(id,enrollment_id,lesson_id,session_id,learner,state,booked_at) VALUES(?,?,?,?,?,'booked',?)",
+          "INSERT INTO bookings(id,enrollment_id,lesson_id,session_id,learner,state,booked_at,session_revision) VALUES(?,?,?,?,?,'booked',?,?)",
         )
-        .run(id, e.id, l.id, s!.id, p.id, new Date().toISOString());
-      return { bookingId: id, sessionId: s!.id, state: "booked" };
+        .run(id, e.id, l.id, s!.id, p.id, new Date().toISOString(),effective.revision);
+      return { bookingId: id, sessionId: s!.id, sessionRevision:effective.revision, state: "booked" };
     }
     if (name === "learning_cancel_booking") {
       const { row, e, s } = this.booking(p, a.bookingId);
@@ -424,8 +492,8 @@ export class BlendedService {
           "Only upcoming unassessed booking can be cancelled",
         );
       this.db
-        .prepare("UPDATE bookings SET state='cancelled' WHERE id=?")
-        .run(row.id);
+        .prepare("UPDATE bookings SET state='cancelled',cancelled_at=?,cancellation_session_revision=? WHERE id=?")
+        .run(new Date(Date.now()).toISOString(),row.session_revision+1,row.id);
       return { bookingId: row.id, state: "cancelled" };
     }
     if (name === "human_mark_attendance") {
@@ -466,9 +534,10 @@ export class BlendedService {
   }
   calendar(p: Principal, id: string) {
     const { row, s, l, e } = this.booking(p, id);
-    if (e.assignment_state !== "active" && e.status !== "completed")
+    const cancellation=row.state==="cancelled"&&!!row.cancelled_at;
+    if (e.assignment_state !== "active" && e.status !== "completed" && !cancellation)
       reject("FORBIDDEN", "Calendar obligation is no longer active");
-    if (row.state !== "booked" && row.state !== "present")
+    if (row.state !== "booked" && row.state !== "present" && !cancellation)
       reject("FORBIDDEN", "Active booking required");
     const esc = (x: string) =>
       x
@@ -502,7 +571,9 @@ export class BlendedService {
       "PRODID:-//Orchard//Pear//EN",
       "BEGIN:VEVENT",
       "UID:" + row.id + "@pear",
-      "DTSTAMP:" + date(row.booked_at),
+      "DTSTAMP:" + date(cancellation?row.cancelled_at:row.booked_at),
+      "SEQUENCE:"+String(cancellation?row.cancellation_session_revision??row.session_revision+1:row.session_revision),
+      "STATUS:"+(cancellation?"CANCELLED":"CONFIRMED"),
       "DTSTART:" + date(s.startsAt),
       "DTEND:" + date(s.endsAt),
       "SUMMARY:" + esc(l.title),

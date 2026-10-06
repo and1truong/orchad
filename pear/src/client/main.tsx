@@ -1,3 +1,4 @@
+import {SessionManagement,SessionNotices} from "./session-changes.tsx";
 import {LearningDigest} from "./digest.tsx";
 import {ExternalActivity} from "./external-activity.tsx";
 import {PackageLearning} from "./scorm.tsx";
@@ -1159,6 +1160,7 @@ function App() {
         {view === "admin" &&
           ["admin", "content_admin", "assessor"].includes(role) && (
             <>
+              <SessionManagement key={"session-management:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
               {["admin", "assessor"].includes(role) && (
                 <BlendedReviews
                   key={"blended:" + session.sessionEpoch + view}
@@ -1196,6 +1198,7 @@ function App() {
             }
           />
         )}
+        {view==="notifications"&&<SessionNotices key={"session-notices:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {(view === "notifications" ||
           (view === "admin" && ["admin", "manager"].includes(role))) && (
           <Assignments

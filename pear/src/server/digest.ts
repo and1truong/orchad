@@ -27,7 +27,7 @@ export class DigestService{
   const candidates=recommended.items.filter((x:any)=>x.duration<=minutes);
   const steps=items.slice(0,limit);
   for(const c of candidates){if(steps.length===limit)break;steps.push({kind:"recommendation",id:c.id,version:c.version,title:c.title,source:"declared_preferences",intendedMinutes:c.duration,remainingMinutes:null,fitsWholeContentBudget:true,action:"preview_course",reason:c.reasons.join("; "),dueAt:null,dueLocal:null,overdue:false});}
-  const unread=this.db.prepare("SELECT COUNT(*) AS n FROM learning_notifications WHERE learner=? AND tenant=? AND read_at IS NULL").get(p.id,p.tenant)!.n;
+  const unread=this.db.prepare("SELECT (SELECT COUNT(*) FROM learning_notifications WHERE learner=? AND tenant=? AND read_at IS NULL)+(SELECT COUNT(*) FROM session_notices WHERE learner=? AND tenant=? AND read_at IS NULL) AS n").get(p.id,p.tenant,p.id,p.tenant)!.n;
   return {generatedAt,timeZone,budgetMinutes:minutes,preferredLanguage:profile?.preferred_language??"en",items:steps,morePending:items.length>limit||courses.length===6||awards.length===6,unreadNotificationCount:unread,noMatchReason:steps.length?null:"No active learning or budget-fitting match among the first ten declared-preference recommendations.",policy:"On-demand own learner metadata only. Intended duration is not remaining time, observed study or mastery. No automated delivery, scheduling, enrollment, acknowledgment, completion or official grading.",recommendationWindow:10};
  }
 }

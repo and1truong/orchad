@@ -15,34 +15,20 @@ export const submissionSchema = object({
   maxAttempts: integer(10, 1),
   passScore: integer(100, 1),
 });
-export const sessionsSchema = array(
-  object(
-    {
-      id: string(64),
-      startsAt: string(40),
-      endsAt: string(40),
-      cutoffAt: string(40),
-      timezone: string(80),
-      capacity: integer(500, 1),
-      location: string(200),
-      joinUrl: string(2048),
-    },
-    [
-      "id",
-      "startsAt",
-      "endsAt",
-      "cutoffAt",
-      "timezone",
-      "capacity",
-      "location",
-    ],
-  ),
-  8,
-  1,
+export const sessionSchema = object(
+ {id:string(64),startsAt:string(40),endsAt:string(40),cutoffAt:string(40),timezone:string(80),capacity:integer(500,1),location:string(200),joinUrl:string(2048)},
+ ["id","startsAt","endsAt","cutoffAt","timezone","capacity","location"],
 );
+export const sessionsSchema=array(sessionSchema,8,1);
 const scope = { enrollmentId: string(128), lessonId: string(64) };
 export function blendedTools(role: Role) {
   return [
+    tool("learning_get_session_notices","read",{offset:integer(100000),limit:integer(20,1)},"Read only own persisted session change facts; not external delivery.",[]),
+    tool("learning_read_session_notice","write",{noticeId:string(128)},"Mark one own in-app session change notice read; never book or complete learning."),
+    ...(["admin","content_admin","assessor"].includes(role)?[
+      tool("learning_get_session_changes","read",{courseId:string(64),offset:integer(100000),limit:integer(8,1)},"Read bounded current operational session states in author/instructor scope; immutable course versions are retained.",["courseId"]),
+      tool("learning_change_session","destructive",{sessionId:string(64),action:{type:"string",enum:["cancel","reschedule"]},reason:string(300),session:sessionSchema},"Explicitly cancel or reschedule a future scoped session, cancelling existing bookings with private notices. Learners must rebook; no attendance or credit is supplied.",["sessionId","action","reason"]),
+    ]:[]),
     tool(
       "learning_get_blended_lesson",
       "read",
@@ -109,6 +95,7 @@ export const blendedHumanTools = [
   ),
 ];
 export const blendedLibraryWrites = new Set([
+  "learning_change_session",
   "human_assess_submission",
   "human_mark_attendance",
 ]);
