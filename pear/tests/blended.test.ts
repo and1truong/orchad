@@ -785,7 +785,7 @@ test("deactivation or withdrawn obligations release unassessed seats without rew
     assert.match(cancelled,/STATUS:CANCELLED/);
     assert.match(cancelled,new RegExp("UID:"+second.bookingId+"@pear"));
     assert.throws(()=>f.service.blended.calendar(f.service.principal("editor"),second.bookingId),/scope denied/);
-    assert.throws(()=>f.service.principal("learner-a"),/inactive/);
+    assert.throws(()=>f.service.principal("learner-a"),/Active account required/);
   } finally {
     Date.now = now;
     f.db.close();
