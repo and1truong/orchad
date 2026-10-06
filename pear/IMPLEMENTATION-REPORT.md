@@ -45,3 +45,9 @@ P2–P4 are not silently reduced or marked complete. Exact reference/legacy/comm
 Additive migration 003, immutable playlists/awards, required/elective alternatives, credits/hours/target, nested/ongoing policies, learner-confirmed evidence, scoped assessor moderation and synthetic award certificates. See ADR-003 and program domain/browser tests. Program-layer tests and runtime results below apply to this head, independently of parent CI.
 
 Program head observed: typecheck/build PASS; domain/HTTP 30 tests PASS; HostPolicy/HTTP 3 tests PASS; production-browser 6 journeys PASS; built shared-Pi browser-host 1 journey PASS. Development program journey PASS (the earlier exact-label test selector was corrected to the accessible combobox role). Parent PR #60 acceptance CI run 37446089489 completed successfully, including strict unpacked Lime; new head requires its own CI result. Synthetic loopback accounts only.
+
+## People layer — stacked on PR #61
+
+Additive migration 004, user lifecycle/profile/custom fields and session revocation/history, own language/interests, reviewed atomic CSV import with row errors and stale-review protection, formula-safe all-page CSV export and static/dynamic ALL/ANY/custom/date groups with active/direct-report preview. Program parent acceptance run 37450632989 passed all eight jobs, including Pear strict unpacked Lime. See ADR-004 and people/domain/HTTP/browser evidence; other capability gaps remain open.
+
+People head observed: independent typecheck/build PASS; SQLite/domain/HTTP 36 tests PASS; host typecheck and HostPolicy/HTTP 3 tests PASS; production browser 7 journeys PASS; built shared-Pi browser host 1 journey PASS. Human tests include CSV download, custom group preview/save, own interests/language after reload and manager isolation. Tests found and fixed duplicate sibling React keys, mobile CSV-header wrapping, initial profile hydration and stable textarea labels. New head still requires its own strict-extension CI.

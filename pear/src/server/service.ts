@@ -41,12 +41,15 @@ const callSchema = object({
   },
 });
 import { DomainError, reject, boundedPage as pageRows } from "./errors.ts";
+import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
   readonly programs: ProgramService;
+  readonly people: PeopleService;
   constructor(readonly db: DatabaseSync) {
     this.programs = new ProgramService(db);
+    this.people = new PeopleService(db);
   }
   principal(id: string): Principal {
     const p = this.db
@@ -169,6 +172,7 @@ export class LearningService {
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
     this.programs.authorize(p, c.toolName, a);
+    this.people.authorize(p, c.toolName, a);
     if (a.enrollmentId) this.enrollment(p, a.enrollmentId);
     if (a.attemptId) this.attempt(p, a.attemptId);
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
@@ -278,21 +282,29 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "human_submit_external_record"
-          ? {
-              awardEnrollmentId: c.arguments.awardEnrollmentId,
-              criterionPath: c.arguments.criterionPath,
-            }
-          : c.toolName === "human_save_answer"
+        c.toolName === "learning_import_users"
+          ? { previewHash: c.arguments.previewHash }
+          : c.toolName === "learning_save_user"
             ? {
-                attemptId: c.arguments.attemptId,
-                questionId: c.arguments.questionId,
+                userId: (c.arguments.user as any).id,
+                role: (c.arguments.user as any).role,
+                active: (c.arguments.user as any).active,
               }
-            : c.toolName.includes("content_item")
-              ? { itemId: c.arguments.itemId }
-              : c.toolName.includes("course")
-                ? { courseId: c.arguments.courseId }
-                : c.arguments;
+            : c.toolName === "human_submit_external_record"
+              ? {
+                  awardEnrollmentId: c.arguments.awardEnrollmentId,
+                  criterionPath: c.arguments.criterionPath,
+                }
+              : c.toolName === "human_save_answer"
+                ? {
+                    attemptId: c.arguments.attemptId,
+                    questionId: c.arguments.questionId,
+                  }
+                : c.toolName.includes("content_item")
+                  ? { itemId: c.arguments.itemId }
+                  : c.toolName.includes("course")
+                    ? { courseId: c.arguments.courseId }
+                    : c.arguments;
       this.db
         .prepare(
           "INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)",
@@ -608,7 +620,17 @@ export class LearningService {
         };
       }
       default:
-        return this.programs.read(p, name, args, source);
+        return name.includes("profile") ||
+          [
+            "learning_list_users",
+            "learning_list_groups",
+            "learning_get_group",
+            "learning_preview_group",
+            "learning_preview_user_import",
+            "learning_export_users",
+          ].includes(name)
+          ? this.people.read(p, name, args)
+          : this.programs.read(p, name, args, source);
     }
   }
   private validateMedia(l: Pick<Lesson, "kind" | "url" | "transcript">) {
@@ -993,7 +1015,14 @@ export class LearningService {
         return this.enroll(p, a.courseId, a.learnerId, p.id, a.dueDate);
       }
       default:
-        return this.programs.write(p, name, args);
+        return [
+          "learning_save_profile",
+          "learning_save_user",
+          "learning_import_users",
+          "learning_save_group",
+        ].includes(name)
+          ? this.people.write(p, name, args)
+          : this.programs.write(p, name, args);
     }
   }
   certificate(id: string, certificateId: string) {

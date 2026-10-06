@@ -3,8 +3,8 @@ import { openDatabase } from "../src/server/database.ts";
 import { LearningService } from "../src/server/service.ts";
 import type { Call, Result } from "../src/shared/model.ts";
 import { libraryWrites } from "../src/shared/catalog.ts";
-export function fixture() {
-  const db = openDatabase(":memory:", true),
+export function fixture(path = ":memory:") {
+  const db = openDatabase(path, true),
     service = new LearningService(db);
   function call(
     user: string,

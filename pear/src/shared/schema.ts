@@ -1,7 +1,7 @@
 import type { Tool } from "./model.ts";
-export const string = (maxLength = 128) => ({
+export const string = (maxLength = 128, minLength = 1) => ({
   type: "string",
-  minLength: 1,
+  minLength,
   maxLength,
 });
 export const integer = (maximum: number, minimum = 0) => ({

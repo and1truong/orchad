@@ -476,3 +476,89 @@ test("program evidence and certificate HTTP routes preserve learner and assessor
     f.db.close();
   }
 });
+
+test("admin user deactivation through HTTP revokes a live session and keeps learner ledger private", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  try {
+    const learner = await login(app),
+      admin = await login(app, "admin");
+    data(
+      f.call("learner-a", "learning_enroll", { courseId: "systems-basics" }),
+    );
+    const saved = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: admin.headers,
+      payload: {
+        requestId: "deactivate",
+        documentId: "library:demo",
+        toolName: "learning_save_user",
+        arguments: {
+          user: {
+            id: "learner-a",
+            name: "learner-a",
+            role: "learner",
+            active: false,
+            managerId: "manager",
+            preferredLanguage: "en",
+            interests: [],
+            customFields: [],
+          },
+        },
+        expectedRevision: f.service.context("admin", "library:demo").revision,
+        idempotencyKey: "deactivate-http",
+      },
+    });
+    assert.equal(saved.statusCode, 200);
+    assert.equal(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/session",
+          headers: learner.headers,
+        })
+      ).statusCode,
+      401,
+    );
+    assert.equal(
+      (
+        f.db
+          .prepare(
+            "SELECT COUNT(*) n FROM enrollments WHERE learner='learner-a'",
+          )
+          .get() as any
+      ).n,
+      1,
+    );
+    const manager = await login(app, "manager");
+    const denied = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: manager.headers,
+      payload: {
+        requestId: "denied",
+        documentId: "library:demo",
+        toolName: "learning_save_user",
+        arguments: {
+          user: {
+            id: "outsider",
+            name: "hidden",
+            role: "admin",
+            active: true,
+            managerId: null,
+            preferredLanguage: "en",
+            interests: [],
+            customFields: [],
+          },
+        },
+        expectedRevision: f.service.context("manager", "library:demo").revision,
+        idempotencyKey: "not-authorized",
+      },
+    });
+    assert.equal(denied.statusCode, 403);
+  } finally {
+    await app.close();
+    f.db.close();
+  }
+});

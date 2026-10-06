@@ -12,6 +12,7 @@ import {
   type ContentDraft,
 } from "./content-library.tsx";
 import "./style.css";
+import { People } from "./people.tsx";
 import { Programs } from "./programs.tsx";
 const labels = {
   en: {
@@ -141,6 +142,7 @@ function App() {
     };
   }, [session]);
   const run = async (fn: () => Promise<void>) => {
+    const capturedSession = sessionRef.current;
     setBusy(true);
     setError("");
     setNotice("");
@@ -148,6 +150,12 @@ function App() {
       await fn();
       return true;
     } catch (e) {
+      if (
+        sessionRef.current === capturedSession &&
+        e instanceof Error &&
+        e.message.startsWith("UNAUTHORIZED:")
+      )
+        setSession(null);
       setError(e instanceof Error ? e.message : String(e));
       return false;
     } finally {
@@ -161,7 +169,17 @@ function App() {
     documentId = doc,
   ) => {
     if (!session) throw new Error("Sign in required");
-    return (await invoke(session, documentId, name, args, write)).data as any;
+    try {
+      return (await invoke(session, documentId, name, args, write)).data as any;
+    } catch (e) {
+      if (
+        sessionRef.current === session &&
+        e instanceof Error &&
+        e.message.startsWith("UNAUTHORIZED:")
+      )
+        setSession(null);
+      throw e;
+    }
   };
   const refresh = async () => {
     if (!session) return;
@@ -351,6 +369,10 @@ function App() {
             ["catalog", t.catalog],
             ["learning", t.learning],
             ["programs", locale === "vi" ? "Chương trình" : "Programs"],
+            [
+              "profile",
+              locale === "vi" ? "Sở thích học" : "Learning preferences",
+            ],
             ...(canAdmin ? [["admin", t.admin]] : []),
           ].map(([id, text]) => (
             <button
@@ -970,9 +992,25 @@ function App() {
             )}
           </>
         )}
+        {(view === "profile" ||
+          (view === "admin" && ["admin", "manager"].includes(role))) && (
+          <People
+            key={"people:" + session.sessionEpoch + view}
+            role={role}
+            administrative={view === "admin"}
+            tick={tick}
+            busy={busy}
+            op={op}
+            mutate={mutate}
+            saveProfile={(args) =>
+              mutate("learning_save_profile", args, personal(session))
+            }
+            run={run}
+          />
+        )}
         {["programs", "admin"].includes(view) && (
           <Programs
-            key={session.sessionEpoch + view}
+            key={"programs:" + session.sessionEpoch + view}
             role={role}
             administrative={view === "admin"}
             tick={tick}

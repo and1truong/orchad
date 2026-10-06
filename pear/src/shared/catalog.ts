@@ -1,3 +1,4 @@
+import { peopleTools, peopleLibraryWrites } from "./people.ts";
 import { type Tool, type Role } from "./model.ts";
 import { string, integer, array, enumeration, object, tool } from "./schema.ts";
 export { object } from "./schema.ts";
@@ -84,6 +85,7 @@ export const courseSchema = object(
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
   ...programLibraryWrites,
+  ...peopleLibraryWrites,
   "learning_create_course",
   "learning_update_course",
   "learning_publish_course",
@@ -275,6 +277,7 @@ export function catalog(role: Role): Tool[] {
   return [
     ...learnerTools,
     ...programTools(role),
+    ...peopleTools(role),
     ...(["admin", "content_admin"].includes(role) ? adminTools : []),
     ...(["admin", "manager"].includes(role) ? [assignment, report] : []),
   ];

@@ -491,3 +491,10 @@ footer {
     min-width: 130px;
   }
 }
+
+.people p {
+  overflow-wrap: anywhere;
+}
+.people button {
+  max-width: 100%;
+}

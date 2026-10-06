@@ -58,3 +58,5 @@ Real browser screenshots, synthetic content only:
 The authoring layer targets codex/pear-lms-49 ([PR #59](https://github.com/and1truong/orchad/pull/59)), not main. Its PR diff contains only the next layer. Review/merge the foundational PR first; retarget/rebase dependent branches while preserving their incremental diffs. Epic #49 remains open until all parity capabilities and dependencies are resolved.
 
 The program layer branches from codex/pear-authoring-49 (PR #60), continuing the stack. Human-only external evidence confirmation is absent from the agent catalog. Ongoing awards do not auto-complete; required rules and targets are independently enforced.
+
+People and groups: Administration provides authorized roster, user lifecycle/custom fields, CSV dry-run/import/export and static/dynamic ALL/ANY/date group preview/save. Managers preview only direct reports. Learning preferences lets each user save their own interests/language. See [people ADR](docs/ADR-004-PEOPLE-GROUPS.md). This layer branches from codex/pear-programs-49 (PR #61).
