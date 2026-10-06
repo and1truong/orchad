@@ -441,3 +441,39 @@ test("dispatch that throws mid-flight lands ambiguous, never retried", async () 
   await runner.close();
   await gw.close();
 });
+
+test("'applied' verdict with no result resolves the op — strict-JSON safe", async () => {
+  const h = host();
+  const { gw, db, runner } = await running([
+    { toolCalls: [incrCall()], usage: { input: 10, output: 5 } },
+    { content: "Done.", usage: { input: 20, output: 5 } },
+  ]);
+  // NOT idempotent → replay 'unsafe' → the tool task is never re-executed.
+  const hung = hangable();
+  await runner.bind([binding(h, false)], async (envelope) => hung.dispatch(envelope));
+  await runner.submit({ prompt: "Increment", requestId: "req-verdict" });
+  const dispatched = await until(
+    runner.status,
+    (s) => s.ops[0]?.status === "dispatched",
+    "dispatched",
+  );
+  // Simulate process death so a second owner may open the same DB.
+  rmSync(`${db}.owner`, { force: true });
+  const r2 = await openRunner({ storagePath: db });
+  await r2.configure({ baseUrl: gw.baseUrl, token: gw.token, model: MODEL });
+  await r2.resume();
+  const status = await until(
+    r2.reconcile.bind(r2),
+    (s) => s.ops[0]?.status === "ambiguous" || s.ops[0]?.status === "interrupted",
+    "reconcile",
+  );
+  assert.equal(status.phase, "needs_reconciliation");
+  // UI sends verdict {status:'reconciled'} with no result — must not throw.
+  await r2.resolveOp(dispatched.ops[0].opId, { status: "reconciled" });
+  const final = await r2.status();
+  assert.equal(final.ops[0].status, "reconciled");
+  await r2.close();
+  hung.releaseAll();
+  await runner.close();
+  await gw.close();
+});
