@@ -2,7 +2,7 @@ import {createHash,randomBytes,randomUUID} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
 import {reject,boundedPage} from "./errors.ts";
-export const integrationScopes=["provisioning.read","provisioning.write","events.read","xapi.read","xapi.write"] as const;
+export const integrationScopes=["provisioning.read","provisioning.write","events.read","xapi.read","xapi.write","catalog.read","catalog.write"] as const;
 export const tokenHash=(value:string)=>createHash("sha256").update(value).digest("hex");
 export class IntegrationCredentials{
  constructor(readonly db:DatabaseSync){}

@@ -91,11 +91,11 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 
 ## G06 question-bank extension
 
-#97 adds scoped immutable self-authored question banks, explicit version/question selection into a draft and verified provenance with explicit manual detachment. Published course/attempt/grading history stays pinned. Four domain/HTTP and one browser regression are authored; exact-head CI pending. Completed-learning retake/reset and exact reference policies remain open. See ADR-038.
+#97 adds scoped immutable self-authored question banks, explicit version/question selection into a draft and verified provenance with explicit manual detachment. Published course/attempt/grading history stays pinned. Four domain/HTTP and one browser regression passed #97 head c7f4033f75ca9b21752a93af11d5aae08a879413 (run 37519095730), all eight jobs. Completed-learning retake/reset and exact reference policies remain open. See ADR-038.
 
 ## G11/G20 scoped chart and actual admin-workflow extension
 
-#98 adds entire-filtered-authorized-report status counts tied to the preview snapshot, an accessible chart with explicit metric/scope labels, and actual unpacked Lime manager-report/admin-group/admin-playlist journeys. Three domain/HTTP and one browser regression plus expanded actual Lime are authored; exact-head CI pending. Scripted Mango is not inference-quality evidence. See ADR-039.
+#98 adds entire-filtered-authorized-report status counts tied to the preview snapshot, an accessible chart with explicit metric/scope labels, and actual unpacked Lime manager-report/admin-group/admin-playlist journeys. Three domain/HTTP and one browser regression plus expanded actual Lime passed #98 head d1d5388bc793550193b9b51ef0c7b7086a8d39a4 (run 37519103801), all eight jobs. Scripted Mango is not inference-quality evidence. See ADR-039.
 
 ## G06/G10 completed-course retake extension
 
@@ -108,3 +108,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## G22 durable recovery guidance and new-request admission
 
 #101 explains persisted run state and original-outcome reconciliation in Lime. Authoritative runner admission denies a new input while an uncertain mutation remains unresolved, including after cancel/reopen. One additional actual Pi/Mango/Lime HostPolicy/Pear HTTP regression is authored; exact-head CI pending. This is not evaluated planning or channel/background delivery. See ADR-042.
+
+## G02/G03 provider metadata ledger extension
+
+#102 adds a disabled-by-default trusted provider/client binding, strict metadata-only ordered feed, canonical dedup, whole-page reconciliation and atomic per-person grants/revocations/retirement. Five backend/domain/real HTTP regressions are authored; exact-head CI pending. Metadata read primitives require live own rights and explicit model metadata permission. Reviewed admin UI and human launch/discovery/history are still next layers. No actual Go1 license, partner wire conformance, licensed body, provider launch or official learning outcome is claimed. See ADR-043.

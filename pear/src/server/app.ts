@@ -1,3 +1,5 @@
+import {ProviderCatalogService,type ProviderAdapter} from "./provider-catalog.ts";
+import {registerProviderCatalog} from "./provider-catalog-routes.ts";
 import {registerSCORM} from "./scorm-routes.ts";
 import {registerXAPI} from "./xapi-routes.ts";
 import {registerTranslations} from "./translations-routes.ts";
@@ -37,6 +39,8 @@ export async function createApp(opts: {
   scimEnabled?: boolean;
   webhookEndpoints?: WebhookEndpoint[];
   xapiEnabled?: boolean;
+  catalogAdapters?: ProviderAdapter[];
+  catalogFixture?: boolean;
 }) {
   const parsed = new URL(opts.origin);
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
@@ -48,6 +52,9 @@ export async function createApp(opts: {
   if(opts.scimEnabled&&!opts.identityFixture&&!opts.secureCookies)throw Error("SCIM requires HTTPS and secure session cookies");
   if(opts.webhookEndpoints?.length&&!opts.identityFixture&&!opts.secureCookies)throw Error("Webhook configuration requires HTTPS and secure session cookies");
   if(opts.xapiEnabled&&(!opts.scimEnabled||!opts.identityFixture&&!opts.secureCookies))throw Error("xAPI requires reviewed SCIM actors and secure configuration");
+  if(opts.catalogFixture&&(!opts.developmentAuth||!["127.0.0.1","localhost","[::1]"].includes(parsed.hostname)))throw Error("Provider fixtures require loopback development authentication");
+  if(opts.catalogAdapters?.length&&!opts.catalogFixture&&!opts.secureCookies)throw Error("Provider catalog requires HTTPS and secure session cookies");
+  const providerCatalog=new ProviderCatalogService(opts.db,opts.catalogAdapters);
   const outbox=new OutboxService(opts.db,opts.webhookEndpoints,!!opts.identityFixture);
   const identity=new IdentityService(opts.db,opts.oidc,opts.origin,!!opts.identityFixture);
   const app = Fastify({
@@ -540,6 +547,7 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  await registerProviderCatalog(app,providerCatalog,opts.origin,!!opts.catalogAdapters?.length);
   await registerSCORM(app,service.scorm,opts.origin,!!opts.developmentAuth||!!opts.identityFixture,req=>service.principal(req.session.principal));
   await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
   registerTranslations(app,service.translations,req=>service.principal(req.session.principal));
@@ -576,5 +584,5 @@ export async function createApp(opts: {
       );
     }
   }
-  return { app, service, outbox };
+  return { app, service, outbox, providerCatalog };
 }
