@@ -1,3 +1,4 @@
+import {awardUnitLabel} from "../shared/programs.ts";
 import {PeopleService} from "./people.ts";
 import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
@@ -246,6 +247,8 @@ export class ProgramService {
       prefix = "",
     ) => {
       new ContentAccess(this.db).validate(p,content);
+      if(content.unit==="custom"?(!content.unitSingular?.trim()||!content.unitPlural?.trim()):content.unitSingular!==undefined||content.unitPlural!==undefined)reject("INVALID_ARGUMENT","Custom units require original nonblank singular and plural labels; built-in units have fixed labels");
+      if(content.completionMode==="one_item"&&content.requirements.some(r=>r.required))reject("INVALID_ARGUMENT","One-item awards use alternative criteria without required flags");
       if (
         path.includes(awardId) ||
         depth > 4 ||
@@ -260,7 +263,7 @@ export class ProgramService {
       if (
         new Set(content.requirements.map((r) => r.id)).size !==
           content.requirements.length ||
-        content.target > content.requirements.reduce((n, r) => n + r.credits, 0)
+        content.completionMode!=="one_item"&&content.target > content.requirements.reduce((n, r) => n + r.credits, 0)
       )
         reject(
           "INVALID_ARGUMENT",
@@ -332,6 +335,9 @@ export class ProgramService {
       ...(row.kind === "award"
         ? {
             unit: (value as Award).unit,
+            unitSingular:(value as Award).unitSingular,
+            unitPlural:(value as Award).unitPlural,
+            completionMode:(value as Award).completionMode??"target",
             target: (value as Award).target,
             ongoing: (value as Award).ongoing,
           }
@@ -456,11 +462,14 @@ export class ProgramService {
       return {
         title: award.title,
         unit: award.unit,
+        unitSingular:award.unitSingular,
+        unitPlural:award.unitPlural,
+        completionMode:award.completionMode??"target",
         target: award.target,
         ongoing: award.ongoing,
         earned,
         requiredComplete,
-        completed: !award.ongoing && requiredComplete && earned >= award.target,
+        completed: !award.ongoing && (award.completionMode==="one_item"?requirements.some(r=>r.completed):requiredComplete && earned >= award.target),
         requirements,
       };
     };
@@ -837,6 +846,10 @@ export class ProgramService {
       accredited: false,
       earned: progress.earned,
       unit: progress.unit,
+      unitLabel:awardUnitLabel(progress,progress.earned),
+      unitSingular:progress.unitSingular,
+      unitPlural:progress.unitPlural,
+      completionMode:progress.completionMode,
     };
   }
 }

@@ -24,7 +24,10 @@ export interface Award {
   summary: string;
   access: "tenant" | "author" | "groups";
   groupIds?: string[];
-  unit: "credits" | "hours";
+  unit: "credits" | "hours" | "custom";
+  unitSingular?:string;
+  unitPlural?:string;
+  completionMode?:"target"|"one_item";
   target: number;
   ongoing: boolean;
   moderatedExternal: boolean;
@@ -38,14 +41,17 @@ const metadata = {
 };
 const reference = (kinds: string[]) =>
   object({ kind: enumeration(...kinds), id: string(64) });
-const optionalAudience=(properties:Record<string,unknown>)=>object(properties,Object.keys(properties).filter(k=>k!=="groupIds"));
+const optionalAudience=(properties:Record<string,unknown>)=>object(properties,Object.keys(properties).filter(k=>!["groupIds","unitSingular","unitPlural","completionMode"].includes(k)));
 export const playlistSchema = optionalAudience({
   ...metadata,
   items: array(reference(["course", "item"]), 16, 1),
 });
 export const awardSchema = optionalAudience({
   ...metadata,
-  unit: enumeration("credits", "hours"),
+  unit: enumeration("credits", "hours", "custom"),
+  unitSingular:string(40),
+  unitPlural:string(40),
+  completionMode:enumeration("target","one_item"),
   target: integer(10000, 1),
   ongoing: { type: "boolean" },
   moderatedExternal: { type: "boolean" },
@@ -199,3 +205,5 @@ export const programHumanTools = [
     ["awardEnrollmentId", "criterionPath", "amount", "evidence", "confirmed"],
   ),
 ];
+
+export function awardUnitLabel(value:Pick<Award,"unit"|"unitSingular"|"unitPlural">,amount:number){return value.unit==="custom"?(amount===1?value.unitSingular:value.unitPlural)??"custom":value.unit;}

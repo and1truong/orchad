@@ -1,3 +1,4 @@
+import {awardUnitLabel} from "../shared/programs.ts";
 import {translateUI} from "./i18n.ts";
 import { Certificate } from "./certificate.tsx";
 import React, { useEffect, useState } from "react";
@@ -189,7 +190,7 @@ function Progress({
           <h4>{r.title}</h4>
           <p>
             {r.required ? "Required" : "Elective"} · {r.earned} / {r.credits}{" "}
-            {progress.unit} · {r.completed ? "Complete" : "In progress"}
+            {awardUnitLabel(progress,r.credits)} · {r.completed ? "Complete" : "In progress"}
           </p>
           {r.alternatives.map((ref: any, i: number) => (
             <div key={i}>
@@ -254,7 +255,7 @@ function Progress({
                     enrollmentId={enrollmentId}
                     criterionPath={r.criterionPath}
                     credits={r.credits}
-                    unit={progress.unit}
+                    unit={awardUnitLabel(progress,r.credits)}
                     active={active}
                   />
                 </>
@@ -438,7 +439,7 @@ export function Programs(props: Props) {
                 {a.assignment_state !== "active"
                   ? a.assignment_state + " · "
                   : ""}
-                Version {a.version} · {a.earned} / {a.target} {a.unit} ·{" "}
+                Version {a.version} · {a.completionMode==="one_item"?<>{translateUI("Complete one configured criterion")} · {a.earned} {awardUnitLabel(a,a.earned)}</>:<>{a.earned} / {a.target} {awardUnitLabel(a,a.target)}</>} ·{" "}
                 {a.ongoing
                   ? "Ongoing · no automatic completion"
                   : a.completed_at
@@ -602,16 +603,20 @@ export function Programs(props: Props) {
                   <label>{translateUI("Credit unit")}<select aria-label={translateUI("Credit unit")}
                       value={award.unit}
                       onChange={(e) =>
-                        setAward({ ...award, unit: e.target.value as any })
+                        setAward(({unitSingular,unitPlural,...current})=>e.target.value==="custom"?{...current,unit:"custom",unitSingular:"credit",unitPlural:"credits"}:{...current,unit:e.target.value as Award["unit"]})
                       }
                     >
                       <option value="credits">{translateUI("Credits")}</option>
                       <option value="hours">{translateUI("Hours")}</option>
+                      <option value="custom">{translateUI("Original custom units")}</option>
                     </select>
                   </label>
+                  {award.unit==="custom"&&<><label>{translateUI("Custom unit singular")}<input required maxLength={40} value={award.unitSingular??""} onChange={e=>setAward({...award,unitSingular:e.target.value})}/></label><label>{translateUI("Custom unit plural")}<input required maxLength={40} value={award.unitPlural??""} onChange={e=>setAward({...award,unitPlural:e.target.value})}/></label></>}
+                  <label>{translateUI("Award completion rule")}<select aria-label={translateUI("Award completion rule")} value={award.completionMode??"target"} onChange={e=>setAward({...award,completionMode:e.target.value as Award["completionMode"],...(e.target.value==="one_item"?{requirements:award.requirements.map(r=>({...r,required:false}))}:{})})}><option value="target">{translateUI("Reach target and required criteria")}</option><option value="one_item">{translateUI("Complete one configured criterion")}</option></select></label>
                   <label>{translateUI("Target")}<input
                       type="number"
                       value={award.target}
+                      disabled={award.completionMode==="one_item"}
                       min={1}
                       max={10000}
                       required
@@ -667,6 +672,7 @@ export function Programs(props: Props) {
                       <label className="choice">
                         <input
                           type="checkbox"
+                          disabled={award.completionMode==="one_item"}
                           checked={r.required}
                           onChange={(e) =>
                             updateRequirement(i, {
@@ -721,7 +727,7 @@ export function Programs(props: Props) {
                         ...award,
                         requirements: [
                           ...award.requirements,
-                          requirement(award.requirements.length + 1),
+                          {...requirement(award.requirements.length + 1),required:award.completionMode!=="one_item"},
                         ],
                       })
                     }

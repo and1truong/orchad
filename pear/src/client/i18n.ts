@@ -1,5 +1,11 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Original custom units":"Đơn vị tùy chỉnh nguyên bản",
+"Custom unit singular":"Tên đơn vị số ít",
+"Custom unit plural":"Tên đơn vị số nhiều",
+"Award completion rule":"Quy tắc hoàn thành chương trình",
+"Reach target and required criteria":"Đạt mục tiêu và các tiêu chí bắt buộc",
+"Complete one configured criterion":"Hoàn thành một tiêu chí đã cấu hình",
 "Optional question title":"Tiêu đề câu hỏi tùy chọn",
 "Question prompt formatting":"Định dạng nội dung câu hỏi",
 "Plain text":"Văn bản thường",

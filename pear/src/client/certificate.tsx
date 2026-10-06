@@ -13,7 +13,7 @@ export function Certificate({
       ? "Award completion certificate"
       : "Completion certificate",
     issued = c.issuedAt ?? c.issued_at;
-  const text = `Pear ${award ? "award " : ""}completion certificate\n${c.learnerName}\n${c.title}\nVersion ${c.version}\nIssued ${issued}\n${award ? `Earned ${c.earned} ${c.unit}\n` : ""}ID ${c.id}\nIssuer ${c.issuer}\nNot accredited`;
+  const text = `Pear ${award ? "award " : ""}completion certificate\n${c.learnerName}\n${c.title}\nVersion ${c.version}\nIssued ${issued}\n${award ? `Earned ${c.earned} ${c.unitLabel??c.unit}\n` : ""}ID ${c.id}\nIssuer ${c.issuer}\nNot accredited`;
   return (
     <section ref={ref} className="panel print-certificate" aria-label={heading}>
       <h2>{heading}</h2>
@@ -23,7 +23,7 @@ export function Certificate({
       <p>{translateUI("Issued")}{" "}{issued}</p>
       {award && (
         <p>
-          {c.earned} {c.unit} earned
+          {c.earned} {c.unitLabel??c.unit} earned
         </p>
       )}
       <p>{translateUI("Certificate ID:")}{" "}{c.id}</p>
