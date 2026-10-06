@@ -9,6 +9,7 @@ import {
   APP_PROVENANCE,
   APP_REQUEST_FORWARD,
   finalAssistantText,
+  makeAppResult,
 } from "./app-request.js";
 import {
   BindingSchema,
@@ -68,9 +69,15 @@ function App() {
     approvals = useRef<ApprovalQueue | null>(null),
     appIngress = useRef<AppRequestIngress | null>(null),
     runningRef = useRef(false),
+    // runTurn is recreated every render over fresh token/model/tools state;
+    // the mount-once app-ingress effect must reach it through a ref or its
+    // `run` dep would keep calling the first-render closure (empty token,
+    // model and tools — every approved app turn fails before the gateway).
+    runTurnRef = useRef(runTurn),
     history = useRef<Message[]>([]),
     externalPolicies = useRef(new Map<string, HostPolicy>()),
     transport = useRef<CompanionTransport | null>(null);
+  runTurnRef.current = runTurn;
   const log = (s: string) => setActivity((x) => [...x.slice(-49), s]);
   // Approval prompts queue FIFO: a second concurrent request waits for its
   // card instead of silently auto-denying the one being shown. Entries free
@@ -208,12 +215,12 @@ function App() {
         void chrome.tabs
           .sendMessage(
             page.tabId,
-            { type: "lime:agentResult", requestId, ...result },
+            makeAppResult(requestId, result),
             { documentId: page.documentId },
           )
           .catch(() => {});
       },
-      run: (p) => runTurn(p, "app"),
+      run: (p) => runTurnRef.current(p, "app"),
     });
     const appMessages = (
       message: unknown,
