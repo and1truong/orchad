@@ -37,10 +37,13 @@ const binding = (h: ReturnType<typeof host>, idempotent = true) => ({
   idempotentTools: idempotent ? ["demo_increment"] : [],
 });
 
-async function running(script: Parameters<typeof fakeGateway>[0]) {
+async function running(
+  script: Parameters<typeof fakeGateway>[0],
+  runnerOpts: Partial<Parameters<typeof openRunner>[0]> = {},
+) {
   const gw = await fakeGateway(script);
   const { db } = tmpDb();
-  const runner = await openRunner({ storagePath: db });
+  const runner = await openRunner({ storagePath: db, ...runnerOpts });
   await runner.configure({
     baseUrl: gw.baseUrl,
     token: gw.token,
@@ -264,4 +267,119 @@ test("incompatible stored version fails closed before scheduling", async () => {
   }, {} as never);
   await harness.close({} as never);
   await assert.rejects(openRunner({ storagePath: db }), IncompatibleStorage);
+});
+
+test("credentials never reach the checkpoint DB", async () => {
+  const h = host();
+  const { gw, db, runner } = await running([
+    { toolCalls: [incrCall()], continuation: { step: 1 }, usage: { input: 10, output: 5 } },
+    { content: "Done.", usage: { input: 20, output: 5 } },
+  ]);
+  await runner.bind([binding(h)], dispatchFor(h));
+  await runner.submit({ prompt: "Increment", requestId: "req-secret" });
+  await until(runner.status, (s) => s.phase === "completed", "completion");
+  await runner.close();
+  const { readFileSync } = await import("node:fs");
+  const bytes = readFileSync(db);
+  assert.equal(bytes.includes(gw.token), false, "gateway token in checkpoint");
+  assert.equal(bytes.includes("Bearer"), false, "bearer material in checkpoint");
+  await gw.close();
+});
+
+test("re-entry with denied revalidation fails closed — no second dispatch", async () => {
+  const { gw, db, runner } = await running([
+    { toolCalls: [incrCall()], usage: { input: 10, output: 5 } },
+    { content: "unreachable", usage: { input: 20, output: 5 } },
+  ]);
+  await runner.bind([binding(host(), true)], async () => new Promise<Result>(() => {}));
+  await runner.submit({ prompt: "Increment", requestId: "req-denied" });
+  await until(runner.status, (s) => s.ops[0]?.status === "dispatched", "dispatched");
+  rmSync(`${db}.owner`, { force: true });
+
+  const r2 = await openRunner({ storagePath: db });
+  let dispatched2 = 0;
+  await r2.configure({ baseUrl: gw.baseUrl, token: gw.token, model: MODEL });
+  await r2.bind(
+    [
+      {
+        ...binding(host(), true),
+        revalidate: async () => {
+          throw new Error("consent expired");
+        },
+      },
+    ],
+    async () => {
+      dispatched2++;
+      return { ok: true, revision: 1, data: null, error: null };
+    },
+  );
+  await r2.resume();
+  const s = await until(r2.status, (st) => st.ops[0]?.status === "failed", "failed op");
+  assert.equal(dispatched2, 0, "revalidation denial must not dispatch");
+  assert.match(s.ops[0].error ?? "", /revalidation failed/i);
+  await r2.close();
+  await gw.close();
+});
+
+test("late tool response after cancel reconciles: result recorded, run stays cancelled", async () => {
+  const h = host();
+  const { gw, runner } = await running([
+    { toolCalls: [incrCall()], usage: { input: 10, output: 5 } },
+    { content: "unreachable", usage: { input: 20, output: 5 } },
+  ]);
+  let release!: () => void;
+  const hung = new Promise<void>((resolve) => (release = resolve));
+  await runner.bind(
+    [binding(h)],
+    async (envelope) => {
+      await hung;
+      return dispatchFor(h)(envelope);
+    },
+  );
+  await runner.submit({ prompt: "Increment", requestId: "req-late" });
+  await until(runner.status, (s) => s.ops[0]?.status === "dispatched", "dispatched");
+  await runner.cancel();
+  const cancelled = await runner.status();
+  assert.equal(cancelled.phase, "cancelled");
+
+  // The host response arrives after the cancel intent is already durable:
+  // the op result is committed honestly but never resurrects the run.
+  release();
+  const s = await until(
+    runner.status,
+    (st) => st.ops[0]?.status === "completed" && st.phase === "cancelled",
+    "late settle",
+  );
+  assert.equal(h.counter, 1);
+  assert.equal(s.ops[0].status, "completed");
+  assert.equal(s.phase, "cancelled");
+  await runner.close();
+  await gw.close();
+});
+
+test("persisted step budget still blocks generation after reopen", async () => {
+  const h = host();
+  let genCalls = 0;
+  // MockProvider consumes one script entry per HTTP request; a second request
+  // must never happen once the committed step budget is spent.
+  const { gw, db, runner } = await running(
+    [
+      { toolCalls: [incrCall()], continuation: { step: 1 }, usage: { input: 10, output: 5 } },
+      { content: "unreachable", usage: { input: 20, output: 5 } },
+    ],
+    { maxSteps: 1 },
+  );
+  await runner.bind([binding(h)], dispatchFor(h));
+  await runner.submit({ prompt: "Increment", requestId: "req-budget" });
+  const s = await until(runner.status, (st) => st.phase === "failed", "step limit");
+  assert.match(s.lastError ?? "", /STEP_LIMIT/);
+  await runner.close();
+
+  const r2 = await openRunner({ storagePath: db, maxSteps: 1 });
+  await r2.configure({ baseUrl: gw.baseUrl, token: gw.token, model: MODEL });
+  await r2.resume();
+  const s2 = await until(r2.status, (st) => st.phase === "failed", "reopen failed");
+  assert.match(s2.lastError ?? "", /STEP_LIMIT/);
+  await r2.close();
+  await gw.close();
 });

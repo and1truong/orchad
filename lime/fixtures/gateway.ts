@@ -5,7 +5,16 @@ import { createServer } from "node:http";
 // so a live extension can reach the approval/dispatch flow end to end. The
 // default stays the deliberately truncated stream that proves partial
 // arguments never dispatch.
-export async function startMockGateway(port = 4311, scripted = false) {
+export async function startMockGateway(
+  port = 4311,
+  scripted = false,
+  // The scripted tool call — demo_increment for the fixture counter; durable
+  // demos point this at guava's canvas_apply_patch instead.
+  tool: { name: string; arguments: string } = {
+    name: "demo_increment",
+    arguments: '{"amount":1}',
+  },
+) {
   let calls = 0;
   const server = createServer(async (req, res) => {
     if (req.url === "/health") {
@@ -37,7 +46,7 @@ export async function startMockGateway(port = 4311, scripted = false) {
           // Fresh id per call: the client rejects ids already in history.
           const id = "mock-call-" + ++calls;
           res.write(
-            `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"${id}","type":"function","function":{"name":"demo_increment","arguments":"{\\"amount\\":1}"}}]},"finish_reason":"tool_calls"}]}\n\n`,
+            `data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"${id}","type":"function","function":{"name":"${tool.name}","arguments":${JSON.stringify(tool.arguments)}}}]},"finish_reason":"tool_calls"}]}\n\n`,
           );
         }
         res.write("data: [DONE]\n\n");
