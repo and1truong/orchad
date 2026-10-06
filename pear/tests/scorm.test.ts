@@ -21,6 +21,7 @@ test("archives reject traversal, duplicate entries, encryption, symlinks, descri
  for(const entries of [
   [{name:"../imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco)}],
   [{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"imsmanifest.xml",data:Buffer.from(manifest)}],
+  [{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco),method:8,trailing:Buffer.from("hidden")}],
   [{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco),flags:1}],
   [{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco),flags:8}],
   [{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco),external:((0o120777<<16)>>>0)}],
