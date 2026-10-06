@@ -1,5 +1,21 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Completed course retake":"Học lại khóa đã hoàn tất",
+"Review course retake":"Xem lựa chọn học lại",
+"Review completed course retake":"Xem xét học lại khóa đã hoàn tất",
+"Fresh learning record created":"Đã tạo lượt học mới",
+"A retake creates a new self-directed record. Prior completion, attempts and certificates remain unchanged. Progress, answers, bookings and assignment deadlines are not copied.":"Học lại tạo lượt tự học mới. Kết quả hoàn tất, bài làm và chứng chỉ cũ được giữ nguyên. Không sao chép tiến độ, câu trả lời, lượt đặt hay hạn chót bài được giao.",
+"A retake already exists. Continue that learning record.":"Đã có lượt học lại. Hãy tiếp tục lượt học đó.",
+"Retake version choice":"Lựa chọn phiên bản học lại",
+"Retake course version":"Phiên bản khóa học để học lại",
+"Previously completed version":"Phiên bản đã hoàn tất trước đây",
+"Latest published version":"Phiên bản mới nhất đã xuất bản",
+"This course is not accepting a new learning record.":"Khóa học này hiện không nhận lượt học mới.",
+"I choose this version for a fresh learning record.":"Tôi chọn phiên bản này để bắt đầu lượt học mới.",
+"Create fresh course retake":"Tạo lượt học lại mới",
+"Close retake review":"Đóng phần xem xét học lại",
+"Fresh course retake":"Lượt học lại mới",
+
 "Filtered report status chart":"Biểu đồ trạng thái báo cáo đã lọc","learning records":"bản ghi học tập","Counts cover the entire filtered authorized audience, including recurring cycles. These are learning records, not unique people or proficiency.":"Số liệu bao gồm toàn bộ đối tượng được phép trong bộ lọc, kể cả các kỳ học lặp lại. Đây là bản ghi học tập, không phải số người duy nhất hay mức độ thành thạo.","Report status counts":"Số bản ghi theo trạng thái báo cáo","Record count":"Số bản ghi","Share of filtered records":"Tỷ lệ bản ghi đã lọc","No matching learning records.":"Không có bản ghi học tập phù hợp.","Standalone completion is learner-confirmed reading. No skill mastery or external benchmark is inferred.":"Nội dung riêng được người học tự xác nhận đã đọc. Không suy ra năng lực kỹ năng hay đối chuẩn bên ngoài.",
 
 "Pinned question bank":"Ngân hàng câu hỏi đã ghim","Detach bank for manual question edits":"Tách ngân hàng để sửa câu hỏi thủ công","Reusable question banks":"Ngân hàng câu hỏi tái sử dụng","Publish bank questions from a saved original course draft. Applying a version changes only the target draft; existing learners keep their published quiz.":"Xuất bản câu hỏi từ bản nháp khóa học gốc đã lưu. Áp dụng phiên bản chỉ thay đổi bản nháp đích; người đang học giữ bài kiểm tra đã xuất bản.","Publish question bank":"Xuất bản ngân hàng câu hỏi","Private source questions require a private bank":"Câu hỏi nguồn riêng tư cần ngân hàng riêng tư","Bank version published":"Đã xuất bản phiên bản ngân hàng","Question bank ID":"Mã ngân hàng câu hỏi","Question bank title":"Tên ngân hàng câu hỏi","Bank source course ID":"Mã khóa học nguồn ngân hàng","Question bank audience":"Đối tượng xem ngân hàng câu hỏi","Permit model processing of bank questions":"Cho phép mô hình xử lý câu hỏi ngân hàng","Publish bank version":"Xuất bản phiên bản ngân hàng","Choose bank questions":"Chọn câu hỏi ngân hàng","Retire question bank":"Ngừng sử dụng ngân hàng câu hỏi","Previous banks":"Ngân hàng trước","Next banks":"Ngân hàng tiếp","Apply question bank":"Áp dụng ngân hàng câu hỏi","Choose one to eight bank questions":"Chọn từ một đến tám câu hỏi ngân hàng","Bank applied. Reopen the target course draft to review and publish.":"Đã áp dụng ngân hàng. Mở lại bản nháp khóa học đích để kiểm tra và xuất bản.","Bank target course ID":"Mã khóa học đích ngân hàng","Apply selected bank version":"Áp dụng phiên bản ngân hàng đã chọn",

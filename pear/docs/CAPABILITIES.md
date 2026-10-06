@@ -90,3 +90,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## G11/G20 scoped chart and actual admin-workflow extension
 
 #98 adds entire-filtered-authorized-report status counts tied to the preview snapshot, an accessible chart with explicit metric/scope labels, and actual unpacked Lime manager-report/admin-group/admin-playlist journeys. Three domain/HTTP and one browser regression plus expanded actual Lime are authored; exact-head CI pending. Scripted Mango is not inference-quality evidence. See ADR-039.
+
+## G06/G10 completed-course retake extension
+
+#99 implements explicit human-only enrolled/latest-version retakes as fresh linked self-directed records. Prior official completion, attempts, certificates and assignment history remain immutable; no automatic progress transfer. Four domain/HTTP and one mobile EN/VI browser regression are authored; exact-head CI pending. Exact reference reset/recertification semantics remain OPEN. See ADR-040.

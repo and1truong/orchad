@@ -1,3 +1,4 @@
+import {RetakeService} from "./retakes.ts";
 import {QuestionBankService} from "./question-banks.ts";
 import {InsightService} from "./insights.ts";
 import {ContentAccess} from "./content-access.ts";
@@ -231,6 +232,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    new RetakeService(this.db).authorize(p,c.toolName,a);
     this.curation.authorize(p, c.toolName, a);
     this.standalone.authorize(p, c.toolName, a);
     this.feedback.authorize(p, c.toolName, a);
@@ -516,6 +518,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="human_get_course_retake_options")return new RetakeService(this.db).read(p,a);
     if(["learning_get_question_banks","learning_get_question_bank"].includes(name))return new QuestionBankService(this.db).read(p,name,a,source);
     if(name==="learning_get_my_insights")return new InsightService(this.db).read(p,a);
     if(name==="learning_search_packages")return this.scorm.list(p,false,a.offset??0,a.limit??20);
@@ -966,7 +969,7 @@ export class LearningService {
     new ContentAccess(this.db).requireVisible(this.principal(learner),"course",courseId,this.version(c.id,c.latest_version));
     const existing = this.db
       .prepare(
-        "SELECT * FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS NULL",
+        "SELECT * FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS NULL AND retake_of IS NULL",
       )
       .get(learner, courseId) as any;
     if (existing)
@@ -1005,6 +1008,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(name==="human_retake_completed_course")return new RetakeService(this.db).write(p,a);
     if(["learning_save_question_bank","learning_retire_question_bank"].includes(name))return new QuestionBankService(this.db).write(p,name,a);
     if(name==="learning_apply_question_bank"){
       const row=this.course(p,a.courseId),draft=decode(row.draft) as Course,selected=new QuestionBankService(this.db).selected(p,a.source,a.courseId);

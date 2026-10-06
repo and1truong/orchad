@@ -1,3 +1,4 @@
+import {CourseRetake} from "./retakes.tsx";
 import {QuestionBanks} from "./question-banks.tsx";
 import {OwnInsights} from "./insights.tsx";
 import {SessionManagement,SessionNotices} from "./session-changes.tsx";
@@ -854,6 +855,8 @@ function App() {
                     {e.assignment_cycle_id ? " · Scheduled cycle" : ""}
                   </span>
                   <h3>{e.course.title}</h3>
+                  {e.retake_of&&<p>{translateUI("Fresh course retake")} · {e.retake_of}</p>}
+                  {e.status==="completed"&&<CourseRetake key={"retake:"+session.sessionEpoch+e.id} enrollmentId={e.id} busy={busy} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onCreated={clearLearning}/>}
                   {e.status === "completed" && (
                     <CourseFeedback
                       key={session.sessionEpoch + e.id}
