@@ -54,7 +54,7 @@ function References({
       {refs.map((ref, i) => (
         <fieldset key={i} disabled={busy}>
           <legend>{translateUI("Alternative")}{" "}{i + 1}</legend>
-          <label>{translateUI("Reference type")}<select
+          <label>{translateUI("Reference type")}<select aria-label={translateUI("Reference type")}
               value={ref.kind}
               onChange={(e) =>
                 onChange(
@@ -558,7 +558,7 @@ export function Programs(props: Props) {
                   pattern="[A-Za-z0-9_-]+"
                 />
               </label>
-              <label>{translateUI("Collection type")}<select
+              <label>{translateUI("Collection type")}<select aria-label={translateUI("Collection type")}
                   value={kind}
                   onChange={(e) => setKind(e.target.value as any)}
                 >
@@ -580,7 +580,7 @@ export function Programs(props: Props) {
                   maxLength={600}
                 />
               </label>
-              <label>{translateUI("Access")}<select
+              <label>{translateUI("Access")}<select aria-label={translateUI("Access")}
                   value={value.access}
                   onChange={(e) => metadata("access", e.target.value)}
                 >
@@ -599,7 +599,7 @@ export function Programs(props: Props) {
                 />
               ) : (
                 <>
-                  <label>{translateUI("Credit unit")}<select
+                  <label>{translateUI("Credit unit")}<select aria-label={translateUI("Credit unit")}
                       value={award.unit}
                       onChange={(e) =>
                         setAward({ ...award, unit: e.target.value as any })
@@ -872,7 +872,7 @@ export function Programs(props: Props) {
               )}
               {r.state === "pending" && (
                 <>
-                  <label>{translateUI("Decision")}<select name="decision">
+                  <label>{translateUI("Decision")}<select aria-label={translateUI("Decision")} name="decision">
                       <option value="accept">{translateUI("Accept")}</option>
                       <option value="reject">{translateUI("Reject")}</option>
                     </select>
