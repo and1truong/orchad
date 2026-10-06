@@ -222,6 +222,64 @@ export async function createApp(
     },
   );
 
+  // Human admin UI endpoints — list/pick data the bounded tool catalog
+  // deliberately does not expose to agents.
+  app.get("/api/admin/content", async (req, reply) => {
+    const s = requireAuth(req, reply);
+    if (!s) return reply;
+    if (s.p.role === "content_admin" || s.p.role === "admin") {
+      const rows = db
+        .prepare(
+          "SELECT id,type,title,summary,status,draft_revision,latest_version,duration_minutes,level FROM content WHERE org_id=? ORDER BY updated DESC",
+        )
+        .all(s.p.orgId);
+      return success({ items: rows }, 0);
+    }
+    if (s.p.role === "manager") {
+      const rows = db
+        .prepare(
+          "SELECT id,type,title,summary,status,latest_version,duration_minutes,level FROM content WHERE org_id=? AND status IN ('published','retiring') ORDER BY updated DESC",
+        )
+        .all(s.p.orgId);
+      return success({ items: rows }, 0);
+    }
+    return reply
+      .code(403)
+      .send(failure("FORBIDDEN", "Không có quyền quản trị.", false, 0));
+  });
+
+  app.get("/api/admin/directory", async (req, reply) => {
+    const s = requireAuth(req, reply);
+    if (!s) return reply;
+    if (!["manager", "admin", "content_admin"].includes(s.p.role))
+      return reply
+        .code(403)
+        .send(failure("FORBIDDEN", "Không có quyền quản trị.", false, 0));
+    const users =
+      s.p.role === "manager"
+        ? db
+            .prepare(
+              "SELECT id,name,role FROM accounts WHERE org_id=? AND manager_id=? AND active=1 ORDER BY id",
+            )
+            .all(s.p.orgId, s.p.id)
+        : db
+            .prepare(
+              "SELECT id,name,role FROM accounts WHERE org_id=? AND active=1 ORDER BY id",
+            )
+            .all(s.p.orgId);
+    const groups =
+      s.p.role === "manager"
+        ? []
+        : db
+            .prepare(
+              `SELECT gr.id,gr.name,count(gm.user_id) AS memberCount FROM groups gr
+                 LEFT JOIN group_members gm ON gm.group_id=gr.id
+                 WHERE gr.org_id=? GROUP BY gr.id ORDER BY gr.id`,
+            )
+            .all(s.p.orgId);
+    return success({ users, groups }, 0);
+  });
+
   app.setErrorHandler(async (err: Error, _req, reply) => {
     reply
       .code(500)

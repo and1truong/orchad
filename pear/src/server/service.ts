@@ -416,13 +416,13 @@ export class LearningService {
       return true;
     });
     filtered.sort((x, y) => x.title.localeCompare(y.title, "vi"));
-    const page = Math.max(0, readInt(a.page) ?? 0);
-    const pageSize = Math.min(40, Math.max(1, readInt(a.pageSize) ?? 20));
+    const offset = Math.min(1000, Math.max(0, readInt(a.offset) ?? 0));
+    const limit = Math.min(40, Math.max(1, readInt(a.limit) ?? 20));
     return {
       total: filtered.length,
-      page,
+      offset,
       items: filtered
-        .slice(page * pageSize, page * pageSize + pageSize)
+        .slice(offset, offset + limit)
         .map((c) => this.itemView(c)),
     };
   }
