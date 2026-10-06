@@ -36,7 +36,12 @@ export async function request<T>(
     const write=!!body&&typeof body==="object"&&"idempotencyKey" in body&&typeof body.idempotencyKey==="string";
     throw new Error(diagnosticText(write?"Request outcome unknown; refresh current data before confirming another action.":error instanceof Error?error.message:"Request failed"));
   }
-  const result = await response.json();
+  let result;
+  try { result = await response.json(); } catch(error) {
+    if(!localizedErrors)throw error;
+    const write=!!body&&typeof body==="object"&&"idempotencyKey" in body&&typeof body.idempotencyKey==="string";
+    throw new Error(diagnosticText(write?"Request outcome unknown; refresh current data before confirming another action.":"Request failed"));
+  }
   if (!response.ok)
     throw new Error(
       localizedErrors ? humanError(result.error?.code??response.status,result.error?.message??"Request failed") : `${result.error?.code ?? response.status}: ${result.error?.message ?? "Request failed"}`,

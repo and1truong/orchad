@@ -30,3 +30,11 @@ test("lost human write response is an explicit unknown outcome without automatic
   const bridge=createBridge(session,()=>"learning:demo:original",()=>assert.fail("Unknown outcome is not confirmed mutation"));const result=await bridge.invoke({requestId:"original",documentId:"learning:demo:original",toolName:"learning_start_attempt",arguments:{enrollmentId:"original"},expectedRevision:0,idempotencyKey:"original-key"});assert.equal(result.ok,false);assert.equal(result.error!.message,"Dispatch outcome unknown; reconcile progress and original operation key before retrying");assert.equal(calls,3);
  }finally{globalThis.fetch=original;setUILocale(locale);}
 });
+
+test("truncated human write response is also unknown, with no replay or false success",async()=>{
+ const original=globalThis.fetch,locale=getUILocale(),session={principal:{id:"original",tenant:"demo",role:"learner"},csrf:"csrf",sessionEpoch:"epoch"} as Session;let calls=0;
+ try{setUILocale("vi");globalThis.fetch=async()=>{calls++;return new Response("{", {status:200,headers:{"content-type":"application/json"}});};
+ await assert.rejects(()=>request("/api/human/invoke",session,{idempotencyKey:"original-write"}),{message:"Chưa biết thao tác đã được ghi nhận chưa. Hãy làm mới dữ liệu trước khi xác nhận thao tác tiếp."});assert.equal(calls,1);
+ await assert.rejects(()=>createBridge(session,()=>"learning:demo:original",()=>assert.fail()).describe(),SyntaxError);assert.equal(calls,2);
+ }finally{globalThis.fetch=original;setUILocale(locale);}
+});
