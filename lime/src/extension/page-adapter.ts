@@ -35,6 +35,13 @@ export async function dispatcher(
   )
     return { unsupported: true };
   if (method === "invoke") {
+    // Chrome API argument conversion may strip null object properties.
+    // Encode the complete validated envelope as data, then parse it here;
+    // never evaluate strings or relax the six-field Bridge call shape.
+    if (typeof payload === "string") {
+      if(new TextEncoder().encode(payload).length>65536)throw new Error("Oversized request");
+      payload=JSON.parse(payload);
+    }
     if (!payload || typeof payload !== "object" || Array.isArray(payload))
       throw new Error("Invalid invoke");
     const p = payload as Record<string, unknown>,
@@ -287,7 +294,7 @@ export class ChromePageAdapter implements PageAdapter {
         target: { tabId: this.tabId, documentIds: [this.documentId] },
         world: "MAIN",
         func: dispatcher,
-        args: [method, call],
+        args: [method, call===null?null:JSON.stringify(call)],
       });
       const r = results[0];
       if (!r || r.frameId !== 0 || r.documentId !== this.documentId)
