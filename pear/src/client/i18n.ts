@@ -678,7 +678,24 @@ export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
   "one per line": "Mỗi dòng một mục",
   "skills": "Kỹ năng",
   "industries": "Ngành",
-  "outcomes": "Kết quả học tập dự kiến"
+  "outcomes": "Kết quả học tập dự kiến",
+  "Organization identity settings": "Thiết lập danh tính tổ chức",
+  "Reviewed SSO account mappings": "Liên kết tài khoản SSO đã xem xét",
+  "Only a tenant administrator may map an issuer subject to an existing active account. Claims never grant roles. Mapping changes revoke that user's sessions.": "Chỉ quản trị viên tổ chức được liên kết subject của issuer với tài khoản hiện có đang hoạt động. Claims không cấp vai trò. Thay đổi liên kết thu hồi phiên của người dùng đó.",
+  "OIDC is not configured. An authorized provider sandbox and secure server configuration are still required.": "Chưa cấu hình OIDC. Cần sandbox nhà cung cấp được cho phép và cấu hình máy chủ an toàn.",
+  "Existing account ID": "Mã tài khoản hiện có",
+  "Issuer subject": "Subject của issuer",
+  "Identity mapping reason": "Lý do liên kết danh tính",
+  "Identity mapping action": "Thao tác liên kết danh tính",
+  "Link reviewed identity": "Liên kết danh tính đã xem xét",
+  "Unlink and revoke sessions": "Bỏ liên kết và thu hồi phiên",
+  "Save reviewed identity mapping": "Lưu liên kết danh tính đã xem xét",
+  "Identity mapping saved; target sessions revoked.": "Đã lưu liên kết danh tính; đã thu hồi phiên của tài khoản đích.",
+  "Previous identity mappings": "Liên kết danh tính trước",
+  "Next identity mappings": "Liên kết danh tính tiếp",
+  "Continue with organization SSO": "Tiếp tục với SSO của tổ chức",
+  "Use your reviewed organization identity to sign in.": "Dùng danh tính tổ chức đã được liên kết để đăng nhập.",
+  "Production identity is not configured.": "Chưa cấu hình danh tính production."
 });
 let current:UILocale="en";
 if(typeof window!=="undefined"){try{if(window.localStorage.getItem("pear-ui-locale")==="vi")current="vi";}catch{}}

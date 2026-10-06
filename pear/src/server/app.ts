@@ -1,3 +1,4 @@
+import {IdentityService,type OIDCConfig} from "./identity.ts";
 import { TelemetryService } from "./telemetry.ts";
 import { uploadLimit, type MediaContext } from "./media.ts";
 import { DomainError } from "./errors.ts";
@@ -25,12 +26,17 @@ export async function createApp(opts: {
   staticRoot?: string;
   secureCookies?: boolean;
   developmentAuth?: boolean;
+  oidc?: OIDCConfig;
+  identityFixture?: boolean;
 }) {
   const parsed = new URL(opts.origin);
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
     throw new Error("APP_ORIGIN must be an exact origin");
   if (opts.secureCookies && parsed.protocol !== "https:")
     throw new Error("Secure cookies require HTTPS");
+  if(opts.oidc&&!opts.identityFixture&&!opts.secureCookies)throw Error("OIDC requires secure session cookies");
+  if(opts.identityFixture&&!["127.0.0.1","localhost","[::1]"].includes(parsed.hostname))throw Error("Identity fixtures require loopback");
+  const identity=new IdentityService(opts.db,opts.oidc,opts.origin,!!opts.identityFixture);
   const app = Fastify({
     bodyLimit: Bounds.message,
     logger: false,
@@ -89,7 +95,7 @@ export async function createApp(opts: {
       return reply
         .code(403)
         .send(failure("FORBIDDEN", "Same-origin request required"));
-    if (req.url.split("?")[0] === "/api/login") return;
+    if (["/api/login","/api/auth/config","/api/auth/start","/api/auth/callback"].includes(req.url.split("?")[0])) return;
     const token = req.cookies[name],
       s = token
         ? (opts.db
@@ -202,6 +208,39 @@ export async function createApp(opts: {
       };
     },
   );
+  const identityCookie=opts.secureCookies?"__Host-pear-oidc":"pear-oidc";
+  app.get("/api/auth/config",async()=>({oidcEnabled:!!opts.oidc,developmentEnabled:!!opts.developmentAuth}));
+  app.post("/api/auth/start",async(req,reply)=>{
+    try{
+      const now=Date.now(),key="oidc:"+req.ip;
+      let budget=loginBudget.get(key);if(!budget||budget.until<now){if(loginBudget.size>=1024)loginBudget.clear();budget={requests:0,failures:0,until:now+60000};loginBudget.set(key,budget);}
+      if(++budget.requests>120)return reply.header("Retry-After","60").code(429).send(failure("FORBIDDEN","Identity login rate limit"));
+      const result=identity.start(req.cookies[name]);
+      reply.setCookie(identityCookie,result.binding,{httpOnly:true,secure:!!opts.secureCookies,sameSite:"lax",path:"/",maxAge:300});
+      return {url:result.url};
+    }catch{return reply.code(403).send(failure("FORBIDDEN","Organization sign-in unavailable"));}
+  });
+  app.get("/api/auth/callback",async(req,reply)=>{
+    try{
+      const result=await identity.callback(req.query,req.cookies[identityCookie]);
+      reply.clearCookie(identityCookie,{path:"/",secure:!!opts.secureCookies,httpOnly:true,sameSite:"lax"});
+      reply.setCookie(name,result!.token,{httpOnly:true,secure:!!opts.secureCookies,sameSite:"strict",path:"/",maxAge:8*3600});
+      return reply.redirect("/");
+    }catch{
+      reply.clearCookie(identityCookie,{path:"/",secure:!!opts.secureCookies,httpOnly:true,sameSite:"lax"});return reply.code(401).send(failure("UNAUTHORIZED","Organization sign-in failed; restart sign-in"));
+    }
+  });
+  app.get("/api/identity-links",async(req,reply)=>{
+    try{
+      const q=req.query as any,offset=q.offset===undefined?0:Number(q.offset);
+      if(!Number.isSafeInteger(offset)||offset<0||offset>100000)return reply.code(400).send(failure("INVALID_ARGUMENT","Invalid identity page"));
+      return identity.list(service.principal((req as any).session.principal),{offset,limit:20});
+    }catch{return reply.code(403).send(failure("FORBIDDEN","Identity settings require tenant administrator"));}
+  });
+  app.post("/api/identity-links",async(req,reply)=>{
+    try{return identity.link(service.principal((req as any).session.principal),req.body);}
+    catch(e){if(e instanceof DomainError)return reply.code(({UNAUTHORIZED:401,FORBIDDEN:403,STALE_CONTEXT:409,IDEMPOTENCY_CONFLICT:409,INVALID_ARGUMENT:400} as any)[e.code]??400).send(failure(e.code,e.message));throw e;}
+  });
   app.get("/api/session", async (req) => {
     const s = (req as any).session;
     return {
@@ -214,7 +253,7 @@ export async function createApp(opts: {
     opts.db
       .prepare("DELETE FROM sessions WHERE token_hash=?")
       .run((req as any).session.token_hash);
-    reply.clearCookie(name, { path: "/" });
+    reply.clearCookie(name, { path: "/", secure: !!opts.secureCookies, httpOnly: true, sameSite: "strict" });
     return { ok: true };
   });
   app.get("/api/audience", async (req, reply) => {

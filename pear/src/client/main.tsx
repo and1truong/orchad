@@ -1,3 +1,4 @@
+import {IdentityLinks} from "./identity.tsx";
 import {translateUI,getUILocale,setUILocale} from "./i18n.ts";
 import { Discovery } from "./discovery.tsx";
 import { CurationPanel, CuratedContent } from "./curation.tsx";
@@ -66,6 +67,8 @@ const personal = (s: Session) =>
   `learning:${s.principal.tenant}:${s.principal.id}`;
 function App() {
   useEffect(()=>{document.documentElement.lang=getUILocale();},[]);
+  const [authOptions,setAuthOptions]=useState<{oidcEnabled:boolean;developmentEnabled:boolean}|null>(null);
+  useEffect(()=>{let active=true;void request<any>("/api/auth/config",null).then(r=>{if(active)setAuthOptions(r);}).catch(()=>{});return()=>{active=false;};},[]);
   const [session, setSessionState] = useState<Session | null>(null),
     [ready, setReady] = useState(false),
     [view, setView] = useState("catalog"),
@@ -334,7 +337,11 @@ function App() {
         <p className="eyebrow">{translateUI("A little progress, every day")}</p>
         <h1>{translateUI("Your next")}<br />{translateUI("learning chapter.")}</h1>
         <p className="muted">{translateUI("Self-authored courses. Real progress. An assistant through Lime when you choose.")}</p>
-        <form
+        {authOptions?.oidcEnabled&&<button disabled={busy} onClick={()=>void run(async()=>{
+          const result=await request<{url:string}>("/api/auth/start",null,{});
+          window.location.assign(result.url);
+        })}>{translateUI("Continue with organization SSO")}</button>}
+        {(authOptions===null||authOptions.developmentEnabled)&&<form
           onSubmit={(e) => {
             e.preventDefault();
             const d = new FormData(e.currentTarget);
@@ -366,8 +373,9 @@ function App() {
             />
           </label>
           <button disabled={busy}>{t.login}</button>
-        </form>
-        <p className="dev">{translateUI("Synthetic development portal. Accounts: learner-a, learner-b, manager, admin, editor, assessor. Password: account name + “-dev”. Production identity is not configured.")}</p>
+        </form>}
+        {!authOptions?.developmentEnabled&&<p>{translateUI(authOptions?.oidcEnabled?"Use your reviewed organization identity to sign in.":"Production identity is not configured.")}</p>}
+        {(authOptions===null||authOptions.developmentEnabled)&&<p className="dev">{translateUI("Synthetic development portal. Accounts: learner-a, learner-b, manager, admin, editor, assessor. Password: account name + “-dev”. Production identity is not configured.")}</p>}
         {error && <p role="alert">{error}</p>}
       </main>
     );
@@ -1112,6 +1120,7 @@ function App() {
             )}
           </>
         )}
+        {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view === "admin" && canEdit && (
           <CurationPanel key={"curation:"+session.sessionEpoch} tick={tick} busy={busy} op={op} mutate={mutate} run={run}
             isCurrent={()=>sessionRef.current===session && docRef.current===doc} />

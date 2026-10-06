@@ -159,3 +159,8 @@ Discovery PR #77 exact head b025c70cd489358a7a1c023572202d268468ec0e passed all 
 ## EN/VI interface expansion — stacked on timed captions
 
 Explicit UI text localization covers major learner/admin surfaces while keeping authored text, backend enums/IDs and official learning untouched. The locale persists independently of content preferences; switching keeps controlled drafts and bridge authority. Report dates keep UTC and source recommendation declarations remain verbatim. Three unit fixtures and one real locale/draft/reload/source browser journey require exact-head CI. ADR-020 records untranslated diagnostic/provider and content-variant gaps; no full provider-language parity claim.
+
+
+## Reviewed OIDC identity — stacked on interface localization
+
+Migration 016 stores bounded one-use browser/provider-bound authentication transactions and explicit issuer subjects mapped to existing accounts. Signed claims never assign roles/tenant. Human-only admin mapping routes retain live authority/CAS/CSRF/epoch/audit and revoke target sessions. HTTPS and secure cookies are required by normal startup; only programmatic loopback CI fixtures allow HTTP. Seven domain/HTTP fixtures and a real browser provider redirect journey require exact-head CI. ADR-021 records the supported profile and real IdP/SCIM/logout/deployment gaps. No real IdP account, credential or deployment has been used.

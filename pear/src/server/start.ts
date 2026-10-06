@@ -1,3 +1,4 @@
+import type {OIDCConfig} from "./identity.ts";
 import { openDatabase } from "./database.ts";
 import { createApp } from "./app.ts";
 const dev = process.argv.includes("--dev"),
@@ -16,11 +17,13 @@ const db = openDatabase(
   process.env.DATABASE_PATH ?? ".data/pear.sqlite",
   developmentAuth,
 );
+const oidc:OIDCConfig|undefined=process.env.PEAR_OIDC_CONFIG?JSON.parse(process.env.PEAR_OIDC_CONFIG):undefined;
 const { app, service } = await createApp({
   db,
   origin,
   dev,
   developmentAuth,
+  oidc,
   secureCookies: process.env.COOKIE_SECURE === "true",
 });
 await app.listen({ port, host });
