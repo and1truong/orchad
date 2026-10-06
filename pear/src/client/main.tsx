@@ -431,6 +431,7 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           <label>{translateUI("Interface language")}<select
+              aria-label={translateUI("Interface language")}
               value={locale}
               onChange={(e) => {
                 const v = e.target.value as "en" | "vi";
