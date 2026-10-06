@@ -265,7 +265,7 @@ function Catalog() {
   const [err, setErr] = useState("");
   const load = useMemo(
     () => async () => {
-      const args: Record<string, unknown> = { page: 0, pageSize: 40 };
+      const args: Record<string, unknown> = { offset: 0, limit: 40 };
       if (query) args.query = query;
       if (type) args.contentType = type;
       if (level) args.level = level;
@@ -833,7 +833,7 @@ function Editor({ courseId }: { courseId: string }) {
         prerequisiteModuleIndexes: [...m.prerequisiteModuleIndexes],
       })),
     );
-    const cat = await ctl.search({ contentType: "item", pageSize: 40 });
+    const cat = await ctl.search({ contentType: "item", limit: 40 });
     setItems(cat.items);
   };
   useEffect(() => {
