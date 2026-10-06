@@ -81,7 +81,8 @@ export class QuestionBankService{
    if(!source)reject("NOT_FOUND","Question bank source course unavailable");
    const draft=JSON.parse(source.draft);new ContentAccess(this.db).author(p,"course",a.sourceCourseId,draft);
    if(draft.access==="groups"&&bank.access!=="author"&&(bank.access!=="groups"||!bank.groupIds?.length||bank.groupIds.some(id=>!draft.groupIds?.includes(id))))reject("FORBIDDEN","Group source questions require an equal or narrower bank audience");
-   if(draft.access==="author"&&bank.access!=="author")reject("FORBIDDEN","Private source questions require a private bank");
+   const bankOwner=(this.db.prepare("SELECT owner FROM question_banks WHERE id=? AND tenant=?").get(a.bankId,p.tenant) as any)?.owner??p.id;
+   if(draft.access==="author"&&(bank.access!=="author"||new ContentAccess(this.db).owner(p,"course",a.sourceCourseId)!==bankOwner))reject("FORBIDDEN","Private source questions require a private bank");
    if(canonical(bank.questions)!==canonical(draft.quiz.questions))reject("INVALID_ARGUMENT","Source draft questions changed; review the source again");
    bank.aiProcessingAllowed=bank.aiProcessingAllowed&&draft.aiProcessingAllowed;
   }

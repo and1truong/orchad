@@ -51,6 +51,7 @@ test("scheduled group awards validate each recipient and withdraw/rejoin the sam
 });
 test("group banks support scoped staff reuse with safe source/course group sets and pinned provenance; removed staff cannot read/apply or replay",()=>{
  const f=setup();try{
+  const {groupIds:privateGroups,...privateSource}=f.course;data(f.call("editor","learning_create_course",{courseId:"owned-private-source",course:{...privateSource,access:"author"}}));const privateBank={title:"Private source bank",access:"author",aiProcessingAllowed:true,questions:f.course.quiz.questions};assert.equal(f.call("admin","learning_save_question_bank",{bankId:"different-private-owner",bank:privateBank,sourceCourseId:"owned-private-source"}).error?.code,"FORBIDDEN");data(f.call("editor","learning_save_question_bank",{bankId:"same-private-owner",bank:privateBank,sourceCourseId:"owned-private-source"}));
   const bank={title:"Original group bank",access:"groups",groupIds:["audience-a"],aiProcessingAllowed:true,questions:f.course.quiz.questions};data(f.call("editor","learning_save_question_bank",{bankId:"group-bank",bank,sourceCourseId:"group-source"}));
   assert.equal(data(f.call("editor-peer","learning_get_question_bank",{bankId:"group-bank"})).questions.length,bank.questions.length);
   assert.equal(f.call("learner-a","learning_get_question_bank",{bankId:"group-bank"}).error?.code,"FORBIDDEN");
