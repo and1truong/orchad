@@ -1,3 +1,5 @@
+import { UploadField, UploadedMedia } from "./media.tsx";
+import type { Session } from "./api.ts";
 import React, { useState } from "react";
 import type { ContentItem } from "../shared/model.ts";
 export interface ContentDraft {
@@ -18,6 +20,7 @@ const emptyItem = (): ContentItem => ({
   text: "",
 });
 export function ContentLibrary({
+  session,
   items,
   busy,
   onSave,
@@ -26,6 +29,7 @@ export function ContentLibrary({
   nextOffset,
   onPage,
 }: {
+  session: Session;
   items: ContentDraft[];
   busy: boolean;
   onSave: (id: string, item: ContentItem, exists: boolean) => Promise<boolean>;
@@ -41,9 +45,9 @@ export function ContentLibrary({
     <section className="panel" aria-label="Reusable content library">
       <h2>Standalone content library</h2>
       <p className="muted">
-        Self-authored text, video or link. Publish exact reusable versions;
-        source edits never rewrite enrolled courses. Standalone reading has no
-        completion or certificate.
+        Self-authored text, video, audio, document, interactive HTML or link.
+        Publish exact reusable versions; source edits never rewrite enrolled
+        courses. Standalone reading has no completion or certificate.
       </p>
       {items.map((row) => (
         <section className="learning-row" key={row.id}>
@@ -169,12 +173,18 @@ export function ContentLibrary({
                   setItem({
                     ...item,
                     kind: e.target.value as ContentItem["kind"],
+                    assetId: undefined,
+                    url: undefined,
+                    transcript: undefined,
                   })
                 }
               >
                 <option value="text">Text</option>
                 <option value="video">HTTPS video</option>
                 <option value="link">HTTPS link</option>
+                <option value="audio">Uploaded audio</option>
+                <option value="document">Uploaded PDF</option>
+                <option value="interactive">Interactive HTML</option>
               </select>
             </label>
             <label>
@@ -186,7 +196,22 @@ export function ContentLibrary({
                 onChange={(e) => setItem({ ...item, text: e.target.value })}
               />
             </label>
-            {item.kind !== "text" && (
+            {["audio", "video", "document", "interactive"].includes(
+              item.kind,
+            ) && (
+              <>
+                <UploadField
+                  key={item.kind}
+                  session={session}
+                  kind={item.kind}
+                  onUploaded={(assetId) =>
+                    setItem((current) => ({ ...current, assetId }))
+                  }
+                />
+                {item.assetId && <p>Stored asset: {item.assetId}</p>}
+              </>
+            )}
+            {["video", "link"].includes(item.kind) && !item.assetId && (
               <label>
                 Item HTTPS URL
                 <input
@@ -198,7 +223,7 @@ export function ContentLibrary({
                 />
               </label>
             )}
-            {item.kind === "video" && (
+            {["video", "audio", "interactive"].includes(item.kind) && (
               <label>
                 Item transcript
                 <textarea
@@ -242,9 +267,11 @@ export function ContentLibrary({
   );
 }
 export function StandaloneReader({
+  session,
   item,
   onClose,
 }: {
+  session: Session;
   item: any;
   onClose: () => void;
 }) {
@@ -256,7 +283,12 @@ export function StandaloneReader({
         certificate
       </p>
       <p className="lesson-text">{item.text}</p>
-      {item.kind === "video" && (
+      <UploadedMedia
+        session={session}
+        content={item}
+        context={{ itemId: item.id, version: item.version }}
+      />
+      {item.kind === "video" && !item.assetId && (
         <video controls preload="none" src={item.url} aria-label={item.title} />
       )}
       {item.kind === "link" && (

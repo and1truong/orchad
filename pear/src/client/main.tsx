@@ -1,3 +1,4 @@
+import { UploadedMedia } from "./media.tsx";
 import { Assessments } from "./assessments.tsx";
 import { AssessmentQuestion, completeResponse } from "./assessment-player.tsx";
 import {
@@ -694,6 +695,7 @@ function App() {
             </div>
             {readingItem && (
               <StandaloneReader
+                session={session}
                 item={readingItem}
                 onClose={() => setReadingItem(null)}
               />
@@ -877,7 +879,13 @@ function App() {
                   <>
                     <h3>{lesson.title}</h3>
                     <p className="lesson-text">{lesson.text}</p>
-                    {lesson.kind === "video" && (
+                    <UploadedMedia
+                      key={active.id + ":" + lesson.id}
+                      session={session}
+                      content={lesson}
+                      context={{ enrollmentId: active.id, lessonId: lesson.id }}
+                    />
+                    {lesson.kind === "video" && !lesson.assetId && (
                       <video src={lesson.url} controls preload="metadata" />
                     )}
                     {lesson.url && (
@@ -1252,6 +1260,7 @@ function App() {
                   }
                 />
                 <ContentLibrary
+                  session={session}
                   key={session.sessionEpoch}
                   items={contentDrafts}
                   busy={busy}

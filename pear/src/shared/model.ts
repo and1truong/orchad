@@ -34,7 +34,8 @@ export interface Lesson {
   id: string;
   title: string;
   text: string;
-  kind: "text" | "video" | "link";
+  kind: "text" | "video" | "link" | "audio" | "document" | "interactive";
+  assetId?: string;
   url?: string;
   transcript?: string;
   prerequisiteIds: string[];
@@ -48,6 +49,7 @@ export interface ContentItem {
   license: "self-authored";
   aiProcessingAllowed: boolean;
   kind: Lesson["kind"];
+  assetId?: string;
   text: string;
   url?: string;
   transcript?: string;

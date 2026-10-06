@@ -316,6 +316,8 @@ export function CourseEditor({
                           next.kind = content.kind;
                           next.text = content.text;
                           delete next.url;
+                          delete next.assetId;
+                          if (content.assetId) next.assetId = content.assetId;
                           delete next.transcript;
                           if (content.url) next.url = content.url;
                           if (content.transcript)
@@ -383,6 +385,7 @@ export function CourseEditor({
                       onChange={(e) =>
                         updateLesson(l.id, (next) => {
                           next.kind = e.target.value as Lesson["kind"];
+                          delete next.assetId;
                           delete next.url;
                           delete next.transcript;
                         })
@@ -391,6 +394,14 @@ export function CourseEditor({
                       <option value="text">Text</option>
                       <option value="video">HTTPS video</option>
                       <option value="link">HTTPS link</option>
+                      {l.contentRef &&
+                        ["audio", "document", "interactive"].includes(
+                          l.kind,
+                        ) && (
+                          <option value={l.kind}>
+                            {l.kind} (uploaded item)
+                          </option>
+                        )}
                     </select>
                   </label>
                   <label>
@@ -407,7 +418,7 @@ export function CourseEditor({
                       }
                     />
                   </label>
-                  {l.kind !== "text" && (
+                  {["video", "link"].includes(l.kind) && !l.assetId && (
                     <label>
                       HTTPS media URL
                       <input
@@ -424,7 +435,7 @@ export function CourseEditor({
                       />
                     </label>
                   )}
-                  {l.kind === "video" && (
+                  {["video", "audio", "interactive"].includes(l.kind) && (
                     <label>
                       Video transcript
                       <textarea

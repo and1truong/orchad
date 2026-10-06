@@ -1,8 +1,11 @@
+import { uploadLimit, type MediaContext } from "./media.ts";
+import { DomainError } from "./errors.ts";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import serveStatic from "@fastify/static";
 import {
   createHash,
+  createHmac,
   randomBytes,
   scryptSync,
   timingSafeEqual,
@@ -41,16 +44,32 @@ export async function createApp(opts: {
   await app.register(cookie);
   const service = new LearningService(opts.db),
     name = opts.secureCookies ? "__Host-pear-session" : "pear-session";
+  const launchSecret = randomBytes(32);
   const loginBudget = new Map<string, { count: number; until: number }>();
   app.addHook("onSend", async (req, reply) => {
+    if (req.url.split("?")[0].startsWith("/api/interactive/")) {
+      reply
+        .header(
+          "Content-Security-Policy",
+          "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; media-src 'none'; frame-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+        )
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Referrer-Policy", "no-referrer")
+        .header("Cache-Control", "no-store")
+        .header(
+          "Permissions-Policy",
+          "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        );
+      return;
+    }
     reply
       .header("X-Content-Type-Options", "nosniff")
       .header("Referrer-Policy", "no-referrer")
       .header(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https:; connect-src 'self'" +
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https: blob:; connect-src 'self'" +
           (opts.dev ? " ws:" : "") +
-          "; frame-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          "; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
     if (req.url.startsWith("/api/")) reply.header("Cache-Control", "no-store");
   });
@@ -88,6 +107,10 @@ export async function createApp(opts: {
     // under. In-flight old-tab requests cannot acquire a newly logged-in user.
     if (
       req.url.split("?")[0] !== "/api/session" &&
+      !(
+        req.method === "GET" &&
+        req.url.split("?")[0].startsWith("/api/interactive/")
+      ) &&
       req.headers["x-pear-epoch"] !==
         hash("binding:" + s.token_hash + ":" + s.auth_version)
     )
@@ -244,6 +267,155 @@ export async function createApp(opts: {
       );
       return reply.code(status(result)).send(result);
     });
+  app.addContentTypeParser(
+    "application/octet-stream",
+    { parseAs: "buffer", bodyLimit: Bounds.message },
+    (_req, body, done) => done(null, body),
+  );
+  const mediaFailure = (e: unknown, reply: any) => {
+    if (e instanceof DomainError)
+      return reply
+        .code(status(failure(e.code, e.message)))
+        .send(failure(e.code, e.message));
+    throw e;
+  };
+  app.post("/api/uploads", { bodyLimit: uploadLimit }, async (req, reply) => {
+    try {
+      if (!opts.developmentAuth)
+        return reply
+          .code(403)
+          .send(
+            failure(
+              "FORBIDDEN",
+              "Production upload scanning/storage gate is not configured",
+            ),
+          );
+      if (!Buffer.isBuffer(req.body))
+        return reply
+          .code(400)
+          .send(failure("INVALID_ARGUMENT", "Binary upload required"));
+      return service.media.upload(
+        service.principal((req as any).session.principal),
+        req.query,
+        req.body,
+      );
+    } catch (e) {
+      return mediaFailure(e, reply);
+    }
+  });
+  app.get("/api/assets/:id", async (req, reply) => {
+    try {
+      const row = service.media.read(
+        service.principal((req as any).session.principal),
+        (req.params as any).id,
+        {
+          ...(req.query as MediaContext),
+          ...((req.query as any).version
+            ? { version: Number((req.query as any).version) }
+            : {}),
+        },
+      );
+      return reply
+        .header(
+          "Content-Disposition",
+          "attachment; filename*=UTF-8''" + encodeURIComponent(row.filename),
+        )
+        .type(row.mime)
+        .send(Buffer.from(row.bytes));
+    } catch (e) {
+      return mediaFailure(e, reply);
+    }
+  });
+  app.post(
+    "/api/launch",
+    {
+      schema: {
+        body: object({
+          assetId: { type: "string", minLength: 1, maxLength: 64 },
+          context: object(
+            {
+              itemId: { type: "string", maxLength: 64 },
+              version: { type: "integer", minimum: 1 },
+              enrollmentId: { type: "string", maxLength: 64 },
+              lessonId: { type: "string", maxLength: 64 },
+            },
+            [],
+          ),
+        }),
+      },
+    },
+    async (req, reply) => {
+      try {
+        const b = req.body as any,
+          session = (req as any).session;
+        const row = service.media.read(
+          service.principal(session.principal),
+          b.assetId,
+          b.context,
+        );
+        if (row.mime !== "text/html")
+          return reply
+            .code(400)
+            .send(failure("INVALID_ARGUMENT", "Interactive HTML required"));
+        const value = Buffer.from(
+          JSON.stringify({
+            id: row.id,
+            context: b.context,
+            binding: session.token_hash,
+            expires: Date.now() + 60_000,
+          }),
+        ).toString("base64url");
+        const signature = createHmac("sha256", launchSecret)
+          .update(value)
+          .digest("hex");
+        return {
+          url:
+            "/api/interactive/" + row.id + "?ticket=" + value + "." + signature,
+        };
+      } catch (e) {
+        return mediaFailure(e, reply);
+      }
+    },
+  );
+  app.get("/api/interactive/:id", async (req, reply) => {
+    try {
+      const ticket = (req.query as any).ticket;
+      if (typeof ticket !== "string" || ticket.length > 2048)
+        throw new Error("Invalid ticket");
+      const [value, signature, extra] = ticket.split(".");
+      const expected = createHmac("sha256", launchSecret)
+        .update(value)
+        .digest("hex");
+      if (
+        extra ||
+        !signature ||
+        !/^[a-f0-9]{64}$/.test(signature) ||
+        !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
+      )
+        throw new Error("Invalid ticket");
+      const payload = JSON.parse(Buffer.from(value, "base64url").toString()),
+        session = (req as any).session;
+      if (
+        payload.binding !== session.token_hash ||
+        payload.expires < Date.now() ||
+        payload.id !== (req.params as any).id
+      )
+        throw new Error("Expired or stale ticket");
+      const row = service.media.read(
+        service.principal(session.principal),
+        payload.id,
+        payload.context,
+      );
+      if (row.mime !== "text/html") throw new Error("Invalid format");
+      return reply
+        .type("text/html; charset=utf-8")
+        .send(Buffer.from(row.bytes));
+    } catch {
+      return reply
+        .code(403)
+        .send(failure("FORBIDDEN", "Interactive launch denied"));
+    }
+  });
   app.get("/api/certificates/:id", async (req, reply) => {
     try {
       return service.certificate(

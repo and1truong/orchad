@@ -569,3 +569,6 @@ footer {
 
 .assessments p, .assessments blockquote { overflow-wrap:anywhere; white-space:pre-wrap; }
 .assessments button { max-width:100%; }
+
+[aria-label="Uploaded learning content"] iframe { width: 100%; min-height: 20rem; border: 1px solid var(--border, #bbb); background: white; }
+[aria-label="Uploaded learning content"] audio { max-width: 100%; }

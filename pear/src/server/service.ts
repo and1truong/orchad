@@ -1,3 +1,4 @@
+import { MediaService } from "./media.ts";
 import {
   AssessmentService,
   validateQuestion,
@@ -56,12 +57,14 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly media: MediaService;
   readonly programs: ProgramService;
   readonly people: PeopleService;
   readonly assignments: AssignmentService;
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
+    this.media = new MediaService(db);
     this.programs = new ProgramService(db);
     this.people = new PeopleService(db);
     this.assignments = new AssignmentService(db);
@@ -618,6 +621,7 @@ export class LearningService {
           title: l.title,
           kind: l.kind,
           text: l.text,
+          assetId: l.assetId ?? null,
           url: l.url ?? null,
           transcript: l.transcript ?? null,
           completed: complete.includes(l.id),
@@ -752,8 +756,17 @@ export class LearningService {
           : this.programs.read(p, name, args, source);
     }
   }
-  private validateMedia(l: Pick<Lesson, "kind" | "url" | "transcript">) {
-    if (l.kind !== "text") {
+  private validateMedia(
+    p: Principal,
+    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId">,
+  ) {
+    if (l.assetId) {
+      if (l.url)
+        reject("INVALID_ARGUMENT", "Choose one immutable asset or HTTPS URL");
+      this.media.validate(p, l.assetId, l.kind);
+    } else if (["audio", "document", "interactive"].includes(l.kind)) {
+      reject("INVALID_ARGUMENT", "Uploaded asset required");
+    } else if (l.kind !== "text") {
       if (!l.url) reject("INVALID_ARGUMENT", "External media URL required");
       let u: URL;
       try {
@@ -764,17 +777,20 @@ export class LearningService {
       if (u!.protocol !== "https:" || u!.username || u!.password)
         reject("INVALID_ARGUMENT", "Media must use HTTPS without credentials");
     }
-    if (l.kind === "video" && !l.transcript?.trim())
-      reject("INVALID_ARGUMENT", "Video transcript required");
+    if (
+      ["video", "audio", "interactive"].includes(l.kind) &&
+      !l.transcript?.trim()
+    )
+      reject("INVALID_ARGUMENT", "Media transcript required");
   }
-  private validateItem(value: unknown): ContentItem {
+  private validateItem(p: Principal, value: unknown): ContentItem {
     if (
       !validateArgs(itemSchema, value) ||
       Buffer.byteLength(JSON.stringify(value)) > 12 * 1024
     )
       reject("INVALID_ARGUMENT", "Invalid standalone content structure");
     const item = structuredClone(value) as ContentItem;
-    this.validateMedia(item);
+    this.validateMedia(p, item);
     return item;
   }
   private validateCourse(p: Principal, value: unknown): Course {
@@ -797,6 +813,8 @@ export class LearningService {
       l.title = item.title;
       l.text = item.text;
       l.kind = item.kind;
+      delete l.assetId;
+      if (item.assetId) l.assetId = item.assetId;
       delete l.url;
       delete l.transcript;
       if (item.url) l.url = item.url;
@@ -820,7 +838,7 @@ export class LearningService {
           "Prerequisites must reference distinct earlier lessons",
         );
       prior.add(l.id);
-      this.validateMedia(l);
+      this.validateMedia(p, l);
     }
     if (c.modules) {
       if (new Set(c.modules.map((m) => m.id)).size !== c.modules.length)
@@ -916,7 +934,7 @@ export class LearningService {
       case "human_reset_assessment":
         return this.assessments.write(p, name, a);
       case "learning_create_content_item": {
-        const item = this.validateItem(a.item);
+        const item = this.validateItem(p, a.item);
         if (
           this.db
             .prepare("SELECT 1 FROM content_items WHERE id=?")
@@ -930,7 +948,7 @@ export class LearningService {
       }
       case "learning_update_content_item": {
         this.contentItem(p, a.itemId);
-        const item = this.validateItem(a.item);
+        const item = this.validateItem(p, a.item);
         this.db
           .prepare("UPDATE content_items SET draft=? WHERE id=?")
           .run(JSON.stringify(item), a.itemId);
@@ -938,7 +956,7 @@ export class LearningService {
       }
       case "learning_publish_content_item": {
         const row = this.contentItem(p, a.itemId),
-          item = this.validateItem(decode(row.draft)),
+          item = this.validateItem(p, decode(row.draft)),
           version = row.latest_version + 1;
         this.db
           .prepare("INSERT INTO content_item_versions VALUES(?,?,?)")
