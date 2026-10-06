@@ -403,10 +403,15 @@ export async function openRunner(
         boundTargets.set(b.targetId, { binding: b, dispatch });
         knownTargets.set(b.targetId, b);
         // Seed the CAS baseline once per rebind; after that, successful
-        // results carry the authoritative revision forward.
+        // results carry the authoritative revision forward. A stale bind-time
+        // snapshot must never regress a revision a result already advanced.
         if (b.revision) {
           const rev = b.revision();
-          if (typeof rev === "number") revisionByTarget.set(b.targetId, rev);
+          if (
+            typeof rev === "number" &&
+            rev > (revisionByTarget.get(b.targetId) ?? -1)
+          )
+            revisionByTarget.set(b.targetId, rev);
         }
       }
       republish();

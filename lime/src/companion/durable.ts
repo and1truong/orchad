@@ -72,6 +72,7 @@ const OPEN = 1;
 export class DurableBridge {
   #runner: Promise<DurableRunner> | null = null;
   #bound: PairLike | null = null;
+  #boundIds = "";
   #unwatch: (() => void) | null = null;
   #epochs = new Map<string, string | null>();
 
@@ -108,6 +109,10 @@ export class DurableBridge {
     process.stderr.write("[durable] " + a.map(String).join(" ") + "\n");
   async bind(pair: PairLike): Promise<void> {
     if (!pair.socket || pair.socket.readyState !== OPEN || pair.revoked) return;
+    // Same pair + same target set → already bound; re-binding would flood the
+    // bridge with get_context/list_tools on every status poll.
+    const ids = pair.targets.slice(0, 32).map((t) => t.targetId).join("");
+    if (this.#bound === pair && this.#boundIds === ids) return;
     const r = await this.runner();
     const bindings: HostBinding[] = [];
     for (const t of pair.targets.slice(0, 32)) {
@@ -168,6 +173,7 @@ export class DurableBridge {
     if (bindings.length === 0) { this.#log("bind: no usable targets"); return; }
     this.#log("bind: binding", bindings.map((b) => b.targetId).join(","));
     this.#bound = pair;
+    this.#boundIds = ids;
     await r.bind(
       bindings,
       async (envelope, _attempt, _ctx) =>
@@ -200,6 +206,7 @@ export class DurableBridge {
   async unbind(pair: PairLike): Promise<void> {
     if (this.#bound === pair) {
       this.#bound = null;
+      this.#boundIds = "";
       (await this.runner().catch(() => null))?.unbind();
     }
   }

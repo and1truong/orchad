@@ -16,6 +16,7 @@ export class Durable {
     this.runnerP = null;
     this.unwatch = noop;
     this.epochs = new Map();
+    this.boundIds = "";
     this.push = opts.push ?? noop;
   }
 
@@ -34,6 +35,10 @@ export class Durable {
   /** Rebind every policy-bound target. Called on 'binding' frames and lazily
    *  before every durable op; when nothing is reachable the run stays parked. */
   async bind() {
+    // Same target set already bound → skip; re-binding floods the sidecar with
+    // get_context/list_tools on every status op.
+    const ids = [...this.policy.targets.keys()].sort().join("");
+    if (this.boundIds === ids && ids !== "") return;
     const r = await this.runner();
     const bindings = [];
     for (const t of this.policy.targets.values()) {
@@ -75,7 +80,7 @@ export class Durable {
         },
       });
     }
-    if (bindings.length === 0) return;
+    if (bindings.length === 0) { this.boundIds = ""; return; }
     const policy = this.policy;
     await r.bind(bindings, async (envelope, _attempt, ctx) => {
       const live = policy.targets.get(envelope.targetId);
@@ -99,10 +104,12 @@ export class Durable {
         ctx?.abortSignal ?? sig(),
       );
     });
+    this.boundIds = ids;
     this.push(await r.status());
   }
 
   async unbind() {
+    this.boundIds = "";
     const r = await this.runner().catch(() => null);
     r?.unbind();
   }
