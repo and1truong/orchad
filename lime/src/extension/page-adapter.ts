@@ -14,6 +14,7 @@ export async function dispatcher(
   method: "describe" | "getContext" | "invoke",
   payload: unknown = null,
 ): Promise<unknown> {
+  try {
   if (window !== window.top) throw new Error("Only top frame supported");
   if (!["describe", "getContext", "invoke"].includes(method))
     throw new Error("Invalid method");
@@ -119,6 +120,10 @@ export async function dispatcher(
   if (!serialized || new TextEncoder().encode(serialized).length > 65536)
     throw new Error("Oversized or non-JSON page output");
   return JSON.parse(serialized);
+  } catch (error) {
+    console.error("Lime MAIN dispatcher rejected:", error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 }
 // Fixed MAIN-world installer for the opt-in app-initiated prompt channel
 // (issue #50). Chrome serializes this function; like the dispatcher it takes
