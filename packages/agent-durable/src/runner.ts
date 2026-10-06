@@ -508,6 +508,13 @@ export async function openRunner(
         if (!op) throw new Error(`Unknown op ${callId}`);
         if (op.status === "completed" || op.status === "reconciled")
           return undefined;
+        // Verdicts only land on ops with no in-flight dispatch — a live
+        // minted/parked/dispatched op will still settle and a verdict now
+        // would race that write.
+        if (op.status !== "ambiguous" && op.status !== "interrupted")
+          throw new Error(
+            `Op ${callId} is ${op.status}; verdicts only apply to ambiguous or interrupted ops`,
+          );
         draft.ops[callId] = {
           ...op,
           status: outcome.status === "reconciled" ? "reconciled" : "failed",

@@ -219,9 +219,13 @@ async function settle(
   await api.commit(
     async (tx) => {
       const draft = await tx.doc(OpsDoc, convId);
+      const current = draft.ops[op.callId];
+      // A late dispatch result must not overwrite a human verdict already
+      // recorded while the op was in flight.
+      const keep = current?.status === "reconciled";
       draft.ops[op.callId] = {
         ...op,
-        status,
+        status: keep ? "reconciled" : status,
         result: result as unknown as JsonObject,
         error: result.ok ? null : (result.error?.message ?? "failed"),
       };
