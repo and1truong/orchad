@@ -1,6 +1,5 @@
 import { hostSafeSchema } from "@orchard/bridge-contract";
 import {
-  createAssistantMessageEventStream,
   Type,
   type AssistantMessage,
   type JsonObject,
@@ -16,10 +15,7 @@ import {
   type StreamFn,
 } from "@earendil-works/pi-agent-core";
 import {
-  AgentError,
-  sse,
   validator,
-  callSchema,
   type ToolCall,
   type Message,
   type ToolDescriptor,
@@ -27,7 +23,13 @@ import {
   type AgentEvent,
   type FinishReason,
 } from "./protocol.js";
+import {
+  errorAssistantStream,
+  makeAssistantMessage,
+  streamMangoCompletion,
+} from "./mango-stream.js";
 export * from "./protocol.js";
+export * from "./mango-stream.js";
 export type AgentInput = {
   gatewayBaseUrl: string;
   gatewayToken: string;
@@ -47,7 +49,6 @@ export type AgentInput = {
   maxTurnMs?: number;
   onEvent?: (event: AgentEvent) => void;
 };
-const checkCall = validator.compile(callSchema);
 // Serialized host results and accumulated deltas must stay inside the gateway
 // message cap so history the client produces is never rejected next turn.
 const MESSAGE_MAX_LENGTH = 65536;
@@ -227,21 +228,12 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
   });
 
   // Mango adapter: streams one Chat Completions inference and replays it as Pi
-  // assistant events. Orchard's strict checks run on the raw SSE payload before
-  // any toolCall block reaches Pi, so Pi's own argument normalization never
-  // sees unvalidated model output. Must not throw: failures become an `error`
-  // event plus a marker for the wrapper.
+  // assistant events. The transport itself lives in streamMangoCompletion so
+  // the durable runner uses the same strict seam; this wrapper keeps the
+  // per-turn bookkeeping (step count, pending assistant/call bookkeeping and
+  // the error marker for finishReason).
   const streamFn: StreamFn = (_model, _context, options) => {
-    const stream = createAssistantMessageEventStream();
     const signal = options?.signal ?? controller.signal;
-    const fail = (reason: "error" | "aborted", message: string) => {
-      stream.push({
-        type: "error",
-        reason,
-        error: assistantMessage([], reason, message),
-      });
-      stream.end();
-    };
     steps++;
     if (steps > maxSteps) {
       // Unreachable while finishTurn enforces the bound; kept so a run can
@@ -252,242 +244,36 @@ async function run(input: AgentInput, fetcher: typeof fetch) {
         retryable: false,
         finish: "step_limit",
       };
-      fail("error", marker.message);
-      return stream;
+      return errorAssistantStream(input.model, "error", marker.message);
     }
-    if (signal.aborted) {
-      fail("aborted", "Run cancelled");
-      return stream;
-    }
-    void (async () => {
-      const response = await fetcher(
-        new URL("v1/chat/completions", url.href.replace(/\/?$/, "/")),
-        {
-          method: "POST",
-          credentials: "omit",
-          redirect: "error",
-          headers: {
-            authorization: `Bearer ${input.gatewayToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: input.model,
-            messages,
-            tools: input.tools.map((t) => ({
-              type: "function",
-              function: {
-                name: t.name,
-                description: t.description,
-                parameters: t.inputSchema,
-              },
-            })),
-            tool_choice: "auto",
-            stream: true,
-          }),
-          signal,
-        },
-      );
-      if (!response.ok) {
-        await response.body?.cancel();
-        throw new AgentError(
-          response.status === 401 || response.status === 403
-            ? "AUTHENTICATION"
-            : "TRANSPORT",
-          `Gateway HTTP ${response.status}`,
-          response.status === 429 || response.status >= 500,
-        );
-      }
-      let content = "",
-        state: string | undefined,
-        reason: string | undefined,
-        done = false,
-        textStarted = false;
-      const toolCalls = new Map<number, ToolCall>();
-      const partial = assistantMessage([], "pending");
-      const snapshot = () => ({
-        ...partial,
-        content: [...partial.content],
-      });
-      stream.push({ type: "start", partial: snapshot() });
-      for await (const frame of sse(response, signal)) {
-        if (frame === "[DONE]") {
-          done = true;
-          break;
-        }
-        let chunk: any;
-        try {
-          chunk = JSON.parse(frame);
-        } catch {
-          throw new AgentError("TRANSPORT", "Invalid SSE JSON");
-        }
-        if (chunk.error)
-          throw new AgentError(
-            chunk.error.code ?? "TRANSPORT",
-            chunk.error.message ?? "Gateway stream failed",
-            false,
-          );
-        const choice = chunk.choices?.[0];
-        if (!choice) continue;
-        if (reason)
-          throw new AgentError("TRANSPORT", "Delta after final choice");
-        const d = choice.delta ?? {};
-        if (d.content !== undefined && d.content !== null) {
-          if (typeof d.content !== "string")
-            throw new AgentError("TRANSPORT", "Invalid content delta");
-          content += d.content;
-          if (content.length > MESSAGE_MAX_LENGTH)
-            throw new AgentError("OUTPUT_LIMIT", "Response exceeds message cap");
-          if (!textStarted) {
-            partial.content = [{ type: "text", text: content }];
-            stream.push({
-              type: "text_start",
-              contentIndex: 0,
-              partial: snapshot(),
-            });
-            textStarted = true;
-          } else {
-            (partial.content[0] as { text: string }).text = content;
-          }
-          stream.push({
-            type: "text_delta",
-            contentIndex: 0,
-            delta: d.content,
-            partial: snapshot(),
-          });
-        }
-        for (const c of d.tool_calls ?? []) {
-          if (!Number.isInteger(c.index) || c.index < 0 || c.index >= 16)
-            throw new AgentError("TRANSPORT", "Invalid tool index");
-          const current = toolCalls.get(c.index) ?? {
-            id: "",
-            type: "function" as const,
-            function: { name: "", arguments: "" },
-          };
-          if (c.id) {
-            if (current.id && current.id !== c.id)
-              throw new AgentError("TRANSPORT", "Tool id changed");
-            current.id = c.id;
-          }
-          if (c.type && c.type !== "function")
-            throw new AgentError("UNSUPPORTED", "Unsupported tool type");
-          if (c.function?.name) current.function.name += c.function.name;
-          if (c.function?.arguments)
-            current.function.arguments += c.function.arguments;
-          toolCalls.set(c.index, current);
-        }
-        if (d.x_gateway_state !== undefined) {
-          if (typeof d.x_gateway_state !== "string" || state)
-            throw new AgentError("TRANSPORT", "Invalid continuation state");
-          state = d.x_gateway_state;
-        }
-        if (choice.finish_reason) reason = choice.finish_reason;
-      }
-      if (!done || !reason)
-        throw new AgentError("TRANSPORT", "Truncated model turn");
-      if (reason !== "stop" && reason !== "tool_calls")
-        throw new AgentError("OUTPUT_TRUNCATED", "Model turn did not complete");
-      const ordered = [...toolCalls.entries()].sort((a, b) => a[0] - b[0]);
-      const completeCalls = ordered.map(([, c]) => c);
-      if ((reason === "tool_calls") !== Boolean(completeCalls.length))
-        throw new AgentError("TRANSPORT", "Inconsistent finish reason");
-      // Strict batch gate: the whole batch validates against raw wire strings
-      // before the first Pi toolCall block exists, so a bad final call still
-      // prevents every dispatch in this batch.
-      const args = completeCalls.map((c, i) => {
-        if (ordered[i][0] !== i || !checkCall(c))
-          throw new AgentError("INVALID_ARGUMENT", "Malformed tool call");
-        let a;
-        try {
-          a = JSON.parse(c.function.arguments);
-        } catch {
-          throw new AgentError(
-            "INVALID_ARGUMENT",
-            "Invalid completed arguments JSON",
-          );
-        }
-        const schema = schemas.get(c.function.name);
-        if (!schema || !schema(a))
-          throw new AgentError(
-            "INVALID_ARGUMENT",
-            "Unknown tool or invalid arguments",
-          );
-        return a as JsonObject;
-      });
-      if (
-        new Set(completeCalls.map((c) => c.id)).size !== completeCalls.length ||
-        completeCalls.some((c) =>
-          messages.some((m) => m.tool_calls?.some((old) => old.id === c.id)),
-        )
-      )
-        throw new AgentError("INVALID_ARGUMENT", "Duplicate tool call id");
-      if (dispatched + completeCalls.length > maxCalls) {
+    if (signal.aborted)
+      return errorAssistantStream(input.model, "aborted", "Run cancelled");
+    const priorCallIds = new Set<string>();
+    for (const m of messages)
+      for (const c of m.tool_calls ?? []) priorCallIds.add(c.id);
+    return streamMangoCompletion({
+      fetcher,
+      gatewayBaseUrl: input.gatewayBaseUrl,
+      gatewayToken: input.gatewayToken,
+      model: input.model,
+      messages,
+      tools: input.tools,
+      signal,
+      priorCallIds,
+      maxCalls: Math.max(0, maxCalls - dispatched),
+      onAssistant: (a) => {
+        pendingAssistant.push(a);
+        for (const c of a.calls) pendingCalls.set(c.id, c.function.name);
+      },
+      onError: (e) => {
         marker = {
-          code: "INVALID_ARGUMENT",
-          message: `Turn exceeded ${maxCalls} tool calls`,
-          retryable: false,
-          finish: "tool_limit",
+          code: e.code,
+          message: e.message,
+          retryable: e.retryable,
+          finish: e.finish ?? "error",
         };
-        throw new AgentError("INVALID_ARGUMENT", marker.message);
-      }
-      if (textStarted)
-        stream.push({
-          type: "text_end",
-          contentIndex: 0,
-          content,
-          partial: snapshot(),
-        });
-      const blocks: AssistantMessage["content"] = content
-        ? [{ type: "text", text: content }]
-        : [];
-      for (let i = 0; i < completeCalls.length; i++) {
-        const block = {
-          type: "toolCall" as const,
-          id: completeCalls[i].id,
-          name: completeCalls[i].function.name,
-          arguments: args[i],
-        };
-        blocks.push(block);
-        partial.content = [...blocks];
-        stream.push({
-          type: "toolcall_start",
-          contentIndex: blocks.length - 1,
-          partial: snapshot(),
-        });
-        stream.push({
-          type: "toolcall_end",
-          contentIndex: blocks.length - 1,
-          toolCall: block,
-          partial: snapshot(),
-        });
-      }
-      const final = assistantMessage(
-        blocks,
-        reason === "stop" ? "stop" : "toolUse",
-      );
-      pendingAssistant.push({ state, calls: completeCalls });
-      for (const c of completeCalls) pendingCalls.set(c.id, c.function.name);
-      stream.push({
-        type: "done",
-        reason: reason === "stop" ? "stop" : "toolUse",
-        message: final,
-      });
-      stream.end();
-    })().catch((e) => {
-      if (signal.aborted) {
-        fail("aborted", "Run cancelled");
-        return;
-      }
-      if (!marker)
-        marker = {
-          code: e instanceof AgentError ? e.code : "TRANSPORT",
-          message:
-            e instanceof AgentError ? e.message : "Agent transport failed",
-          retryable: e instanceof AgentError ? e.retryable : false,
-          finish: "error",
-        };
-      fail("error", marker.message);
+      },
     });
-    return stream;
   };
 
   // Orchard history → Pi transcript. Raw arguments strings parse once here;

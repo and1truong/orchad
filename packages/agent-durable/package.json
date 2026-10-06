@@ -1,0 +1,36 @@
+{
+  "name": "@orchard/agent-durable",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Durable agent runner for Orchard hosts: pi-durable Harness over SQLite with the shared Mango transport seam, host-tool journal and safe-replay rules.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npm run vendor:client && tsc -p tsconfig.json",
+    "test": "npm run vendor:client && node --import tsx --test tests/*.test.ts",
+    "check": "tsc --noEmit",
+    "vendor:client": "npm --prefix ../../mango run build -w @orchard/agent-client"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.0.4",
+    "@earendil-works/pi-ai": "1.0.4",
+    "@earendil-works/pi-durable": "1.0.4",
+    "@orchard/agent-client": "file:../../mango/packages/agent-client",
+    "@orchard/bridge-contract": "file:../bridge-contract"
+  },
+  "devDependencies": {
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  }
+}
