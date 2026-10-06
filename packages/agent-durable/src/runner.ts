@@ -236,7 +236,7 @@ export async function openRunner(
               };
             const result = await live.dispatch(envelope, attempt, ctx);
             if (result.ok && typeof result.revision === "number")
-              revisionByTarget.set(envelope.targetId, result.revision);
+              revisionByTarget.set(envelope.targetId, Math.max(revisionByTarget.get(envelope.targetId) ?? -1, result.revision));
             return result;
           },
         }),

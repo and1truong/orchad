@@ -21,6 +21,11 @@ jobs:
         run: npm ci
       - working-directory: mango
         run: npm ci
+      - name: Pear and Lime dependencies for actual durable domain recovery
+        working-directory: pear
+        run: npm ci
+      - working-directory: lime
+        run: npm ci
       - working-directory: packages/agent-durable
         run: |
           npm ci
