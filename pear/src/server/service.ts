@@ -14,15 +14,20 @@ import {
   humanTools,
   object,
   courseSchema,
+  itemSchema,
+  libraryWrites,
 } from "../shared/catalog.ts";
 import {
   appId,
   type Call,
   type Course,
+  type ContentItem,
+  type Lesson,
   type Principal,
   type Result,
   type Role,
 } from "../shared/model.ts";
+import { requiredLessonIds } from "../shared/progression.ts";
 const callSchema = object({
   requestId: { type: "string", minLength: 1, maxLength: Bounds.id },
   documentId: { type: "string", minLength: 1, maxLength: Bounds.documentId },
@@ -129,6 +134,32 @@ export class LearningService {
     if (!v) reject("NOT_FOUND", "Course version unavailable");
     return decode(v.content);
   }
+  private contentItem(p: Principal, id: string) {
+    const row = this.db
+      .prepare("SELECT * FROM content_items WHERE id=? AND tenant=?")
+      .get(id, p.tenant) as any;
+    if (!row) reject("NOT_FOUND", "Content item unavailable");
+    return row;
+  }
+  private itemVersion(p: Principal, id: string, version: number): ContentItem {
+    this.contentItem(p, id);
+    const row = this.db
+      .prepare(
+        "SELECT content FROM content_item_versions WHERE item_id=? AND version=?",
+      )
+      .get(id, version) as any;
+    if (!row) reject("NOT_FOUND", "Published content version unavailable");
+    return decode(row.content);
+  }
+  private itemPreview(row: any, value: ContentItem) {
+    const { text, url, transcript, ...metadata } = value;
+    return {
+      id: row.id,
+      state: row.state,
+      version: row.latest_version,
+      ...metadata,
+    };
+  }
   private enrollment(p: Principal, id: string) {
     const e = this.db
       .prepare(
@@ -163,6 +194,8 @@ export class LearningService {
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
     if (a.courseId && c.toolName !== "learning_create_course")
       this.course(p, a.courseId);
+    if (a.itemId && c.toolName !== "learning_create_content_item")
+      this.contentItem(p, a.itemId);
   }
   invoke(
     principalId: string,
@@ -191,13 +224,7 @@ export class LearningService {
           : c.expectedRevision !== null || c.idempotencyKey !== null
       )
         reject("INVALID_ARGUMENT", "Invalid revision or idempotency fields");
-      const admin = [
-        "learning_create_course",
-        "learning_update_course",
-        "learning_publish_course",
-        "learning_retire_course",
-        "learning_assign",
-      ].includes(c.toolName);
+      const admin = libraryWrites.has(c.toolName);
       if (
         write &&
         c.documentId !== (admin ? this.library(p) : this.personal(p))
@@ -274,9 +301,11 @@ export class LearningService {
               attemptId: c.arguments.attemptId,
               questionId: c.arguments.questionId,
             }
-          : c.toolName.includes("course")
-            ? { courseId: c.arguments.courseId }
-            : c.arguments;
+          : c.toolName.includes("content_item")
+            ? { itemId: c.arguments.itemId }
+            : c.toolName.includes("course")
+              ? { courseId: c.arguments.courseId }
+              : c.arguments;
       this.db
         .prepare(
           "INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)",
@@ -306,11 +335,12 @@ export class LearningService {
       state: row.state,
       version: row.latest_version,
       ...metadata,
-      lessons: lessons.map(({ id, title, kind, prerequisiteIds }) => ({
-        id,
-        title,
-        kind,
-        prerequisiteIds,
+      lessons: lessons.map((lesson) => ({
+        id: lesson.id,
+        title: lesson.title,
+        kind: lesson.kind,
+        ...(lesson.contentRef ? { contentRef: lesson.contentRef } : {}),
+        prerequisiteIds: requiredLessonIds(content, lesson),
       })),
       quiz: {
         passScore: quiz.passScore,
@@ -341,6 +371,75 @@ export class LearningService {
   ): any {
     const a = args as any;
     switch (name) {
+      case "learning_search_items": {
+        const rows = (
+          this.db
+            .prepare(
+              "SELECT * FROM content_items WHERE tenant=? AND state='published' ORDER BY id",
+            )
+            .all(p.tenant) as any[]
+        )
+          .map((row) =>
+            this.itemPreview(
+              row,
+              this.itemVersion(p, row.id, row.latest_version),
+            ),
+          )
+          .filter(
+            (item) =>
+              !a.query ||
+              (item.title + " " + item.summary)
+                .toLocaleLowerCase()
+                .includes(a.query.toLocaleLowerCase()),
+          );
+        return pageRows(rows, a.offset ?? 0, a.limit ?? 20);
+      }
+      case "learning_get_content_item": {
+        const row = this.contentItem(p, a.itemId);
+        if (row.state !== "published")
+          reject("NOT_FOUND", "Content item is not available for discovery");
+        const item = this.itemVersion(p, row.id, row.latest_version);
+        const preview = this.itemPreview(row, item);
+        return source === "bridge" && !item.aiProcessingAllowed
+          ? {
+              ...preview,
+              contentWithheld: true,
+              reason: "Content is licensed for human reading only.",
+            }
+          : {
+              ...preview,
+              text: item.text,
+              ...(item.url ? { url: item.url } : {}),
+              ...(item.transcript ? { transcript: item.transcript } : {}),
+            };
+      }
+      case "learning_get_content_drafts":
+        return pageRows(
+          (
+            this.db
+              .prepare("SELECT * FROM content_items WHERE tenant=? ORDER BY id")
+              .all(p.tenant) as any[]
+          ).map(({ draft, ...row }) => {
+            const sanitize = (item: ContentItem) =>
+              source === "bridge" && !item.aiProcessingAllowed
+                ? {
+                    title: item.title,
+                    summary: item.summary,
+                    aiProcessingAllowed: false,
+                    contentWithheld: true,
+                  }
+                : item;
+            return {
+              ...row,
+              draft: sanitize(decode(draft)),
+              published: row.latest_version
+                ? sanitize(this.itemVersion(p, row.id, row.latest_version))
+                : null,
+            };
+          }),
+          a.offset ?? 0,
+          a.limit ?? 20,
+        );
       case "learning_search": {
         const candidates = this.db
           .prepare(
@@ -417,7 +516,7 @@ export class LearningService {
           l = v.lessons.find((l) => l.id === a.lessonId);
         if (!l) reject("NOT_FOUND", "Lesson unavailable");
         const complete = decode(e.completed_lessons);
-        if (l.prerequisiteIds.some((id) => !complete.includes(id)))
+        if (requiredLessonIds(v, l).some((id) => !complete.includes(id)))
           reject("FORBIDDEN", "Complete prerequisite lessons first");
         if (source === "bridge" && !v.aiProcessingAllowed)
           return {
@@ -486,6 +585,21 @@ export class LearningService {
           a.offset ?? 0,
           a.limit ?? 20,
         );
+      case "learning_get_course_draft": {
+        const { draft, ...row } = this.course(p, a.courseId),
+          d = decode(draft);
+        return source === "bridge" && !d.aiProcessingAllowed
+          ? {
+              ...row,
+              contentWithheld: true,
+              draft: {
+                title: d.title,
+                summary: d.summary,
+                aiProcessingAllowed: false,
+              },
+            }
+          : { ...row, draft: d };
+      }
       case "learning_report_query": {
         const rows = this.db
           .prepare(
@@ -510,14 +624,57 @@ export class LearningService {
         reject("UNSUPPORTED", "Unknown read");
     }
   }
-  private validateCourse(value: unknown): Course {
+  private validateMedia(l: Pick<Lesson, "kind" | "url" | "transcript">) {
+    if (l.kind !== "text") {
+      if (!l.url) reject("INVALID_ARGUMENT", "External media URL required");
+      let u: URL;
+      try {
+        u = new URL(l.url);
+      } catch {
+        reject("INVALID_ARGUMENT", "Invalid media URL");
+      }
+      if (u!.protocol !== "https:" || u!.username || u!.password)
+        reject("INVALID_ARGUMENT", "Media must use HTTPS without credentials");
+    }
+    if (l.kind === "video" && !l.transcript?.trim())
+      reject("INVALID_ARGUMENT", "Video transcript required");
+  }
+  private validateItem(value: unknown): ContentItem {
+    if (
+      !validateArgs(itemSchema, value) ||
+      Buffer.byteLength(JSON.stringify(value)) > 12 * 1024
+    )
+      reject("INVALID_ARGUMENT", "Invalid standalone content structure");
+    const item = structuredClone(value) as ContentItem;
+    this.validateMedia(item);
+    return item;
+  }
+  private validateCourse(p: Principal, value: unknown): Course {
     if (
       !validateArgs(courseSchema, value) ||
       !withinMessageCap(value) ||
       Buffer.byteLength(JSON.stringify(value)) > 44 * 1024
     )
       reject("INVALID_ARGUMENT", "Invalid course structure");
-    const c = value as Course;
+    const c = structuredClone(value) as Course;
+    // Server snapshots the explicitly pinned item version. Caller-supplied text,
+    // URL or license flags cannot override the authoritative source item.
+    for (const l of c.lessons) {
+      if (!l.contentRef) continue;
+      const ref = l.contentRef,
+        row = this.contentItem(p, ref.itemId);
+      if (row.state !== "published")
+        reject("FORBIDDEN", "Reusable item must be published and available");
+      const item = this.itemVersion(p, ref.itemId, ref.version);
+      l.title = item.title;
+      l.text = item.text;
+      l.kind = item.kind;
+      delete l.url;
+      delete l.transcript;
+      if (item.url) l.url = item.url;
+      if (item.transcript) l.transcript = item.transcript;
+      c.aiProcessingAllowed = c.aiProcessingAllowed && item.aiProcessingAllowed;
+    }
     if (
       new Set(c.lessons.map((l) => l.id)).size !== c.lessons.length ||
       new Set(c.quiz.questions.map((q) => q.id)).size !==
@@ -535,26 +692,43 @@ export class LearningService {
           "Prerequisites must reference distinct earlier lessons",
         );
       prior.add(l.id);
-      if (l.kind !== "text") {
-        if (!l.url) reject("INVALID_ARGUMENT", "External media URL required");
-        let u: URL;
-        try {
-          u = new URL(l.url);
-        } catch {
-          reject("INVALID_ARGUMENT", "Invalid media URL");
-        }
-        if (u!.protocol !== "https:" || u!.username || u!.password)
+      this.validateMedia(l);
+    }
+    if (c.modules) {
+      if (new Set(c.modules.map((m) => m.id)).size !== c.modules.length)
+        reject("INVALID_ARGUMENT", "Duplicate module IDs");
+      const flattened = c.modules.flatMap((m) => m.lessonIds);
+      if (
+        JSON.stringify(flattened) !== JSON.stringify(c.lessons.map((l) => l.id))
+      )
+        reject(
+          "INVALID_ARGUMENT",
+          "Modules must partition every lesson exactly once in course sequence",
+        );
+      const earlier = new Set<string>();
+      for (const m of c.modules) {
+        if (
+          m.prerequisiteIds.some((id) => !earlier.has(id)) ||
+          new Set(m.prerequisiteIds).size !== m.prerequisiteIds.length
+        )
           reject(
             "INVALID_ARGUMENT",
-            "Media must use HTTPS without credentials",
+            "Module prerequisites must reference distinct earlier modules",
           );
+        earlier.add(m.id);
       }
-      if (l.kind === "video" && !l.transcript)
-        reject("INVALID_ARGUMENT", "Video transcript required");
     }
     for (const q of c.quiz.questions)
       if (q.correct >= q.options.length)
         reject("INVALID_ARGUMENT", "Correct choice outside options");
+    if (
+      !validateArgs(courseSchema, c) ||
+      Buffer.byteLength(JSON.stringify(c)) > 44 * 1024
+    )
+      reject(
+        "INVALID_ARGUMENT",
+        "Resolved course exceeds schema or byte bounds",
+      );
     return c;
   }
   private enroll(
@@ -607,6 +781,52 @@ export class LearningService {
   ): any {
     const a = args as any;
     switch (name) {
+      case "learning_create_content_item": {
+        const item = this.validateItem(a.item);
+        if (
+          this.db
+            .prepare("SELECT 1 FROM content_items WHERE id=?")
+            .get(a.itemId)
+        )
+          reject("INVALID_ARGUMENT", "Content item ID already exists");
+        this.db
+          .prepare("INSERT INTO content_items VALUES(?,?,'draft',?,0)")
+          .run(a.itemId, p.tenant, JSON.stringify(item));
+        return { itemId: a.itemId, state: "draft" };
+      }
+      case "learning_update_content_item": {
+        this.contentItem(p, a.itemId);
+        const item = this.validateItem(a.item);
+        this.db
+          .prepare("UPDATE content_items SET draft=? WHERE id=?")
+          .run(JSON.stringify(item), a.itemId);
+        return { itemId: a.itemId, draftUpdated: true };
+      }
+      case "learning_publish_content_item": {
+        const row = this.contentItem(p, a.itemId),
+          item = this.validateItem(decode(row.draft)),
+          version = row.latest_version + 1;
+        this.db
+          .prepare("INSERT INTO content_item_versions VALUES(?,?,?)")
+          .run(row.id, version, JSON.stringify(item));
+        this.db
+          .prepare(
+            "UPDATE content_items SET state='published',latest_version=? WHERE id=?",
+          )
+          .run(version, row.id);
+        return { itemId: row.id, version, state: "published" };
+      }
+      case "learning_retire_content_item": {
+        this.contentItem(p, a.itemId);
+        this.db
+          .prepare("UPDATE content_items SET state='retired' WHERE id=?")
+          .run(a.itemId);
+        return {
+          itemId: a.itemId,
+          state: "retired",
+          courseSnapshotsPreserved: true,
+        };
+      }
       case "learning_enroll":
         return this.enroll(p, a.courseId, p.id, null, null);
       case "learning_set_bookmark": {
@@ -629,7 +849,7 @@ export class LearningService {
           l = v.lessons.find((l) => l.id === a.lessonId);
         if (!l) reject("NOT_FOUND", "Lesson unavailable");
         const completed = decode(e.completed_lessons);
-        if (l.prerequisiteIds.some((id) => !completed.includes(id)))
+        if (requiredLessonIds(v, l).some((id) => !completed.includes(id)))
           reject("FORBIDDEN", "Complete prerequisites first");
         if (!completed.includes(l.id)) completed.push(l.id);
         this.db
@@ -729,7 +949,7 @@ export class LearningService {
         };
       }
       case "learning_create_course": {
-        const c = this.validateCourse(a.course);
+        const c = this.validateCourse(p, a.course);
         if (this.db.prepare("SELECT 1 FROM courses WHERE id=?").get(a.courseId))
           reject("INVALID_ARGUMENT", "Course ID already exists");
         this.db
@@ -738,7 +958,7 @@ export class LearningService {
         return { courseId: a.courseId, state: "draft" };
       }
       case "learning_update_course": {
-        const c = this.validateCourse(a.course);
+        const c = this.validateCourse(p, a.course);
         this.course(p, a.courseId);
         this.db
           .prepare("UPDATE courses SET draft=? WHERE id=?")
@@ -747,7 +967,7 @@ export class LearningService {
       }
       case "learning_publish_course": {
         const c = this.course(p, a.courseId),
-          draft = this.validateCourse(decode(c.draft)),
+          draft = this.validateCourse(p, decode(c.draft)),
           v = c.latest_version + 1;
         this.db
           .prepare("INSERT INTO course_versions VALUES(?,?,?)")

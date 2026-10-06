@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture } from "./helpers.ts";
 import { createApp } from "../src/server/app.ts";
+import { data } from "./helpers.ts";
 const origin = "http://127.0.0.1:4314";
 async function login(app: any, user = "learner-a") {
   const r = await app.inject({
@@ -23,6 +24,88 @@ async function login(app: any, user = "learner-a") {
     body: b,
   };
 }
+test("standalone authoring HTTP and bridge share tenant/role/egress checks", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  const item = {
+    title: "Private item",
+    summary: "Original fixture",
+    language: "en",
+    provider: "Pear Originals",
+    license: "self-authored",
+    aiProcessingAllowed: false,
+    kind: "text",
+    text: "Human-only source content",
+  };
+  try {
+    const editor = await login(app, "editor");
+    const envelope = {
+      requestId: "item-http",
+      documentId: "library:demo",
+      toolName: "learning_create_content_item",
+      arguments: { itemId: "http-item", item },
+      expectedRevision: 0,
+      idempotencyKey: "http-item-key",
+    };
+    const saved = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: editor.headers,
+      payload: envelope,
+    });
+    assert.equal(saved.statusCode, 200);
+    data(saved.json());
+    data(
+      f.call("editor", "learning_publish_content_item", {
+        itemId: "http-item",
+      }),
+    );
+    const learner = await login(app);
+    const read = {
+      requestId: "item-read",
+      documentId: "learning:demo:learner-a",
+      toolName: "learning_get_content_item",
+      arguments: { itemId: "http-item" },
+      expectedRevision: null,
+      idempotencyKey: null,
+    };
+    const bridge = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: learner.headers,
+      payload: read,
+    });
+    assert.equal(data(bridge.json()).contentWithheld, true);
+    assert.equal(JSON.stringify(bridge.json()).includes(item.text), false);
+    const human = await app.inject({
+      method: "POST",
+      url: "/api/human/invoke",
+      headers: learner.headers,
+      payload: read,
+    });
+    assert.equal(data(human.json()).text, item.text);
+    for (const url of ["/api/human/invoke", "/api/bridge/invoke"]) {
+      const denied = await app.inject({
+        method: "POST",
+        url,
+        headers: learner.headers,
+        payload: { ...envelope, expectedRevision: 2, idempotencyKey: "denied" },
+      });
+      assert.equal(denied.json().error.code, "FORBIDDEN");
+    }
+    const outsider = await login(app, "outsider");
+    const denied = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: outsider.headers,
+      payload: { ...read, documentId: "learning:other:outsider" },
+    });
+    assert.equal(denied.json().error.code, "NOT_FOUND");
+  } finally {
+    await app.close();
+    f.db.close();
+  }
+});
 
 test("HTTP auth, origin, host, CSRF, session binding and account switch fail closed", async () => {
   const f = fixture(),

@@ -141,6 +141,7 @@ nav button {
   margin-top: 24px;
 }
 main {
+  min-width: 0;
   padding: 44px 52px;
   max-width: 1600px;
   width: 100%;
@@ -315,6 +316,7 @@ video {
   margin: 0;
 }
 fieldset {
+  min-inline-size: 0;
   border: 1px solid #dce4d7;
   border-radius: 10px;
   margin: 20px 0;
@@ -322,11 +324,26 @@ fieldset {
 }
 legend {
   padding: 0 10px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .editor {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+.option-row {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.option-row label {
+  flex: 1;
+  min-width: 0;
+}
+.option-row button {
+  font-size: 12px;
 }
 .table-wrap {
   overflow: auto;
@@ -401,8 +418,18 @@ footer {
   }
 }
 @media (max-width: 700px) {
+  .option-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .option-row button {
+    align-self: start;
+  }
+  .muted {
+    overflow-wrap: anywhere;
+  }
   .shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   aside {
     padding: 16px;

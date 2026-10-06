@@ -38,6 +38,25 @@ export interface Lesson {
   url?: string;
   transcript?: string;
   prerequisiteIds: string[];
+  contentRef?: { itemId: string; version: number };
+}
+export interface ContentItem {
+  title: string;
+  summary: string;
+  language: "en" | "vi";
+  provider: string;
+  license: "self-authored";
+  aiProcessingAllowed: boolean;
+  kind: Lesson["kind"];
+  text: string;
+  url?: string;
+  transcript?: string;
+}
+export interface CourseModule {
+  id: string;
+  title: string;
+  lessonIds: string[];
+  prerequisiteIds: string[];
 }
 export interface Question {
   id: string;
@@ -57,6 +76,7 @@ export interface Course {
   license: "self-authored";
   completionPolicy: "human_attestation_and_quiz";
   lessons: Lesson[];
+  modules?: CourseModule[];
   quiz: { passScore: number; maxAttempts: number; questions: Question[] };
 }
 export interface Bridge {

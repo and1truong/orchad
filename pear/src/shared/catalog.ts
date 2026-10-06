@@ -29,6 +29,7 @@ const lesson = object(
     url: { type: "string", maxLength: 2048 },
     transcript: { type: "string", maxLength: 2500 },
     prerequisiteIds: array(string(64), 8),
+    contentRef: object({ itemId: string(64), version: integer(100000, 1) }),
   },
   ["id", "title", "text", "kind", "prerequisiteIds"],
 );
@@ -38,7 +39,31 @@ const question = object({
   options: array(string(240), 6, 2),
   correct: integer(5),
 });
-export const courseSchema = object({
+export const itemSchema = object(
+  {
+    title: string(160),
+    summary: string(600),
+    language: enumeration("en", "vi"),
+    provider: string(100),
+    license: enumeration("self-authored"),
+    aiProcessingAllowed: { type: "boolean" },
+    kind: enumeration("text", "video", "link"),
+    text: string(2500),
+    url: { type: "string", maxLength: 2048 },
+    transcript: { type: "string", maxLength: 2500 },
+  },
+  [
+    "title",
+    "summary",
+    "language",
+    "provider",
+    "license",
+    "aiProcessingAllowed",
+    "kind",
+    "text",
+  ],
+);
+const courseProperties = {
   title: string(160),
   summary: string(600),
   topic: string(80),
@@ -50,12 +75,38 @@ export const courseSchema = object({
   license: enumeration("self-authored"),
   completionPolicy: enumeration("human_attestation_and_quiz"),
   lessons: array(lesson, 8, 1),
+  modules: array(
+    object({
+      id: string(64),
+      title: string(160),
+      lessonIds: array(string(64), 8, 1),
+      prerequisiteIds: array(string(64), 8),
+    }),
+    8,
+    1,
+  ),
   quiz: object({
     passScore: integer(100, 1),
     maxAttempts: integer(10, 1),
     questions: array(question, 8, 1),
   }),
-});
+};
+export const courseSchema = object(
+  courseProperties,
+  Object.keys(courseProperties).filter((k) => k !== "modules"),
+);
+// Shared aggregate mapping for UI/test helpers and authoritative server validation.
+export const libraryWrites = new Set([
+  "learning_create_course",
+  "learning_update_course",
+  "learning_publish_course",
+  "learning_retire_course",
+  "learning_assign",
+  "learning_create_content_item",
+  "learning_update_content_item",
+  "learning_publish_content_item",
+  "learning_retire_content_item",
+]);
 const tool = (
   name: string,
   effect: Tool["effect"],
@@ -71,6 +122,23 @@ const tool = (
 const id = { courseId: string() };
 const enrollment = { enrollmentId: string() };
 export const learnerTools: Tool[] = [
+  tool(
+    "learning_search_items",
+    "read",
+    {
+      query: { type: "string", maxLength: 160 },
+      offset: integer(100000),
+      limit: integer(20, 1),
+    },
+    "Discover published standalone item metadata. Items have no course completion or certificate.",
+    [],
+  ),
+  tool(
+    "learning_get_content_item",
+    "read",
+    { itemId: string(64) },
+    "Read current published standalone content, respecting model-processing permission.",
+  ),
   tool(
     "learning_search",
     "read",
@@ -138,6 +206,43 @@ export const learnerTools: Tool[] = [
   ),
 ];
 export const adminTools: Tool[] = [
+  tool(
+    "learning_get_course_draft",
+    "read",
+    { courseId: string(64) },
+    "Read one authorized course draft with model-processing restrictions.",
+  ),
+  tool(
+    "learning_create_content_item",
+    "write",
+    { itemId: string(64), item: itemSchema },
+    "Create a self-authored standalone content draft.",
+  ),
+  tool(
+    "learning_update_content_item",
+    "write",
+    { itemId: string(64), item: itemSchema },
+    "Update draft without changing published item versions or course snapshots.",
+  ),
+  tool(
+    "learning_publish_content_item",
+    "write",
+    { itemId: string(64) },
+    "Publish immutable reusable content version. References specify exact versions.",
+  ),
+  tool(
+    "learning_retire_content_item",
+    "destructive",
+    { itemId: string(64) },
+    "Stop discovery and new course publication using this item; existing course snapshots remain available.",
+  ),
+  tool(
+    "learning_get_content_drafts",
+    "read",
+    { offset: integer(100000), limit: integer(20, 1) },
+    "Read scoped standalone drafts and published versions with model-egress checks.",
+    [],
+  ),
   tool(
     "learning_create_course",
     "write",

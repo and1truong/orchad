@@ -1,7 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createBridge, invoke, request, type Session } from "./api.ts";
-import type { Course } from "../shared/model.ts";
+import {
+  CourseEditor,
+  newCourse,
+  type DraftSelection,
+} from "./course-editor.tsx";
+import {
+  ContentLibrary,
+  StandaloneReader,
+  type ContentDraft,
+} from "./content-library.tsx";
 import "./style.css";
 const labels = {
   en: {
@@ -66,17 +75,15 @@ function App() {
     [draftOffset, setDraftOffset] = useState(0),
     [catalogTotal, setCatalogTotal] = useState(0),
     [draftNext, setDraftNext] = useState<number | null>(null);
-  const [editing, setEditing] = useState<string | null>(null),
-    [form, setForm] = useState({
-      id: "",
-      title: "",
-      summary: "",
-      lesson: "",
-      question: "",
-      option0: "",
-      option1: "",
-      correct: 1,
-    });
+  const [editing, setEditing] = useState<DraftSelection | null>(null),
+    [editorKey, setEditorKey] = useState(0),
+    [contentDrafts, setContentDrafts] = useState<ContentDraft[]>([]),
+    [contentOffset, setContentOffset] = useState(0),
+    [contentNext, setContentNext] = useState<number | null>(null),
+    [standalone, setStandalone] = useState<any[]>([]),
+    [standaloneOffset, setStandaloneOffset] = useState(0),
+    [standaloneNext, setStandaloneNext] = useState<number | null>(null),
+    [readingItem, setReadingItem] = useState<any>(null);
   const sessionRef = useRef<Session | null>(null);
   const refreshGeneration = useRef(0);
   const setSession = (next: Session | null) => {
@@ -94,6 +101,11 @@ function App() {
     setCertificate(null);
     setPreview(null);
     setEditing(null);
+    setContentDrafts([]);
+    setContentOffset(0);
+    setStandalone([]);
+    setStandaloneOffset(0);
+    setReadingItem(null);
     setCatalogOffset(0);
     setLearningOffset(0);
     setDraftOffset(0);
@@ -133,8 +145,10 @@ function App() {
     setNotice("");
     try {
       await fn();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -163,6 +177,15 @@ function App() {
       offset: learningOffset,
       limit: 20,
     });
+    const itemPage =
+      view === "catalog"
+        ? await op("learning_search_items", {
+            query,
+            offset: standaloneOffset,
+            limit: 20,
+          })
+        : null;
+    let itemDraftPage: any = null;
     let draftContinuation: number | null = null;
     let draftRows: any[] = [],
       reportRows: any[] = [],
@@ -171,6 +194,10 @@ function App() {
       if (["admin", "content_admin"].includes(session.principal.role)) {
         const page = await op("learning_get_drafts", {
           offset: draftOffset,
+          limit: 20,
+        });
+        itemDraftPage = await op("learning_get_content_drafts", {
+          offset: contentOffset,
           limit: 20,
         });
         draftRows = page.items;
@@ -194,6 +221,14 @@ function App() {
     setDrafts(draftRows);
     setReport(reportRows);
     setAudience(users);
+    if (itemPage) {
+      setStandalone(itemPage.items);
+      setStandaloneNext(itemPage.nextOffset);
+    }
+    if (itemDraftPage) {
+      setContentDrafts(itemDraftPage.items);
+      setContentNext(itemDraftPage.nextOffset);
+    }
   };
   useEffect(() => {
     void refresh().catch((e) => {
@@ -210,6 +245,8 @@ function App() {
     catalogOffset,
     learningOffset,
     draftOffset,
+    contentOffset,
+    standaloneOffset,
   ]);
   const mutate = async (
     name: string,
@@ -401,7 +438,11 @@ function App() {
                 <input
                   placeholder="Try systems, learning, security…"
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setStandaloneOffset(0);
+                    setCatalogOffset(0);
+                  }}
                 />
               </label>
               <label>
@@ -534,6 +575,65 @@ function App() {
               <p>No matching permitted content. Adjust your filters.</p>
             )}
           </>
+        )}
+        {view === "catalog" && (
+          <section aria-label="Standalone discovery">
+            <h2>Standalone items</h2>
+            <p className="muted">
+              Reading an item does not create course progress. Search keywords
+              apply to both catalogs; course filters apply to courses only.
+            </p>
+            {standalone.length === 0 && (
+              <p>No published standalone items match.</p>
+            )}
+            {standalone.map((item) => (
+              <section className="learning-row" key={item.id}>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>
+                    {item.summary} · {item.language} · {item.kind} · v
+                    {item.version}
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    void run(async () => {
+                      const value = await op("learning_get_content_item", {
+                        itemId: item.id,
+                      });
+                      if (sessionRef.current === session) setReadingItem(value);
+                    })
+                  }
+                >
+                  Read item
+                </button>
+              </section>
+            ))}
+            <div className="actions">
+              <button
+                className="ghost"
+                disabled={standaloneOffset === 0}
+                onClick={() =>
+                  setStandaloneOffset(Math.max(0, standaloneOffset - 20))
+                }
+              >
+                Previous standalone
+              </button>
+              <button
+                className="ghost"
+                disabled={standaloneNext === null}
+                onClick={() => setStandaloneOffset(standaloneNext!)}
+              >
+                Next standalone
+              </button>
+            </div>
+            {readingItem && (
+              <StandaloneReader
+                item={readingItem}
+                onClose={() => setReadingItem(null)}
+              />
+            )}
+          </section>
         )}
         {preview && (
           <section className="panel" aria-label="Course preview">
@@ -681,6 +781,11 @@ function App() {
               <section className="panel">
                 <h2>{active.course.title}</h2>
                 <nav className="lesson-nav">
+                  {active.course.modules?.map((m: any) => (
+                    <span className="badge" key={m.id}>
+                      {m.title}
+                    </span>
+                  ))}
                   {active.course.lessons.map((l: any) => (
                     <button
                       className="ghost"
@@ -881,17 +986,12 @@ function App() {
                         <button
                           className="ghost"
                           onClick={() => {
-                            setEditing(d.id);
-                            setForm({
+                            setEditing({
                               id: d.id,
-                              title: d.draft.title,
-                              summary: d.draft.summary,
-                              lesson: d.draft.lessons[0].text,
-                              question: d.draft.quiz.questions[0].prompt,
-                              option0: d.draft.quiz.questions[0].options[0],
-                              option1: d.draft.quiz.questions[0].options[1],
-                              correct: d.draft.quiz.questions[0].correct,
+                              course: structuredClone(d.draft),
+                              exists: true,
                             });
+                            setEditorKey((n) => n + 1);
                           }}
                         >
                           Edit draft
@@ -929,159 +1029,88 @@ function App() {
                     </section>
                   ))}
                 </div>
-                <section className="panel">
-                  <h2>
-                    {editing ? "Edit course draft" : "Create course draft"}
-                  </h2>
-                  <form
-                    className="editor"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void run(async () => {
-                        const base = editing
-                          ? (structuredClone(
-                              drafts.find((d) => d.id === editing).draft,
-                            ) as Course)
-                          : null;
-                        const c: Course = base ?? {
-                          title: "",
-                          summary: "",
-                          topic: "Learning skills",
-                          language: "en",
-                          duration: 10,
-                          level: "beginner",
-                          provider: "Pear Originals",
-                          license: "self-authored",
-                          aiProcessingAllowed: true,
-                          completionPolicy: "human_attestation_and_quiz",
-                          lessons: [
-                            {
-                              id: "lesson-1",
-                              title: "Introduction",
-                              text: "",
-                              kind: "text",
-                              prerequisiteIds: [],
-                            },
-                          ],
-                          quiz: {
-                            passScore: 100,
-                            maxAttempts: 2,
-                            questions: [
-                              {
-                                id: "question-1",
-                                prompt: "",
-                                options: ["", ""],
-                                correct: 1,
-                              },
-                            ],
-                          },
-                        };
-                        c.title = form.title;
-                        c.summary = form.summary;
-                        c.lessons[0].text = form.lesson;
-                        c.quiz.questions[0].prompt = form.question;
-                        c.quiz.questions[0].options[0] = form.option0;
-                        c.quiz.questions[0].options[1] = form.option1;
-                        c.quiz.questions[0].correct = Number(form.correct);
-                        await mutate(
-                          editing
-                            ? "learning_update_course"
-                            : "learning_create_course",
-                          { courseId: form.id, course: c },
-                        );
-                        setNotice("Draft saved. Publish when ready.");
-                      });
-                    }}
+                <div className="actions">
+                  <button
+                    className="ghost"
+                    disabled={draftOffset === 0 || busy}
+                    onClick={() =>
+                      setDraftOffset(Math.max(0, draftOffset - 20))
+                    }
                   >
-                    {(
-                      [
-                        "id",
-                        "title",
-                        "summary",
-                        "lesson",
-                        "question",
-                        "option0",
-                        "option1",
-                      ] as const
-                    ).map((k) => (
-                      <label key={k}>
-                        {
-                          {
-                            id: "Course ID",
-                            title: "Title",
-                            summary: "Summary",
-                            lesson: "First lesson text",
-                            question: "First quiz question",
-                            option0: "Option A",
-                            option1: "Option B",
-                          }[k]
-                        }
-                        {k === "lesson" ? (
-                          <textarea
-                            required
-                            maxLength={2500}
-                            value={form[k]}
-                            onChange={(e) =>
-                              setForm({ ...form, [k]: e.target.value })
-                            }
-                          />
-                        ) : (
-                          <input
-                            required
-                            disabled={k === "id" && !!editing}
-                            maxLength={
-                              k === "summary"
-                                ? 600
-                                : k === "question"
-                                  ? 400
-                                  : k === "id"
-                                    ? 64
-                                    : 160
-                            }
-                            value={form[k]}
-                            onChange={(e) =>
-                              setForm({ ...form, [k]: e.target.value })
-                            }
-                          />
-                        )}
-                      </label>
-                    ))}
-                    <label>
-                      Correct option
-                      <select
-                        value={form.correct}
-                        onChange={(e) =>
-                          setForm({ ...form, correct: Number(e.target.value) })
-                        }
-                      >
-                        <option value="0">A</option>
-                        <option value="1">B</option>
-                      </select>
-                    </label>
-                    <button disabled={busy}>Save draft</button>
-                    {editing && (
-                      <button
-                        type="button"
-                        className="ghost"
-                        onClick={() => {
-                          setEditing(null);
-                          setForm({
-                            id: "",
-                            title: "",
-                            summary: "",
-                            lesson: "",
-                            question: "",
-                            option0: "",
-                            option1: "",
-                            correct: 1,
-                          });
-                        }}
-                      >
-                        New course
-                      </button>
-                    )}
-                  </form>
-                </section>
+                    Previous courses
+                  </button>
+                  <button
+                    className="ghost"
+                    disabled={draftNext === null || busy}
+                    onClick={() => setDraftOffset(draftNext!)}
+                  >
+                    Next courses
+                  </button>
+                </div>
+                <CourseEditor
+                  key={String(editorKey) + ":" + session.sessionEpoch}
+                  selection={
+                    editing ?? { id: "", course: newCourse(), exists: false }
+                  }
+                  reusableItems={contentDrafts}
+                  busy={busy}
+                  onNew={() => {
+                    setEditing(null);
+                    setEditorKey((n) => n + 1);
+                  }}
+                  onSave={(courseId, course, exists) =>
+                    void run(async () => {
+                      await mutate(
+                        exists
+                          ? "learning_update_course"
+                          : "learning_create_course",
+                        { courseId, course },
+                      );
+                      const saved = await op("learning_get_course_draft", {
+                        courseId,
+                      });
+                      if (sessionRef.current !== session) return;
+                      setEditing({
+                        id: courseId,
+                        course: saved.draft,
+                        exists: true,
+                      });
+                      setEditorKey((n) => n + 1);
+                      setNotice("Draft saved. Publish when ready.");
+                    })
+                  }
+                />
+                <ContentLibrary
+                  key={session.sessionEpoch}
+                  items={contentDrafts}
+                  busy={busy}
+                  offset={contentOffset}
+                  nextOffset={contentNext}
+                  onPage={setContentOffset}
+                  onSave={(itemId, item, exists) =>
+                    run(async () => {
+                      await mutate(
+                        exists
+                          ? "learning_update_content_item"
+                          : "learning_create_content_item",
+                        { itemId, item },
+                      );
+                      setNotice(
+                        "Item draft saved. Publish to make it reusable.",
+                      );
+                    })
+                  }
+                  onAction={(name, itemId) =>
+                    void run(async () => {
+                      await mutate(name, { itemId });
+                      setNotice(
+                        name === "learning_publish_content_item"
+                          ? "Item version published."
+                          : "Item retired. Existing course snapshots preserved.",
+                      );
+                    })
+                  }
+                />
               </>
             )}
             {["admin", "manager"].includes(role) && (

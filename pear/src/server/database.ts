@@ -12,6 +12,9 @@ export function openDatabase(path: string, seed = false) {
   db.exec(
     readFileSync(new URL("../../migrations/001.sql", import.meta.url), "utf8"),
   );
+  db.exec(
+    readFileSync(new URL("../../migrations/002.sql", import.meta.url), "utf8"),
+  );
   if (seed) {
     db.exec("BEGIN IMMEDIATE");
     try {
