@@ -19,5 +19,6 @@ test("author audience persists through reload, hides learner discovery and can b
   await page.screenshot({path:"artifacts/content-audience-authoring.png",fullPage:true});
   await page.getByRole("button",{name:"Sign out",exact:true}).click();await login("learner-a");await page.getByRole("button",{name:"Explore",exact:true}).click();await expect(page.locator(".cards article").filter({has:page.getByRole("heading",{name:course.title,exact:true})})).toHaveCount(1);
   expect(f.db.prepare("SELECT content FROM course_versions WHERE course_id='audience-ui' AND version=1").get()!.content).toContain('"access":"author"');
- }finally{await app.close();f.db.close();}
+ console.log("content audience assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();console.log("content audience cleanup: complete");}
 });
