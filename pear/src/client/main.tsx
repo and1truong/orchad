@@ -1273,14 +1273,13 @@ function App() {
                       <div className="actions">
                         <button
                           className="ghost"
-                          onClick={() => {
-                            setEditing({
-                              id: d.id,
-                              course: structuredClone(d.draft),
-                              exists: true,
-                            });
+                          disabled={busy}
+                          onClick={() => void run(async () => {
+                            const latest=await op("learning_get_course_draft",{courseId:d.id});
+                            if(sessionRef.current!==session||docRef.current!==doc)return;
+                            setEditing({id:d.id,course:structuredClone(latest.draft),exists:true});
                             setEditorKey((n) => n + 1);
-                          }}
+                          })}
                         >{translateUI("Edit draft")}</button>
                         <button
                           onClick={() =>
