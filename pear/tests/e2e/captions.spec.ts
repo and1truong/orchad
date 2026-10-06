@@ -21,7 +21,7 @@ test("human uploads original timed captions, reads native cues and opens transcr
  await library.getByLabel("Content file",{exact:true}).setInputFiles({name:"original.wav",mimeType:"audio/wav",buffer:wav});
  await expect(library.getByRole("status")).toContainText("Stored original.wav");
  await library.getByText("Add or review caption tracks",{exact:true}).click();
- const captions=library.getByRole("group",{name:"Original audio/video captions",exact:true});
+ const captions=library.getByRole("group",{name:"Caption authoring",exact:true});
  await captions.getByLabel("I own this content and may upload it",{exact:true}).check();
  await captions.getByLabel("Content file",{exact:true}).setInputFiles({name:"original.vtt",mimeType:"text/vtt",
   buffer:Buffer.from("WEBVTT\n\n00:00.000 --> 00:00.500\nOriginal timed caption\n")});

@@ -172,6 +172,7 @@ export function ContentLibrary({
             <label>
               Item format
               <select
+                aria-label="Item format"
                 value={item.kind}
                 onChange={(e) =>
                   setItem({
