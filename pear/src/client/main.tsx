@@ -1167,7 +1167,7 @@ function App() {
             {certificate && (
               <Certificate
                 key={session.sessionEpoch + certificate.id}
-                certificate={certificate}
+                certificate={certificate} session={session}
               />
             )}
           </>

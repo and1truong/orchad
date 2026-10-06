@@ -483,7 +483,7 @@ export function Programs(props: Props) {
           {certificate && (
             <Certificate
               key={props.session.sessionEpoch + certificate.id}
-              certificate={certificate}
+              certificate={certificate} session={props.session}
               award
             />
           )}

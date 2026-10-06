@@ -1,14 +1,20 @@
 import {translateUI} from "./i18n.ts";
-import React, { useRef } from "react";
+import React, { useRef,useEffect,useState } from "react";
+import type {Session} from "./api.ts";
 import { printView } from "./print.ts";
 export function Certificate({
   certificate: c,
   award = false,
+  session,
 }: {
   certificate: any;
   award?: boolean;
+  session?:Session;
 }) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLElement>(null),alive=useRef(true);
+  const [saving,setSaving]=useState(false),[downloadError,setDownloadError]=useState("");
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
+  const downloadPDF=async()=>{if(!session||saving)return;setSaving(true);setDownloadError("");try{const response=await fetch((award?"/api/award-certificates/":"/api/certificates/")+encodeURIComponent(c.id)+"/pdf",{credentials:"same-origin",headers:{"x-pear-epoch":session.sessionEpoch}});if(!alive.current)return;if(!response.ok){const failure=await response.json();throw Error(failure.error?.message??"Certificate PDF unavailable");}const blob=await response.blob();if(!alive.current)return;const url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`pear-${award?"award":"certificate"}-${c.id}.pdf`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){if(alive.current)setDownloadError(error instanceof Error?error.message:"Certificate PDF unavailable");}finally{if(alive.current)setSaving(false);}};
   const heading = award
       ? "Award completion certificate"
       : "Completion certificate",
@@ -30,7 +36,8 @@ export function Certificate({
       <p>{c.issuer}</p>
       <p>{translateUI("Self-authored development content. This certificate is not accredited.")}</p>
       <div className="print-controls">
-        {c.pdfAvailable&&<a href={(award?"/api/award-certificates/":"/api/certificates/")+encodeURIComponent(c.id)+"/pdf"} download>{translateUI(award?"Download award PDF":"Download certificate PDF")}</a>}
+        {c.pdfAvailable&&session&&<button type="button" disabled={saving} onClick={()=>void downloadPDF()}>{translateUI(award?"Download award PDF":"Download certificate PDF")}</button>}
+        {downloadError&&<p role="alert">{downloadError}</p>}
         <a
           download={`pear-${award ? "award" : "certificate"}-${c.id}.txt`}
           href={"data:text/plain;charset=utf-8," + encodeURIComponent(text)}

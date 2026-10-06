@@ -24,10 +24,11 @@ test("trusted font validation rejects malformed/restricted embedding; unsupporte
 });
 test("authenticated binary PDF route checks owner, live account, Host/session and configured font before export; reads do not change official state",async()=>{
  const f=complete(),origin="http://127.0.0.1:4370",{app}=await createApp({db:f.db,origin,developmentAuth:true,certificateFont:fontBytes});
- async function login(user:string){const r=await app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4370",origin},payload:{username:user,password:user+"-dev"}});assert.equal(r.statusCode,200);return {host:"127.0.0.1:4370",cookie:String(r.headers["set-cookie"]).split(";")[0]!};}
+ async function login(user:string){const r=await app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4370",origin},payload:{username:user,password:user+"-dev"}});assert.equal(r.statusCode,200);return {host:"127.0.0.1:4370",cookie:String(r.headers["set-cookie"]).split(";")[0]!,"x-pear-epoch":r.json().sessionEpoch};}
  try{
   const headers=await login("learner-a"),url="/api/certificates/"+f.id+"/pdf",before=f.db.prepare("SELECT * FROM certificates").all(),response=await app.inject({url,headers});
-  assert.equal(response.statusCode,200);assert.equal(response.headers["content-type"],"application/pdf");assert.match(response.headers["content-disposition"]!,/attachment/);assert.match(response.headers["cache-control"]!,/no-store/);assert.match(execFileSync("pdftotext",["-","-"],{input:response.rawPayload,encoding:"utf8"}),/Nguyễn Trường/);assert.deepEqual(f.db.prepare("SELECT * FROM certificates").all(),before);
+  assert.equal(response.statusCode,200,response.body);assert.equal(response.headers["content-type"],"application/pdf");assert.match(response.headers["content-disposition"]!,/attachment/);assert.match(response.headers["cache-control"]!,/no-store/);assert.match(execFileSync("pdftotext",["-","-"],{input:response.rawPayload,encoding:"utf8"}),/Nguyễn Trường/);assert.deepEqual(f.db.prepare("SELECT * FROM certificates").all(),before);
+  assert.equal((await app.inject({url,headers:{...headers,"x-pear-epoch":"wrong"}})).statusCode,409);
   assert.equal((await app.inject({url,headers:await login("learner-b")})).statusCode,403);assert.equal((await app.inject({url,headers:{host:"127.0.0.1:4370"}})).statusCode,401);assert.notEqual((await app.inject({url,headers:{...headers,host:"evil.example"}})).statusCode,200);
   f.db.prepare("UPDATE accounts SET active=0,auth_version=auth_version+1 WHERE id='learner-a'").run();assert.equal((await app.inject({url,headers})).statusCode,401);
  }finally{await app.close();f.db.close();}
@@ -41,7 +42,7 @@ test("custom award PDF contains actual authoritative earned quantity, original u
 test("production without an explicitly configured font keeps JSON/text proof and denies PDF without guessing a system font",async()=>{
  const f=complete(),origin="http://127.0.0.1:4370",dev=await createApp({db:f.db,origin,developmentAuth:true});let production:any;
  try{
-  const login=await dev.app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4370",origin},payload:{username:"learner-a",password:"learner-a-dev"}});assert.equal(login.statusCode,200);const headers={host:"127.0.0.1:4370",cookie:String(login.headers["set-cookie"]).split(";")[0]!};await dev.app.close();production=(await createApp({db:f.db,origin})).app;
-  const json=await production.inject({url:"/api/certificates/"+f.id,headers});assert.equal(json.statusCode,200);assert.equal(json.json().pdfAvailable,false);const pdf=await production.inject({url:"/api/certificates/"+f.id+"/pdf",headers});assert.equal(pdf.statusCode,403);assert.match(pdf.json().error.message,/not configured/);
+  const login=await dev.app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4370",origin},payload:{username:"learner-a",password:"learner-a-dev"}});assert.equal(login.statusCode,200);const headers={host:"127.0.0.1:4370",cookie:String(login.headers["set-cookie"]).split(";")[0]!,"x-pear-epoch":login.json().sessionEpoch};await dev.app.close();production=(await createApp({db:f.db,origin})).app;
+  const json=await production.inject({url:"/api/certificates/"+f.id,headers});assert.equal(json.statusCode,200,json.body);assert.equal(json.json().pdfAvailable,false);const pdf=await production.inject({url:"/api/certificates/"+f.id+"/pdf",headers});assert.equal(pdf.statusCode,403);assert.match(pdf.json().error.message,/not configured/);
  }finally{if(production)await production.close();else await dev.app.close();f.db.close();}
 });
