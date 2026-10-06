@@ -1,0 +1,18 @@
+{
+  "name": "learning_report_query — learner out of scope",
+  "notes": "Report tools are manager/admin only; a learner's request is denied server-side even when the host offered the tool.",
+  "request": {
+    "requestId": "req-0009",
+    "documentId": "org:org-demo",
+    "toolName": "learning_report_query",
+    "arguments": { "dataset": "completions", "groupId": "grp-eng" },
+    "expectedRevision": null,
+    "idempotencyKey": null
+  },
+  "result": {
+    "ok": false,
+    "revision": 11,
+    "data": null,
+    "error": { "code": "FORBIDDEN", "message": "role learner has no report scope", "retryable": false }
+  }
+}

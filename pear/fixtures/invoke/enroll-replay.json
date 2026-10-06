@@ -1,0 +1,18 @@
+{
+  "name": "learning_enroll — idempotent replay",
+  "notes": "Retry with the same idempotencyKey and same semantic payload returns the stored result; no second enrollment is created.",
+  "request": {
+    "requestId": "req-0003",
+    "documentId": "workspace:u-learner-1",
+    "toolName": "learning_enroll",
+    "arguments": { "contentId": "crs-onb-101" },
+    "expectedRevision": 4,
+    "idempotencyKey": "enr-9c8a2f"
+  },
+  "result": {
+    "ok": true,
+    "revision": 4,
+    "data": { "enrollmentId": "enr-001", "contentId": "crs-onb-101", "contentVersionId": "cv-7", "status": "enrolled" },
+    "error": null
+  }
+}

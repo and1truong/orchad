@@ -1,0 +1,18 @@
+{
+  "name": "host-side denial — APPROVAL_DENIED before dispatch",
+  "notes": "Host produces this envelope without invoking the page when the user denies approval; the app sees no dispatch at all.",
+  "request": {
+    "requestId": "req-0010",
+    "documentId": "enrollment:enr-001",
+    "toolName": "learning_submit_attempt",
+    "arguments": { "attemptId": "att-013" },
+    "expectedRevision": 5,
+    "idempotencyKey": "sub-41cd91"
+  },
+  "result": {
+    "ok": false,
+    "revision": null,
+    "data": null,
+    "error": { "code": "APPROVAL_DENIED", "message": "user denied approval for learning_submit_attempt", "retryable": false }
+  }
+}

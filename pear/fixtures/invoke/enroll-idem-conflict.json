@@ -1,0 +1,18 @@
+{
+  "name": "learning_enroll — same key, different payload",
+  "notes": "Same idempotencyKey bound to a different semantic payload returns IDEMPOTENCY_CONFLICT, not a silent second write.",
+  "request": {
+    "requestId": "req-0004",
+    "documentId": "workspace:u-learner-1",
+    "toolName": "learning_enroll",
+    "arguments": { "contentId": "crs-hr-202" },
+    "expectedRevision": 4,
+    "idempotencyKey": "enr-9c8a2f"
+  },
+  "result": {
+    "ok": false,
+    "revision": 4,
+    "data": null,
+    "error": { "code": "IDEMPOTENCY_CONFLICT", "message": "idempotency key reused with a different payload", "retryable": false }
+  }
+}

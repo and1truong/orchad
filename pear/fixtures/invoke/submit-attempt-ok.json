@@ -1,0 +1,18 @@
+{
+  "name": "learning_submit_attempt — backend grades",
+  "notes": "Score/pass are computed by the backend from the immutable quiz version and saved answers. The caller supplies no score; approval was required_confirm at host.",
+  "request": {
+    "requestId": "req-0008",
+    "documentId": "enrollment:enr-001",
+    "toolName": "learning_submit_attempt",
+    "arguments": { "attemptId": "att-013" },
+    "expectedRevision": 5,
+    "idempotencyKey": "sub-41cd90"
+  },
+  "result": {
+    "ok": true,
+    "revision": 6,
+    "data": { "attemptId": "att-013", "quizVersionId": "qv-3", "score": 80, "passed": true, "status": "graded" },
+    "error": null
+  }
+}

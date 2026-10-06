@@ -1,0 +1,26 @@
+{
+  "name": "learning_get_lesson — no answer keys, per-item egress",
+  "notes": "Lesson payloads never carry correct answers. egress field per item decides whether host may put content into model context (ADR 0005).",
+  "request": {
+    "requestId": "req-0007",
+    "documentId": "enrollment:enr-001",
+    "toolName": "learning_get_lesson",
+    "arguments": { "enrollmentId": "enr-001", "lessonId": "lesson-0042" },
+    "expectedRevision": null,
+    "idempotencyKey": null
+  },
+  "result": {
+    "ok": true,
+    "revision": 1,
+    "data": {
+      "lessonId": "lesson-0042",
+      "title": "Mật khẩu và phishing",
+      "kind": "text",
+      "body": "Nội dung bài học synthetic...",
+      "media": [],
+      "egress": "model_ok",
+      "contentVersionId": "cv-7"
+    },
+    "error": null
+  }
+}
