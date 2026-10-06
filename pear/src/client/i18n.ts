@@ -1,5 +1,7 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Skip to learning content":"Bỏ qua đến nội dung học",
+"Learning navigation":"Điều hướng học",
 "External reported activity":"Hoạt động do nguồn ngoài báo",
 "Connector-reported completion, success, score and duration are separate from Pear official completion, assessment score, observed timers and award credit.":"Completion, kết quả, điểm và thời lượng do connector báo được giữ riêng với completion chính thức, điểm kiểm tra, bộ đếm học và tín chỉ Pear.",
 "No external reported activity is available.":"Chưa có hoạt động do nguồn ngoài báo.",

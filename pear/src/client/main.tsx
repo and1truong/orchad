@@ -114,6 +114,12 @@ function App() {
     [standaloneOffset, setStandaloneOffset] = useState(0),
     [standaloneNext, setStandaloneNext] = useState<number | null>(null),
     [readingItem, setReadingItem] = useState<any>(null);
+  const contentHeading=useRef<HTMLHeadingElement>(null);
+  const previousView=useRef(view);
+  useEffect(()=>{
+    if(session&&previousView.current!==view)contentHeading.current?.focus();
+    previousView.current=view;
+  },[view,session]);
   const sessionRef = useRef<Session | null>(null);
   const refreshGeneration = useRef(0);
   const setSession = (next: Session | null) => {
@@ -389,6 +395,7 @@ function App() {
     canEdit = ["admin", "content_admin"].includes(role);
   return (
     <div className="shell">
+      <a className="skip-link" href="#learning-main">{translateUI("Skip to learning content")}</a>
       <aside>
         <div className="brand">{translateUI("◒ pear")}</div>
         <p className="eyebrow">{translateUI("Learning workspace")}</p>
@@ -405,7 +412,7 @@ function App() {
             ))}
           </select>
         </label>
-        <nav>
+        <nav aria-label={translateUI("Learning navigation")}>
           {[
             ["catalog", t.catalog],
             ["learning", t.learning],
@@ -421,6 +428,7 @@ function App() {
           ].map(([id, text]) => (
             <button
               key={id}
+              aria-current={view===id?"page":undefined}
               disabled={busy}
               className={view === id ? "selected" : "ghost"}
               onClick={() => {
@@ -476,11 +484,11 @@ function App() {
           </button>
         </div>
       </aside>
-      <main>
+      <main id="learning-main" tabIndex={-1}>
         <header>
           <div>
             <p className="eyebrow">{translateUI("Your learning, at your pace")}</p>
-            <h1>
+            <h1 ref={contentHeading} tabIndex={-1}>
               {view === "catalog"
                 ? "Make room for curiosity."
                 : view === "learning"

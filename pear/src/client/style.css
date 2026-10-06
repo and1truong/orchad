@@ -617,3 +617,16 @@ footer {
     display: none !important;
   }
 }
+
+/* Keyboard entry point remains reachable before the long learning navigation. */
+.skip-link {position:fixed;top:8px;left:8px;z-index:1000;transform:translateY(-160%);background:#fff;color:#183d2c;padding:12px 18px;border:2px solid #245c43;border-radius:8px;}
+.skip-link:focus {transform:none;}
+.panel, .panel article, .learning-row > *, .stats > * {min-width:0;}
+.panel p, .panel h3, .lesson-text {overflow-wrap:anywhere;}
+.panel button {max-width:100%;white-space:normal;}
+input[type="checkbox"], input[type="radio"] {width:auto;}
+@media (max-width:400px) {
+ .panel {padding:16px;}
+ .stats div {padding:12px;}
+ .filters label {min-width:0;flex-basis:100%;}
+}
