@@ -107,6 +107,7 @@ export interface Course {
   lessons: Lesson[];
   modules?: CourseModule[];
   quiz: {
+    questionBankRef?:{bankId:string;version:number;questionIds:string[]};
     passScore: number;
     maxAttempts: number;
     questions: Question[];

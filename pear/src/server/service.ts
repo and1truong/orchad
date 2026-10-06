@@ -1,3 +1,4 @@
+import {QuestionBankService} from "./question-banks.ts";
 import {InsightService} from "./insights.ts";
 import {ContentAccess} from "./content-access.ts";
 import {DigestService} from "./digest.ts";
@@ -234,6 +235,7 @@ export class LearningService {
     this.standalone.authorize(p, c.toolName, a);
     this.feedback.authorize(p, c.toolName, a);
     this.blended.authorize(p, c.toolName, a);
+    new QuestionBankService(this.db).authorize(p,c.toolName,a);
     this.programs.authorize(p, c.toolName, a);
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
@@ -264,7 +266,7 @@ export class LearningService {
     if (a.courseId && c.toolName !== "learning_create_course") {
       const row=this.course(p,a.courseId);
       if(c.toolName==="learning_get_session_changes"){ /* Delegated author/instructor scope checked above. */ }
-      else if(["learning_update_course","learning_publish_course","learning_unpublish_course","learning_retire_course","learning_get_course_draft","learning_set_course_assessor"].includes(c.toolName))
+      else if(["learning_update_course","learning_publish_course","learning_unpublish_course","learning_retire_course","learning_get_course_draft","learning_set_course_assessor","learning_apply_question_bank"].includes(c.toolName))
         new ContentAccess(this.db).author(p,"course",row.id,decode(row.draft));
       else if(row.latest_version&&!(c.toolName==="learning_set_bookmark"&&a.saved===false))new ContentAccess(this.db).requireVisible(p,"course",row.id,this.version(row.id,row.latest_version));
     }
@@ -406,7 +408,9 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "human_save_course_feedback"
+        c.toolName === "learning_save_question_bank"
+          ? {bankId:c.arguments.bankId,title:(c.arguments.bank as any).title,access:(c.arguments.bank as any).access,questionCount:(c.arguments.bank as any).questions.length,sourceCourseId:c.arguments.sourceCourseId??null}
+          : c.toolName === "human_save_course_feedback"
           ? {
               enrollmentId: c.arguments.enrollmentId,
               rating: c.arguments.rating,
@@ -512,6 +516,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(["learning_get_question_banks","learning_get_question_bank"].includes(name))return new QuestionBankService(this.db).read(p,name,a,source);
     if(name==="learning_get_my_insights")return new InsightService(this.db).read(p,a);
     if(name==="learning_search_packages")return this.scorm.list(p,false,a.offset??0,a.limit??20);
     if(name==="learning_get_my_package_records"){const value=this.scorm.records(p,a.offset??0,a.limit??20);return {...value,items:value.items.map((r:any)=>({id:r.id,packageId:r.packageId,title:r.title,language:r.language,packageState:r.packageState,revision:r.revision,reportedStatus:r.state["cmi.core.lesson_status"],reportedScore:r.state["cmi.core.score.raw"],reportedSeconds:r.reportedSeconds,updatedAt:r.updatedAt,officialLearningChanged:false}))};}
@@ -933,6 +938,7 @@ export class LearningService {
         earlier.add(m.id);
       }
     }
+    new QuestionBankService(this.db).resolve(p,c,courseId);
     for (const q of c.quiz.questions) validateQuestion(q);
     if (Buffer.byteLength(JSON.stringify(c.quiz)) > 16 * 1024)
       reject("INVALID_ARGUMENT", "Assessment content exceeds 16 KiB budget");
@@ -998,6 +1004,14 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(["learning_save_question_bank","learning_retire_question_bank"].includes(name))return new QuestionBankService(this.db).write(p,name,a);
+    if(name==="learning_apply_question_bank"){
+      const row=this.course(p,a.courseId),draft=decode(row.draft) as Course,selected=new QuestionBankService(this.db).selected(p,a.source,a.courseId);
+      draft.quiz.questions=selected.questions;draft.quiz.questionBankRef=structuredClone(a.source);
+      draft.aiProcessingAllowed=draft.aiProcessingAllowed&&selected.bank.aiProcessingAllowed;
+      const validated=this.validateCourse(p,draft,a.courseId);this.db.prepare("UPDATE courses SET draft=? WHERE id=?").run(JSON.stringify(validated),a.courseId);
+      return {courseId:a.courseId,bankId:a.source.bankId,bankVersion:a.source.version,questionIds:a.source.questionIds,draftUpdated:true,officialLearningChanged:false};
+    }
     if (["learning_save_curation","learning_retire_with_replacement"].includes(name)) return this.curation.write(p,name,a);
     if (["learning_enroll_item", "human_complete_item"].includes(name))
       return this.standalone.write(p, name, a);

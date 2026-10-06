@@ -1,3 +1,4 @@
+import {QuestionBanks} from "./question-banks.tsx";
 import {OwnInsights} from "./insights.tsx";
 import {SessionManagement,SessionNotices} from "./session-changes.tsx";
 import {LearningDigest} from "./digest.tsx";
@@ -1162,6 +1163,7 @@ function App() {
         {view === "admin" &&
           ["admin", "content_admin", "assessor"].includes(role) && (
             <>
+              {canEdit&&<QuestionBanks key={"question-banks:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
               <SessionManagement key={"session-management:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
               {["admin", "assessor"].includes(role) && (
                 <BlendedReviews

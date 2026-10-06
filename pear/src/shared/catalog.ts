@@ -1,3 +1,4 @@
+import {questionBankTools,questionBankLibraryWrites,questionBankRefSchema} from "./question-banks.ts";
 import {packageTools} from "./scorm.ts";
 import {externalActivityTools} from "./xapi.ts";
 import {translationTools} from "./translations.ts";
@@ -122,6 +123,7 @@ const courseProperties = {
   ),
   quiz: object(
     {
+      questionBankRef:questionBankRefSchema,
       passScore: integer(100, 1),
       maxAttempts: integer(10, 1),
       questions: array(questionSchema, 8, 1),
@@ -141,6 +143,7 @@ export const libraryWrites = new Set([
   ...curationLibraryWrites,
   ...blendedLibraryWrites,
   ...assessmentLibraryWrites,
+  ...questionBankLibraryWrites,
   ...programLibraryWrites,
   ...peopleLibraryWrites,
   ...assignmentLibraryWrites,
@@ -343,6 +346,7 @@ export function allCatalog(role: Role): Tool[] {
     ...standaloneTools,
     ...blendedTools(role),
     ...assessmentTools(role),
+    ...questionBankTools(role),
     ...programTools(role),
     ...peopleTools(role),
     ...assignmentTools(role),
@@ -375,7 +379,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
               ...(["admin", "content_admin"].includes(role) ? adminTools : []),
             ]
           : group === "assessments"
-            ? assessmentTools(role)
+            ? [...assessmentTools(role),...questionBankTools(role)]
             : group === "programs"
               ? programTools(role)
               : group === "people"

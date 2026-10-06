@@ -645,8 +645,9 @@ export function CourseEditor({
               <option value="after_exhausted">{translateUI("After all allowed attempts · human player only")}</option>
             </select>
           </label>
+          {course.quiz.questionBankRef&&<div><p>{translateUI("Pinned question bank")} · {course.quiz.questionBankRef.bankId} · v{course.quiz.questionBankRef.version}</p><button type="button" disabled={busy} onClick={()=>update(c=>{delete c.quiz.questionBankRef;})}>{translateUI("Detach bank for manual question edits")}</button></div>}
           {course.quiz.questions.map((q, qi) => (
-            <fieldset key={q.id} aria-label={`Question ${qi + 1}`}>
+            <fieldset key={q.id} aria-label={`Question ${qi + 1}`} disabled={!!course.quiz.questionBankRef}>
               <legend>{translateUI("Question")}{" "}{qi + 1}</legend>
               <label>
                 {qi === 0 ? "First quiz question" : "Quiz question"}
@@ -763,7 +764,7 @@ export function CourseEditor({
           ))}
           <button
             type="button"
-            disabled={course.quiz.questions.length >= 8}
+            disabled={course.quiz.questions.length >= 8||!!course.quiz.questionBankRef}
             onClick={() =>
               update((c) => {
                 c.quiz.questions.push({

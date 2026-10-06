@@ -82,3 +82,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## G14 own insight extension
 
 #96 adds own-only, on-demand ledger metrics and pinned author-declared skill exposure, with typed definitions and source IDs. Intended durations, observed timers, official completion and self-confirmed reading remain separate. No mastery, accreditation or external benchmark is inferred. Three domain/HTTP and one browser regression are authored; exact-head CI pending. See ADR-037.
+
+## G06 question-bank extension
+
+#97 adds scoped immutable self-authored question banks, explicit version/question selection into a draft and verified provenance with explicit manual detachment. Published course/attempt/grading history stays pinned. Four domain/HTTP and one browser regression are authored; exact-head CI pending. Completed-learning retake/reset and exact reference policies remain open. See ADR-038.
