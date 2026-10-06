@@ -22,9 +22,8 @@ test("human reviews an authored language variant; learner sees one identity, cho
   await expect(review.getByRole("button",{name:"Disable reviewed variant",exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Sign out",exact:true}).click();await login("learner-a");
   const previews=page.getByRole("region",{name:"Course preview",exact:true});
-  await page.getByPlaceholder("Try systems, learning, security…").fill("Reliable systems basics");
-  await page.getByRole("button",{name:"Search",exact:true}).click();
-  await page.getByRole("button",{name:"Preview",exact:true}).click();
+  const original=page.getByRole("article").filter({has:page.getByRole("heading",{name:"Reliable systems basics",exact:true})});
+  await original.getByRole("button",{name:"Preview",exact:true}).click();
   const variants=previews.getByRole("region",{name:"Reviewed content language variants",exact:true});
   await variants.getByLabel("Preferred variant language",{exact:true}).selectOption("vi");
   await expect(variants.getByText("Preferred reviewed variant",{exact:true})).toBeVisible();
