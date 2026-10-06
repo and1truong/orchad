@@ -62,6 +62,7 @@ export const programLibraryWrites = [
   "learning_save_award",
   "learning_publish_collection",
   "learning_retire_collection",
+  "learning_unpublish_collection",
   "learning_assign_award",
   "learning_set_award_assessor",
   "learning_assess_external_record",
@@ -124,6 +125,7 @@ const authors = [
     collection,
     "Validate graph and publish a new immutable collection version, pinning content/nested award versions.",
   ),
+  tool("learning_unpublish_collection", "destructive", collection, "Withdraw published playlist or award from discovery and new enrollment/references; preserve enrolled immutable award rules."),
   tool(
     "learning_retire_collection",
     "destructive",

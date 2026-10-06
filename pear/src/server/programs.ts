@@ -114,6 +114,7 @@ export class ProgramService {
         "learning_get_collection",
         "learning_publish_collection",
         "learning_retire_collection",
+        "learning_unpublish_collection",
         "learning_assign_award",
         "learning_enroll_award",
         "learning_set_award_assessor",
@@ -122,7 +123,7 @@ export class ProgramService {
     ) {
       const row = this.collection(p, a.collectionId);
       if (
-        ["learning_publish_collection", "learning_retire_collection"].includes(
+        ["learning_publish_collection", "learning_retire_collection", "learning_unpublish_collection"].includes(
           name,
         )
       )
@@ -634,6 +635,12 @@ export class ProgramService {
           )
           .run(version, row.id);
         return { collectionId: row.id, version, state: "published" };
+      }
+      case "learning_unpublish_collection": {
+        const row = this.collection(p, a.collectionId);
+        if (row.state !== "published") reject("INVALID_ARGUMENT", "Only published collections can be unpublished");
+        this.db.prepare("UPDATE collections SET state='draft' WHERE id=?").run(row.id);
+        return {collectionId: row.id, state:"draft", enrolledVersionsPreserved:true};
       }
       case "learning_retire_collection":
         this.db

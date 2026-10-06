@@ -75,6 +75,7 @@ export function ContentLibrary({
               disabled={busy}
               onClick={() => onAction("learning_publish_content_item", row.id)}
             >{translateUI("Publish item")}</button>
+            <button className="ghost" disabled={busy || row.state !== "published"} onClick={() => onAction("learning_unpublish_content_item", row.id)}>{translateUI("Unpublish item")}</button>
             <button
               className="ghost"
               disabled={busy || row.state === "retired"}

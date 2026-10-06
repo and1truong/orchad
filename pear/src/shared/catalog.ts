@@ -147,11 +147,13 @@ export const libraryWrites = new Set([
   "learning_update_course",
   "learning_publish_course",
   "learning_retire_course",
+  "learning_unpublish_course",
   "learning_assign",
   "learning_create_content_item",
   "learning_update_content_item",
   "learning_publish_content_item",
   "learning_retire_content_item",
+  "learning_unpublish_content_item",
 ]);
 const id = { courseId: string() };
 const enrollment = { enrollmentId: string() };
@@ -259,6 +261,7 @@ export const adminTools: Tool[] = [
     { itemId: string(64) },
     "Publish immutable reusable content version. References specify exact versions.",
   ),
+  tool("learning_unpublish_content_item", "destructive", { itemId: string(64) }, "Withdraw published content from discovery and new enrollment/references; preserve existing pinned learning. Republish creates a new version."),
   tool(
     "learning_retire_content_item",
     "destructive",
@@ -290,6 +293,7 @@ export const adminTools: Tool[] = [
     id,
     "Publish a new immutable course version from draft.",
   ),
+  tool("learning_unpublish_course", "destructive", id, "Withdraw published content from discovery and new enrollment/references; preserve existing pinned learning. Republish creates a new version."),
   tool(
     "learning_retire_course",
     "destructive",

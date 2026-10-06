@@ -1030,6 +1030,12 @@ export class LearningService {
           .run(version, row.id);
         return { itemId: row.id, version, state: "published" };
       }
+      case "learning_unpublish_content_item": {
+        const row = this.contentItem(p, a.itemId);
+        if (row.state !== "published") reject("INVALID_ARGUMENT", "Only published content can be unpublished");
+        this.db.prepare("UPDATE content_items SET state='draft' WHERE id=?").run(row.id);
+        return {itemId: row.id, state: "draft", courseSnapshotsPreserved: true};
+      }
       case "learning_retire_content_item": {
         this.contentItem(p, a.itemId);
         this.db
@@ -1187,6 +1193,12 @@ export class LearningService {
           )
           .run(v, c.id);
         return { courseId: c.id, version: v, state: "published" };
+      }
+      case "learning_unpublish_course": {
+        const row = this.course(p, a.courseId);
+        if (row.state !== "published") reject("INVALID_ARGUMENT", "Only published content can be unpublished");
+        this.db.prepare("UPDATE courses SET state='draft' WHERE id=?").run(row.id);
+        return {courseId: row.id, state: "draft", existingEnrollmentsPreserved: true};
       }
       case "learning_retire_course": {
         const c = this.course(p, a.courseId);

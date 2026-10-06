@@ -1285,6 +1285,10 @@ function App() {
                             })
                           }
                         >{translateUI("Publish")}</button>
+                        <button className="ghost" disabled={busy || d.state !== "published"} onClick={() => void run(async () => {
+                          await mutate("learning_unpublish_course", {courseId:d.id});
+                          setNotice("Unpublished. Existing learning history preserved.");
+                        })}>{translateUI("Unpublish")}</button>
                         <button
                           className="ghost"
                           onClick={() =>
@@ -1376,7 +1380,7 @@ function App() {
                       setNotice(
                         name === "learning_publish_content_item"
                           ? "Item version published."
-                          : "Item retired. Existing course snapshots preserved.",
+                          : name === "learning_unpublish_content_item" ? "Item unpublished. Existing learning history preserved." : "Item retired. Existing course snapshots preserved.",
                       );
                     })
                   }

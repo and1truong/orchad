@@ -1,5 +1,6 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Unpublish":"Gỡ xuất bản","Unpublish item":"Gỡ xuất bản nội dung","Unpublish program":"Gỡ xuất bản chương trình",
 "Skip to learning content":"Bỏ qua đến nội dung học",
 "Learning navigation":"Điều hướng học",
 "External reported activity":"Hoạt động do nguồn ngoài báo",

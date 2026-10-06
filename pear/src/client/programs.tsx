@@ -515,6 +515,7 @@ export function Programs(props: Props) {
                     })
                   }
                 >{translateUI("Publish program")}</button>
+                <button className="ghost" disabled={busy || d.state !== "published"} onClick={() => void run(async () => {await mutate("learning_unpublish_collection", {collectionId:d.id});})}>{translateUI("Unpublish program")}</button>
                 <button
                   className="ghost"
                   disabled={busy || d.state === "retired"}
