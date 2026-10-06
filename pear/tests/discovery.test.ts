@@ -128,3 +128,21 @@ test("metadata validation/publication rollback and disk reopen preserve version 
   assert.deepEqual(f.db.prepare("PRAGMA foreign_key_check").all(),[]);
  }finally{f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test("tracked standalone metadata never leaks human-only outcomes or raw asset IDs to the bridge",()=>{
+ const f=fixture();try{
+  const asset=f.service.media.upload(f.service.principal("editor"),{filename:"original.pdf",mime:"application/pdf",key:"original-file",
+   revision:String(f.service.context("editor","library:demo").revision),confirmed:"true"},Buffer.from("%PDF-original"));
+  const item={title:"Private standalone",summary:"Metadata only",language:"en",provider:"Original",license:"self-authored",aiProcessingAllowed:false,
+   kind:"document",text:"PRIVATE-ITEM-BODY",assetId:asset.id,discovery:md({outcomes:["PRIVATE-ITEM-OUTCOME"]})};
+  data(f.call("editor","learning_create_content_item",{itemId:"private-item",item}));
+  data(f.call("editor","learning_publish_content_item",{itemId:"private-item"}));
+  const e=data(f.call("learner-a","learning_enroll_item",{itemId:"private-item"}));
+  for(const [name,args] of [["learning_get_content_item",{itemId:"private-item"}],["learning_get_item_enrollment",{itemEnrollmentId:e.itemEnrollmentId}]] as const){
+   const bridge=JSON.stringify(data(f.call("learner-a",name,args)));
+   assert.equal(bridge.includes(asset.id),false);assert.equal(bridge.includes("PRIVATE-ITEM"),false);
+   const human=JSON.stringify(data(f.call("learner-a",name,args,"human")));
+   assert.ok(human.includes(asset.id));assert.ok(human.includes("PRIVATE-ITEM-OUTCOME"));
+  }
+ }finally{f.db.close();}
+});

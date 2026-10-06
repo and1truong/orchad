@@ -69,6 +69,7 @@ export class StandaloneService {
     const e = this.enrollment(p, a.itemEnrollmentId),
       item = JSON.parse(e.content) as ContentItem;
     const { text, url, transcript, assetId, ...metadata } = item;
+    if(source==="bridge"&&!item.aiProcessingAllowed&&metadata.discovery)metadata.discovery={...metadata.discovery,outcomes:[]};
     return {
       ...this.summary(e),
       item: {
