@@ -7,7 +7,7 @@ test("human reviews a one-time scoped credential and a real SCIM client creates,
  const {app}=await createApp({db,origin,identityFixture:true,scimEnabled:true,developmentAuth:true,staticRoot:resolve("dist")});
  try{
   await app.listen({port:4317,host:"127.0.0.1"});await page.goto(origin);
-  await page.getByLabel("Account",{exact:true}).selectOption("admin");await page.getByLabel("Password",{exact:true}).fill("admin-dev");
+  await page.getByLabel("Account",{exact:true}).fill("admin");await page.getByLabel("Password",{exact:true}).fill("admin-dev");
   await page.getByRole("button",{name:"Sign in",exact:true}).click();
   await page.getByRole("button",{name:"Administration",exact:true}).click();
   const region=page.getByRole("region",{name:"Provisioning credentials",exact:true});
