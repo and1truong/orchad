@@ -46,7 +46,7 @@ test("offer, draft, counterpart revision and redacted audit roll back together i
 });
 test("immutable addressed offers and independently mapped drafts survive actual SQLite reopen without auto-publication",()=>{
  const dir=mkdtempSync(join(tmpdir(),"pear-collection-share-"));let f=shareFixture(join(dir,"state.sqlite"));try{
-  const id=data(offer(f)).offerId;data(accept(f,id));const before=f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),award=f.award;f.db.close();f={...fixture(join(dir,"state.sqlite")),award};assert.deepEqual(f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),before);assert.equal(incoming(f)[0].state,"accepted");assert.equal(f.db.prepare("SELECT max(version) n FROM schema_version").get()!.n,36);
+  const id=data(offer(f)).offerId;data(accept(f,id));const before=f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),award=f.award;f.db.close();f={...fixture(join(dir,"state.sqlite")),award};assert.deepEqual(f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),before);assert.equal(incoming(f)[0].state,"accepted");assert.equal(f.db.prepare("SELECT max(version) n FROM schema_version").get()!.n,37);
  }finally{f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
 test("actual HTTP requires addressed human cookie/epoch/CSRF and independent destination administrator; model bridge cannot offer or accept",async()=>{
