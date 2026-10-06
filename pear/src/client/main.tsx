@@ -2,8 +2,12 @@ import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   AppController,
+  type AdminContentRow,
+  type AssignmentPreview,
   type AttemptView,
   type CatalogItem,
+  type CourseDraft,
+  type Directory,
   type EnrollmentListItem,
   type ItemDetail,
   type LessonView,
@@ -95,6 +99,16 @@ function Topbar({ route, navigate }: { route: Route; navigate: (r: Route) => voi
         >
           Catalog
         </button>
+        {["manager", "content_admin", "admin"].includes(s.role) && (
+          <button
+            className={
+              ["admin", "editor", "assign"].includes(route.view) ? "active" : ""
+            }
+            onClick={() => navigate({ view: "admin" })}
+          >
+            Quản trị
+          </button>
+        )}
       </nav>
       <div className="userchip">
         <span className="mono">{s.principal}</span>
@@ -686,6 +700,503 @@ function Player({ enrollmentId, lessonId }: { enrollmentId: string; lessonId?: s
   );
 }
 
+function Admin() {
+  const [rows, setRows] = useState<AdminContentRow[] | null>(null);
+  const [err, setErr] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState("");
+  const isEditor = ["content_admin", "admin"].includes(ctl.session!.role);
+  const reload = async () => {
+    try {
+      setRows(await ctl.adminContent());
+      setErr("");
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+  useEffect(() => {
+    void reload();
+  }, []);
+  if (err) return <div className="banner err">{err}</div>;
+  if (!rows) return <p>Đang tải…</p>;
+  const create = async () => {
+    if (!title.trim()) return;
+    const r = await ctl.saveCourse({
+      title: title.trim(),
+      modules: [{ title: "Module 1", lessonIds: [], prerequisiteModuleIndexes: [] }],
+    });
+    if (!r.ok) {
+      setErr(r.error?.message ?? "Không tạo được course");
+      return;
+    }
+    setCreating(false);
+    setTitle("");
+    ctl.navigate({
+      view: "editor",
+      courseId: (r.data as { courseId: string }).courseId,
+    });
+  };
+  return (
+    <div>
+      <div className="row">
+        <h2 style={{ marginBottom: 0 }}>Quản trị nội dung</h2>
+        {isEditor && (
+          <button className="primary right" onClick={() => setCreating(true)}>
+            + Course mới
+          </button>
+        )}
+      </div>
+      {creating && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <label>
+            Tên course
+            <input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </label>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button className="primary" onClick={create}>
+              Tạo draft
+            </button>
+            <button onClick={() => setCreating(false)}>Hủy</button>
+          </div>
+        </div>
+      )}
+      <div className="section-title">Nội dung</div>
+      <div className="cards">
+        {rows.map((r) => (
+          <div className="card" key={r.id}>
+            <div className="row">
+              <span className={`chip ${r.status}`}>{r.status}</span>
+              <span className="chip">{r.type}</span>
+              {r.latest_version > 0 && (
+                <span className="chip">v{r.latest_version}</span>
+              )}
+              {r.draft_revision !== undefined && (
+                <span className="chip">draft r{r.draft_revision}</span>
+              )}
+            </div>
+            <h3>{r.title}</h3>
+            <small className="mono">{r.id}</small>
+            <div className="row">
+              {r.type === "course" && isEditor && (
+                <button
+                  onClick={() =>
+                    ctl.navigate({ view: "editor", courseId: r.id })
+                  }
+                >
+                  Sửa
+                </button>
+              )}
+              {(r.status === "published" || r.status === "retiring") &&
+                ["manager", "admin"].includes(ctl.session!.role) && (
+                  <button
+                    onClick={() =>
+                      ctl.navigate({ view: "assign", contentId: r.id })
+                    }
+                  >
+                    Giao bài
+                  </button>
+                )}
+              <button
+                onClick={() => ctl.navigate({ view: "item", itemId: r.id })}
+              >
+                Xem
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Editor({ courseId }: { courseId: string }) {
+  const [d, setD] = useState<CourseDraft | null>(null);
+  const [title, setTitle] = useState("");
+  const [summary, setSummary] = useState("");
+  const [modules, setModules] = useState<
+    { title: string; lessonIds: string[]; prerequisiteModuleIndexes: number[] }[]
+  >([]);
+  const [items, setItems] = useState<CatalogItem[]>([]);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const isEditor = ["content_admin", "admin"].includes(ctl.session!.role);
+  const load = async () => {
+    const draft = await ctl.courseDraft(courseId);
+    setD(draft);
+    setTitle(draft.item.title);
+    setSummary(draft.item.summary ?? "");
+    setModules(
+      (draft.structure?.modules ?? []).map((m) => ({
+        title: m.title,
+        lessonIds: [...m.lessonIds],
+        prerequisiteModuleIndexes: [...m.prerequisiteModuleIndexes],
+      })),
+    );
+    const cat = await ctl.search({ contentType: "item", pageSize: 40 });
+    setItems(cat.items);
+  };
+  useEffect(() => {
+    load().catch((e) => setErr(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courseId]);
+  if (err) return <div className="banner err">{err}</div>;
+  if (!d) return <p>Đang tải…</p>;
+  if (!isEditor) return <div className="banner err">Chỉ content_admin/admin được sửa course.</div>;
+  const draftRev = d.item.draftRevision ?? 0;
+  const setModule = (i: number, patch: Partial<(typeof modules)[0]>) =>
+    setModules(modules.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    const r = await ctl.saveCourse({
+      courseId,
+      title,
+      description: summary,
+      modules,
+    });
+    setBusy(false);
+    if (r.ok) {
+      setMsg(`Đã lưu draft r${(r.data as { draftRevision: number }).draftRevision}.`);
+      await load();
+    } else setErr(r.error?.message ?? "Không lưu được");
+  };
+  const publish = async () => {
+    setBusy(true);
+    setErr("");
+    const r = await ctl.publishCourse(courseId, draftRev);
+    setBusy(false);
+    if (r.ok) {
+      setMsg("Đã publish.");
+      await load();
+    } else setErr(r.error?.message ?? "Không publish được");
+  };
+  return (
+    <div>
+      <div className="row">
+        <h2 style={{ marginBottom: 0 }}>Sửa course</h2>
+        <span className={`chip ${d.item.status}`}>{d.item.status}</span>
+        <span className="chip">draft r{draftRev}</span>
+        {d.item.latestVersion > 0 && (
+          <span className="chip">v{d.item.latestVersion}</span>
+        )}
+      </div>
+      <small className="mono">{courseId}</small>
+      {msg && <div className="banner ok" style={{ marginTop: 12 }}>{msg}</div>}
+      {err && <div className="banner err" style={{ marginTop: 12 }}>{err}</div>}
+      <div className="card" style={{ marginTop: 14 }}>
+        <label>
+          Tên course
+          <input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </label>
+        <label>
+          Mô tả
+          <textarea
+            rows={2}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+          />
+        </label>
+      </div>
+      <div className="section-title">Modules</div>
+      {modules.map((m, i) => (
+        <div className="card" key={i} style={{ marginBottom: 10 }}>
+          <div className="row">
+            <input
+              style={{ flex: 1 }}
+              value={m.title}
+              onChange={(e) => setModule(i, { title: e.target.value })}
+            />
+            <button
+              disabled={modules.length <= 1}
+              onClick={() => setModules(modules.filter((_, j) => j !== i))}
+            >
+              Xóa module
+            </button>
+          </div>
+          {i > 0 && (
+            <small>
+              Yêu cầu xong trước:{" "}
+              {modules.slice(0, i).map((_, pi) => (
+                <label key={pi} style={{ display: "inline-flex", gap: 4, marginRight: 10, marginTop: 0, fontWeight: 400 }}>
+                  <input
+                    type="checkbox"
+                    style={{ width: "auto" }}
+                    checked={m.prerequisiteModuleIndexes.includes(pi)}
+                    onChange={(e) =>
+                      setModule(i, {
+                        prerequisiteModuleIndexes: e.target.checked
+                          ? [...m.prerequisiteModuleIndexes, pi]
+                          : m.prerequisiteModuleIndexes.filter((x) => x !== pi),
+                      })
+                    }
+                  />
+                  module {pi + 1}
+                </label>
+              ))}
+            </small>
+          )}
+          <div>
+            {m.lessonIds.map((lid) => (
+              <span className="chip mono" key={lid} style={{ marginRight: 6 }}>
+                {lid}{" "}
+                <a
+                  style={{ cursor: "pointer" }}
+                  onClick={() =>
+                    setModule(i, {
+                      lessonIds: m.lessonIds.filter((x) => x !== lid),
+                    })
+                  }
+                >
+                  ×
+                </a>
+              </span>
+            ))}
+          </div>
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value && !m.lessonIds.includes(e.target.value))
+                setModule(i, {
+                  lessonIds: [...m.lessonIds, e.target.value],
+                });
+            }}
+          >
+            <option value="">+ thêm bài học…</option>
+            {items
+              .filter((it) => !m.lessonIds.includes(it.id))
+              .map((it) => (
+                <option key={it.id} value={it.id}>
+                  {it.title} ({it.id})
+                </option>
+              ))}
+          </select>
+        </div>
+      ))}
+      <div className="row">
+        <button
+          onClick={() =>
+            setModules([
+              ...modules,
+              {
+                title: `Module ${modules.length + 1}`,
+                lessonIds: [],
+                prerequisiteModuleIndexes: [],
+              },
+            ])
+          }
+        >
+          + Module
+        </button>
+        <div className="right row">
+          <button onClick={save} disabled={busy || !title.trim()}>
+            Lưu nháp
+          </button>
+          <button
+            className="primary"
+            disabled={busy || d.item.status === "published"}
+            onClick={publish}
+          >
+            Publish
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Assign({ contentId }: { contentId?: string }) {
+  const [rows, setRows] = useState<AdminContentRow[] | null>(null);
+  const [dir, setDir] = useState<Directory | null>(null);
+  const [cid, setCid] = useState(contentId ?? "");
+  const [users, setUsers] = useState<string[]>([]);
+  const [groups, setGroups] = useState<string[]>([]);
+  const [dueKind, setDueKind] = useState<"fixed" | "rolling" | "none">("none");
+  const [dueAt, setDueAt] = useState("");
+  const [rollingDays, setRollingDays] = useState(30);
+  const [preview, setPreview] = useState<AssignmentPreview | null>(null);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    ctl.adminContent().then(setRows).catch((e) => setErr(e.message));
+    ctl.adminDirectory().then(setDir).catch(() => {});
+  }, []);
+  if (err) return <div className="banner err">{err}</div>;
+  if (!rows || !dir) return <p>Đang tải…</p>;
+  const candidates = rows.filter(
+    (r) => r.status === "published" || r.status === "retiring",
+  );
+  const doPreview = async () => {
+    setErr("");
+    setMsg("");
+    try {
+      setPreview(
+        await ctl.previewAssignment(cid, users, groups),
+      );
+    } catch (e) {
+      setErr((e as Error).message);
+      setPreview(null);
+    }
+  };
+  const create = async () => {
+    setBusy(true);
+    setErr("");
+    const args: Parameters<typeof ctl.createAssignment>[0] = {
+      contentId: cid,
+      userIds: users,
+      groupIds: groups,
+      dueKind,
+    };
+    if (dueKind === "fixed" && dueAt) args.dueAt = new Date(dueAt).toISOString();
+    if (dueKind === "rolling") args.rollingDays = rollingDays;
+    const r = await ctl.createAssignment(args);
+    setBusy(false);
+    if (r.ok) {
+      setMsg(
+        `Đã giao cho ${(r.data as { assigned: string[] }).assigned.length} learner.`,
+      );
+      setPreview(null);
+    } else setErr(r.error?.message ?? "Không tạo được assignment");
+  };
+  return (
+    <div>
+      <h2>Giao bài</h2>
+      {msg && <div className="banner ok">{msg}</div>}
+      {err && <div className="banner err">{err}</div>}
+      <div className="card">
+        <label>
+          Nội dung
+          <select value={cid} onChange={(e) => { setCid(e.target.value); setPreview(null); }}>
+            <option value="">— chọn —</option>
+            {candidates.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title} ({r.id})
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="row" style={{ alignItems: "flex-start" }}>
+          <label style={{ flex: 1 }}>
+            Learners
+            <div style={{ marginTop: 6 }}>
+              {dir.users.map((u) => (
+                <label key={u.id} style={{ display: "flex", gap: 6, fontWeight: 400, marginTop: 4 }}>
+                  <input
+                    type="checkbox"
+                    style={{ width: "auto" }}
+                    checked={users.includes(u.id)}
+                    onChange={(e) =>
+                      setUsers(
+                        e.target.checked
+                          ? [...users, u.id]
+                          : users.filter((x) => x !== u.id),
+                      )
+                    }
+                  />
+                  {u.name} <span className="mono">({u.id})</span>
+                </label>
+              ))}
+            </div>
+          </label>
+          {dir.groups.length > 0 && (
+            <label style={{ flex: 1 }}>
+              Groups
+              <div style={{ marginTop: 6 }}>
+                {dir.groups.map((g) => (
+                  <label key={g.id} style={{ display: "flex", gap: 6, fontWeight: 400, marginTop: 4 }}>
+                    <input
+                      type="checkbox"
+                      style={{ width: "auto" }}
+                      checked={groups.includes(g.id)}
+                      onChange={(e) =>
+                        setGroups(
+                          e.target.checked
+                            ? [...groups, g.id]
+                            : groups.filter((x) => x !== g.id),
+                        )
+                      }
+                    />
+                    {g.name} <span className="mono">({g.id})</span> · {g.memberCount}
+                  </label>
+                ))}
+              </div>
+            </label>
+          )}
+        </div>
+        <div className="row">
+          <label style={{ flex: 1 }}>
+            Hạn nộp
+            <select
+              value={dueKind}
+              onChange={(e) => setDueKind(e.target.value as typeof dueKind)}
+            >
+              <option value="none">Không hạn</option>
+              <option value="fixed">Ngày cố định</option>
+              <option value="rolling">Rolling (số ngày)</option>
+            </select>
+          </label>
+          {dueKind === "fixed" && (
+            <label style={{ flex: 1 }}>
+              Ngày
+              <input
+                type="date"
+                value={dueAt}
+                onChange={(e) => setDueAt(e.target.value)}
+              />
+            </label>
+          )}
+          {dueKind === "rolling" && (
+            <label style={{ flex: 1 }}>
+              Số ngày
+              <input
+                type="number"
+                min={1}
+                value={rollingDays}
+                onChange={(e) => setRollingDays(Number(e.target.value))}
+              />
+            </label>
+          )}
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <button
+            onClick={doPreview}
+            disabled={!cid || (users.length === 0 && groups.length === 0)}
+          >
+            Preview
+          </button>
+          <button
+            className="primary"
+            disabled={busy || !preview || preview.resolved.length === 0}
+            onClick={create}
+          >
+            Tạo assignment
+          </button>
+        </div>
+      </div>
+      {preview && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <h3>
+            Preview: {preview.title} → {preview.resolved.length} learner
+          </h3>
+          <div>
+            {preview.resolved.map((u) => (
+              <span className="chip mono" key={u.userId} style={{ marginRight: 6 }}>
+                {u.userId}
+                {u.alreadyEnrolled && " (đã enroll)"}
+              </span>
+            ))}
+          </div>
+          {preview.unknownUsers.length > 0 && (
+            <small>Không tồn tại: {preview.unknownUsers.join(", ")}</small>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   useCtl();
   const [route, setRoute] = useState<Route>(ctl.route);
@@ -710,6 +1221,9 @@ function App() {
             lessonId={route.lessonId}
           />
         )}
+        {route.view === "admin" && <Admin />}
+        {route.view === "editor" && <Editor courseId={route.courseId} />}
+        {route.view === "assign" && <Assign contentId={route.contentId} />}
       </div>
     </>
   );

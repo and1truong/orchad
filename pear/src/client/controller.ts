@@ -135,7 +135,43 @@ export type Route =
   | { view: "home" }
   | { view: "catalog" }
   | { view: "item"; itemId: string }
-  | { view: "player"; enrollmentId: string; lessonId?: string };
+  | { view: "player"; enrollmentId: string; lessonId?: string }
+  | { view: "admin" }
+  | { view: "editor"; courseId: string }
+  | { view: "assign"; contentId?: string };
+
+export type AdminContentRow = {
+  id: string;
+  type: string;
+  title: string;
+  summary: string;
+  status: string;
+  draft_revision?: number;
+  latest_version: number;
+  duration_minutes: number;
+  level: string;
+};
+
+export type Directory = {
+  users: { id: string; name: string; role: string }[];
+  groups: { id: string; name: string; memberCount: number }[];
+};
+
+export type AssignmentPreview = {
+  contentId: string;
+  title: string;
+  resolved: { userId: string; alreadyEnrolled: boolean }[];
+  unknownUsers: string[];
+};
+
+export type CourseDraft = {
+  item: { id: string; title: string; summary: string; status: string; draftRevision?: number; latestVersion: number };
+  structure: {
+    modules: ModuleView[];
+    completionPolicy: string;
+    attemptCap: number;
+  } | null;
+};
 
 export class AppController {
   session: SessionInfo | null = null;
@@ -305,6 +341,68 @@ export class AppController {
       "learning_get_attempt",
       { attemptId },
     );
+  }
+
+  async adminContent() {
+    const r = await this.request("/api/admin/content");
+    return (r.data as { items: AdminContentRow[] }).items;
+  }
+
+  async adminDirectory() {
+    const r = await this.request("/api/admin/directory");
+    return r.data as Directory;
+  }
+
+  async courseDraft(courseId: string) {
+    return this.read<CourseDraft>(
+      `course:${courseId}`,
+      "learning_get_item",
+      { itemId: courseId },
+    );
+  }
+
+  async saveCourse(
+    args: {
+      courseId?: string;
+      title: string;
+      description?: string;
+      modules: {
+        title: string;
+        lessonIds: string[];
+        prerequisiteModuleIndexes: number[];
+      }[];
+    },
+  ) {
+    const doc = args.courseId
+      ? `course:${args.courseId}`
+      : `org:${this.session!.orgId}`;
+    return this.write(doc, "learning_save_course", args);
+  }
+
+  async publishCourse(courseId: string, draftRevision: number) {
+    return this.write(`course:${courseId}`, "learning_publish_course", {
+      courseId,
+      draftRevision,
+    });
+  }
+
+  async previewAssignment(contentId: string, userIds: string[], groupIds: string[]) {
+    return this.read<AssignmentPreview>(
+      `org:${this.session!.orgId}`,
+      "learning_preview_assignment",
+      { contentId, userIds, groupIds },
+    );
+  }
+
+  async createAssignment(args: {
+    contentId: string;
+    userIds: string[];
+    groupIds: string[];
+    dueKind: "fixed" | "rolling" | "none";
+    dueAt?: string;
+    rollingDays?: number;
+  }) {
+    return this.write(`org:${this.session!.orgId}`, "learning_create_assignment", args);
   }
 
   async completeLesson(enrollmentId: string, lessonId: string) {
