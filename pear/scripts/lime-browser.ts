@@ -201,10 +201,10 @@ try {
   async function bind(mode:string,reads:string[]){
     // pin() sets target before describe() finishes and clears selected reads afterwards.
     // Wait for the actual completed discovery event, not merely a visible stale checkbox.
-    const discovered=panel.getByText(/Discovered .*; consent required/),before=await discovered.count();
+    const activity=panel.locator("details").filter({has:panel.getByText("Tool activity",{exact:true})}).locator(".transcript"),before=await activity.textContent();
     const expectedDocument=await page.evaluate(async()=>String((await window.agentBridgeV1!.getContext()).documentId));
     await panel.getByRole("button",{name:"Pin target",exact:true}).click();
-    await expect(discovered).toHaveCount(before+1);
+    await expect.poll(async()=>{const value=await activity.textContent();return {changed:value!==before,last:(value??"").split("\n").at(-1)};}).toEqual({changed:true,last:"Discovered orchard-pear; consent required"});
     await expect(panel.locator(".status")).toHaveText("connected");
     await expect(panel.locator(".pin")).toContainText("Document: "+expectedDocument);
     await panel.getByLabel("Learning workflow",{exact:true}).selectOption(mode);
