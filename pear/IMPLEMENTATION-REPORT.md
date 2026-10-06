@@ -132,3 +132,9 @@ Telemetry PR #74 head 66e06288b414fe7914eef702fecc0b508808c7ae passed all eight 
 ## Content promotion and retirement alternatives — stacked on PR #74
 
 Migration 014 stores explicit organization curation metadata. Aggregate impact includes pinned enrollments, reusable course/playlist/nested-award references and future assignment plans. Exact source/replacement impact is rechecked in the retirement transaction; no learning or references silently migrate. Learners explicitly preview a currently available alternative while original tracked reading remains pinned. Five domain/HTTP fixtures and one human browser journey cover metadata/privacy, role scope, stale impact, retry, rollback/restart, nested references and retained reading. Exact-head CI remains required; local runner is offline. External provider lifecycle feeds are unverified.
+
+Curation PR #75 passed all eight acceptance jobs in run 37479392709, with 98 domain/HTTP tests, 16 development and 16 production journeys, and 2 shared-Pi journeys. The opaque standalone interactive launch regression also passes real HTTP owner/session/CSP assertions.
+
+## Actual Pear native/MCP lane — stacked on PR #75
+
+A strict native lane builds the real Pear guest and drives the real Coconut Tauri binary/sidecar under Xvfb. An external MCP SDK client discovers the authenticated Pear target, searches actual catalog metadata and submits a separately approved real enrollment; denied/hidden-host requests must leave the ledger unchanged. Human official-confirmation tools remain absent, progress stays pinned and account switching revokes old pairing. Fixture bootstrap/state routes exist only in the CI script and synthetic loopback process, never normal application entry points. No new native trust permission or guest evaluation primitive is introduced. Current-head runtime evidence is pending GitHub Actions because local execution is unavailable.

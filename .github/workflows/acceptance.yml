@@ -78,6 +78,11 @@ jobs:
           npm ci
           npm run package:sidecar
           npm run build
+      - name: Build the real Pear guest for native integration
+        working-directory: pear
+        run: |
+          npm ci
+          npm run build
       - working-directory: coconut/src-tauri
         run: cargo build --verbose
       - name: Rust predicate unit tests
@@ -96,6 +101,12 @@ jobs:
           npm run dev >/tmp/coconut-vite.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:1420/ >/dev/null && break; sleep 1; done
           xvfb-run -a node scripts/native-acceptance.mjs "$BIN"
+      - name: Native Pear WebView and external Coconut MCP acceptance
+        working-directory: coconut
+        run: |
+          BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
+          test -n "$BIN"
+          xvfb-run -a node scripts/native-pear-acceptance.mjs "$BIN"
   guava:
     runs-on: ubuntu-latest
     steps:
