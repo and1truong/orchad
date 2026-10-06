@@ -663,6 +663,9 @@ export function CourseEditor({
           {course.quiz.questions.map((q, qi) => (
             <fieldset key={q.id} aria-label={`Question ${qi + 1}`} disabled={!!course.quiz.questionBankRef}>
               <legend>{translateUI("Question")}{" "}{qi + 1}</legend>
+              <label>{translateUI("Optional question title")}<input aria-label={translateUI("Optional question title")} maxLength={255} value={q.title??""} onChange={e=>updateQuestion(q.id,next=>{if(e.target.value)next.title=e.target.value;else delete next.title;})}/></label>
+              <label>{translateUI("Question prompt formatting")}<select aria-label={translateUI("Question prompt formatting")} value={q.promptFormat??"plain"} onChange={e=>updateQuestion(q.id,next=>{next.promptFormat=e.target.value as Question["promptFormat"];})}><option value="plain">{translateUI("Plain text")}</option><option value="original_markup">{translateUI("Original bounded formatting")}</option></select></label>
+              {q.promptFormat==="original_markup"&&<><p>{translateUI("Use **bold**, *italic*, __underline__, - list, or 1. list. HTML and links remain literal text. Maximum 32 lines.")}</p><div className="actions">{[["Bold","**"],["Italic","*"],["Underline","__"]].map(([label,marker])=><button key={label} type="button" disabled={q.prompt.length+marker.length*2>400} onClick={event=>{const field=event.currentTarget.closest("fieldset")?.querySelector<HTMLTextAreaElement>('textarea[aria-label="First quiz question"], textarea[aria-label="Quiz question"]');const start=field?.selectionStart??0,end=field?.selectionEnd??q.prompt.length;updateQuestion(q.id,next=>{next.prompt=next.prompt.slice(0,start)+marker+next.prompt.slice(start,end)+marker+next.prompt.slice(end);});}}>{translateUI(label)}</button>)}</div></>}
               <label>
                 {qi === 0 ? "First quiz question" : "Quiz question"}
                 <textarea aria-label={qi === 0 ? "First quiz question" : "Quiz question"}

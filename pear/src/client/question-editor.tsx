@@ -14,6 +14,8 @@ export function QuestionSettings({ q, update }: Props) {
             const common = {
               id: q.id,
               prompt: q.prompt,
+              ...(q.title?{title:q.title}:{}),
+              ...(q.promptFormat?{promptFormat:q.promptFormat}:{}),
               points: q.points ?? 1,
               kind,
               correct: 0,

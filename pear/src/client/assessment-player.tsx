@@ -1,3 +1,4 @@
+import {QuestionPrompt} from "./question-prompt.tsx";
 import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
 export function completeResponse(q: any, a: any) {
@@ -38,8 +39,9 @@ export function AssessmentQuestion({
   return (
     <fieldset disabled={disabled}>
       <legend>
-        {q.prompt} · {q.points ?? 1} points
+        {q.title||(q.promptFormat==="original_markup"?translateUI("Question"):q.prompt)} · {q.points ?? 1} points
       </legend>
+      {(q.title||q.promptFormat==="original_markup")&&<QuestionPrompt q={q}/>}
       {(q.kind ?? "mcq") === "mcq" ? (
         q.options.map((o: string, i: number) => (
           <label className="choice" key={i}>

@@ -1,5 +1,13 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Optional question title":"Tiêu đề câu hỏi tùy chọn",
+"Question prompt formatting":"Định dạng nội dung câu hỏi",
+"Plain text":"Văn bản thường",
+"Original bounded formatting":"Định dạng nguyên bản có giới hạn",
+"Use **bold**, *italic*, __underline__, - list, or 1. list. HTML and links remain literal text. Maximum 32 lines.":"Dùng **in đậm**, *in nghiêng*, __gạch chân__, - danh sách hoặc 1. danh sách. HTML và liên kết giữ nguyên dạng văn bản. Tối đa 32 dòng.",
+"Bold":"In đậm",
+"Italic":"In nghiêng",
+"Underline":"Gạch chân",
 "Attempt":"Lượt",
 "Show previous responses in human player":"Hiển thị câu trả lời trước trong giao diện người học",
 "Retry only incorrect objective questions":"Chỉ làm lại câu khách quan trả lời chưa đúng",

@@ -3,6 +3,8 @@ import type { Role, Tool } from "./model.ts";
 export const questionSchema = object(
   {
     id: string(64),
+    title: string(255),
+    promptFormat: enumeration("plain","original_markup"),
     prompt: string(400),
     options: array(string(240), 8),
     correct: integer(7),

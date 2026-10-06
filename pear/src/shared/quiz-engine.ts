@@ -6,6 +6,8 @@ const kind=(q:Question)=>q.kind??"mcq";
 function reject(_code:string,message:string):never {throw new RangeError(message);}
 export function validateQuestionForm(q: Question) {
   if(!validateArgs(questionSchema,q))throw new RangeError("Invalid question schema");
+  if(q.title!==undefined&&!q.title.trim())throw new RangeError("Question title cannot be blank");
+  if(q.promptFormat==="original_markup"&&q.prompt.split("\n").length>32)throw new RangeError("Formatted question prompt exceeds 32 lines");
   const k = kind(q);
   if(k!=="mcq"&&(q.correctIndices||q.partialCredit!==undefined||q.feedbackSelected||q.feedbackNotSelected))reject("INVALID_ARGUMENT","Choice settings require MCQ");
   if(k!=="blanks"&&(q.blankChoiceCounts||q.blankChoiceOptions))reject("INVALID_ARGUMENT","Dropdown choices require blanks");
