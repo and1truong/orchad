@@ -417,3 +417,27 @@ test("persisted step budget still blocks generation after reopen", async () => {
   await r2.close();
   await gw.close();
 });
+
+test("dispatch that throws mid-flight lands ambiguous, never retried", async () => {
+  const h = host();
+  const { gw, runner } = await running([
+    { toolCalls: [incrCall()], usage: { input: 10, output: 5 } },
+    { content: "Done.", usage: { input: 10, output: 5 } },
+  ]);
+  let threw = 0;
+  await runner.bind([binding(h)], async () => {
+    threw++;
+    throw new Error("socket died mid-write");
+  });
+  await runner.submit({ prompt: "Increment", requestId: "req-throw" });
+  const s = await until(
+    runner.status,
+    (st) => st.ops[0]?.status === "ambiguous",
+    "ambiguous",
+  );
+  assert.equal(s.phase, "needs_reconciliation");
+  assert.equal(threw, 1);
+  assert.equal(h.context().summary, "value 0");
+  await runner.close();
+  await gw.close();
+});

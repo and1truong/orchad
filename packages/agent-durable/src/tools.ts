@@ -169,9 +169,16 @@ export function orchardTool(
           { opId: op.opId, attemptNo: op.attempts },
           context,
         );
-        result = validResult(raw) ? raw : internal("Invalid host result");
+        // A malformed result is still an unprovable outcome.
+        result = validResult(raw)
+          ? raw
+          : internal("Invalid host result; outcome unknown — no replay");
       } catch {
-        result = context?.abortSignal?.aborted ? cancelled() : internal("Host tool execution failed");
+        // A dispatch that threw may still have reached the host — outcome is
+        // unprovable either way, so it must classify 'ambiguous' below.
+        result = context?.abortSignal?.aborted
+          ? cancelled()
+          : internal("Host tool execution threw; outcome unknown — no replay");
       }
       let serialized = JSON.stringify(result);
       if (serialized.length > RESULT_CAP) {
