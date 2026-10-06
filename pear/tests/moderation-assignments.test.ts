@@ -45,7 +45,7 @@ test("assignment enforces human source, administrator, delegated active tenant i
   assert.equal(assign(f,"learner-b").ok,false);
   f.db.prepare("UPDATE accounts SET tenant='elsewhere' WHERE id='assessor-two'").run();assert.equal(assign(f,"assessor-two").ok,false);f.db.prepare("UPDATE accounts SET tenant='demo' WHERE id='assessor-two'").run();
   const revision=f.service.context("admin","library:demo").revision,override={idempotencyKey:"live-primary",expectedRevision:revision};data(assign(f,"assessor",0,override));
-  data(f.call("admin","learning_set_award_assessor",{collectionId:"primary-award",assessorId:"assessor",enabled:false}));assert.equal(assign(f,"assessor",0,override).ok,false);assert.equal(queue(f,"assessor").length,0);assert.equal(grade(f).ok,false);
+  data(f.call("admin","learning_set_award_assessor",{collectionId:"primary-award",assessorId:"assessor",enabled:false}));assert.equal(assign(f,"assessor",0,override).ok,false);assert.equal(f.call("assessor","learning_get_external_records",{collectionId:"primary-award"},"human").ok,false);assert.equal(grade(f).ok,false);
   assert.ok(data(f.call("assessor","human_get_assessment_notices",{},"human")).items.every((n:any)=>n.recordId===null));
  }finally{f.db.close();}
 });
@@ -65,4 +65,23 @@ test("pinned primary rule survives later publication disabling it and SQLite reo
 });
 test("primary moderation requires moderated policy and cannot turn self-attestation into assigned official grading",()=>{
  const f=fixture();try{assert.equal(f.call("editor","learning_save_award",{collectionId:"bad-primary",award:{...award,moderatedExternal:false}}).ok,false);assert.equal(f.db.prepare("SELECT 1 FROM collections WHERE id='bad-primary'").get(),undefined);}finally{f.db.close();}
+});
+
+test("private PDF access follows current primary assignment immediately and never becomes a public reusable file",()=>{
+ const f=setup();try{
+  const asset=f.service.media.upload(f.service.principal("learner-a"),{filename:"proof.pdf",mime:"application/pdf",purpose:"award_evidence",awardEnrollmentId:f.e.awardEnrollmentId,criterionPath:"practice",key:"primary-pdf",revision:String(f.service.context("learner-a","learning:demo:learner-a").revision),confirmed:"true"},Buffer.from("%PDF-1.4\nOriginal proof\n%%EOF"));
+  const record=data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:f.e.awardEnrollmentId,criterionPath:"practice",amount:1,evidence:"Original file proof",assetId:asset.id,confirmed:true},"human"));f.record=record;
+  const read=(user:string)=>f.service.media.read(f.service.principal(user),asset.id,{recordId:record.recordId});
+  assert.throws(()=>read("assessor"));assert.throws(()=>read("assessor-two"));assert.equal(read("learner-a").id,asset.id);assert.equal(read("admin").id,asset.id);
+  data(assign(f));assert.equal(read("assessor").id,asset.id);assert.throws(()=>read("assessor-two"));data(assign(f,"assessor-two",1));assert.throws(()=>read("assessor"));assert.equal(read("assessor-two").id,asset.id);
+  data(f.call("admin","learning_set_award_assessor",{collectionId:"primary-award",assessorId:"assessor-two",enabled:false}));assert.throws(()=>read("assessor-two"));assert.throws(()=>f.service.media.read(f.service.principal("learner-b"),asset.id,{}));
+ }finally{f.db.close();}
+});
+
+test("nested external criterion inherits primary requirement from pinned child even when root uses legacy policy",()=>{
+ const f=setup();try{
+  data(f.call("editor","learning_save_award",{collectionId:"primary-root",award:{...award,primaryModeration:false,requirements:[{id:"child",title:"Child",required:true,credits:1,alternatives:[{kind:"award",id:"primary-award"}]}]}}));data(f.call("editor","learning_publish_collection",{collectionId:"primary-root"}));data(f.call("admin","learning_set_award_assessor",{collectionId:"primary-root",assessorId:"assessor",enabled:true}));
+  const e=data(f.call("learner-a","learning_enroll_award",{collectionId:"primary-root"})),record=data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:e.awardEnrollmentId,criterionPath:"child/primary-award@1/practice",amount:1,evidence:"Original nested evidence",confirmed:true},"human"));f.e=e;f.record=record;
+  assert.equal(new ModerationAssignments(f.db).metadata(record.recordId).primaryRequired,true);assert.equal(grade(f).ok,false);data(assign(f));data(grade(f));assert.ok(f.db.prepare("SELECT completed_at FROM award_enrollments WHERE id=?").get(e.awardEnrollmentId)!.completed_at);
+ }finally{f.db.close();}
 });

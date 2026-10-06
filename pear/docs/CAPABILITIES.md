@@ -167,4 +167,4 @@ Optional complete-one-configured-criterion policy alongside existing target-plus
 
 
 ## Primary assessor assignment (PR #115)
-Optional pinned primary policy, explicit admin assignment/reassignment to existing delegated active same-tenant assessor, live queue/file/decision ACL and version CAS. Own in-app notices have human acknowledgment and omit revoked record identity; no external messages or official grading from assignment. Six domain/reopen/rollback regressions and one EN/VI browser fixture authored; exact-head CI pending. Original bounded profile; provider notifications/crossportal/retention/manual audits remain OPEN.
+Optional pinned primary policy, explicit admin assignment/reassignment to existing delegated active same-tenant assessor, live queue/file/decision ACL and version CAS. Own in-app notices have human acknowledgment and omit revoked record identity; no external messages or official grading from assignment. Eight domain/file/nested/reopen/rollback regressions and one EN/VI browser fixture authored; exact-head CI pending. Original bounded profile; provider notifications/crossportal/retention/manual audits remain OPEN.
