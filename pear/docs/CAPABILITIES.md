@@ -171,4 +171,4 @@ Optional pinned primary policy, explicit admin assignment/reassignment to existi
 
 
 ## Actual child award quantities (PR #116)
-Optional identical-unit child-only quantity mode accumulates actual partial accepted child credits, counts greatest alternative once and independently requires child completion for required criteria. Immutable pins, legacy fixed criteria and graph/capacity bounds retained. Four domain/reopen and one actual EN/VI browser fixture authored; exact-head CI pending. Reference/provider/crossportal/manual audits remain OPEN.
+Optional identical-unit child-only quantity mode accumulates actual partial accepted child credits, counts greatest alternative once and independently requires child completion for required criteria. Immutable pins, legacy fixed criteria and graph/capacity bounds retained. Six domain/alternative/ongoing/reopen and one actual EN/VI browser fixture authored; exact-head CI pending. Reference/provider/crossportal/manual audits remain OPEN.

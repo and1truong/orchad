@@ -684,7 +684,7 @@ export function Programs(props: Props) {
                             })
                           }
                         />{translateUI("Required criterion")}</label>
-                      <label>{translateUI("Criterion credit calculation")}<select value={r.creditMode??"fixed"} onChange={e=>updateRequirement(i,{...r,creditMode:e.target.value as Requirement["creditMode"]})}><option value="fixed">{translateUI("Fixed criterion quantity")}</option><option value="nested_earned">{translateUI("Actual earned child award credits")}</option></select></label>
+                      <label>{translateUI("Criterion credit calculation")}<select aria-label={translateUI("Criterion credit calculation")} value={r.creditMode??"fixed"} onChange={e=>updateRequirement(i,{...r,creditMode:e.target.value as Requirement["creditMode"]})}><option value="fixed">{translateUI("Fixed criterion quantity")}</option><option value="nested_earned">{translateUI("Actual earned child award credits")}</option></select></label>
                       {r.creditMode==="nested_earned"&&<p>{translateUI("Only child award alternatives with identical units. Greatest actual child quantity counts once; child completion determines the required criterion.")}</p>}
                       <label>{translateUI("Criterion credits or hours")}<input disabled={r.creditMode==="nested_earned"}
                           type="number"
