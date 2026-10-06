@@ -108,7 +108,7 @@ export async function createApp(opts: {
           (opts.dev ? " ws:" : "") +
           "; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
-    if (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))) reply.header("Cache-Control", "no-store");
+    if (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))) reply.header("Cache-Control", reply.getHeader("Cache-Control")==="private, no-store"?"private, no-store":"no-store");
   });
   app.addHook("preHandler", async (req, reply) => {
     if (!req.url.startsWith("/api/")) return;
