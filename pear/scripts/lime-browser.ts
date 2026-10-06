@@ -151,11 +151,17 @@ try {
   await panel.getByRole("button",{name:"Consent to pinned target + model",exact:true}).click();
   scriptedTool.name="learning_get_lesson";scriptedTool.arguments=JSON.stringify({enrollmentId:enrollment.id,lessonId:"practice"});
   await panel.getByLabel("Message",{exact:true}).fill("Offer optional practice from this original permitted lesson.");
+  const practiceRequestStart=gateway.requests.length;
   await panel.getByRole("button",{name:"Send",exact:true}).click();
-  await expect.poll(()=>gateway!.requests.some((r:any)=>r.messages?.some((m:any)=>m.role==="tool"&&m.content?.includes("Luyện nhớ chủ động")))).toBe(true);
-  const transcriptRequest=gateway.requests.find((r:any)=>r.messages?.some((m:any)=>m.role==="tool"&&m.content?.includes("Luyện nhớ chủ động")))!;
+  try{await expect.poll(()=>gateway!.requests.slice(practiceRequestStart).some((r:any)=>r.messages?.some((m:any)=>m.role==="tool"))).toBe(true);}
+  catch(error){console.log("Practice fixture activity:",await panel.locator("main").innerText());throw error;}
+  const transcriptRequest=gateway.requests.slice(practiceRequestStart).find((r:any)=>r.messages?.some((m:any)=>m.role==="tool"))!;
+  const observed=JSON.parse(transcriptRequest.messages.find((m:any)=>m.role==="tool").content);
+  assert.equal(observed.ok,true,JSON.stringify(observed));
+  assert.equal(observed.data.title,"Luyện nhớ chủ động");
+
   assert.ok(transcriptRequest.messages.some((m:any)=>m.role==="system"&&m.content.includes("unofficial and skippable")));
-  const toolResult=JSON.parse(transcriptRequest.messages.find((m:any)=>m.role==="tool"&&m.content?.includes("Luyện nhớ chủ động")).content);
+  const toolResult=observed;
   assert.equal(toolResult.data.courseId,"learning-vi");assert.equal(toolResult.data.version,1);assert.equal(toolResult.data.enrollmentId,enrollment.id);
   for(const key of ["correct","quiz","answers","password","csrf","sessionEpoch"])assert.equal(Object.hasOwn(toolResult.data,key),false);
   await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
