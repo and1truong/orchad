@@ -1,5 +1,5 @@
 export type UILocale="en"|"vi";
-export const vietnamese:Readonly<Record<string,string>>=Object.freeze({"Standalone item:":"Học liệu độc lập:","Reading confirmed":"Đã xác nhận học","Only real human-confirmed reading of the pinned item version counts. No assessment score is inferred.":"Chỉ việc học phiên bản học liệu đã ghim do người học thực sự xác nhận mới được tính. Không suy ra điểm đánh giá.","Study standalone item for this award":"Học học liệu độc lập cho chương trình này",
+export const vietnamese:Readonly<Record<string,string>>=Object.freeze({"Tracked · In progress":"Đã theo dõi · Đang học","Standalone item:":"Học liệu độc lập:","Reading confirmed":"Đã xác nhận học","Only real human-confirmed reading of the pinned item version counts. No assessment score is inferred.":"Chỉ việc học phiên bản học liệu đã ghim do người học thực sự xác nhận mới được tính. Không suy ra điểm đánh giá.","Study standalone item for this award":"Học học liệu độc lập cho chương trình này",
 "Reviewed course cycle":"Chu kỳ khóa học đã xem xét",
 "Original cycle version":"Phiên bản gốc của chu kỳ",
 "Only this learner delivery changes; future cycles keep their original version.":"Chỉ bản giao cho người học này thay đổi; các chu kỳ tiếp theo giữ phiên bản gốc.",
