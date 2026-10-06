@@ -12,8 +12,46 @@ approval rồi mới tới `window.agentBridgeV1`.
 
 ## Trạng thái
 
-**P0 — Scope và contracts (đã đóng băng).** Chưa có code app. Mọi quyết định
-kiến trúc và contract của đợt này nằm trong:
+**P1 đang dựng — backend chạy được.** Scaffold app đã có: Fastify + SQLite
+(`node:sqlite`) + migrations/seed deterministic, contract pipeline đầy đủ
+(aggregate revisions + idempotency + audit + backend grading), tests xanh.
+UI React và bridge client đang theo sau trong các PR kế tiếp của epic.
+
+## Chạy local
+
+```bash
+npm --prefix ../packages/bridge-contract run build   # contract helpers
+npm install
+npm test       # backend tests (node:test + tsx)
+npm run dev    # http://127.0.0.1:4315 (Vite middleware mode)
+```
+
+Tài khoản seed (org `org-demo`, dev passwords): `learner1`/`learner2`
+(learner, report cho `manager`), `manager`, `cadmin` (content_admin),
+`admin`. Mật khẩu lần lượt `learner-dev`, `learner-dev`, `manager-dev`,
+`content-dev`, `admin-dev`. Seed: 3 course tiếng Việt có quiz + 2 item đọc.
+
+Điểm cần biết khi đọc code:
+
+- `src/server/service.ts` — mỗi invoke: `BEGIN IMMEDIATE` → validate
+  envelope/args/role/aggregate access → idempotency lookup **trước**
+  revision check → mutation → bump revision + persist idempotency + audit →
+  `COMMIT`; lỗi → `ROLLBACK` + failure envelope.
+- `documentId` = `kind:id` aggregate (`workspace:{userId}`,
+  `enrollment:{id}`, `course:{id}`, `org:{orgId}`) — revision ledger trong
+  bảng `aggregates` (ADR 0001).
+- Lesson là `item`; quiz là item có payload `quiz` (`quizId` trong
+  `learning_start_attempt` là item id). Publish course snapshot payload
+  các item vào `content_versions` → enrollment pin immutable (ADR 0002).
+- Answer keys không bao giờ egress: `get_lesson`/`get_attempt` strip
+  `correct`; backend chấm điểm duy nhất.
+- Progress ghi qua REST `POST /api/enrollments/:id/lessons/:lessonId/complete`
+  — cố ý KHÔNG phải bridge tool để agent không tự đánh dấu hoàn thành.
+- Tool phase `p2` trả `UNSUPPORTED`; `policy-map.json` là source of truth
+  cho role gating.
+
+**P0 — Scope và contracts (đã đóng băng).** Mọi quyết định kiến trúc và
+contract của đợt đó nằm trong:
 
 | Artifact | Nội dung |
 | --- | --- |
@@ -49,12 +87,12 @@ kiến trúc và contract của đợt này nằm trong:
 - Upload: validate type/size, quarantine, signed access; SCORM/interactive
   chạy origin riêng, sandbox, không chia cookie/bridge với Pear.
 
-## Stack đề xuất (P1)
+## Stack
 
 React/TypeScript + same-origin Fastify API + SQLite (`node:sqlite`), Node
 24+, migrations và deterministic seeds — mô hình Guava, không copy canvas
-logic. Dev port chưa dùng: **4315** (4310 guava trusted origin, 4313 coconut
-sidecar, 4314 coconut fixture, 1420 vite dev). Cấu trúc dự kiến:
+logic. Dev port: **4315** (4310 guava trusted origin, 4313 coconut
+sidecar, 4314 coconut fixture, 1420 vite dev). Cấu trúc:
 `src/client`, `src/shared`, `src/server`, `migrations`, `tests`.
 
 ## Không thuộc phase này

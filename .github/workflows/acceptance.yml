@@ -115,9 +115,17 @@ jobs:
         run: |
           npm ci
           npm run build
+      - working-directory: pear
+        run: npm ci
       - name: P0 contract freeze — catalog, policy map and fixtures
         working-directory: pear
         run: node scripts/validate-catalog.mjs
+      - name: Typecheck
+        working-directory: pear
+        run: npx tsc --noEmit
+      - name: Backend tests
+        working-directory: pear
+        run: npm test
   mango:
     runs-on: ubuntu-latest
     steps:
