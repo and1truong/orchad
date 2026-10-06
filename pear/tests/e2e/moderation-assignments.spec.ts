@@ -9,7 +9,7 @@ test("admin assigns primary assessor in real UI; scoped assessor sees in-app not
  const e=data(f.call("learner-a","learning_enroll_award",{collectionId:"ui-primary"})),record=data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:e.awardEnrollmentId,criterionPath:"practice",amount:1,evidence:"Original literal evidence <img src=x>",confirmed:true},"human"));
  const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist")});
  async function login(user:string){await page.goto(origin);await page.getByLabel("Account",{exact:true}).fill(user);await page.getByLabel("Password",{exact:true}).fill(user+"-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();await expect(page.getByRole("button",{name:"Sign out",exact:true})).toBeVisible();}
- async function action(tool:string,click:()=>Promise<void>){const response=page.waitForResponse(r=>r.url().endsWith("/api/human/invoke")&&r.request().postDataJSON()?.toolName===tool);await click();expect((await(await response).json()).ok).toBe(true);}
+ async function action(tool:string,click:()=>Promise<void>){const response=page.waitForResponse(r=>r.url().endsWith("/api/human/invoke")&&r.request().postDataJSON()?.toolName===tool);await click();const result=await(await response).json();expect(result.ok,tool+" "+JSON.stringify(result.error)).toBe(true);}
  try{
   await app.listen({port:4367,host:"127.0.0.1"});await login("admin");await page.getByRole("button",{name:"Administration",exact:true}).click();
   await page.getByLabel("Moderation award ID",{exact:true}).fill("ui-primary");await action("learning_get_external_records",()=>page.getByRole("button",{name:"Load submissions",exact:true}).click());
