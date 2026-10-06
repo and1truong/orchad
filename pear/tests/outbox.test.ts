@@ -29,7 +29,8 @@ function setup(url:string,path?:string){
  const f=fixture(path),outbox=new OutboxService(f.db,[{id:"original-fixture",url,secret}],true),p=f.service.principal("admin");
  const action=(args:any)=>outbox.mutate(p,{reason:"Reviewed event delivery",revision:f.service.context("admin","library:demo").revision,key:crypto.randomUUID(),...args});
  const subscribe=(extra:any={})=>action({action:"subscribe",endpointId:"original-fixture",topics:["enrollment.created","enrollment.completed","content.published","content.retired"],...extra});
- const enroll=(learner="learner-a",key:string=crypto.randomUUID())=>data(f.call(learner,"learning_enroll",{courseId:"systems-basics"},"bridge",{idempotencyKey:key}));
+ const revisions=new Map<string,number>();
+ const enroll=(learner="learner-a",key:string=crypto.randomUUID())=>{const revision=revisions.get(key)??f.service.context(learner,"learning:demo:"+learner).revision;revisions.set(key,revision);return data(f.call(learner,"learning_enroll",{courseId:"systems-basics"},"bridge",{idempotencyKey:key,expectedRevision:revision}));};
  return {...f,outbox,p,action,subscribe,enroll};
 }
 test("HMAC receiver rejects altered bytes/signature, old/future timestamps and invalid syntax",()=>{
@@ -47,8 +48,9 @@ test("domain enrollment/completion/content transactions append minimal ordered e
   for(const lessonId of ["retry","capacity"])data(s.call("learner-a","human_complete_lesson",{enrollmentId:enrollment.enrollmentId,lessonId},"human"));
   const at=data(s.call("learner-a","learning_start_attempt",{enrollmentId:enrollment.enrollmentId}));
   for(const [questionId,answer] of [["q-retry",1],["q-write",2]])data(s.call("learner-a","human_save_answer",{attemptId:at.attemptId,questionId,answer},"human"));
-  const submitted=data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human",{idempotencyKey:"completion-exact"}));assert.equal(submitted.progress.status,"completed");
-  data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId},"human",{idempotencyKey:"completion-exact"}));
+  const submitRevision=s.service.context("learner-a","learning:demo:learner-a").revision;
+  const submitted=data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human",{idempotencyKey:"completion-exact",expectedRevision:submitRevision}));assert.equal(submitted.progress.status,"completed");
+  data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId},"human",{idempotencyKey:"completion-exact",expectedRevision:submitRevision}));
   assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM integration_events WHERE topic='enrollment.completed'").get()!.n,1);
   const before=s.db.prepare("SELECT COUNT(*) AS n FROM integration_events").get()!.n;
   s.db.exec("CREATE TRIGGER reject_outbox_audit BEFORE INSERT ON audit BEGIN SELECT RAISE(ABORT,'audit failed'); END");
