@@ -71,3 +71,15 @@ test("objective-only cycle option keeps identical lessons and rejects agent writ
   const root=f.db.prepare("SELECT award_enrollment_id FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id WHERE c.plan_id='award-plan'").get()!,child=data(f.call("learner-a","learning_enroll_award_course",{awardEnrollmentId:root.award_enrollment_id,courseId:"fresh-course"}));assert.equal(f.call("manager","human_get_assigned_quiz_review",{sourceEnrollmentId:child.enrollmentId},"human").ok,false);const learning=data(f.call("learner-a","learning_get_my_learning"));assert.equal(learning.enrollments.find((e:any)=>e.id===child.enrollmentId).cycleCourseReviewable,false);
  }finally{f.db.close();}
 });
+
+test("reconciliation checks the reviewed delivery pinned audience even when original cycle and latest published version are tenant-visible",()=>{
+ const f=setup();try{
+  const group=(ids:string[])=>({name:"Original reviewed-version access",kind:"static",memberIds:ids,mode:"ALL",rules:[]});data(f.call("admin","learning_save_group",{groupId:"reviewed-access",group:group(["manager","learner-a"])}));
+  const restricted={...f.next,title:"Original reviewed restricted v3",access:"groups",groupIds:["reviewed-access"]};data(f.call("editor","learning_update_course",{courseId:"fresh-course",course:restricted}));data(f.call("editor","learning_publish_course",{courseId:"fresh-course"}));
+  const review=data(f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:f.e.enrollmentId,targetVersion:3,mode:"fresh_course",confirmed:true},"human")),next=data(f.call("learner-a","human_accept_assigned_quiz_restart",{reviewId:review.reviewId,targetVersion:3,mode:"fresh_course",confirmed:true},"human"));
+  data(f.call("editor","learning_update_course",{courseId:"fresh-course",course:{...f.next,title:"Original tenant-visible v4"}}));data(f.call("editor","learning_publish_course",{courseId:"fresh-course"}));
+  data(f.call("admin","learning_save_group",{groupId:"reviewed-access",group:group(["manager"])}));f.service.assignments.runBackground("2026-10-02T10:00:00.000Z");
+  assert.equal(f.db.prepare("SELECT state FROM assignment_deliveries WHERE enrollment_id=?").get(next.enrollmentId)!.state,"withdrawn");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"withdrawn");assert.equal(f.call("learner-a","learning_get_lesson",{enrollmentId:next.enrollmentId,lessonId:f.value.lessons[0].id}).ok,false);assert.equal(f.db.prepare("SELECT target_version FROM assignment_cycles").get()!.target_version,1);
+  data(f.call("admin","learning_save_group",{groupId:"reviewed-access",group:group(["manager","learner-a"])}));f.service.assignments.runBackground("2026-10-02T10:00:00.000Z");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"active");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(f.e.enrollmentId)!.assignment_state,"withdrawn");
+ }finally{f.db.close();}
+});
