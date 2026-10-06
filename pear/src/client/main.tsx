@@ -872,7 +872,7 @@ function App() {
                   {e.retake_of&&<p>{translateUI("Fresh course retake")} · {e.retake_of}</p>}
                   {e.status==="in_progress"&&e.assignment_state==="active"&&!e.assigned_by&&!e.assignment_cycle_id&&<CourseFreshRestart key={"fresh-course:"+session.sessionEpoch+e.id} enrollmentId={e.id} busy={busy} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onCreated={clearLearning}/>}
                   {e.status==="in_progress"&&e.assignment_state==="active"&&!e.assigned_by&&!e.assignment_cycle_id&&<QuizUpgrade key={"quiz-upgrade:"+session.sessionEpoch+e.id} enrollmentId={e.id} busy={busy} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onCreated={clearLearning}/>}
-                  {e.status==="in_progress"&&e.assignment_state==="active"&&e.assigned_by&&!e.assignment_cycle_id&&<AssignedQuizReview key={"assigned-quiz:"+session.sessionEpoch+e.id} sourceEnrollmentId={e.id} tick={tick} actions={{busy,op,mutate,run}} onCreated={clearLearning}/>}
+                  {e.status==="in_progress"&&e.assignment_state==="active"&&e.assigned_by&&(!e.assignment_cycle_id||e.cycleCourseReviewable)&&<AssignedQuizReview key={"assigned-quiz:"+session.sessionEpoch+e.id} sourceEnrollmentId={e.id} tick={tick} actions={{busy,op,mutate,run}} onCreated={clearLearning}/>}
                   {e.status==="completed"&&<CourseRetake key={"retake:"+session.sessionEpoch+e.id} enrollmentId={e.id} busy={busy} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onCreated={clearLearning}/>}
                   {e.status === "completed" && (
                     <CourseFeedback

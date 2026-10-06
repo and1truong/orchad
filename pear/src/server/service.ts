@@ -661,6 +661,7 @@ export class LearningService {
         const page = pageRows(
           rows.map((e) => ({
             ...this.progress(e),
+            cycleCourseReviewable:!!(e.assignment_cycle_id&&this.db.prepare("SELECT 1 FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id WHERE d.cycle_id=? AND d.learner=? AND d.enrollment_id=? AND c.target_kind='course' AND c.target_id=?").get(e.assignment_cycle_id,p.id,e.id,e.course_id)),
             course: this.preview(
               {
                 id: e.course_id,

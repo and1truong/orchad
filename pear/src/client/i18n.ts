@@ -1,5 +1,8 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Reviewed course cycle":"Chu kỳ khóa học đã xem xét",
+"Original cycle version":"Phiên bản gốc của chu kỳ",
+"Only this learner delivery changes; future cycles keep their original version.":"Chỉ bản giao cho người học này thay đổi; các chu kỳ tiếp theo giữ phiên bản gốc.",
 "Primary assessor assignment":"Phân công người đánh giá chính",
 "Assign or reassign primary assessor":"Phân công hoặc chuyển người đánh giá chính",
 "Choose an active assessor already delegated to this award. Assignment does not grant rights or accept evidence.":"Chọn người đánh giá đang hoạt động và đã được cấp phạm vi chương trình này. Phân công không cấp quyền hay chấp nhận bằng chứng.",

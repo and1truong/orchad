@@ -227,7 +227,8 @@ export class AssignmentService {
         if(!this.recipientAvailable(p,id))return false;
         if(s.targetKind==="award"){try{const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;new ProgramService(this.db).requireRecipient(recipient,cycle.target_id,cycle.target_version);return true;}catch{return false;}}
         const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;
-        const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(cycle.target_id,cycle.target_version) as any).content);
+        const delivery=current.find(d=>d.learner===id),pinned=delivery?.enrollment_id?(this.db.prepare("SELECT version FROM enrollments WHERE id=?").get(delivery.enrollment_id) as any)?.version:cycle.target_version;
+        const raw=this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(cycle.target_id,pinned) as any;if(!raw)return false;const value=JSON.parse(raw.content);
         try{new ContentAccess(this.db).current(recipient,"course",cycle.target_id);return new ContentAccess(this.db).visible(recipient,"course",cycle.target_id,value);}catch{return false;}
       }),
     );
@@ -267,7 +268,7 @@ export class AssignmentService {
             .run(state, id);
           this.db
             .prepare(
-              "UPDATE enrollments SET assignment_state=? WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL",
+              "UPDATE enrollments SET assignment_state=? WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL AND NOT EXISTS(SELECT 1 FROM enrollments successor WHERE successor.retake_of=enrollments.id)",
             )
             .run(state, cycle.id, d.learner);
           releaseInactiveBookings(this.db, p.tenant);
@@ -320,7 +321,7 @@ export class AssignmentService {
           );
       this.db
         .prepare(
-          "INSERT INTO assignment_deliveries VALUES(?,?,?,?, 'active',?)",
+          "INSERT INTO assignment_deliveries(cycle_id,learner,enrollment_id,award_enrollment_id,state,delivered_at) VALUES(?,?,?,?, 'active',?)",
         )
         .run(
           cycle.id,
@@ -806,7 +807,7 @@ export class AssignmentService {
               .run(id);
             this.db
               .prepare(
-                "UPDATE enrollments SET assignment_state='cancelled' WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL",
+                "UPDATE enrollments SET assignment_state='cancelled' WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL AND NOT EXISTS(SELECT 1 FROM enrollments successor WHERE successor.retake_of=enrollments.id)",
               )
               .run(d.cycle_id, d.learner);
             releaseInactiveBookings(this.db, p.tenant);
