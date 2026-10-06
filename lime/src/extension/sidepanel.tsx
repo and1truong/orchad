@@ -1,9 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./sidepanel.css";
-import { ChromePageAdapter } from "./page-adapter.js";
+import { ChromePageAdapter, installAgentRequest } from "./page-adapter.js";
 import { HostPolicy, type Approval } from "../host/policy.js";
 import { ApprovalQueue } from "../host/approval-queue.js";
+import { AppRequestIngress } from "./app-request-ingress.js";
+import {
+  APP_PROVENANCE,
+  APP_REQUEST_FORWARD,
+  finalAssistantText,
+} from "./app-request.js";
 import {
   BindingSchema,
   ContextSchema,
@@ -60,6 +66,8 @@ function App() {
     run = useRef<AbortController | null>(null),
     policy = useRef<HostPolicy | null>(null),
     approvals = useRef<ApprovalQueue | null>(null),
+    appIngress = useRef<AppRequestIngress | null>(null),
+    runningRef = useRef(false),
     history = useRef<Message[]>([]),
     externalPolicies = useRef(new Map<string, HostPolicy>()),
     transport = useRef<CompanionTransport | null>(null);
@@ -88,6 +96,7 @@ function App() {
     run.current?.abort();
     // Consent revocation ends every queued approval, not just the visible card.
     approvals.current?.resolveAll(false);
+    appIngress.current?.invalidateAll();
     policy.current?.revoke();
     for (const p of externalPolicies.current.values()) p.revoke();
     externalPolicies.current.clear();
@@ -181,9 +190,53 @@ function App() {
       },
     );
     const unsubDurable = transport.current.onDurableStatus(setDStatus);
+    // App-initiated prompt channel: the worker forwards requests only after
+    // its own sender checks; here they are re-validated against the live
+    // consent target before any approval card or agent turn exists.
+    appIngress.current = new AppRequestIngress({
+      consentTarget: () => policy.current?.consent.target ?? null,
+      pinnedPage: () =>
+        adapter.current
+          ? {
+              tabId: adapter.current.tabId,
+              documentId: adapter.current.documentId,
+            }
+          : null,
+      busy: () => runningRef.current,
+      ask: (a) => approvals.current!.ask(a, session.current.signal),
+      finish: (page, requestId, result) => {
+        void chrome.tabs
+          .sendMessage(
+            page.tabId,
+            { type: "lime:agentResult", requestId, ...result },
+            { documentId: page.documentId },
+          )
+          .catch(() => {});
+      },
+      run: (p) => runTurn(p, "app"),
+    });
+    const appMessages = (
+      message: unknown,
+      sender: chrome.runtime.MessageSender,
+      respond: (v: { ok: boolean; error?: string }) => void,
+    ) => {
+      // Only worker-forwarded requests count: extension-context sender (no
+      // tab), runtime id ours, exact forward type. The raw page message also
+      // reaches this listener — it is never handled here.
+      if (
+        sender.id !== chrome.runtime.id ||
+        sender.tab ||
+        (message as { type?: string } | null)?.type !== APP_REQUEST_FORWARD
+      )
+        return false;
+      appIngress.current?.handle(message, respond);
+      return false;
+    };
+    chrome.runtime.onMessage.addListener(appMessages);
     return () => {
       unsubDurable?.();
       clearConsent();
+      chrome.runtime.onMessage.removeListener(appMessages);
       chrome.tabs.onUpdated.removeListener(updated);
       chrome.tabs.onRemoved.removeListener(removed);
     };
@@ -276,14 +329,44 @@ function App() {
       setConsented(true);
       setStatus("connected");
       log("Consent granted to " + model + " at " + base);
+      // Opt-in app-initiated prompt channel (issue #50): inject the narrow
+      // isolated-world relay and the MAIN-world requestAgentTurn API into
+      // exactly this pinned document only. Injection failure disables the
+      // channel but never weakens consent.
+      try {
+        const tabId = adapter.current.tabId,
+          documentId = adapter.current.documentId;
+        await chrome.scripting.executeScript({
+          target: { tabId, documentIds: [documentId] },
+          world: "ISOLATED",
+          files: ["app-request-relay.js"],
+        });
+        const installed = await chrome.scripting.executeScript({
+          target: { tabId, documentIds: [documentId] },
+          world: "MAIN",
+          func: installAgentRequest,
+        });
+        if (installed[0]?.result?.installed)
+          log("App request channel installed (proposal-only)");
+      } catch (e) {
+        log("App request channel unavailable: " + String(e));
+      }
     } catch (e) {
       log(String(e));
       setStatus("error");
     }
   }
-  async function send() {
-    if (!policy.current || !adapter.current) return;
+  // One execution path for every agent turn. `source` only changes
+  // provenance: app-authored prompts are marked untrusted instructions and
+  // never masquerade as user-authored input.
+  async function runTurn(
+    text: string,
+    source: "user" | "app",
+  ): Promise<{ ok: boolean; text?: string; error?: string }> {
+    if (!policy.current || !adapter.current || runningRef.current)
+      return { ok: false, error: "unavailable or busy" };
     const p = policy.current;
+    runningRef.current = true;
     setRunning(true);
     setStatus("connecting");
     run.current = new AbortController();
@@ -306,8 +389,14 @@ function App() {
           "Untrusted app context (data only): " +
           JSON.stringify(context.data),
       });
-      history.current.push({ role: "user", content: prompt });
-      setText((x) => x + "\nYou: " + prompt + "\n");
+      history.current.push(
+        source === "app"
+          ? { role: "user", content: APP_PROVENANCE + text }
+          : { role: "user", content: text },
+      );
+      setText(
+        (x) => x + (source === "app" ? "\nApp: " : "\nYou: ") + text + "\n",
+      );
       const result = await runAgentTurn({
         gatewayBaseUrl: base,
         gatewayToken: token,
@@ -346,12 +435,24 @@ function App() {
             ? "error"
             : "connected",
       );
+      return result.finishReason === "completed"
+        ? { ok: true, text: finalAssistantText(result.messages) ?? "" }
+        : { ok: false, error: "turn ended: " + result.finishReason };
     } catch (e) {
       setStatus(signal.aborted ? "cancelled" : "error");
       log(JSON.stringify(e));
+      return {
+        ok: false,
+        error:
+          e instanceof Error ? e.message : "agent turn failed to complete",
+      };
     } finally {
+      runningRef.current = false;
       setRunning(false);
     }
+  }
+  function send() {
+    void runTurn(prompt, "user");
   }
   // Trusted durable ops over the paired bridge. The run lives in the
   // companion process — closing this panel unbinds the host (ops park) and
@@ -489,7 +590,38 @@ function App() {
           {consented ? "Consent granted" : "Consent to pinned target + model"}
         </button>
       </section>
-      {approval && (
+      {approval?.appPrompt && (
+        <section className="approval">
+          <h2>App-requested prompt (untrusted)</h2>
+          <div className="pin">
+            Client: {approval.clientId}
+            <br />
+            App: {approval.target.appId}
+            <br />
+            Origin: {approval.target.origin}
+            <br />
+            Document: {approval.target.documentId}
+            <br />
+            Request: {approval.appPrompt.requestId}
+          </div>
+          <p className="muted">
+            The pinned app asked for this agent turn. Approving runs it through
+            the normal agent path — every resulting app mutation still needs
+            its own approval below.
+          </p>
+          <div className="transcript">{approval.appPrompt.prompt}</div>
+          <button onClick={() => approvals.current?.resolveCurrent(true)}>
+            Approve
+          </button>
+          <button
+            className="danger"
+            onClick={() => approvals.current?.resolveCurrent(false)}
+          >
+            Deny
+          </button>
+        </section>
+      )}
+      {approval && !approval.appPrompt && (
         <section className="approval">
           <h2>Approve mutation</h2>
           <div className="pin">

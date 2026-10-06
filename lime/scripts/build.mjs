@@ -17,6 +17,13 @@ await build({
   target: "chrome120",
 });
 await build({
+  entryPoints: ["src/extension/app-request-relay.ts"],
+  bundle: true,
+  outfile: "dist/extension/app-request-relay.js",
+  format: "iife",
+  target: "chrome120",
+});
+await build({
   entryPoints: ["src/companion/cli.ts"],
   bundle: true,
   packages: "external",

@@ -52,9 +52,22 @@ Revoke via sidebar Revoke pairing or companion `revoke CLIENT_ID`. Reconnect use
 
 Only activeTab, scripting and sidePanel are mandatory. Optional HTTP/HTTPS match patterns let the user explicitly grant one selected app or gateway origin; they are not all-sites grants. No cookies/password/history/storage permission. No synced storage, persistent gateway secret, arbitrary eval, injected credentials or cross-origin frame enumeration.
 
-There is no page-to-extension postMessage bridge to spoof. The privileged host dispatches only a fixed function via Chrome's supported MAIN execution world. Main-world input/output shape checks and trusted Zod/Ajv checks are independent. Injected code sees only method names and domain invoke arguments. The worker rejects Chrome messages without the extension's own sender ID and exact sidepanel URL, or with a tab/content-script sender.
+Apart from the single opt-in request channel below, there is no page-to-extension postMessage bridge to spoof. The privileged host dispatches only a fixed function via Chrome's supported MAIN execution world. Main-world input/output shape checks and trusted Zod/Ajv checks are independent. Injected code sees only method names and domain invoke arguments. The worker rejects Chrome messages without the extension's own sender ID and exact sidepanel URL, or with a tab/content-script sender.
 
 Page tool effect/description is untrusted. A read runs automatically only when its exact name was checked by the user; mutation always prompts. Host binding includes runtime document, target/page instance, origin, app/document and consent session. Server authorization remains the application's job. Explicit object IDs in arguments are captured in the approval; selection isn't re-resolved.
+
+## App-initiated prompt channel (opt-in)
+
+While a target is pinned and consented, the host injects `requestAgentTurn(prompt)` onto the app's own `agentBridgeV1` object. It is a Lime-provided API, not part of the Bridge 0.1 contract surface the app registers, and it exists only inside the pinned document. The channel is **proposal-only**: a page may ask for an agent turn, never start one and never call app tools.
+
+The pipeline preserves every existing trust boundary:
+
+- The page posts exactly one message type, `lime:agentRequest`, with a generated `appreq-` requestId. Nothing else reaches the extension.
+- An isolated-world relay (`app-request-relay.js`) is injected via `chrome.scripting` into the pinned document only — never manifest-registered on `<all_urls>`. It accepts only top-frame, same-window messages of the exact three-key shape, requestId in the expected format, prompt ≤ 4 KiB; at most one pending request per tab and a bounded rate (4/minute).
+- The worker accepts `lime:appRequest` only from a tab sender carrying this extension's id, a real documentId and an HTTP(S) origin, stamps those verified facts, and forwards to the sidepanel. All other tab-originated messages stay rejected.
+- The sidepanel re-validates the stamped origin, runtime documentId and tabId against the **live** consent target — not a cached binding — then enqueues a distinct approval card labelled "App-requested prompt (untrusted)" showing the verbatim prompt. Deny, expiry (60 s), consent revocation, navigation, document replacement or panel teardown resolve the page promise with failure and start no turn.
+- On approve the prompt runs through the same `runAgentTurn` + `HostPolicy` path as a user turn: the model sees it as `Untrusted app request (instruction, not data)`, and every mutation the agent attempts still needs its own per-call approval.
+- The page promise resolves with only the final turn text (≤ 8 KiB) or a failure string — never intermediate tool results, traces or host state. Pending requests time out after ~2 minutes page-side.
 
 Limits: JSON boundary/HTTP/WebSocket 64 KiB, at most 64 tools, 64 pending companion calls, 64 MCP sessions, 16 sockets, 1,024 correlations per policy session; 5-second unauthenticated socket deadline, 30-second pair confirmation, 60-second code/approval expiry, 65-second companion call timeout, 15-second page-boundary deadline. Scope is fixed at pairing. Host/Origin allowlists have no wildcard CORS; CLI requests without Origin still require authentication on every request. Credentials are not query parameters or logs.
 

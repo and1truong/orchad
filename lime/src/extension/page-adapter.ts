@@ -120,6 +120,93 @@ export async function dispatcher(
     throw new Error("Oversized or non-JSON page output");
   return JSON.parse(serialized);
 }
+// Fixed MAIN-world installer for the opt-in app-initiated prompt channel
+// (issue #50). Chrome serializes this function; like the dispatcher it takes
+// no closures. It adds `requestAgentTurn` to the app's own agentBridgeV1
+// object — an explicitly host-injected API, not part of the Bridge 0.1
+// contract surface the app registers — only while the target is pinned and
+// consented. The page promise resolves with the final agent-turn result or
+// failure only; tool results never cross to the page.
+export function installAgentRequest(): { installed: boolean } {
+  const TIMEOUT_MS = 120_000,
+    MAX_PROMPT_BYTES = 4096;
+  const bridge = (
+    window as unknown as {
+      agentBridgeV1?: Record<string, unknown> & {
+        requestAgentTurn?: (
+          prompt: string,
+        ) => Promise<{ ok: boolean; text?: string; error?: string }>;
+      };
+    }
+  ).agentBridgeV1;
+  if (!bridge || typeof bridge !== "object") return { installed: false };
+  if (typeof bridge.requestAgentTurn === "function")
+    return { installed: false };
+  const pending = new Map<
+    string,
+    {
+      resolve: (r: { ok: boolean; text?: string; error?: string }) => void;
+      timer: ReturnType<typeof setTimeout>;
+      listener: (e: MessageEvent) => void;
+    }
+  >();
+  const finish = (
+    requestId: string,
+    result: { ok: boolean; text?: string; error?: string },
+  ) => {
+    const entry = pending.get(requestId);
+    if (!entry) return;
+    pending.delete(requestId);
+    clearTimeout(entry.timer);
+    window.removeEventListener("message", entry.listener);
+    entry.resolve(result);
+  };
+  bridge.requestAgentTurn = (prompt: unknown) => {
+    if (typeof prompt !== "string" || prompt.length === 0)
+      return Promise.resolve({ ok: false, error: "prompt must be a string" });
+    if (new TextEncoder().encode(prompt).length > MAX_PROMPT_BYTES)
+      return Promise.resolve({
+        ok: false,
+        error: "prompt exceeds 4 KiB",
+      });
+    if (pending.size >= 1)
+      return Promise.resolve({
+        ok: false,
+        error: "an agent request is already pending",
+      });
+    const requestId = "appreq-" + crypto.randomUUID();
+    return new Promise((resolve) => {
+      const listener = (event: MessageEvent) => {
+        if (event.source !== window) return;
+        const d = event.data;
+        if (
+          !d ||
+          typeof d !== "object" ||
+          d.type !== "lime:agentResult" ||
+          d.requestId !== requestId
+        )
+          return;
+        const result: { ok: boolean; text?: string; error?: string } = {
+          ok: d.ok === true,
+        };
+        if (typeof d.text === "string") result.text = d.text;
+        if (typeof d.error === "string") result.error = d.error;
+        finish(requestId, result);
+      };
+      const timer = setTimeout(
+        () => finish(requestId, { ok: false, error: "agent request timed out" }),
+        TIMEOUT_MS,
+      );
+      pending.set(requestId, { resolve, timer, listener });
+      window.addEventListener("message", listener);
+      window.postMessage(
+        { type: "lime:agentRequest", requestId, prompt },
+        window.location.origin,
+      );
+    });
+  };
+  return { installed: true };
+}
 export class ChromePageAdapter implements PageAdapter {
   private invalid = false;
   private constructor(

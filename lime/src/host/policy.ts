@@ -32,6 +32,10 @@ export interface Approval {
   targetObjects: string[];
   canonicalArguments: string;
   expiresAt: number;
+  // Present only for app-initiated prompt proposals (issue #50): the card
+  // shows the verbatim page prompt and the "untrusted" label instead of a
+  // tool call. Tool/call carry pseudo values and must not be dispatched.
+  appPrompt?: { requestId: string; prompt: string };
 }
 export interface Consent {
   clientId: string;
