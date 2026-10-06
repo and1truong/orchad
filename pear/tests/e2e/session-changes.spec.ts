@@ -4,6 +4,7 @@ import {courses} from "../../src/server/seed.ts";
 import {createApp} from "../../src/server/app.ts";
 import {resolve} from "node:path";
 test("human reschedules and cancels a published session; learner reads own notice, explicitly rebooks and downloads cancelled calendar",async({page})=>{
+ test.setTimeout(90000);
  const f=fixture(),origin="http://127.0.0.1:4349",start=Date.now()+86400000,definition={id:"session-change-ui",startsAt:new Date(start).toISOString(),endsAt:new Date(start+3600000).toISOString(),cutoffAt:new Date(start-3600000).toISOString(),timezone:"Asia/Ho_Chi_Minh",capacity:2,location:"Original room"};
  const course={...structuredClone(courses["systems-basics"]),title:"Original changed workshop",lessons:[{id:"event",title:"Changed workshop",text:"Attend with the human instructor",kind:"event" as const,prerequisiteIds:[],sessions:[definition]}]};
  data(f.call("editor","learning_create_course",{courseId:"session-change-ui",course}));data(f.call("editor","learning_publish_course",{courseId:"session-change-ui"}));

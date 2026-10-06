@@ -781,14 +781,11 @@ test("deactivation or withdrawn obligations release unassessed seats without rew
       .prepare("UPDATE enrollments SET assignment_state='withdrawn' WHERE id=?")
       .run(other);
     assert.equal(releaseInactiveBookings(f.db, "demo"), 1);
-    assert.throws(
-      () =>
-        f.service.blended.calendar(
-          f.service.principal("learner-b"),
-          second.bookingId,
-        ),
-      /no longer active/,
-    );
+    const cancelled=f.service.blended.calendar(f.service.principal("learner-b"),second.bookingId);
+    assert.match(cancelled,/STATUS:CANCELLED/);
+    assert.match(cancelled,new RegExp("UID:"+second.bookingId+"@pear"));
+    assert.throws(()=>f.service.blended.calendar(f.service.principal("editor"),second.bookingId),/scope denied/);
+    assert.throws(()=>f.service.principal("learner-a"),/inactive/);
   } finally {
     Date.now = now;
     f.db.close();
