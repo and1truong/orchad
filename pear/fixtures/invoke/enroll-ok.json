@@ -1,0 +1,18 @@
+{
+  "name": "learning_enroll — write, revision bump",
+  "notes": "Write binds documentId aggregate revision; enrollment pins contentVersionId at enroll time (ADR 0002).",
+  "request": {
+    "requestId": "req-0002",
+    "documentId": "workspace:u-learner-1",
+    "toolName": "learning_enroll",
+    "arguments": { "contentId": "crs-onb-101" },
+    "expectedRevision": 3,
+    "idempotencyKey": "enr-9c8a2f"
+  },
+  "result": {
+    "ok": true,
+    "revision": 4,
+    "data": { "enrollmentId": "enr-001", "contentId": "crs-onb-101", "contentVersionId": "cv-7", "status": "enrolled" },
+    "error": null
+  }
+}

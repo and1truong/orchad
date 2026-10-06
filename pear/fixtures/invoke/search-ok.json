@@ -1,0 +1,24 @@
+{
+  "name": "learning_search — read, null revision/key",
+  "notes": "Reads always carry expectedRevision=null and idempotencyKey=null. Results respect caller entitlement.",
+  "request": {
+    "requestId": "req-0001",
+    "documentId": "workspace:u-learner-1",
+    "toolName": "learning_search",
+    "arguments": { "query": "onboarding", "level": "beginner", "limit": 10 },
+    "expectedRevision": null,
+    "idempotencyKey": null
+  },
+  "result": {
+    "ok": true,
+    "revision": 3,
+    "data": {
+      "items": [
+        { "itemId": "crs-onb-101", "type": "course", "title": "Onboarding an ninh", "provider": "pear-synthetic", "durationMinutes": 25, "level": "beginner", "entitled": true }
+      ],
+      "total": 1,
+      "nextOffset": null
+    },
+    "error": null
+  }
+}

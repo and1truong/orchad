@@ -2,7 +2,8 @@
 
 Collection of Agent App Bridge 0.1 POCs: `lime/` (Chrome MV3 host), `coconut/`
 (Tauri 2 host), `guava/` (web app + backend), `mango/` (model gateway +
-portable agent client). `acceptance/` holds the canonical interop scenario
+portable agent client), `pear/` (LMS app — P0 contracts only, see
+`pear/README.md`). `acceptance/` holds the canonical interop scenario
 every POC executes — see `acceptance/README.md`.
 
 ## Shared contract

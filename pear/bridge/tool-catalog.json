@@ -1,0 +1,989 @@
+[
+  {
+    "name": "learning_search",
+    "effect": "read",
+    "description": "Keyword search over the entitled catalog. Optional facet filters (skill, topic, provider, language, level, type, duration, rating, industry, updated, accessibility). At most 40 results per page; every result respects caller entitlement.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "skill": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "topic": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "language": {
+          "type": "string",
+          "maxLength": 16,
+          "pattern": "^[a-z]{2}(-[A-Za-z]{2,8})?$"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "beginner",
+            "intermediate",
+            "advanced"
+          ]
+        },
+        "contentType": {
+          "type": "string",
+          "enum": [
+            "item",
+            "course",
+            "playlist",
+            "award"
+          ]
+        },
+        "maxDurationMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "minRating": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "industry": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "updatedWithinDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3650
+        },
+        "requiresAccessibility": {
+          "type": "boolean"
+        },
+        "sort": {
+          "type": "string",
+          "enum": [
+            "relevance",
+            "newest",
+            "rating",
+            "duration"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_get_item",
+    "effect": "read",
+    "description": "Read catalog metadata for one content item: title, provider, outcomes, duration, level, availability and entitlement state, license/egress class, current published version. Never returns licensed full text or answer keys.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "itemId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_get_lesson",
+    "effect": "read",
+    "description": "Read one lesson's learner-facing content bound to the caller's enrollment. Bounded text plus media references; never returns answer keys or other learners' data. Licensed items with aiProcessing=deny return metadata only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "enrollmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "lessonId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "enrollmentId",
+        "lessonId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_get_my_learning",
+    "effect": "read",
+    "description": "Read the authenticated learner's own enrollments, assignments and bookmarks with status and due dates. Self only; there is no parameter to read another user.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "all",
+            "assigned",
+            "in_progress",
+            "overdue",
+            "completed",
+            "saved"
+          ]
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_get_progress",
+    "effect": "read",
+    "description": "Read the progress ledger summary of one enrollment: completed lessons, attempt states, policy status, completion record if any. Caller must own the enrollment or hold a manager/assessor/admin scope covering it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "enrollmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "enrollmentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_get_attempt",
+    "effect": "read",
+    "description": "Read one quiz attempt's state: status, saved answers, score and pass/fail once backend-graded. Correct answers and answer keys are never returned.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "attemptId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_report_query",
+    "effect": "read",
+    "description": "Run a bounded report over a named dataset with fixed filter fields. Results are scoped to the caller's report permission (direct reports or org). No raw SQL; unknown fields are rejected.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "dataset": {
+          "type": "string",
+          "enum": [
+            "enrollments",
+            "progress",
+            "completions",
+            "assignments",
+            "assessments"
+          ]
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "groupId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "contentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "sinceDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3650
+        },
+        "untilDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3650
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [
+        "dataset"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_preview_assignment",
+    "effect": "read",
+    "description": "Dry-run an assignment audience: returns resolved recipient count and scoped preview for the given content and user/group IDs. Creates nothing; manager scope is enforced on the resolved set.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "groupIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "contentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_preview_group_rules",
+    "effect": "read",
+    "description": "Dry-run dynamic group membership rules (ALL/ANY conditions over profile fields). Returns deterministic member count and bounded sample before saving. Creates nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "all",
+            "any"
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "role",
+                  "managerId",
+                  "groupId",
+                  "customField",
+                  "joinedBeforeDays",
+                  "joinedWithinDays"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "field",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "mode",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_enroll",
+    "effect": "write",
+    "description": "Enroll the authenticated learner in a published content item or course. Idempotent: a duplicate request for the same content returns the existing enrollment. Respects entitlement, availability and retired-content policy.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "contentId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_set_bookmark",
+    "effect": "write",
+    "description": "Save or unsave a content item in the caller's workspace. Bookmarks are personal; the write binds the workspace aggregate of the caller.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "saved": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "contentId",
+        "saved"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_start_attempt",
+    "effect": "write",
+    "description": "Start a new quiz attempt inside the caller's enrollment. Enforces prerequisite gates and the attempt cap server-side; returns the new attempt bound to the immutable quiz version.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "enrollmentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "quizId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "enrollmentId",
+        "quizId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_save_answer",
+    "effect": "write",
+    "description": "Save one draft answer inside an open attempt owned by the caller. The answer payload is validated against the question type of the pinned quiz version; answers are drafts until submit.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "questionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "selectedChoiceIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 8192
+        }
+      },
+      "required": [
+        "attemptId",
+        "questionId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_submit_attempt",
+    "effect": "write",
+    "description": "Submit an open attempt for grading. The backend grades against the immutable quiz version and records the authoritative result; the caller supplies no score or pass flag. Host approval should require explicit learner confirmation.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "attemptId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_book_session",
+    "effect": "write",
+    "description": "Book the caller into an instructor-led session. Enforces capacity, booking cutoff and timezone rules server-side; concurrent bookings cannot exceed capacity.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "required": [
+        "sessionId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_submit_external_record",
+    "effect": "write",
+    "description": "Submit the caller's external learning record for moderation: title, provider, hours, completion date and an evidence reference. Pending or rejected records never count toward awards.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "provider": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "hours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10000
+        },
+        "completedAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "evidenceRef": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "statement": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "title",
+        "hours",
+        "completedAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_save_course",
+    "effect": "write",
+    "description": "Create or update a course draft (content_admin): title, description and ordered modules referencing published lessons with optional prerequisite gates. Edits never touch published versions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "courseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "lessonIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80,
+                  "pattern": "^[a-zA-Z0-9_-]+$"
+                },
+                "maxItems": 200
+              },
+              "prerequisiteModuleIndexes": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 200
+                },
+                "maxItems": 200,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "title",
+              "lessonIds"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 200
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_publish_course",
+    "effect": "write",
+    "description": "Publish a course draft as a new immutable version (content_admin). Existing enrollments stay pinned to their version; the new version applies to new enrollments only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "courseId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "draftRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "courseId",
+        "draftRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_save_playlist",
+    "effect": "write",
+    "description": "Create or update a playlist draft (content_admin): an ordered list of published content items. Playlists are curation/share only — they carry no completion and cannot be assigned like courses.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "playlistId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "itemIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 256,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "title",
+        "itemIds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_publish_playlist",
+    "effect": "write",
+    "description": "Publish a playlist draft as a new immutable version (content_admin).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "playlistId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "draftRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "playlistId",
+        "draftRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_save_award",
+    "effect": "write",
+    "description": "Create or update an award/program draft (content_admin): target credits, required and elective content, alternatives, ongoing flag and nesting depth limit. Cyclic or over-depth structures are rejected at validation.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "awardId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "targetCredits": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100000
+        },
+        "requiredContentIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 200,
+          "uniqueItems": true
+        },
+        "electiveContentIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 200,
+          "uniqueItems": true
+        },
+        "electiveCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "ongoing": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_publish_award",
+    "effect": "write",
+    "description": "Publish an award draft as a new immutable version (content_admin). In-progress award records keep evaluating against their pinned version.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "awardId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "draftRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        }
+      },
+      "required": [
+        "awardId",
+        "draftRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_create_assignment",
+    "effect": "write",
+    "description": "Create an assignment of published content to explicit users and/or groups (admin, or manager limited to direct reports). Supports fixed/rolling/no due date, a future start and recurrence; the resolved audience is recorded at creation.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "contentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "userIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "groupIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "dueKind": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "rolling",
+            "none"
+          ]
+        },
+        "dueAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z$"
+        },
+        "rollingDays": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3650
+        },
+        "startsAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2})?Z$"
+        },
+        "recurrence": {
+          "type": "string",
+          "enum": [
+            "none",
+            "weekly",
+            "monthly",
+            "quarterly",
+            "yearly"
+          ]
+        }
+      },
+      "required": [
+        "contentId",
+        "dueKind"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_save_group_rules",
+    "effect": "write",
+    "description": "Save dynamic membership rules for a group (admin): ALL/ANY conditions over profile fields, including date rules. Membership evaluation is deterministic; use learning_preview_group_rules to preview before saving.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "all",
+            "any"
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "role",
+                  "managerId",
+                  "groupId",
+                  "customField",
+                  "joinedBeforeDays",
+                  "joinedWithinDays"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "field",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "groupId",
+        "mode",
+        "conditions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "learning_assess_submission",
+    "effect": "write",
+    "description": "Record an assessor decision on a pending submission, long answer or attendance entry, restricted to items assigned to the assessor. Decision, optional score and feedback plus reason are audited; assessor holds no other admin rights.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "submissionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail"
+          ]
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "feedback": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "submissionId",
+        "decision",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

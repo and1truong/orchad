@@ -1,0 +1,30 @@
+{
+  "$comment": "Host policy mapping for pear tool-catalog.json (epic #49 P0 freeze). Semantics in host-policy.md. Server enforces every permission again — this map is the host's consent/approval contract, not the authorization.",
+  "tools": {
+    "learning_search": { "phase": "p1", "roles": ["learner", "manager", "content_admin", "assessor", "admin"], "effect": "read", "consent": "catalog", "approval": "none", "egress": "metadata" },
+    "learning_get_item": { "phase": "p1", "roles": ["learner", "manager", "content_admin", "assessor", "admin"], "effect": "read", "consent": "catalog", "approval": "none", "egress": "metadata" },
+    "learning_get_lesson": { "phase": "p1", "roles": ["learner", "manager", "content_admin", "assessor", "admin"], "effect": "read", "consent": "lesson_content", "approval": "none", "egress": "per_item_license" },
+    "learning_get_my_learning": { "phase": "p1", "roles": ["learner", "manager", "content_admin", "assessor", "admin"], "effect": "read", "consent": "personal", "approval": "none", "egress": "personal" },
+    "learning_get_progress": { "phase": "p1", "roles": ["learner", "manager", "assessor", "admin"], "effect": "read", "consent": "personal", "approval": "none", "egress": "scoped" },
+    "learning_get_attempt": { "phase": "p1", "roles": ["learner", "manager", "assessor", "admin"], "effect": "read", "consent": "personal", "approval": "none", "egress": "scoped" },
+    "learning_report_query": { "phase": "p2", "roles": ["manager", "admin"], "effect": "read", "consent": "report", "approval": "none", "egress": "scoped" },
+    "learning_preview_assignment": { "phase": "p1", "roles": ["manager", "admin"], "effect": "read", "consent": "admin_surface", "approval": "none", "egress": "scoped" },
+    "learning_preview_group_rules": { "phase": "p2", "roles": ["admin"], "effect": "read", "consent": "admin_surface", "approval": "none", "egress": "scoped" },
+    "learning_enroll": { "phase": "p1", "roles": ["learner", "manager", "content_admin", "assessor", "admin"], "effect": "write", "consent": "personal", "approval": "required", "egress": "personal" },
+    "learning_set_bookmark": { "phase": "p1", "roles": ["learner", "manager", "content_admin", "assessor", "admin"], "effect": "write", "consent": "personal", "approval": "required", "egress": "personal" },
+    "learning_start_attempt": { "phase": "p1", "roles": ["learner"], "effect": "write", "consent": "personal", "approval": "required", "egress": "personal" },
+    "learning_save_answer": { "phase": "p1", "roles": ["learner"], "effect": "write", "consent": "personal", "approval": "required", "egress": "personal" },
+    "learning_submit_attempt": { "phase": "p1", "roles": ["learner"], "effect": "write", "consent": "personal", "approval": "required_confirm", "egress": "personal" },
+    "learning_book_session": { "phase": "p2", "roles": ["learner", "manager", "admin"], "effect": "write", "consent": "personal", "approval": "required", "egress": "personal" },
+    "learning_submit_external_record": { "phase": "p2", "roles": ["learner"], "effect": "write", "consent": "personal", "approval": "required", "egress": "personal" },
+    "learning_save_course": { "phase": "p1", "roles": ["content_admin", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_publish_course": { "phase": "p1", "roles": ["content_admin", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_save_playlist": { "phase": "p2", "roles": ["content_admin", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_publish_playlist": { "phase": "p2", "roles": ["content_admin", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_save_award": { "phase": "p2", "roles": ["content_admin", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_publish_award": { "phase": "p2", "roles": ["content_admin", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_create_assignment": { "phase": "p1", "roles": ["manager", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_save_group_rules": { "phase": "p2", "roles": ["admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" },
+    "learning_assess_submission": { "phase": "p2", "roles": ["assessor", "admin"], "effect": "write", "consent": "admin_surface", "approval": "required", "egress": "scoped" }
+  }
+}
