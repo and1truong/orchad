@@ -325,7 +325,10 @@ export function Programs(props: Props) {
   }, [tick, offset, awardOffset, administrative, role]);
   const value = kind === "award" ? award : playlist;
   const metadata = (field: "title" | "summary" | "access", v: string) => {
-    if (kind === "award") setAward({ ...award, [field]: v });
+    if(field==="access"){
+      const next={...value,access:v as Award["access"]};if(v==="groups")next.groupIds=next.groupIds??[];else delete next.groupIds;
+      if(kind==="award")setAward(next as Award);else setPlaylist(next as Playlist);
+    }else if (kind === "award") setAward({ ...award, [field]: v });
     else setPlaylist({ ...playlist, [field]: v });
   };
   const updateRequirement = (i: number, r: Requirement) =>
@@ -583,8 +586,10 @@ export function Programs(props: Props) {
                 >
                   <option value="tenant">{translateUI("Organization")}</option>
                   <option value="author">{translateUI("Author only")}</option>
+                  <option value="groups">{translateUI("Selected groups")}</option>
                 </select>
               </label>
+              {value.access==="groups"&&<label>{translateUI("Audience group IDs")}<input aria-label={translateUI("Audience group IDs")} required maxLength={520} value={(value.groupIds??[]).join(",")} onChange={e=>{const groupIds=e.target.value.split(",").map(id=>id.trim()).filter(Boolean);if(kind==="award")setAward({...award,groupIds});else setPlaylist({...playlist,groupIds});}}/></label>}
               {kind === "playlist" ? (
                 <References
                   refs={playlist.items}

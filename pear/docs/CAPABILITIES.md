@@ -124,3 +124,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## G04/G12/G13 live course/item group audience extension
 
 #105 adds explicit same-tenant static/dynamic group audiences for original courses/items, bounded group-set-safe reusable references, and current membership gates for pinned content/media/answers/completion/timers without deleting history. Four domain/actual HTTP and one EN/VI mobile author/learner browser regression are authored; exact-head CI pending. Collection/bank group sharing and cross-portal/reference entitlement policies remain OPEN. See ADR-046.
+
+## Group collections/banks/scheduled obligations extension
+
+#106 extends current group audiences to playlists, awards and staff-only question banks with conservative reuse containment, immutable quiz provenance and current recipient scheduling/withdraw/rejoin checks. Six domain/actual HTTP/scheduler and one EN/VI mobile author/learner browser regression are authored; exact-head CI pending. Cross-portal sharing and exact reference/provider lifecycle/recertification semantics remain OPEN. See ADR-047.

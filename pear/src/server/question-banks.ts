@@ -1,10 +1,11 @@
+import {PeopleService} from "./people.ts";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal,Course,Question} from "../shared/model.ts";
 import {canonical} from "@orchard/bridge-contract";
 import {validateQuestion} from "./assessments.ts";
 import {ContentAccess} from "./content-access.ts";
 import {boundedPage,reject} from "./errors.ts";
-type Bank={title:string;access:"tenant"|"author";aiProcessingAllowed:boolean;questions:Question[]};
+type Bank={title:string;access:"tenant"|"author"|"groups";groupIds?:string[];aiProcessingAllowed:boolean;questions:Question[]};
 export class QuestionBankService{
  constructor(readonly db:DatabaseSync){}
  private live(p:Principal){
@@ -12,19 +13,21 @@ export class QuestionBankService{
   if(!live?.active||live.tenant!==p.tenant||live.auth_version!==p.auth_version||live.role!==p.role)reject("UNAUTHORIZED","Question bank authority changed");
   if(!["admin","content_admin"].includes(live.role))reject("FORBIDDEN","Question bank author required");
  }
+ private visible(p:Principal,row:any,bank:Bank){return p.role==="admin"||row.owner===p.id||bank.access==="tenant"||bank.access==="groups"&&!!bank.groupIds?.some(id=>new PeopleService(this.db).isMember(p.tenant,id,p.id));}
+ private audience(bank:Bank,root:{access?:string;groupIds?:string[]}){if(bank.access==="groups"&&root.access!=="author"&&(root.access!=="groups"||!root.groupIds?.length||root.groupIds.some(id=>!bank.groupIds?.includes(id))))reject("FORBIDDEN","Group bank cannot be redistributed outside its declared audience");}
  private row(p:Principal,id:string){
   this.live(p);
   const row=this.db.prepare("SELECT * FROM question_banks WHERE id=? AND tenant=?").get(id,p.tenant) as any;
   if(!row)reject("NOT_FOUND","Scoped question bank unavailable");
   const latest=this.version(row,row.latest_version);
-  if(p.role!=="admin"&&row.owner!==p.id&&latest.access==="author")reject("NOT_FOUND","Question bank outside author audience");
+  if(!this.visible(p,row,latest))reject("NOT_FOUND","Question bank outside author audience");
   return row;
  }
  private version(row:any,version:number):Bank{
   const value=this.db.prepare("SELECT content FROM question_bank_versions WHERE bank_id=? AND version=?").get(row.id,version) as any;
   if(!value)reject("NOT_FOUND","Question bank version unavailable");return JSON.parse(value.content);
  }
- private readable(p:Principal,row:any,version:number){const bank=this.version(row,version);if(p.role!=="admin"&&bank.access==="author"&&row.owner!==p.id)reject("NOT_FOUND","Private bank version unavailable");return bank;}
+ private readable(p:Principal,row:any,version:number){const bank=this.version(row,version);if(!this.visible(p,row,bank))reject("NOT_FOUND","Private bank version unavailable");return bank;}
  authorize(p:Principal,name:string,a:any){
   if(name.startsWith("learning_")&&["learning_get_question_bank","learning_save_question_bank","learning_retire_question_bank","learning_apply_question_bank"].includes(name)){
    if(!["admin","content_admin"].includes(p.role))reject("FORBIDDEN","Question bank author required");
@@ -51,6 +54,7 @@ export class QuestionBankService{
   const course=this.db.prepare("SELECT draft FROM courses WHERE id=? AND tenant=?").get(courseId,p.tenant) as any;
   if(!course)reject("NOT_FOUND","Question bank course draft unavailable");
   const draft=JSON.parse(course.draft),access=new ContentAccess(this.db);access.author(p,"course",courseId,draft);
+  this.audience(bank,draft);
   if(bank.access==="author"&&(draft.access!=="author"||access.owner(p,"course",courseId)!==row.owner))reject("FORBIDDEN","Private bank cannot be redistributed to a wider course audience");
   if(new Set(ref.questionIds).size!==ref.questionIds.length)reject("INVALID_ARGUMENT","Distinct bank question IDs required");
   const questions=ref.questionIds.map(id=>bank.questions.find(q=>q.id===id));if(questions.some(q=>!q))reject("INVALID_ARGUMENT","Question ID missing from selected bank version");
@@ -61,6 +65,7 @@ export class QuestionBankService{
   if(!courseId)reject("INVALID_ARGUMENT","Create the course draft before applying a question bank");
   const {bank,questions}=this.selected(p,ref,courseId!);
   const owner=new ContentAccess(this.db).owner(p,"course",courseId!);
+  this.audience(bank,c);
   if(bank.access==="author"&&(c.access!=="author"||owner!==this.row(p,ref.bankId).owner))reject("FORBIDDEN","Private bank requires the same owned author course audience");
   if(canonical(c.quiz.questions)!==canonical(questions))reject("INVALID_ARGUMENT","Pinned bank questions differ; explicitly detach the bank before manual edits");
   c.aiProcessingAllowed=c.aiProcessingAllowed&&bank.aiProcessingAllowed;
@@ -70,11 +75,13 @@ export class QuestionBankService{
   if(name==="learning_retire_question_bank"){const row=this.row(p,a.bankId);this.db.prepare("UPDATE question_banks SET state='retired' WHERE id=?").run(row.id);return {bankId:row.id,state:"retired",existingSnapshotsPreserved:true};}
   if(name!=="learning_save_question_bank")reject("UNSUPPORTED","Unknown question bank write");
   const bank=structuredClone(a.bank) as Bank;
+  new ContentAccess(this.db).validate(p,bank);
   if(a.sourceCourseId){
    const source=this.db.prepare("SELECT draft FROM courses WHERE id=? AND tenant=?").get(a.sourceCourseId,p.tenant) as any;
    if(!source)reject("NOT_FOUND","Question bank source course unavailable");
    const draft=JSON.parse(source.draft);new ContentAccess(this.db).author(p,"course",a.sourceCourseId,draft);
-   if(["author","groups"].includes(draft.access)&&bank.access!=="author")reject("FORBIDDEN","Private source questions require a private bank");
+   if(draft.access==="groups"&&bank.access!=="author"&&(bank.access!=="groups"||!bank.groupIds?.length||bank.groupIds.some(id=>!draft.groupIds?.includes(id))))reject("FORBIDDEN","Group source questions require an equal or narrower bank audience");
+   if(draft.access==="author"&&bank.access!=="author")reject("FORBIDDEN","Private source questions require a private bank");
    if(canonical(bank.questions)!==canonical(draft.quiz.questions))reject("INVALID_ARGUMENT","Source draft questions changed; review the source again");
    bank.aiProcessingAllowed=bank.aiProcessingAllowed&&draft.aiProcessingAllowed;
   }

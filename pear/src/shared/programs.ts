@@ -15,13 +15,15 @@ export interface Requirement {
 export interface Playlist {
   title: string;
   summary: string;
-  access: "tenant" | "author";
+  access: "tenant" | "author" | "groups";
+  groupIds?: string[];
   items: Reference[];
 }
 export interface Award {
   title: string;
   summary: string;
-  access: "tenant" | "author";
+  access: "tenant" | "author" | "groups";
+  groupIds?: string[];
   unit: "credits" | "hours";
   target: number;
   ongoing: boolean;
@@ -31,15 +33,17 @@ export interface Award {
 const metadata = {
   title: string(160),
   summary: string(600),
-  access: enumeration("tenant", "author"),
+  access: enumeration("tenant", "author", "groups"),
+  groupIds: array(string(64),8,1),
 };
 const reference = (kinds: string[]) =>
   object({ kind: enumeration(...kinds), id: string(64) });
-export const playlistSchema = object({
+const optionalAudience=(properties:Record<string,unknown>)=>object(properties,Object.keys(properties).filter(k=>k!=="groupIds"));
+export const playlistSchema = optionalAudience({
   ...metadata,
   items: array(reference(["course", "item"]), 16, 1),
 });
-export const awardSchema = object({
+export const awardSchema = optionalAudience({
   ...metadata,
   unit: enumeration("credits", "hours"),
   target: integer(10000, 1),

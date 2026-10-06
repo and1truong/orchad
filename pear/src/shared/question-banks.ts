@@ -1,7 +1,7 @@
 import {array,integer,string,enumeration,object,tool} from "./schema.ts";
 import {questionSchema} from "./assessments.ts";
 import type {Role} from "./model.ts";
-export const questionBankSchema=object({title:string(160),access:enumeration("tenant","author"),aiProcessingAllowed:{type:"boolean"},questions:array(questionSchema,40,1)});
+export const questionBankSchema=object({title:string(160),access:enumeration("tenant","author","groups"),groupIds:array(string(64),8,1),aiProcessingAllowed:{type:"boolean"},questions:array(questionSchema,40,1)},["title","access","aiProcessingAllowed","questions"]);
 export const questionBankRefSchema=object({bankId:string(64),version:integer(100,1),questionIds:array(string(64),8,1)});
 export const questionBankLibraryWrites=["learning_save_question_bank","learning_retire_question_bank","learning_apply_question_bank"];
 export function questionBankTools(role:Role){

@@ -86,8 +86,9 @@ export class AssignmentService {
     if (!v) reject("NOT_FOUND", "Target version unavailable");
     const content = JSON.parse(v.content);
     if(s.targetKind==="course"){new ContentAccess(this.db).current(p,"course",row.id);new ContentAccess(this.db).requireVisible(p,"course",row.id,content);}
-    if (s.targetKind === "award" && content.access !== "tenant")
+    if (s.targetKind === "award" && content.access === "author")
       reject("FORBIDDEN", "Scheduled awards require organization access");
+    if(s.targetKind==="award")new ProgramService(this.db).requireRecipient(p,row.id,selected);
     return { version: selected, title: content.title };
   }
   private validate(p: Principal, s: AssignmentPlan) {
@@ -142,6 +143,7 @@ export class AssignmentService {
       const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(s.targetId,target.version) as any).content);
       for(const id of recipients){const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;new ContentAccess(this.db).requireVisible(recipient,"course",s.targetId,value);new ContentAccess(this.db).current(recipient,"course",s.targetId);}
     }
+    if(s.targetKind==="award")for(const id of recipients){const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;new ProgramService(this.db).requireRecipient(recipient,s.targetId,target.version);}
     return { ...target, recipients };
   }
   authorize(p: Principal, name: string, a: any) {
@@ -223,7 +225,7 @@ export class AssignmentService {
     const desired = new Set(
       members.filter((id) => {
         if(!this.recipientAvailable(p,id))return false;
-        if(s.targetKind!=="course")return true;
+        if(s.targetKind==="award"){try{const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;new ProgramService(this.db).requireRecipient(recipient,cycle.target_id,cycle.target_version);return true;}catch{return false;}}
         const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;
         const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(cycle.target_id,cycle.target_version) as any).content);
         try{new ContentAccess(this.db).current(recipient,"course",cycle.target_id);return new ContentAccess(this.db).visible(recipient,"course",cycle.target_id,value);}catch{return false;}
@@ -371,6 +373,7 @@ export class AssignmentService {
       )
       .get(a.awardEnrollmentId, p.id, p.tenant) as any;
     if (!award) reject("FORBIDDEN", "Active own award enrollment required");
+    new ProgramService(this.db).requireEnrolled(p,award.id);
     const root = JSON.parse(
       (
         this.db

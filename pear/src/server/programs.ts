@@ -1,3 +1,4 @@
+import {PeopleService} from "./people.ts";
 import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID, createHash } from "node:crypto";
@@ -32,7 +33,7 @@ export class ProgramService {
     return json(row.content);
   }
   private visible(p: Principal, row: any, value: Award | Playlist) {
-    return value.access === "tenant" || row.owner === p.id;
+    return value.access === "tenant" || row.owner === p.id || value.access==="groups"&&!!value.groupIds?.some(id=>new PeopleService(this.db).isMember(p.tenant,id,p.id));
   }
   private author(p: Principal, row: any) {
     if (
@@ -50,7 +51,14 @@ export class ProgramService {
       )
       .get(id, p.id, p.tenant) as any;
     if (!row) reject("FORBIDDEN", "Award enrollment access denied");
+    const collection=this.collection(p,row.award_id),value=this.version(row.award_id,row.version);
+    if(value.access==="groups"&&!this.visible(p,collection,value))reject("FORBIDDEN","Current award group membership required");
     return row;
+  }
+  requireEnrolled(p:Principal,id:string){this.enrollment(p,id);}
+  requireRecipient(p:Principal,id:string,version:number){
+    const row=this.collection(p,id),value=this.version(id,version),current=this.version(id,row.latest_version);
+    if(row.state!=="published"||!this.visible(p,row,value)||!this.visible(p,row,current))reject("FORBIDDEN","Award outside current recipient audience");
   }
   evidenceScope(p: Principal, id: string, path: string, file = false) {
     const e = this.enrollment(p, id);
@@ -138,7 +146,7 @@ export class ProgramService {
       }
       if (name === "learning_get_external_records") this.assessor(p, row.id);
     }
-    if (name === "learning_assign_award") this.recipient(p, a.learnerId);
+    if (name === "learning_assign_award") {this.recipient(p, a.learnerId);const row=this.collection(p,a.collectionId),recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(a.learnerId,p.tenant) as unknown as Principal;this.requireRecipient(recipient,row.id,row.latest_version);}
     if (
       name === "human_submit_external_record" &&
       this.enrollment(p, a.awardEnrollmentId).assignment_state !== "active"
@@ -170,6 +178,7 @@ export class ProgramService {
     rootAccess: string,
     publishing: boolean,
     rootOwner=p.id,
+    rootGroups:string[]=[],
   ): Reference {
     if (!identifier.test(ref.id))
       reject("INVALID_ARGUMENT", "Invalid reference ID");
@@ -191,7 +200,7 @@ export class ProgramService {
       const column=ref.kind==="course"?"course_id":"item_id",versionTable=ref.kind==="course"?"course_versions":"content_item_versions";
       const content=publishing?json((this.db.prepare("SELECT content FROM "+versionTable+" WHERE "+column+"=? AND version=?").get(row.id,ref.version??row.latest_version) as any)?.content??"null"):json(row.draft);
       if(!content)reject("NOT_FOUND","Referenced content version unavailable");
-      new ContentAccess(this.db).reference(p,ref.kind,row.id,content,rootAccess,rootOwner,publishing||row.latest_version>0);
+      new ContentAccess(this.db).reference(p,ref.kind,row.id,content,rootAccess,rootOwner,publishing||row.latest_version>0,rootGroups);
     }
     if (ref.kind === "award") {
       const child = publishing
@@ -199,7 +208,8 @@ export class ProgramService {
         : json(row.draft);
       if (
         !this.visible(p, row, child) ||
-        (rootAccess === "tenant" && child.access === "author")
+        (child.access==="author"&&(rootAccess!=="author"||row.owner!==rootOwner)) ||
+        (child.access==="groups"&&rootAccess!=="author"&&(rootAccess!=="groups"||!rootGroups.length||rootGroups.some(id=>!child.groupIds?.includes(id))))
       )
         reject("FORBIDDEN", "Private nested award cannot be redistributed");
     }
@@ -223,6 +233,7 @@ export class ProgramService {
     )
       reject("INVALID_ARGUMENT", "Invalid collection structure or size");
     const value = structuredClone(raw) as Award | Playlist;
+    new ContentAccess(this.db).validate(p,value);
     let nodes = 0,
       criteria = 0,
       graphBytes = 0,
@@ -234,6 +245,7 @@ export class ProgramService {
       depth: number,
       prefix = "",
     ) => {
+      new ContentAccess(this.db).validate(p,content);
       if (
         path.includes(awardId) ||
         depth > 4 ||
@@ -269,7 +281,7 @@ export class ProgramService {
             "Invalid or duplicate criterion alternatives",
           );
         for (const ref of r.alternatives) {
-          this.reference(p, ref, content.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(awardId,p.tenant) as any)?.owner??p.id);
+          this.reference(p, ref, content.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(awardId,p.tenant) as any)?.owner??p.id,content.groupIds??[]);
           if (ref.kind === "award") {
             const child = this.collection(p, ref.id);
             // Draft cycle checks are deliberately conservative, including drafts
@@ -291,7 +303,7 @@ export class ProgramService {
       walk(id, value as Award, [], 1);
       for (const r of (value as Award).requirements)
         r.alternatives = r.alternatives.map((ref) =>
-          this.reference(p, ref, value.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(id,p.tenant) as any)?.owner??p.id),
+          this.reference(p, ref, value.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(id,p.tenant) as any)?.owner??p.id,value.groupIds??[]),
         );
     } else {
       const playlist = value as Playlist;
@@ -301,7 +313,7 @@ export class ProgramService {
       )
         reject("INVALID_ARGUMENT", "Duplicate playlist items");
       playlist.items = playlist.items.map((ref) =>
-        this.reference(p, ref, value.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(id,p.tenant) as any)?.owner??p.id),
+        this.reference(p, ref, value.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(id,p.tenant) as any)?.owner??p.id,value.groupIds??[]),
       );
     }
     if (Buffer.byteLength(JSON.stringify(value)) > 28 * 1024)
@@ -486,9 +498,10 @@ export class ProgramService {
     if (row.kind !== "award")
       reject("INVALID_ARGUMENT", "Playlists cannot be enrolled or assigned");
     const value = this.version(row.id, row.latest_version) as Award;
+    const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(learner,p.tenant) as unknown as Principal;
     if (
       row.state !== "published" ||
-      (value.access !== "tenant" && row.owner !== learner)
+      (!recipient||!this.visible(recipient,row,value))
     )
       reject("FORBIDDEN", "Award unavailable to recipient");
     const existing = this.db
