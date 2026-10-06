@@ -40,3 +40,18 @@ test("nested actual quantities retain pinned child publication and SQLite progre
   evidence(f,"elective",5);const before=own(f);publish(f,"credit-child",{...child,requirements:[{...child.requirements[0],credits:10}]});assert.deepEqual(own(f),before);const e=f.e;f.db.close();f={...fixture(join(dir,"state.sqlite")),e};assert.deepEqual(own(f),before);assert.equal(own(f).certificate_id,null);evidence(f,"required",2);assert.equal(own(f).earned,7);
  }finally{f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test("actual child alternatives count greatest accepted quantity once rather than summing duplicate practice branches",()=>{
+ const f=fixture();try{
+  publish(f,"credit-child",child);publish(f,"other-child",{...child,title:"Original second branch"});
+  publish(f,"alternative-root",{...child,target:6,requirements:[{id:"nested",title:"Alternatives",required:false,credits:1,creditMode:"nested_earned",alternatives:[{kind:"award",id:"credit-child"},{kind:"award",id:"other-child"}]}]});
+  data(f.call("admin","learning_set_award_assessor",{collectionId:"alternative-root",assessorId:"assessor",enabled:true}));const e=data(f.call("learner-a","learning_enroll_award",{collectionId:"alternative-root"}));
+  for(const id of ["credit-child","other-child"]){const r=data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:e.awardEnrollmentId,criterionPath:"nested/"+id+"@1/elective",amount:5,evidence:"Original alternative "+id,confirmed:true},"human"));data(f.call("assessor","learning_assess_external_record",{recordId:r.recordId,accepted:true,reason:"Human verification"}));}
+  const p=data(f.call("learner-a","learning_get_my_awards")).items.find((r:any)=>r.id===e.awardEnrollmentId);assert.equal(p.earned,5);assert.equal(p.completed,false);assert.equal(p.requirements[0].credits,7);
+ }finally{f.db.close();}
+});
+test("actual ongoing child contributes quantity but cannot satisfy required child completion",()=>{
+ const f=fixture();try{
+  publish(f,"ongoing-child",{...child,ongoing:true});publish(f,"ongoing-root",{...child,target:2,requirements:[{id:"nested",title:"Ongoing required",required:true,credits:1,creditMode:"nested_earned",alternatives:[{kind:"award",id:"ongoing-child"}]}]});data(f.call("admin","learning_set_award_assessor",{collectionId:"ongoing-root",assessorId:"assessor",enabled:true}));const e=data(f.call("learner-a","learning_enroll_award",{collectionId:"ongoing-root"})),r=data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:e.awardEnrollmentId,criterionPath:"nested/ongoing-child@1/required",amount:2,evidence:"Original ongoing practice",confirmed:true},"human"));data(f.call("assessor","learning_assess_external_record",{recordId:r.recordId,accepted:true,reason:"Human verification"}));const p=data(f.call("learner-a","learning_get_my_awards")).items.find((r:any)=>r.id===e.awardEnrollmentId);assert.equal(p.earned,2);assert.equal(p.requiredComplete,false);assert.equal(p.completed,false);assert.equal(p.certificate_id,null);
+ }finally{f.db.close();}
+});
