@@ -498,3 +498,10 @@ footer {
 .people button {
   max-width: 100%;
 }
+
+.assignments p {
+  overflow-wrap: anywhere;
+}
+.assignments button {
+  max-width: 100%;
+}

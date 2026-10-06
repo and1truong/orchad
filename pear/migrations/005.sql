@@ -1,0 +1,22 @@
+-- Executed once inside a FK-disabled transaction; database.ts validates FKs before commit.
+CREATE TABLE assignment_plans(id TEXT PRIMARY KEY,tenant TEXT NOT NULL,owner TEXT NOT NULL REFERENCES accounts(id),state TEXT NOT NULL CHECK(state IN ('active','closed','cancelled','blocked')),definition TEXT NOT NULL,target_version INTEGER NOT NULL,audience_snapshot TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1,next_run TEXT NOT NULL,last_error TEXT);
+CREATE TABLE assignment_cycles(id TEXT PRIMARY KEY,plan_id TEXT NOT NULL REFERENCES assignment_plans(id),run_at TEXT NOT NULL,due_date TEXT,target_kind TEXT NOT NULL,target_id TEXT NOT NULL,target_version INTEGER NOT NULL,definition TEXT NOT NULL,UNIQUE(plan_id,run_at));
+CREATE TABLE enrollments_next(id TEXT PRIMARY KEY,tenant TEXT NOT NULL,learner TEXT NOT NULL REFERENCES accounts(id),course_id TEXT NOT NULL REFERENCES courses(id),version INTEGER NOT NULL,assigned_by TEXT REFERENCES accounts(id),due_date TEXT,completed_lessons TEXT NOT NULL DEFAULT '[]',status TEXT NOT NULL DEFAULT 'in_progress',completed_at TEXT,assignment_cycle_id TEXT REFERENCES assignment_cycles(id),assignment_state TEXT NOT NULL DEFAULT 'active' CHECK(assignment_state IN ('active','withdrawn','cancelled')),FOREIGN KEY(course_id,version) REFERENCES course_versions(course_id,version));
+INSERT INTO enrollments_next(id,tenant,learner,course_id,version,assigned_by,due_date,completed_lessons,status,completed_at) SELECT id,tenant,learner,course_id,version,assigned_by,due_date,completed_lessons,status,completed_at FROM enrollments;
+DROP TABLE enrollments;
+ALTER TABLE enrollments_next RENAME TO enrollments;
+CREATE UNIQUE INDEX enrollment_direct ON enrollments(learner,course_id) WHERE assignment_cycle_id IS NULL;
+CREATE UNIQUE INDEX enrollment_cycle ON enrollments(learner,assignment_cycle_id,course_id) WHERE assignment_cycle_id IS NOT NULL;
+CREATE INDEX enrollment_learner ON enrollments(tenant,learner);
+CREATE TABLE award_enrollments_next(id TEXT PRIMARY KEY,tenant TEXT NOT NULL,learner TEXT NOT NULL REFERENCES accounts(id),award_id TEXT NOT NULL REFERENCES collections(id),version INTEGER NOT NULL,assigned_by TEXT REFERENCES accounts(id),completed_at TEXT,certificate_id TEXT UNIQUE,assignment_cycle_id TEXT REFERENCES assignment_cycles(id),assignment_state TEXT NOT NULL DEFAULT 'active' CHECK(assignment_state IN ('active','withdrawn','cancelled')),FOREIGN KEY(award_id,version) REFERENCES collection_versions(collection_id,version));
+INSERT INTO award_enrollments_next(id,tenant,learner,award_id,version,assigned_by,completed_at,certificate_id) SELECT id,tenant,learner,award_id,version,assigned_by,completed_at,certificate_id FROM award_enrollments;
+DROP TABLE award_enrollments;
+ALTER TABLE award_enrollments_next RENAME TO award_enrollments;
+CREATE UNIQUE INDEX award_direct ON award_enrollments(learner,award_id) WHERE assignment_cycle_id IS NULL;
+CREATE UNIQUE INDEX award_cycle ON award_enrollments(learner,assignment_cycle_id,award_id) WHERE assignment_cycle_id IS NOT NULL;
+CREATE INDEX award_learner ON award_enrollments(tenant,learner);
+CREATE TABLE assignment_deliveries(cycle_id TEXT NOT NULL REFERENCES assignment_cycles(id),learner TEXT NOT NULL REFERENCES accounts(id),enrollment_id TEXT REFERENCES enrollments(id),award_enrollment_id TEXT REFERENCES award_enrollments(id),state TEXT NOT NULL CHECK(state IN ('active','withdrawn','cancelled','completed')),delivered_at TEXT NOT NULL,PRIMARY KEY(cycle_id,learner));
+CREATE TABLE learning_notifications(id TEXT PRIMARY KEY,tenant TEXT NOT NULL,learner TEXT NOT NULL REFERENCES accounts(id),cycle_id TEXT NOT NULL REFERENCES assignment_cycles(id),kind TEXT NOT NULL,title TEXT NOT NULL,created_at TEXT NOT NULL,read_at TEXT,UNIQUE(cycle_id,learner,kind));
+CREATE INDEX notification_learner ON learning_notifications(tenant,learner,created_at);
+INSERT INTO schema_version VALUES(5);
+CREATE TABLE assignment_scheduler(tenant TEXT PRIMARY KEY,after_id TEXT NOT NULL);

@@ -16,7 +16,7 @@ const db = openDatabase(
   process.env.DATABASE_PATH ?? ".data/pear.sqlite",
   developmentAuth,
 );
-const { app } = await createApp({
+const { app, service } = await createApp({
   db,
   origin,
   dev,
@@ -24,11 +24,22 @@ const { app } = await createApp({
   secureCookies: process.env.COOKIE_SECURE === "true",
 });
 await app.listen({ port, host });
+const assignmentTimer = setInterval(() => {
+  try {
+    service.assignments.runBackground();
+  } catch {
+    console.error(
+      "Assignment scheduler failed; durable state retained for retry",
+    );
+  }
+}, 30000);
+assignmentTimer.unref();
 console.log(
   `Pear: ${origin}${developmentAuth ? " · SYNTHETIC DEVELOPMENT ACCOUNTS" : ""}`,
 );
 for (const signal of ["SIGINT", "SIGTERM"])
   process.once(signal, async () => {
+    clearInterval(assignmentTimer);
     await app.close();
     db.close();
     process.exit(0);

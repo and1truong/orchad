@@ -12,6 +12,7 @@ import {
   type ContentDraft,
 } from "./content-library.tsx";
 import "./style.css";
+import { Assignments } from "./assignments.tsx";
 import { People } from "./people.tsx";
 import { Programs } from "./programs.tsx";
 const labels = {
@@ -369,6 +370,7 @@ function App() {
             ["catalog", t.catalog],
             ["learning", t.learning],
             ["programs", locale === "vi" ? "Chương trình" : "Programs"],
+            ["notifications", locale === "vi" ? "Thông báo" : "Notifications"],
             [
               "profile",
               locale === "vi" ? "Sở thích học" : "Learning preferences",
@@ -730,16 +732,19 @@ function App() {
                   <span className="eyebrow">
                     {e.assigned_by ? "Assigned" : "Self-directed"} · Version{" "}
                     {e.version}
+                    {e.assignment_cycle_id ? " · Scheduled cycle" : ""}
                   </span>
                   <h3>{e.course.title}</h3>
                   <p>
                     {e.completed_lessons.length}/{e.course.lessons.length}{" "}
                     lessons ·{" "}
-                    {e.status === "completed"
-                      ? "Completed"
-                      : e.overdue
-                        ? "Overdue"
-                        : "In progress"}
+                    {e.assignment_state !== "active"
+                      ? e.assignment_state
+                      : e.status === "completed"
+                        ? "Completed"
+                        : e.overdue
+                          ? "Overdue"
+                          : "In progress"}
                     {e.due_date
                       ? " · Due " + new Date(e.due_date).toLocaleString()
                       : ""}
@@ -854,7 +859,11 @@ function App() {
                       quiz.
                     </p>
                     <button
-                      disabled={busy || lesson.completed}
+                      disabled={
+                        busy ||
+                        lesson.completed ||
+                        active.assignment_state !== "active"
+                      }
                       onClick={() =>
                         void run(async () => {
                           await mutate("human_complete_lesson", {
@@ -871,7 +880,7 @@ function App() {
                 )}
                 <button
                   className="ghost"
-                  disabled={busy}
+                  disabled={busy || active.assignment_state !== "active"}
                   onClick={() =>
                     void run(async () => {
                       const r = await mutate("learning_start_attempt", {
@@ -892,7 +901,14 @@ function App() {
                   <div>
                     <h3>Assessment · Attempt {attempt.number}</h3>
                     {attempt.questions.map((q: any) => (
-                      <fieldset key={q.id} disabled={attempt.submitted || busy}>
+                      <fieldset
+                        key={q.id}
+                        disabled={
+                          attempt.submitted ||
+                          busy ||
+                          active.assignment_state !== "active"
+                        }
+                      >
                         <legend>{q.prompt}</legend>
                         {q.options.map((o: string, i: number) => (
                           <label className="choice" key={i}>
@@ -936,6 +952,7 @@ function App() {
                       <button
                         disabled={
                           busy ||
+                          active.assignment_state !== "active" ||
                           attempt.questions.some(
                             (q: any) => attempt.answers[q.id] === undefined,
                           )
@@ -992,6 +1009,19 @@ function App() {
             )}
           </>
         )}
+        {(view === "notifications" ||
+          (view === "admin" && ["admin", "manager"].includes(role))) && (
+          <Assignments
+            key={"assignments:" + session.sessionEpoch + view}
+            role={role}
+            administrative={view === "admin"}
+            tick={tick}
+            busy={busy}
+            op={op}
+            mutate={mutate}
+            run={run}
+          />
+        )}
         {(view === "profile" ||
           (view === "admin" && ["admin", "manager"].includes(role))) && (
           <People
@@ -1018,6 +1048,11 @@ function App() {
             op={op}
             mutate={mutate}
             run={run}
+            studyCourse={() => {
+              clearLearning();
+              setLearningOffset(0);
+              setView("learning");
+            }}
             certificate={(id) =>
               request(
                 "/api/award-certificates/" + encodeURIComponent(id),

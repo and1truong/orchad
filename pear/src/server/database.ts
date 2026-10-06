@@ -21,6 +21,24 @@ export function openDatabase(path: string, seed = false) {
   db.exec(
     readFileSync(new URL("../../migrations/004.sql", import.meta.url), "utf8"),
   );
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=5").get()) {
+    db.exec("PRAGMA foreign_keys=OFF; BEGIN IMMEDIATE");
+    try {
+      db.exec(
+        readFileSync(
+          new URL("../../migrations/005.sql", import.meta.url),
+          "utf8",
+        ),
+      );
+      if (db.prepare("PRAGMA foreign_key_check").all().length)
+        throw new Error("Assignment migration violates foreign keys");
+      db.exec("COMMIT; PRAGMA foreign_keys=ON");
+    } catch (e) {
+      db.exec("ROLLBACK; PRAGMA foreign_keys=ON");
+      db.close();
+      throw e;
+    }
+  }
   if (seed) {
     db.exec("BEGIN IMMEDIATE");
     try {

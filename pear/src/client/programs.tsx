@@ -14,6 +14,7 @@ type Props = {
   mutate: (name: string, args: Record<string, unknown>) => Promise<any>;
   run: (fn: () => Promise<void>) => Promise<boolean>;
   certificate: (id: string) => Promise<any>;
+  studyCourse?: () => void;
 };
 const requirement = (n: number): Requirement => ({
   id: `criterion-${n}`,
@@ -108,7 +109,9 @@ function Progress({
   progress,
   enrollmentId,
   props,
+  active = true,
 }: {
+  active?: boolean;
   progress: any;
   enrollmentId: string;
   props: Props;
@@ -133,15 +136,32 @@ function Progress({
                     progress={ref}
                     enrollmentId={enrollmentId}
                     props={props}
+                    active={active}
                   />
                 </>
               ) : ref.kind === "course" ? (
-                <p>
-                  Course: {ref.id} ·{" "}
-                  {ref.completed
-                    ? "Completed"
-                    : "Complete this course in My learning"}
-                </p>
+                <div>
+                  <p>
+                    Course: {ref.id} ·{" "}
+                    {ref.completed ? "Completed" : "In progress"}
+                  </p>
+                  {!ref.completed && (
+                    <button
+                      disabled={props.busy || !active}
+                      onClick={() =>
+                        void props.run(async () => {
+                          await props.mutate("learning_enroll_award_course", {
+                            awardEnrollmentId: enrollmentId,
+                            courseId: ref.id,
+                          });
+                          props.studyCourse?.();
+                        })
+                      }
+                    >
+                      Study course for this award
+                    </button>
+                  )}
+                </div>
               ) : (
                 <>
                   <p>
@@ -191,7 +211,7 @@ function Progress({
                       <input type="checkbox" required />I confirm this evidence
                       describes my own external learning.
                     </label>
-                    <button disabled={props.busy}>
+                    <button disabled={props.busy || !active}>
                       Submit external learning
                     </button>
                   </form>
@@ -386,6 +406,9 @@ export function Programs(props: Props) {
             <section className="panel" key={a.id}>
               <h3>{a.title}</h3>
               <p>
+                {a.assignment_state !== "active"
+                  ? a.assignment_state + " · "
+                  : ""}
                 Version {a.version} · {a.earned} / {a.target} {a.unit} ·{" "}
                 {a.ongoing
                   ? "Ongoing · no automatic completion"
@@ -395,7 +418,12 @@ export function Programs(props: Props) {
                 · Required learning{" "}
                 {a.requiredComplete ? "satisfied" : "still needed"}
               </p>
-              <Progress progress={a} enrollmentId={a.id} props={props} />
+              <Progress
+                progress={a}
+                enrollmentId={a.id}
+                props={props}
+                active={a.assignment_state === "active"}
+              />
               {a.certificate_id && (
                 <button
                   disabled={busy}

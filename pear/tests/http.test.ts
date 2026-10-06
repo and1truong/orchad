@@ -562,3 +562,152 @@ test("admin user deactivation through HTTP revokes a live session and keeps lear
     f.db.close();
   }
 });
+
+test("assignment jobs use server time, deduplicate HTTP retries and keep notification reads/writes private", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  try {
+    const plan = {
+      title: "HTTP scheduled requirement",
+      targetKind: "course",
+      targetId: "systems-basics",
+      audienceKind: "individuals",
+      learnerIds: ["learner-a"],
+      groupId: "",
+      membership: "fixed",
+      startsAt: new Date(Date.now() - 60000).toISOString(),
+      repeatDays: 0,
+      endAt: null,
+      dueKind: "none",
+      fixedDueAt: null,
+      rollingDays: 0,
+    };
+    data(
+      f.call("manager", "learning_save_assignment_plan", {
+        planId: "http-job",
+        plan,
+        reason: "Reviewed",
+      }),
+    );
+    const admin = await login(app, "admin"),
+      manager = await login(app, "manager");
+    const payload = {
+      requestId: "run",
+      documentId: "library:demo",
+      toolName: "learning_run_assignment_jobs",
+      arguments: {},
+      expectedRevision: f.service.context("admin", "library:demo").revision,
+      idempotencyKey: "run-http",
+    };
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/bridge/invoke",
+          headers: manager.headers,
+          payload,
+        })
+      ).statusCode,
+      403,
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/bridge/invoke",
+          headers: admin.headers,
+          payload: {
+            ...payload,
+            arguments: { now: "2099-01-01T00:00:00.000Z" },
+          },
+        })
+      ).statusCode,
+      400,
+    );
+    const first = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: admin.headers,
+      payload,
+    });
+    assert.equal(first.statusCode, 200);
+    assert.equal(data(first.json()).cyclesProcessed, 1);
+    const retried = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: admin.headers,
+      payload,
+    });
+    assert.deepEqual(retried.json(), first.json());
+    assert.equal(
+      (
+        f.db
+          .prepare("SELECT COUNT(*) n FROM assignment_deliveries")
+          .get() as any
+      ).n,
+      1,
+    );
+    const learner = await login(app),
+      other = await login(app, "learner-b");
+    const read = {
+      requestId: "notifications",
+      documentId: "learning:demo:learner-a",
+      toolName: "learning_get_notifications",
+      arguments: {},
+      expectedRevision: null,
+      idempotencyKey: null,
+    };
+    const notifications = data(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/bridge/invoke",
+          headers: learner.headers,
+          payload: read,
+        })
+      ).json(),
+    );
+    assert.equal(notifications.items.length, 1);
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/bridge/invoke",
+          headers: other.headers,
+          payload: read,
+        })
+      ).statusCode,
+      403,
+    );
+    const notificationId = notifications.items[0].id;
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/human/invoke",
+          headers: other.headers,
+          payload: {
+            ...read,
+            documentId: "learning:demo:learner-b",
+            toolName: "learning_read_notification",
+            arguments: { notificationId },
+            expectedRevision: f.service.context("learner-b").revision,
+            idempotencyKey: "foreign-notification",
+          },
+        })
+      ).statusCode,
+      403,
+    );
+    assert.equal(
+      (
+        f.db
+          .prepare("SELECT read_at FROM learning_notifications WHERE id=?")
+          .get(notificationId) as any
+      ).read_at,
+      null,
+    );
+  } finally {
+    await app.close();
+    f.db.close();
+  }
+});

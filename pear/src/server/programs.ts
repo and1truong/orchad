@@ -106,8 +106,11 @@ export class ProgramService {
       if (name === "learning_get_external_records") this.assessor(p, row.id);
     }
     if (name === "learning_assign_award") this.recipient(p, a.learnerId);
-    if (name === "human_submit_external_record")
-      this.enrollment(p, a.awardEnrollmentId);
+    if (
+      name === "human_submit_external_record" &&
+      this.enrollment(p, a.awardEnrollmentId).assignment_state !== "active"
+    )
+      reject("FORBIDDEN", "Award obligation is no longer active");
     if (name === "learning_assess_external_record") {
       const row = this.db
         .prepare(
@@ -312,6 +315,13 @@ export class ProgramService {
         "SELECT id,criterion_path,amount,state FROM external_records WHERE enrollment_id=? ORDER BY created_at,id",
       )
       .all(enrollment.id) as any[];
+    const cycleStart = enrollment.assignment_cycle_id
+      ? (
+          this.db
+            .prepare("SELECT run_at FROM assignment_cycles WHERE id=?")
+            .get(enrollment.assignment_cycle_id) as any
+        ).run_at
+      : null;
     let count = 0,
       recordBudget = 20;
     const evaluate = (award: Award, prefix: string, depth: number): any => {
@@ -324,9 +334,15 @@ export class ProgramService {
           if (ref.kind === "course") {
             const completed = !!this.db
               .prepare(
-                "SELECT 1 FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND status='completed'",
+                "SELECT 1 FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND status='completed' AND (? IS NULL OR completed_at>=?)",
               )
-              .get(enrollment.learner, enrollment.tenant, ref.id);
+              .get(
+                enrollment.learner,
+                enrollment.tenant,
+                ref.id,
+                cycleStart,
+                cycleStart,
+              );
             if (completed) earned = r.credits;
             return { ...ref, completed };
           }
@@ -392,12 +408,20 @@ export class ProgramService {
         requirements,
       };
     };
-    return { ...enrollment, ...evaluate(root, "", 1), title: root.title };
+    const evaluated = evaluate(root, "", 1);
+    return {
+      ...enrollment,
+      ...evaluated,
+      completed:
+        !!enrollment.completed_at ||
+        (enrollment.assignment_state === "active" && evaluated.completed),
+      title: root.title,
+    };
   }
   refreshLearner(tenant: string, learner: string) {
     const rows = this.db
       .prepare(
-        "SELECT * FROM award_enrollments WHERE tenant=? AND learner=? AND completed_at IS NULL",
+        "SELECT * FROM award_enrollments WHERE tenant=? AND learner=? AND completed_at IS NULL AND assignment_state='active'",
       )
       .all(tenant, learner) as any[];
     for (const row of rows)
@@ -424,7 +448,9 @@ export class ProgramService {
     )
       reject("FORBIDDEN", "Award unavailable to recipient");
     const existing = this.db
-      .prepare("SELECT * FROM award_enrollments WHERE learner=? AND award_id=?")
+      .prepare(
+        "SELECT * FROM award_enrollments WHERE learner=? AND award_id=? AND assignment_cycle_id IS NULL",
+      )
       .get(learner, row.id) as any;
     if (existing)
       return {

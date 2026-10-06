@@ -41,15 +41,18 @@ const callSchema = object({
   },
 });
 import { DomainError, reject, boundedPage as pageRows } from "./errors.ts";
+import { AssignmentService } from "./assignments.ts";
 import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
   readonly programs: ProgramService;
   readonly people: PeopleService;
+  readonly assignments: AssignmentService;
   constructor(readonly db: DatabaseSync) {
     this.programs = new ProgramService(db);
     this.people = new PeopleService(db);
+    this.assignments = new AssignmentService(db);
   }
   principal(id: string): Principal {
     const p = this.db
@@ -173,8 +176,23 @@ export class LearningService {
     const a = c.arguments as any;
     this.programs.authorize(p, c.toolName, a);
     this.people.authorize(p, c.toolName, a);
-    if (a.enrollmentId) this.enrollment(p, a.enrollmentId);
-    if (a.attemptId) this.attempt(p, a.attemptId);
+    this.assignments.authorize(p, c.toolName, a);
+    const scopedEnrollment = a.enrollmentId
+      ? this.enrollment(p, a.enrollmentId)
+      : a.attemptId
+        ? this.attempt(p, a.attemptId).e
+        : null;
+    if (
+      scopedEnrollment &&
+      [
+        "human_complete_lesson",
+        "learning_start_attempt",
+        "human_save_answer",
+        "human_submit_attempt",
+      ].includes(c.toolName) &&
+      scopedEnrollment.assignment_state !== "active"
+    )
+      reject("FORBIDDEN", "Assignment obligation is no longer active");
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
     if (a.courseId && c.toolName !== "learning_create_course")
       this.course(p, a.courseId);
@@ -265,6 +283,24 @@ export class LearningService {
       const data = this.write(p, c.toolName, c.arguments);
       if (c.toolName === "human_submit_attempt")
         this.programs.refreshLearner(p.tenant, p.id);
+      if (
+        ["human_submit_attempt", "human_submit_external_record"].includes(
+          c.toolName,
+        )
+      )
+        this.assignments.refreshCompletionNotifications(p.tenant, p.id, false);
+      if (c.toolName === "learning_assess_external_record") {
+        const target = this.db
+          .prepare(
+            "SELECT learner FROM award_enrollments WHERE id=? AND tenant=?",
+          )
+          .get(data.awardEnrollmentId, p.tenant) as any;
+        this.assignments.refreshCompletionNotifications(
+          p.tenant,
+          target.learner,
+          false,
+        );
+      }
       this.db
         .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
         .run(c.documentId);
@@ -620,6 +656,14 @@ export class LearningService {
         };
       }
       default:
+        if (
+          [
+            "learning_get_notifications",
+            "learning_preview_assignment_plan",
+            "learning_list_assignment_plans",
+          ].includes(name)
+        )
+          return this.assignments.read(p, name, args);
         return name.includes("profile") ||
           [
             "learning_list_users",
@@ -751,7 +795,9 @@ export class LearningService {
     if (c.state !== "published")
       reject("FORBIDDEN", "Course is not accepting enrollments");
     const existing = this.db
-      .prepare("SELECT * FROM enrollments WHERE learner=? AND course_id=?")
+      .prepare(
+        "SELECT * FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS NULL",
+      )
       .get(learner, courseId) as any;
     if (existing)
       return {
@@ -1015,6 +1061,16 @@ export class LearningService {
         return this.enroll(p, a.courseId, a.learnerId, p.id, a.dueDate);
       }
       default:
+        if (
+          [
+            "learning_enroll_award_course",
+            "learning_read_notification",
+            "learning_save_assignment_plan",
+            "learning_set_assignment_plan_state",
+            "learning_run_assignment_jobs",
+          ].includes(name)
+        )
+          return this.assignments.write(p, name, args);
         return [
           "learning_save_profile",
           "learning_save_user",

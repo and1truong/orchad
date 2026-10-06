@@ -582,7 +582,12 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
     let db = openDatabase(path, true),
       service = new LearningService(db);
     assert.equal(
-      JSON.stringify(db.prepare("SELECT * FROM enrollments").all()),
+      JSON.stringify(
+        db
+          .prepare("SELECT * FROM enrollments")
+          .all()
+          .map(({ assignment_cycle_id, assignment_state, ...row }: any) => row),
+      ),
       legacyEnrollment,
     );
     assert.equal(service.context("learner-a").revision, 3);
@@ -613,7 +618,7 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
     assert.equal(
       (db.prepare("SELECT MAX(version) AS n FROM schema_version").get() as any)
         .n,
-      4,
+      5,
     );
     const r = service.invoke("learner-a", {
       requestId: "persist",

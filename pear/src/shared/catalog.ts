@@ -1,3 +1,4 @@
+import { assignmentTools, assignmentLibraryWrites } from "./assignments.ts";
 import { peopleTools, peopleLibraryWrites } from "./people.ts";
 import { type Tool, type Role } from "./model.ts";
 import { string, integer, array, enumeration, object, tool } from "./schema.ts";
@@ -86,6 +87,7 @@ export const courseSchema = object(
 export const libraryWrites = new Set([
   ...programLibraryWrites,
   ...peopleLibraryWrites,
+  ...assignmentLibraryWrites,
   "learning_create_course",
   "learning_update_course",
   "learning_publish_course",
@@ -278,6 +280,7 @@ export function catalog(role: Role): Tool[] {
     ...learnerTools,
     ...programTools(role),
     ...peopleTools(role),
+    ...assignmentTools(role),
     ...(["admin", "content_admin"].includes(role) ? adminTools : []),
     ...(["admin", "manager"].includes(role) ? [assignment, report] : []),
   ];
