@@ -47,7 +47,7 @@ test("domain enrollment/completion/content transactions append minimal ordered e
   for(const lessonId of ["retry","capacity"])data(s.call("learner-a","human_complete_lesson",{enrollmentId:enrollment.enrollmentId,lessonId},"human"));
   const at=data(s.call("learner-a","learning_start_attempt",{enrollmentId:enrollment.enrollmentId}));
   for(const [questionId,answer] of [["q-retry",1],["q-write",2]])data(s.call("learner-a","human_save_answer",{attemptId:at.attemptId,questionId,answer},"human"));
-  const submitted=data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId},"human",{idempotencyKey:"completion-exact"}));assert.equal(submitted.progress.status,"completed");
+  const submitted=data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human",{idempotencyKey:"completion-exact"}));assert.equal(submitted.progress.status,"completed");
   data(s.call("learner-a","human_submit_attempt",{attemptId:at.attemptId},"human",{idempotencyKey:"completion-exact"}));
   assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM integration_events WHERE topic='enrollment.completed'").get()!.n,1);
   const before=s.db.prepare("SELECT COUNT(*) AS n FROM integration_events").get()!.n;
