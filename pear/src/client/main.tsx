@@ -1,3 +1,4 @@
+import {ProvisioningClients} from "./provisioning.tsx";
 import {IdentityLinks} from "./identity.tsx";
 import {translateUI,getUILocale,setUILocale} from "./i18n.ts";
 import { Discovery } from "./discovery.tsx";
@@ -1121,6 +1122,7 @@ function App() {
           </>
         )}
         {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
+        {view==="admin"&&role==="admin"&&<ProvisioningClients key={"provisioning:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view === "admin" && canEdit && (
           <CurationPanel key={"curation:"+session.sessionEpoch} tick={tick} busy={busy} op={op} mutate={mutate} run={run}
             isCurrent={()=>sessionRef.current===session && docRef.current===doc} />

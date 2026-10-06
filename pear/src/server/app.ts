@@ -1,3 +1,4 @@
+import {registerSCIM} from "./scim-routes.ts";
 import {IdentityService,type OIDCConfig} from "./identity.ts";
 import { TelemetryService } from "./telemetry.ts";
 import { uploadLimit, type MediaContext } from "./media.ts";
@@ -28,6 +29,7 @@ export async function createApp(opts: {
   developmentAuth?: boolean;
   oidc?: OIDCConfig;
   identityFixture?: boolean;
+  scimEnabled?: boolean;
 }) {
   const parsed = new URL(opts.origin);
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
@@ -36,6 +38,7 @@ export async function createApp(opts: {
     throw new Error("Secure cookies require HTTPS");
   if(opts.oidc&&!opts.identityFixture&&!opts.secureCookies)throw Error("OIDC requires secure session cookies");
   if(opts.identityFixture&&!["127.0.0.1","localhost","[::1]"].includes(parsed.hostname))throw Error("Identity fixtures require loopback");
+  if(opts.scimEnabled&&!opts.identityFixture&&!opts.secureCookies)throw Error("SCIM requires HTTPS and secure session cookies");
   const identity=new IdentityService(opts.db,opts.oidc,opts.origin,!!opts.identityFixture);
   const app = Fastify({
     bodyLimit: Bounds.message,
@@ -81,7 +84,7 @@ export async function createApp(opts: {
           (opts.dev ? " ws:" : "") +
           "; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
-    if (req.url.startsWith("/api/")) reply.header("Cache-Control", "no-store");
+    if (req.url.startsWith("/api/")||req.url.startsWith("/scim/")) reply.header("Cache-Control", "no-store");
   });
   app.addHook("preHandler", async (req, reply) => {
     if (!req.url.startsWith("/api/")) return;
@@ -527,21 +530,12 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  registerSCIM(app,opts.db,opts.origin,!!opts.scimEnabled,req=>service.principal(req.session.principal));
   app.get("/health", async () => ({ ok: true }));
-  app.setErrorHandler((e: any, _req, reply) =>
-    reply
-      .code(e.statusCode === 413 ? 413 : e.validation ? 400 : 500)
-      .send(
-        failure(
-          e.statusCode === 413 || e.validation
-            ? "INVALID_ARGUMENT"
-            : "INTERNAL",
-          e.validation || e.statusCode === 413
-            ? "Invalid or oversized request"
-            : "Internal application error",
-        ),
-      ),
-  );
+  app.setErrorHandler((e:any,req,reply)=>{
+    if(req.url.startsWith("/scim/"))return reply.code(e.statusCode===413?413:e.statusCode===400?400:500).type("application/scim+json").send({schemas:["urn:ietf:params:scim:api:messages:2.0:Error"],status:String(e.statusCode===413?413:e.statusCode===400?400:500),detail:"Invalid or unavailable provisioning request"});
+    return reply.code(e.statusCode===413?413:e.validation?400:500).send(failure(e.statusCode===413||e.validation?"INVALID_ARGUMENT":"INTERNAL",e.validation||e.statusCode===413?"Invalid or oversized request":"Internal application error"));
+  });
   if (opts.dev) {
     const { createServer } = await import("vite");
     const vite = await createServer({
@@ -549,7 +543,7 @@ export async function createApp(opts: {
       appType: "spa",
     });
     app.setNotFoundHandler((req, reply) => {
-      if (req.url.startsWith("/api/"))
+      if ((req.url.startsWith("/api/")||req.url.startsWith("/scim/")))
         return reply.code(404).send(failure("NOT_FOUND", "Endpoint not found"));
       reply.hijack();
       vite.middlewares(req.raw, reply.raw);
@@ -562,7 +556,7 @@ export async function createApp(opts: {
     if (existsSync(root)) {
       await app.register(serveStatic, { root });
       app.setNotFoundHandler((req, reply) =>
-        req.url.startsWith("/api/")
+        (req.url.startsWith("/api/")||req.url.startsWith("/scim/"))
           ? reply.code(404).send(failure("NOT_FOUND", "Endpoint not found"))
           : reply.sendFile("index.html"),
       );

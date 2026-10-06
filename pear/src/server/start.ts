@@ -24,6 +24,7 @@ const { app, service } = await createApp({
   dev,
   developmentAuth,
   oidc,
+  scimEnabled: process.env.PEAR_SCIM_ENABLED === "true",
   secureCookies: process.env.COOKIE_SECURE === "true",
 });
 await app.listen({ port, host });

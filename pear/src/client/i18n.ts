@@ -1,5 +1,22 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Provisioning credentials":"Thông tin xác thực cấp tài khoản",
+"Reviewed provisioning clients":"Ứng dụng cấp tài khoản đã duyệt",
+"Credentials are restricted to client-owned users and static groups. They cannot grant roles, link SSO identities or change learning records.":"Thông tin xác thực chỉ quản lý người dùng và nhóm tĩnh của ứng dụng. Chúng không cấp vai trò, liên kết SSO hay thay đổi lịch sử học.",
+"Provisioning requires explicit secure server configuration.":"Cấp tài khoản cần cấu hình máy chủ bảo mật rõ ràng.",
+"Provisioning client name":"Tên ứng dụng cấp tài khoản",
+"Provisioning review reason":"Lý do duyệt cấp tài khoản",
+"Credential duration in days":"Thời hạn xác thực theo ngày",
+"Allow provisioning writes":"Cho phép ghi dữ liệu cấp tài khoản",
+"Issue reviewed credential":"Cấp thông tin xác thực đã duyệt",
+"One-time provisioning secret":"Bí mật cấp tài khoản dùng một lần",
+"Save this secret now. It is not stored in the browser and cannot be displayed again.":"Lưu bí mật này ngay. Bí mật không được lưu trong trình duyệt và không thể hiển thị lại.",
+"Hide provisioning secret":"Ẩn bí mật cấp tài khoản",
+"Revoked":"Đã thu hồi",
+"Revoke provisioning credential":"Thu hồi thông tin xác thực cấp tài khoản",
+"Previous provisioning clients":"Ứng dụng cấp tài khoản trước",
+"Next provisioning clients":"Ứng dụng cấp tài khoản tiếp",
+
   "Account": "Tài khoản",
   "Password": "Mật khẩu",
   "Interface language": "Ngôn ngữ giao diện",

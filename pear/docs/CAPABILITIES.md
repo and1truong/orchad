@@ -73,3 +73,5 @@ Timed caption layer: ADR-019 adds validated original plain-text WebVTT uploads, 
 Interface localization layer: ADR-020 adds explicit Vietnamese UI labels/accessible names across major surfaces and independent persisted interface locale without translating authored source data or backend IDs. Provider language coverage/content variants, exhaustive diagnostic translation and linguistic/accessibility audits remain open.
 
 Reviewed OIDC layer: ADR-021 adds an explicit signed Authorization Code/PKCE profile, admin-owned subject mappings and live revocation with loopback domain/HTTP/browser fixtures. Actual IdP sandbox, provider-specific/SCIM/logout profiles and production deployment remain BLOCKED/NOT VERIFIED; no credentials or account were configured.
+
+Scoped provisioning layer: ADR-022 adds expiring human-issued read/write credentials and a bounded client-owned SCIM User/static Group profile with live authority, ETags, exact reconciliation, session revocation and retained learning history. Actual provider sandbox, enterprise schema/filter/PATCH compatibility, invitations and production deployment remain BLOCKED/NOT VERIFIED.

@@ -11,7 +11,7 @@
     "start": "node --import tsx src/server/start.ts",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test tests/domain.test.ts tests/http.test.ts tests/authoring.test.ts tests/programs.test.ts tests/people.test.ts tests/assignments.test.ts tests/reports.test.ts tests/assessments.test.ts tests/media.test.ts tests/blended.test.ts tests/feedback.test.ts tests/standalone.test.ts tests/calendar.test.ts tests/telemetry.test.ts tests/curation.test.ts tests/discovery.test.ts tests/captions.test.ts tests/i18n.test.ts tests/identity.test.ts",
+    "test": "node --import tsx --test tests/domain.test.ts tests/http.test.ts tests/authoring.test.ts tests/programs.test.ts tests/people.test.ts tests/assignments.test.ts tests/reports.test.ts tests/assessments.test.ts tests/media.test.ts tests/blended.test.ts tests/feedback.test.ts tests/standalone.test.ts tests/calendar.test.ts tests/telemetry.test.ts tests/curation.test.ts tests/discovery.test.ts tests/captions.test.ts tests/i18n.test.ts tests/identity.test.ts tests/scim.test.ts",
     "test:e2e": "playwright test",
     "test:lime": "node --import tsx scripts/lime-browser.ts",
     "vendor:contract": "npm --prefix ../packages/bridge-contract run build",
