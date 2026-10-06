@@ -9,4 +9,5 @@ CREATE TABLE IF NOT EXISTS digest_notifications(
  payload TEXT NOT NULL,created_at TEXT NOT NULL,expires_at TEXT NOT NULL,read_at TEXT,
  UNIQUE(tenant,learner,subscription_version,run_at));
 CREATE INDEX IF NOT EXISTS digest_own ON digest_notifications(tenant,learner,created_at);
+CREATE INDEX IF NOT EXISTS digest_delivery_audit ON audit(tenant,principal,tool,created_at);
 INSERT OR IGNORE INTO schema_version VALUES(32);
