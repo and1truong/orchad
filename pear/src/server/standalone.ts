@@ -12,6 +12,7 @@ export class StandaloneService {
       )
       .get(id, p.tenant, p.id) as any;
     if (!e) reject("FORBIDDEN", "Own standalone enrollment required");
+    new ContentAccess(this.db).enrolled(p,"item",e.item_id,e.version);
     return e;
   }
   private published(p: Principal, a: any, live = true) {

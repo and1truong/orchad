@@ -185,6 +185,7 @@ export class BlendedService {
         : e.learner !== p.id)
     )
       reject("FORBIDDEN", "Course operation scope denied");
+    if(!review)new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
     return { e, c: JSON.parse(e.content) as Course };
   }
   private lesson(p: Principal, a: any, review = false, unlock = true) {

@@ -74,7 +74,7 @@ export class QuestionBankService{
    const source=this.db.prepare("SELECT draft FROM courses WHERE id=? AND tenant=?").get(a.sourceCourseId,p.tenant) as any;
    if(!source)reject("NOT_FOUND","Question bank source course unavailable");
    const draft=JSON.parse(source.draft);new ContentAccess(this.db).author(p,"course",a.sourceCourseId,draft);
-   if(draft.access==="author"&&bank.access!=="author")reject("FORBIDDEN","Private source questions require a private bank");
+   if(["author","groups"].includes(draft.access)&&bank.access!=="author")reject("FORBIDDEN","Private source questions require a private bank");
    if(canonical(bank.questions)!==canonical(draft.quiz.questions))reject("INVALID_ARGUMENT","Source draft questions changed; review the source again");
    bank.aiProcessingAllowed=bank.aiProcessingAllowed&&draft.aiProcessingAllowed;
   }

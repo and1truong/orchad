@@ -107,6 +107,7 @@ export class MediaService {
           )
         )
           reject("FORBIDDEN", "Submission lesson must be unlocked");
+        new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
         context = { enrollmentId: e.id, lessonId: l.id };
       }
       if (!bytes.length || bytes.length > uploadLimit)
@@ -295,10 +296,10 @@ export class MediaService {
     if (c.itemEnrollmentId) {
       const e = this.db
         .prepare(
-          "SELECT v.content FROM item_enrollments e JOIN content_item_versions v ON v.item_id=e.item_id AND v.version=e.version JOIN content_items i ON i.id=e.item_id AND i.tenant=e.tenant WHERE e.id=? AND e.tenant=? AND e.learner=?",
+          "SELECT e.item_id,e.version,v.content FROM item_enrollments e JOIN content_item_versions v ON v.item_id=e.item_id AND v.version=e.version JOIN content_items i ON i.id=e.item_id AND i.tenant=e.tenant WHERE e.id=? AND e.tenant=? AND e.learner=?",
         )
         .get(c.itemEnrollmentId, p.tenant, p.id) as any;
-      if (e) content = JSON.parse(e.content);
+      if (e) {new ContentAccess(this.db).enrolled(p,"item",e.item_id,e.version);content = JSON.parse(e.content);}
     } else if (c.itemId && !c.enrollmentId && Number.isInteger(c.version)) {
       const item = this.db
         .prepare(
@@ -313,6 +314,7 @@ export class MediaService {
         )
         .get(c.enrollmentId, p.tenant, p.id) as any;
       if (e && (e.assignment_state === "active" || e.status === "completed")) {
+        new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
         const course = JSON.parse(e.content) as Course,
           lesson = course.lessons.find((l) => l.id === c.lessonId),
           done = JSON.parse(e.completed_lessons);

@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import type { Principal } from "../shared/model.ts";
@@ -14,6 +15,7 @@ export class TelemetryService {
     const row=this.db.prepare(`SELECT * FROM ${table} WHERE id=? AND tenant=? AND learner=?`).get(id,p.tenant,p.id) as any;
     if (!row || (kind==="course" && row.assignment_state !== "active"))
       reject("FORBIDDEN","Own active learning record required");
+    new ContentAccess(this.db).enrolled(p,kind as "course"|"item",kind==="course"?row.course_id:row.item_id,row.version);
   }
   get(p: Principal, kind: string, id: string) {
     this.target(p,kind,id);

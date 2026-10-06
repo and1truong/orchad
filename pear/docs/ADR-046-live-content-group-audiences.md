@@ -1,0 +1,10 @@
+# ADR-046: live group audiences for original courses/items
+Epic #49 G04/G12/G13. Extends ADR-035.
+
+Self-authored course/item versions can declare a union of one to eight distinct current same-tenant group IDs. Static and dynamic ALL/ANY membership reuse PeopleService's existing rule evaluation against the current active account/profile. No roster is returned by content tools. Authors retain own-source access; authoring/review privileges remain unchanged.
+
+Search, preview, comparison, curation, new enrollment/assignment and reuse respect current groups. A reusable item's declared group set must contain every receiving course group ID; public redistribution rejects, while private author copies remain owner scoped. This conservative set rule does not infer equivalence between differently named dynamic groups. Private group course quiz extraction cannot create a public question bank. Existing signed external event triggers emit only tenant-public content and remain silent for group content.
+
+Pinned group learning also checks live membership for body/answers/submission/reading confirmation, course/item media and telemetry. Removal withholds further content access and original enrollment replay, without rewriting enrollment/progress/attempts/certificates. Restored membership permits continuing the same pinned record. Original own ledger/report metadata remains history; administrative assessor review stays scoped to its existing explicit responsibilities. Latest audience changes do not rewrite older version audience definitions. An original tenant-public enrolled version retains its previous versioned rights.
+
+Human authoring controls accept explicit group IDs and show the live-access policy. Four domain/actual HTTP and one author/learner EN/VI mobile browser regression are authored. Course/item group audiences do not implement collection/question-bank group sharing, cross-portal licensing/sharing or complete reference portal semantics; those remain open. No commercial licensed material is introduced.

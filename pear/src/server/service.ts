@@ -214,6 +214,7 @@ export class LearningService {
       )
       .get(id, p.id, p.tenant) as any;
     if (!e) reject("FORBIDDEN", "Enrollment access denied");
+    new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
     return e;
   }
   private attempt(p: Principal, id: string) {
@@ -864,6 +865,7 @@ export class LearningService {
     )
       reject("INVALID_ARGUMENT", "Invalid standalone content structure");
     const item = structuredClone(value) as ContentItem;
+    new ContentAccess(this.db).validate(p,item);
     this.validateDiscovery(item.discovery);
     this.validateMedia(p, item);
     return item;
@@ -884,6 +886,7 @@ export class LearningService {
     )
       reject("INVALID_ARGUMENT", "Invalid course structure");
     const c = structuredClone(value) as Course;
+    new ContentAccess(this.db).validate(p,c);
     this.validateDiscovery(c.discovery);
     c.completionPolicy = c.lessons.some((l) =>
       ["submission", "event"].includes(l.kind),
@@ -899,7 +902,7 @@ export class LearningService {
       if (row.state !== "published")
         reject("FORBIDDEN", "Reusable item must be published and available");
       const item = this.itemVersion(p, ref.itemId, ref.version);
-      new ContentAccess(this.db).reference(p,"item",ref.itemId,item,c.access??"tenant",courseId?new ContentAccess(this.db).owner(p,"course",courseId)??p.id:p.id);
+      new ContentAccess(this.db).reference(p,"item",ref.itemId,item,c.access??"tenant",courseId?new ContentAccess(this.db).owner(p,"course",courseId)??p.id:p.id,true,c.groupIds??[]);
       l.title = item.title;
       l.text = item.text;
       l.kind = item.kind;

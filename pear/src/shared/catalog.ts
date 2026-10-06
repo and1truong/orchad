@@ -64,7 +64,8 @@ const lesson = object(
 );
 export const itemSchema = object(
   {
-    access: enumeration("tenant", "author"),
+    access: enumeration("tenant", "author", "groups"),
+  groupIds: array(string(64),8,1),
     discovery: discoveryMetadataSchema,
     title: string(160),
     summary: string(600),
@@ -98,7 +99,8 @@ export const itemSchema = object(
   ],
 );
 const courseProperties = {
-  access: enumeration("tenant", "author"),
+  access: enumeration("tenant", "author", "groups"),
+  groupIds: array(string(64),8,1),
   discovery: discoveryMetadataSchema,
   title: string(160),
   summary: string(600),
@@ -139,7 +141,7 @@ const courseProperties = {
 };
 export const courseSchema = object(
   courseProperties,
-  Object.keys(courseProperties).filter((k) => !["modules","discovery","access"].includes(k)),
+  Object.keys(courseProperties).filter((k) => !["modules","discovery","access","groupIds"].includes(k)),
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([

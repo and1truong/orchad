@@ -24,13 +24,13 @@ const headers = [
 ];
 export class PeopleService {
   constructor(readonly db: DatabaseSync) {}
-  private users(tenant: string) {
+  private users(tenant: string,userId?:string) {
     return (
       this.db
         .prepare(
-          "SELECT a.id,a.name,a.role,a.active,a.manager_id,a.auth_version,p.created_at,p.preferred_language,p.interests,p.custom_fields FROM accounts a LEFT JOIN user_profiles p ON p.user_id=a.id WHERE a.tenant=? ORDER BY a.id",
+          "SELECT a.id,a.name,a.role,a.active,a.manager_id,a.auth_version,p.created_at,p.preferred_language,p.interests,p.custom_fields FROM accounts a LEFT JOIN user_profiles p ON p.user_id=a.id WHERE a.tenant=? AND (? IS NULL OR a.id=?) ORDER BY a.id",
         )
-        .all(tenant) as any[]
+        .all(tenant,userId??null,userId??null) as any[]
     ).map((r) => ({
       id: r.id,
       name: r.name,
@@ -297,6 +297,12 @@ export class PeopleService {
       case "after":
         return actual > r.value;
     }
+  }
+  isMember(tenant:string,groupId:string,userId:string){
+    const row=this.db.prepare("SELECT definition FROM learning_groups WHERE id=? AND tenant=?").get(groupId,tenant) as any;
+    if(!row)return false;
+    const user=this.users(tenant,userId)[0],group=JSON.parse(row.definition) as Group;
+    return !!user?.active&&(group.kind==="static"?group.memberIds.includes(userId):group.mode==="ALL"?group.rules.every(r=>this.matches(user,r)):group.rules.some(r=>this.matches(user,r)));
   }
   members(p: Principal, g: Group) {
     this.validateGroup(p, g);

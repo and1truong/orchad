@@ -120,3 +120,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## Reviewed provider settings and channel isolation extension
 
 #104 makes the configured provider disabled until explicit same-owner tenant-admin human review, bound to current auth-version and exact server policy. It adds settings UI, catalog-only credential issuance without enabling SCIM and secure startup configuration. Four domain/actual HTTP and one mobile EN/VI admin/learner browser regression are authored; exact-head CI pending. Actual contracted provider connection/launch/conformance and retention remain BLOCKED/NOT VERIFIED. See ADR-045.
+
+## G04/G12/G13 live course/item group audience extension
+
+#105 adds explicit same-tenant static/dynamic group audiences for original courses/items, bounded group-set-safe reusable references, and current membership gates for pinned content/media/answers/completion/timers without deleting history. Four domain/actual HTTP and one EN/VI mobile author/learner browser regression are authored; exact-head CI pending. Collection/bank group sharing and cross-portal/reference entitlement policies remain OPEN. See ADR-046.

@@ -1,5 +1,8 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Selected groups":"Nhóm được chọn",
+"Audience group IDs":"ID nhóm được xem nội dung",
+"Use one to eight existing group IDs. Current members of any selected group can access the content; membership changes revoke access without deleting history.":"Dùng một đến tám ID nhóm hiện có. Thành viên hiện tại của bất kỳ nhóm được chọn nào có thể xem nội dung; thay đổi thành viên thu hồi quyền truy cập nhưng không xóa lịch sử.",
 "Allow provider catalog reconciliation reads":"Cho phép đọc đối soát catalog nhà cung cấp",
 "Allow provider metadata and entitlement feed writes":"Cho phép ghi feed metadata và quyền lợi nhà cung cấp",
 "Reviewed credentials authorize only the selected configured integration scopes. Provider feed credentials handle bounded metadata and entitlements; they cannot create official learning outcomes.":"Credential đã duyệt chỉ cho phép các phạm vi tích hợp được cấu hình và chọn. Credential feed nhà cung cấp xử lý metadata và quyền lợi có giới hạn; không tạo kết quả học chính thức.",

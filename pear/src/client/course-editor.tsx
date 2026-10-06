@@ -209,7 +209,8 @@ export function CourseEditor({
                 }
               />
             </label>
-            <label>{translateUI("Content audience")}<select aria-label={translateUI("Content audience")} value={course.access??"tenant"} onChange={e=>update(c=>{c.access=e.target.value as "tenant"|"author";})}><option value="tenant">{translateUI("Organization")}</option><option value="author">{translateUI("Author only")}</option></select></label>
+            <label>{translateUI("Content audience")}<select aria-label={translateUI("Content audience")} value={course.access??"tenant"} onChange={e=>update(c=>{c.access=e.target.value as "tenant"|"author"|"groups";if(c.access==="groups")c.groupIds=c.groupIds??[];else delete c.groupIds;})}><option value="tenant">{translateUI("Organization")}</option><option value="author">{translateUI("Author only")}</option><option value="groups">{translateUI("Selected groups")}</option></select></label>
+            {course.access==="groups"&&<label>{translateUI("Audience group IDs")}<input aria-label={translateUI("Audience group IDs")} maxLength={520} value={(course.groupIds??[]).join(",")} onChange={e=>update(c=>{c.groupIds=e.target.value.split(",").map(id=>id.trim()).filter(Boolean);})}/><span>{translateUI("Use one to eight existing group IDs. Current members of any selected group can access the content; membership changes revoke access without deleting history.")}</span></label>}
             <label className="choice">
               <input
                 type="checkbox"
