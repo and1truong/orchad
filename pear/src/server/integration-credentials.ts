@@ -49,7 +49,7 @@ export class IntegrationCredentials{
    this.db.prepare("INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)")
     .run(p.tenant,p.id,doc,"human_integration_"+a.action,JSON.stringify({clientId:id,reason:a.reason,scopes:a.scopes??null}),new Date().toISOString());
    this.db.prepare("INSERT INTO idempotency VALUES(?,?,?,?,?)").run(p.id,doc,a.key,payload,JSON.stringify({id}));
-   const row=this.db.prepare("SELECT * FROM integration_clients WHERE id=?").get(id);this.db.exec("COMMIT");return {...this.metadata(row),token};
+   const row=this.db.prepare("SELECT * FROM integration_clients WHERE id=?").get(id);this.db.exec("COMMIT");return {...this.metadata(row),token,oneTimeSecretUnavailable:false};
   }catch(e){this.db.exec("ROLLBACK");throw e;}
  }
  authenticate(header:string|undefined,scope:string){
