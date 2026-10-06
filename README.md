@@ -15,4 +15,4 @@ adopted changes are recorded per-POC in `<poc>/CONTRACT-CHANGES.md`.
 
 ## Pear
 
-Pear implements a synthetic LMS vertical slice: catalog, personal learning, immutable course versions, backend-graded MCQ, certificates and scoped administration. It exposes the same Bridge 0.1 to Lime; it contains no embedded AI. See [Pear README](pear/README.md), [capability register](pear/docs/CAPABILITIES.md) and [evidence](pear/IMPLEMENTATION-REPORT.md). Full Go1 parity remains tracked in #49.
+Pear implements deterministic versioned learning: authored/reusable media, courses, standalone reading, playlists/awards, typed human assessments, groups/scheduled assignments, scoped reports, reviewed language variants, identity/provisioning adapters and restricted SCORM/xAPI profiles. The stack adds explicit unpublish, an own on-demand digest and shared durable recovery evidence. It exposes the same Bridge 0.1 to Lime; it contains no embedded AI. See [Pear README](pear/README.md), [capability register](pear/docs/CAPABILITIES.md) and [evidence](pear/IMPLEMENTATION-REPORT.md). Full Go1 parity remains tracked in #49.

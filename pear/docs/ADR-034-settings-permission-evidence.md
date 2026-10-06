@@ -1,0 +1,6 @@
+# ADR-034: Settings and machine-channel permission matrix
+Actual HTTP regressions exercise Admin, Manager, Content Admin, Learner, Assessor and outsider identities across identity-link, integration-credential and webhook settings. Non-admin GET and valid mutation attempts must fail before any settings revision, credential, link or subscription changes. These operations and human official learning tools remain absent from every bounded agent workspace descriptor.
+Tenant administrators may read their own settings and issue a scoped credential. Session cookies do not authenticate SCIM/event/xAPI machine endpoints; bearer credentials do not authenticate human settings routes. An events-only credential cannot read provisioning. A separate tenant administrator does not see the first tenant's clients/subscriptions.
+A live account role/auth-version change invalidates the session and derived bearer before settings/event reads, retaining history without another revision.
+This records the implemented settings/channel boundaries. It is not an exhaustive reference-product permission audit and does not close course/item author access policies or deployment/account verification.
+Exact-head CI pending.
