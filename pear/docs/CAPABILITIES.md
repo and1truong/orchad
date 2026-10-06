@@ -223,3 +223,7 @@ ADR-066 supplies 12 original bounded discovery/practice/report/group/curation ca
 
 ## #126 reviewed fresh latest self-directed course candidate
 ADR-067 implements a human-only full-change fresh restart, including resolved essay/submission/event formats; no lesson/answer/result/attendance/timer progress is copied. Pending human assessment and booked events explicitly block, preserving official work. CI PENDING. G06 original self-directed full-change restart is implemented; assigned/cycle full-change and exact reference/reset/recertification semantics remain OPEN. Original objective-only retention remains a distinct explicit choice.
+
+
+## #127 reviewed full direct-assignment candidate
+ADR-068/Migration 039 adds an immutable reviewed mode and exact-mode learner acceptance; full changes start from zero, preserving due/assigner and prior official history. New or existing pending assessment/bookings gate both humans. Legacy objective-only calls/receipts retain their mode. CI PENDING. G06 original self-directed and direct-assigned full-change restarts are implemented; cycles and exact reference/reset/recertification remain OPEN.

@@ -434,7 +434,7 @@ export class LearningService {
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
         ["human_offer_assigned_quiz_restart","human_accept_assigned_quiz_restart","human_cancel_assigned_quiz_review"].includes(c.toolName)
-          ? {reviewId:data.reviewId,sourceEnrollmentId:data.sourceEnrollmentId,targetVersion:c.arguments.targetVersion,newEnrollmentId:data.enrollmentId}
+          ? {reviewId:data.reviewId,sourceEnrollmentId:data.sourceEnrollmentId,targetVersion:c.arguments.targetVersion,mode:data.mode??c.arguments.mode??"objective_only",newEnrollmentId:data.enrollmentId}
           : ["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(c.toolName)
           ? {offerId:data.offerId,collectionId:c.arguments.collectionId??c.arguments.destinationCollectionId,sourceVersion:c.arguments.sourceVersion,referenceCount:Array.isArray(c.arguments.references)?c.arguments.references.length:0,state:data.state}
           : c.toolName === "human_open_provider_content"

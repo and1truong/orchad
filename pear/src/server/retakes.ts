@@ -60,7 +60,7 @@ export class RetakeService{
  readFresh(p:Principal,a:any){
   const e=this.upgradeSource(p,a.enrollmentId),course=this.course(p,e),after=this.value(course.id,course.latest_version);
   new ContentAccess(this.db).requireVisible(p,"course",course.id,after);
-  const pendingOfficialWork=!!this.db.prepare("SELECT 1 FROM attempts WHERE enrollment_id=? AND submitted=1 AND grading_state='pending_manual'").get(e.id)||!!this.db.prepare("SELECT 1 FROM submissions WHERE enrollment_id=? AND state='pending'").get(e.id)||!!this.db.prepare("SELECT 1 FROM bookings WHERE enrollment_id=? AND state='booked'").get(e.id);
+  const pendingOfficialWork=hasPendingOfficialWork(this.db,e.id);
   const successor=this.db.prepare("SELECT id,version FROM enrollments WHERE retake_of=?").get(e.id) as any;
   return {enrollmentId:e.id,courseId:course.id,originalVersion:e.version,targetVersion:course.latest_version,title:after.title,summary:after.summary,lessonCount:after.lessons.length,lessonTypes:[...new Set(after.lessons.map((l:any)=>l.kind))],hasEssay:!!after.quiz?.questions.some((q:any)=>q.kind==="long_answer"),completedLessonCount:JSON.parse(e.completed_lessons).length,pendingOfficialWork,successor:successor??null,acceptingNewLearning:course.state==="published",available:course.state==="published"&&course.latest_version>e.version&&!pendingOfficialWork&&e.assignment_state==="active"&&!successor,policy:"Fresh latest self-directed course; no lessons, answers, submission results, event attendance/bookings or measured time carry over. Prior records remain immutable in withdrawn history. Resolve pending assessor work and cancel bookings first. Assigned/cycle learning requires separate coordinator review."};
  }
@@ -85,3 +85,5 @@ export function objectiveUpgradeProfile(before:any,after:any){
  const withoutQuiz=(v:any)=>{const {quiz,...body}=v;return body;};
  return !!before.quiz&&!!after.quiz&&!before.quiz.questions.some((q:any)=>q.kind==="long_answer")&&!after.quiz.questions.some((q:any)=>q.kind==="long_answer")&&!before.lessons.some((l:any)=>["event","submission"].includes(l.kind))&&stable(withoutQuiz(before))===stable(withoutQuiz(after));
 }
+
+export function hasPendingOfficialWork(db:DatabaseSync,enrollmentId:string){return !!db.prepare("SELECT 1 FROM attempts WHERE enrollment_id=? AND submitted=1 AND grading_state='pending_manual'").get(enrollmentId)||!!db.prepare("SELECT 1 FROM submissions WHERE enrollment_id=? AND state='pending'").get(enrollmentId)||!!db.prepare("SELECT 1 FROM bookings WHERE enrollment_id=? AND state='booked'").get(enrollmentId);}
