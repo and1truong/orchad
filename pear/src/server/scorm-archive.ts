@@ -22,7 +22,7 @@ export function readSCORMZip(bytes:Buffer){
   if(expanded===0||expanded>max||compressed===0||expanded>compressed*100||offset+30>directory||!signature(bytes,offset,0x04034b50))fail("expanded-size/ratio/header bound");
   const localName=bytes.readUInt16LE(offset+26),localExtra=bytes.readUInt16LE(offset+28),start=offset+30+localName+localExtra,finish=start+compressed;
   if(finish>directory||localExtra||bytes.readUInt16LE(offset+6)!==flags||bytes.readUInt16LE(offset+8)!==method||bytes.readUInt32LE(offset+14)!==checksum||bytes.readUInt32LE(offset+18)!==compressed||bytes.readUInt32LE(offset+22)!==expanded||!bytes.subarray(offset+30,offset+30+localName).equals(bytes.subarray(cursor+46,cursor+46+nameLength)))fail("local/central header mismatch");
-  let data:Buffer;try{data=method===0?Buffer.from(bytes.subarray(start,finish)):inflateRawSync(bytes.subarray(start,finish),{maxOutputLength:expanded+1});}catch{fail("invalid or oversized deflate stream");}
+  let data:Buffer;try{if(method===0)data=Buffer.from(bytes.subarray(start,finish));else{const result=inflateRawSync(bytes.subarray(start,finish),{maxOutputLength:expanded+1,info:true}) as unknown as {buffer:Buffer;engine:{bytesWritten:number}};if(result.engine.bytesWritten!==compressed)fail("trailing deflate bytes");data=result.buffer;}}catch{fail("invalid, trailing or oversized deflate stream");}
   if(data!.length!==expanded||crc32(data!)!==checksum)fail("length/CRC mismatch");
   total+=expanded;if(total>1048576+16384)fail("expanded archive quota");files.set(name!,data!);ranges.push({start:offset,end:finish});cursor=next;
  }

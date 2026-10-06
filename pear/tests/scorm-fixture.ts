@@ -25,10 +25,10 @@ export const sco=`<!doctype html><html><head><title>Original inline SCO</title><
  };
  document.getElementById("finish").onclick=()=>{document.getElementById("result").textContent="Finish: "+API.LMSFinish("");};
 </script></body></html>`;
-export function zip(entries:{name:string;data:Buffer;method?:number;flags?:number;external?:number}[]=[{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco)}]){
+export function zip(entries:{name:string;data:Buffer;method?:number;flags?:number;external?:number;trailing?:Buffer}[]=[{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco)}]){
  const locals:Buffer[]=[],centrals:Buffer[]=[];let offset=0;
  for(const entry of entries){
-  const name=Buffer.from(entry.name),method=entry.method??0,flags=entry.flags??0x800,compressed=method===8?deflateRawSync(entry.data):entry.data,checksum=crc32(entry.data);
+  const name=Buffer.from(entry.name),method=entry.method??0,flags=entry.flags??0x800,compressed=Buffer.concat([method===8?deflateRawSync(entry.data):entry.data,entry.trailing??Buffer.alloc(0)]),checksum=crc32(entry.data);
   const local=Buffer.alloc(30);local.writeUInt32LE(0x04034b50,0);local.writeUInt16LE(20,4);local.writeUInt16LE(flags,6);local.writeUInt16LE(method,8);local.writeUInt32LE(checksum,14);local.writeUInt32LE(compressed.length,18);local.writeUInt32LE(entry.data.length,22);local.writeUInt16LE(name.length,26);
   locals.push(local,name,compressed);
   const central=Buffer.alloc(46);central.writeUInt32LE(0x02014b50,0);central.writeUInt16LE((3<<8)|20,4);central.writeUInt16LE(20,6);central.writeUInt16LE(flags,8);central.writeUInt16LE(method,10);central.writeUInt32LE(checksum,16);central.writeUInt32LE(compressed.length,20);central.writeUInt32LE(entry.data.length,24);central.writeUInt16LE(name.length,28);central.writeUInt32LE(entry.external??((0o100644<<16)>>>0),38);central.writeUInt32LE(offset,42);
