@@ -18,7 +18,7 @@ type Props = {
   tick: number;
   busy: boolean;
   op: (name: string, args?: Record<string, unknown>) => Promise<any>;
-  mutate: (name: string, args: Record<string, unknown>) => Promise<any>;
+  mutate: (name: string, args: Record<string, unknown>,documentId?:string) => Promise<any>;
   run: (fn: () => Promise<void>) => Promise<boolean>;
   certificate: (id: string) => Promise<any>;
   studyCourse?: () => void;
@@ -790,7 +790,7 @@ export function Programs(props: Props) {
           <button disabled={busy}>{translateUI("Assign award")}</button>
         </form>
       )}
-      {["admin","assessor"].includes(role)&&<AssessmentNotices actions={props} tick={tick}/>}
+      {["admin","assessor"].includes(role)&&<AssessmentNotices actions={{...props,mutate:(name,args)=>props.mutate(name,args,`learning:${props.session.principal.tenant}:${props.session.principal.id}`)}} tick={tick}/>}
       {administrative && role === "admin" && (
         <form
           className="panel"
