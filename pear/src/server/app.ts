@@ -531,11 +531,13 @@ export async function createApp(opts: {
     }
   });
   app.get("/api/transcript/pdf",async(req,reply)=>{
+   try{
     const p=service.principal((req as any).session.principal);
     if(!certificateFont)throw new DomainError("FORBIDDEN","Server PDF font is not configured; original text and browser print remain available");
     const snapshotHash=String((req.query as any).snapshotHash??"");
     const bytes=transcriptPDF(p,service.reports,snapshotHash,certificateFont);
     return reply.header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Disposition",'attachment; filename="pear-transcript.pdf"').type("application/pdf").send(bytes);
+   }catch(e){return mediaFailure(e,reply);}
   });
   app.get("/api/certificates/:id", async (req, reply) => {
     try {
