@@ -1,3 +1,4 @@
+import {PortalService} from "./portal.ts";
 import {RetakeService} from "./retakes.ts";
 import {QuestionBankService} from "./question-banks.ts";
 import {InsightService} from "./insights.ts";
@@ -232,6 +233,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    new PortalService(this.db).authorize(p,c.toolName);
     new RetakeService(this.db).authorize(p,c.toolName,a);
     this.curation.authorize(p, c.toolName, a);
     this.standalone.authorize(p, c.toolName, a);
@@ -520,6 +522,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="human_get_portal_branding")return new PortalService(this.db).read(p);
     if(name==="human_get_course_retake_options")return new RetakeService(this.db).read(p,a);
     if(["learning_get_question_banks","learning_get_question_bank"].includes(name))return new QuestionBankService(this.db).read(p,name,a,source);
     if(name==="learning_get_my_insights")return new InsightService(this.db).read(p,a);
@@ -1010,6 +1013,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);
     if(name==="human_retake_completed_course")return new RetakeService(this.db).write(p,a);
     if(["learning_save_question_bank","learning_retire_question_bank"].includes(name))return new QuestionBankService(this.db).write(p,name,a);
     if(name==="learning_apply_question_bank"){

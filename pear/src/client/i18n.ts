@@ -1,5 +1,18 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Organization portal settings":"Thiết lập portal tổ chức",
+"These settings change only this organization's signed-in portal presentation. Learning, access, identity providers and certificates keep their own policies.":"Các thiết lập chỉ thay đổi giao diện portal sau khi đăng nhập của tổ chức này. Việc học, quyền truy cập, nhà cung cấp danh tính và chứng chỉ giữ chính sách riêng.",
+"Organization portal settings saved":"Đã lưu thiết lập portal tổ chức",
+"Portal presentation":"Giao diện portal",
+"Portal display name":"Tên hiển thị portal",
+"Portal tagline":"Lời giới thiệu portal",
+"Portal color palette":"Bảng màu portal",
+"forest":"Xanh lá",
+"navy":"Xanh đậm",
+"ink":"Màu mực",
+"Save organization portal settings":"Lưu thiết lập portal tổ chức",
+"Organization learning portal":"Portal học tập của tổ chức",
+
 "Completed course retake":"Học lại khóa đã hoàn tất",
 "Review course retake":"Xem lựa chọn học lại",
 "Review completed course retake":"Xem xét học lại khóa đã hoàn tất",

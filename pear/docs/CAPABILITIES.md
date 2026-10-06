@@ -94,3 +94,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## G06/G10 completed-course retake extension
 
 #99 implements explicit human-only enrolled/latest-version retakes as fresh linked self-directed records. Prior official completion, attempts, certificates and assignment history remain immutable; no automatic progress transfer. Four domain/HTTP and one mobile EN/VI browser regression are authored; exact-head CI pending. Exact reference reset/recertification semantics remain OPEN. See ADR-040.
+
+## G04 organization portal presentation extension
+
+#100 adds tenant-admin-only signed-in portal name/tagline/fixed palette, scoped to current authenticated tenant and cleared on identity change. Three domain/real HTTP and one mobile EN/VI browser regression are authored; exact-head CI pending. Cross-portal sharing and complete reference branding/settings remain OPEN. See ADR-041.

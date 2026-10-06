@@ -1,3 +1,5 @@
+import {defaultPortal,portalPalettes,type PortalBranding} from "../shared/portal.ts";
+import {PortalSettings} from "./portal.tsx";
 import {CourseRetake} from "./retakes.tsx";
 import {QuestionBanks} from "./question-banks.tsx";
 import {OwnInsights} from "./insights.tsx";
@@ -76,6 +78,7 @@ const labels = {
 const personal = (s: Session) =>
   `learning:${s.principal.tenant}:${s.principal.id}`;
 function App() {
+  const [portal,setPortal]=useState<{branding:PortalBranding;version:number}>({branding:structuredClone(defaultPortal),version:0});
   useEffect(()=>{document.documentElement.lang=getUILocale();},[]);
   const [authOptions,setAuthOptions]=useState<{oidcEnabled:boolean;developmentEnabled:boolean}|null>(null);
   useEffect(()=>{let active=true;void request<any>("/api/auth/config",null).then(r=>{if(active)setAuthOptions(r);}).catch(()=>{});return()=>{active=false;};},[]);
@@ -128,6 +131,7 @@ function App() {
   const sessionRef = useRef<Session | null>(null);
   const refreshGeneration = useRef(0);
   const setSession = (next: Session | null) => {
+    setPortal({branding:structuredClone(defaultPortal),version:0});
     setAssistantGroup("learning");
     sessionRef.current = next;
     if (!next) delete window.agentBridgeV1;
@@ -324,6 +328,7 @@ function App() {
     setTick((n) => n + 1);
     return r;
   };
+  useEffect(()=>{let live=true;if(session)void invoke(session,personal(session),"human_get_portal_branding",{}).then(r=>{if(live&&sessionRef.current===session)setPortal(r.data as {branding:PortalBranding;version:number});}).catch(()=>{});return()=>{live=false;};},[session,tick]);
   const openLesson = async (e: any, id: string) => {
     const r = await op(
       "learning_get_lesson",
@@ -403,7 +408,7 @@ function App() {
     <div className="shell">
       <a className="skip-link" href="#learning-main">{translateUI("Skip to learning content")}</a>
       <aside>
-        <div className="brand">{translateUI("◒ pear")}</div>
+        <div className="brand" aria-label={translateUI("Organization learning portal")} style={{color:portalPalettes[portal.branding.palette],overflowWrap:"anywhere",maxWidth:"100%"}}><span>◒ {portal.branding.name}</span>{portal.branding.tagline&&<p className="muted">{portal.branding.tagline}</p>}</div>
         <p className="eyebrow">{translateUI("Learning workspace")}</p>
         <label>{translateUI("Assistant workspace")}<select
             aria-label={translateUI("Assistant workspace")}
@@ -1148,6 +1153,7 @@ function App() {
             )}
           </>
         )}
+        {view==="admin"&&role==="admin"&&<PortalSettings key={"portal:"+session.sessionEpoch} value={portal.branding} version={portal.version} busy={busy} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onSaved={branding=>setPortal(previous=>({...previous,branding}))}/>}
         {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<ProvisioningClients key={"provisioning:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&canEdit&&<PackageLearning author key={"package-admin:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
