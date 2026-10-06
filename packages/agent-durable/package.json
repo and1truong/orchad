@@ -19,7 +19,7 @@
   "scripts": {
     "build": "npm run vendor:client && tsc -p tsconfig.json",
     "test": "npm run vendor:client && node --import tsx --test tests/*.test.ts",
-    "check": "tsc --noEmit",
+    "check": "npm run vendor:client && tsc --noEmit",
     "vendor:client": "npm --prefix ../../mango run build -w @orchard/agent-client"
   },
   "dependencies": {
