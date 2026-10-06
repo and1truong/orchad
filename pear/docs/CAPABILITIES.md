@@ -1,6 +1,6 @@
 # Go1 parity register
 
-Baseline: [epic #49](https://github.com/and1truong/orchad/issues/49), public-source research 2026-10-05. Implementation snapshot: 2026-10-06, stacked delivery through #109. Sources below retain the epic baseline; this is not a new reference-account or plan audit. Exact Go1 offering/portal/plan entitlements remain NOT VERIFIED. No paid provider, reference catalog, actual IdP/channel account, deployment or scope exception has been authorized or verified.
+Baseline: [epic #49](https://github.com/and1truong/orchad/issues/49), public-source research 2026-10-05. Implementation snapshot: 2026-10-06, stacked delivery through #120 (current candidate; CI pending). Sources below retain the epic baseline; this is not a new reference-account or plan audit. Exact Go1 offering/portal/plan entitlements remain NOT VERIFIED. No paid provider, reference catalog, actual IdP/channel account, deployment or scope exception has been authorized or verified.
 
 Full parity remains the target. OPEN means a required internal sub-capability or validation is unfinished; BLOCKED names an external dependency; NOT VERIFIED means evidence is insufficient. TESTED applies only to the named baseline fixture/profile. Implemented code with CI pending/failing is not PASS. Scripted Mango validates transport/policy, not model inference quality. Every row retains its unfinished scope.
 
@@ -184,3 +184,18 @@ Authenticated read-only original course/award PDF from authoritative own complet
 
 ## Reviewed original collection configuration sharing (PR #119)
 Two explicit administrators offer/review one published original configuration; receiver maps current authorized local references and creates an author-private draft. No media/licenses/users/history/groups/assessor grants/publication transfer. Current source/destination authority, version CAS, expiry, redacted audit/counterpart revisions and definition withholding on revocation. Seven domain/live-rights/HTTP/reopen regressions and one actual EN/VI two-admin browser fixture authored; exact-head CI pending. Live/provider crossportal equivalence, retention/invitation/user synchronization/production audits remain OPEN/NOT VERIFIED.
+
+
+## Verified continuation through #119; #120 candidate
+All eight workflow jobs passed at the following exact heads. These are original scoped capabilities, not full reference parity. Historical #64 native failure remains FAIL.
+
+| PR | Exact verified head | Scoped addition |
+|---|---|---|
+| #114 | 7876b199ecb6d7743370cbd7c4fffce0f69a17c5 | One-criterion completion and custom units |
+| #115 | c449e19e326504a71cacea02af45de697df13d55 | Human primary assessor assignment/current evidence rights |
+| #116 | f85978a6348d4d1b29eb8d39f3a8e1a603785cf7 | Actual nested earned quantities |
+| #117 | 5aec03b973beb5f9ebf113533a94b25b97c999e0 | Explicit unfinished self-directed objective-quiz restart |
+| #118 | eb25f20e8e09412f6ea3baae67d3d9808d964f9a | Authenticated original EN/VI server PDF |
+| #119 | 06827902edd75d000a8f6026be3a7ce4395c97d3 | Two-admin review of original cross-tenant collection configuration |
+
+#120 (ADR-061) adds 522 exact known human diagnostic translations and unknown-write-outcome guidance; CI PENDING. Dynamic/unknown strings remain original. Bridge wire is unchanged. G16 remains OPEN for exhaustive runtime and professional linguistic validation. G06 remains OPEN for assigned/cycle/essay/nonquiz version migration. G08 remains OPEN for exact reference grouping/required semantics and recertification. G04 remains OPEN for cross-portal resources, licensing, users and retention. G14 original local PDF is tested at #118; accreditation/PDF/A/tagged/reference equivalence remain NOT VERIFIED. Semantic/model-quality and full standards-conformance validation remain OPEN, alongside named external dependencies.

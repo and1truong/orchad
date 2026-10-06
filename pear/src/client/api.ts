@@ -1,3 +1,4 @@
+import {diagnosticText,humanError} from "./diagnostics.ts";
 import {
   appId,
   type Bridge,
@@ -16,8 +17,10 @@ export async function request<T>(
   path: string,
   session: Session | null,
   body?: unknown,
+  localizedErrors = true,
 ): Promise<T> {
-  const response = await fetch(path, {
+  let response:Response;
+  try {response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     credentials: "same-origin",
     headers: {
@@ -28,10 +31,15 @@ export async function request<T>(
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+  } catch(error) {
+    if(!localizedErrors)throw error;
+    const write=!!body&&typeof body==="object"&&"idempotencyKey" in body&&typeof body.idempotencyKey==="string";
+    throw new Error(diagnosticText(write?"Request outcome unknown; refresh current data before confirming another action.":error instanceof Error?error.message:"Request failed"));
+  }
   const result = await response.json();
   if (!response.ok)
     throw new Error(
-      `${result.error?.code ?? response.status}: ${result.error?.message ?? "Request failed"}`,
+      localizedErrors ? humanError(result.error?.code??response.status,result.error?.message??"Request failed") : `${result.error?.code ?? response.status}: ${result.error?.message ?? "Request failed"}`,
     );
   return result;
 }
@@ -54,7 +62,7 @@ export async function invoke(
     expectedRevision: write ? ctx.revision : null,
     idempotencyKey: write ? crypto.randomUUID() : null,
   });
-  if (!result.ok) throw new Error(result.error!.message);
+  if (!result.ok) throw new Error(diagnosticText(result.error!.message));
   return result;
 }
 export function createBridge(
@@ -67,11 +75,15 @@ export function createBridge(
       request<Description>(
         "/api/describe?documentId=" + encodeURIComponent(currentDocument()),
         session,
+        undefined,
+        false,
       ),
     getContext: () =>
       request<Context>(
         "/api/context?documentId=" + encodeURIComponent(currentDocument()),
         session,
+        undefined,
+        false,
       ),
     async invoke(call: Call): Promise<Result> {
       if (call.documentId !== currentDocument())

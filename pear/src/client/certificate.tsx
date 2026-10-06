@@ -1,3 +1,4 @@
+import {diagnosticText} from "./diagnostics.ts";
 import {translateUI} from "./i18n.ts";
 import React, { useRef,useEffect,useState } from "react";
 import type {Session} from "./api.ts";
@@ -14,7 +15,7 @@ export function Certificate({
   const ref = useRef<HTMLElement>(null),alive=useRef(true);
   const [saving,setSaving]=useState(false),[downloadError,setDownloadError]=useState("");
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
-  const downloadPDF=async()=>{if(!session||saving)return;setSaving(true);setDownloadError("");try{const response=await fetch((award?"/api/award-certificates/":"/api/certificates/")+encodeURIComponent(c.id)+"/pdf",{credentials:"same-origin",headers:{"x-pear-epoch":session.sessionEpoch}});if(!alive.current)return;if(!response.ok){const failure=await response.json();throw Error(failure.error?.message??"Certificate PDF unavailable");}const blob=await response.blob();if(!alive.current)return;const url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`pear-${award?"award":"certificate"}-${c.id}.pdf`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){if(alive.current)setDownloadError(error instanceof Error?error.message:"Certificate PDF unavailable");}finally{if(alive.current)setSaving(false);}};
+  const downloadPDF=async()=>{if(!session||saving)return;setSaving(true);setDownloadError("");try{const response=await fetch((award?"/api/award-certificates/":"/api/certificates/")+encodeURIComponent(c.id)+"/pdf",{credentials:"same-origin",headers:{"x-pear-epoch":session.sessionEpoch}});if(!alive.current)return;if(!response.ok){const failure=await response.json();throw Error(diagnosticText(failure.error?.message??"Certificate PDF unavailable"));}const blob=await response.blob();if(!alive.current)return;const url=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=url;anchor.download=`pear-${award?"award":"certificate"}-${c.id}.pdf`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(error){if(alive.current)setDownloadError(error instanceof Error?error.message:"Certificate PDF unavailable");}finally{if(alive.current)setSaving(false);}};
   const heading = award
       ? "Award completion certificate"
       : "Completion certificate",
