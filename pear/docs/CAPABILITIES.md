@@ -1,6 +1,6 @@
 # Go1 parity register
 
-Baseline: [epic #49](https://github.com/and1truong/orchad/issues/49), public-source research 2026-10-05. Implementation snapshot: 2026-10-06, stacked delivery through #120 (current candidate; CI pending). Sources below retain the epic baseline; this is not a new reference-account or plan audit. Exact Go1 offering/portal/plan entitlements remain NOT VERIFIED. No paid provider, reference catalog, actual IdP/channel account, deployment or scope exception has been authorized or verified.
+Baseline: [epic #49](https://github.com/and1truong/orchad/issues/49), public-source research 2026-10-05. Implementation snapshot: 2026-10-06, stacked delivery through #123 (current candidate; CI pending). Sources below retain the epic baseline; this is not a new reference-account or plan audit. Exact Go1 offering/portal/plan entitlements remain NOT VERIFIED. No paid provider, reference catalog, actual IdP/channel account, deployment or scope exception has been authorized or verified.
 
 Full parity remains the target. OPEN means a required internal sub-capability or validation is unfinished; BLOCKED names an external dependency; NOT VERIFIED means evidence is insufficient. TESTED applies only to the named baseline fixture/profile. Implemented code with CI pending/failing is not PASS. Scripted Mango validates transport/policy, not model inference quality. Every row retains its unfinished scope.
 
@@ -198,7 +198,7 @@ All eight workflow jobs passed at the following exact heads. These are original 
 | #118 | eb25f20e8e09412f6ea3baae67d3d9808d964f9a | Authenticated original EN/VI server PDF |
 | #119 | 06827902edd75d000a8f6026be3a7ce4395c97d3 | Two-admin review of original cross-tenant collection configuration |
 
-#120 (ADR-061) adds 522 exact known human diagnostic translations and unknown-write-outcome guidance; CI PENDING. Dynamic/unknown strings remain original. Bridge wire is unchanged. G16 remains OPEN for exhaustive runtime and professional linguistic validation. G06 remains OPEN for assigned/cycle/essay/nonquiz version migration. G08 remains OPEN for exact reference grouping/required semantics and recertification. G04 remains OPEN for cross-portal resources, licensing, users and retention. G14 original local PDF is tested at #118; accreditation/PDF/A/tagged/reference equivalence remain NOT VERIFIED. Semantic/model-quality and full standards-conformance validation remain OPEN, alongside named external dependencies.
+#120 (ADR-061) adds 522 exact known human diagnostic translations and unknown-write-outcome guidance; all eight jobs passed at fb795562360c4b77fb7f510bc9c3aef7b2b3207a (run 37539891720), 289 domain / 53 dev + 53 built-browser journeys. Dynamic/unknown strings remain original. Bridge wire is unchanged. G16 remains OPEN for exhaustive runtime and professional linguistic validation. G06 remains OPEN for assigned/cycle/essay/nonquiz version migration. G08 remains OPEN for exact reference grouping/required semantics and recertification. G04 remains OPEN for cross-portal resources, licensing, users and retention. G14 original local PDF is tested at #118; accreditation/PDF/A/tagged/reference equivalence remain NOT VERIFIED. Semantic/model-quality and full standards-conformance validation remain OPEN, alongside named external dependencies.
 
 
 ## #121 coordinated direct-assignment objective quiz restart candidate
@@ -207,3 +207,7 @@ ADR-062: separate current coordinator offer and addressed learner confirmation; 
 
 ## #122 assignment review lifecycle candidate
 ADR-063 closes the bounded internal expired/cancelled same-version review renewal gap left in ADR-062: explicit latest-predecessor review, human cancellation, preserved historical records, no automatic replay or official completion changes. Migration 038 is tested from actual 037 records. CI PENDING; G06 remains OPEN for cycle/essay/submission/nonquiz and exact reference migration semantics.
+
+
+## #123 authenticated original own-transcript server PDF candidate
+ADR-064: current own-ledger snapshot, bounded multi-page PDF with Latin/Vietnamese trusted font, epoch/owner/no-store checks and guarded real download. Existing CSV/browser-print export remains available. Exact-head CI PENDING. G10 original PDF is implemented but reference layout/production font and unrestricted admin PDF remain NOT VERIFIED/OPEN; G14 accreditation/PDF/A/tagged conformance remains NOT VERIFIED.

@@ -1,3 +1,5 @@
+import type {Session} from "./api.ts";
+import {downloadOriginalPDF} from "./download-pdf.ts";
 import {translateUI,formatUIDate} from "./i18n.ts";
 import { printView } from "./print.ts";
 import React, { useEffect, useRef, useState } from "react";
@@ -9,6 +11,7 @@ import {
 } from "../shared/reports.ts";
 import { encodeCsv, parseCsv } from "../shared/csv.ts";
 type Props = {
+  session?:Session;
   administrative: boolean;
   tick: number;
   busy: boolean;
@@ -531,6 +534,11 @@ export function Reports(p: Props) {
           }
         >{translateUI("Download")}{" "}{p.administrative ? "report" : "transcript"} CSV
         </button>
+        {!p.administrative&&p.session&&<button disabled={p.busy||!!loadError||!snapshot.current} onClick={()=>void p.run(async()=>{
+          current();if(!snapshot.current)throw Error("Review current transcript before PDF export");
+          await downloadOriginalPDF("/api/transcript/pdf?snapshotHash="+encodeURIComponent(snapshot.current),"pear-transcript.pdf",p.session!,current);
+          current();setNotice("Original server transcript PDF exported from one authorized ledger snapshot.");
+        })}>{translateUI("Download original server transcript PDF")}</button>}
         <button
           className="ghost"
           disabled={p.busy}

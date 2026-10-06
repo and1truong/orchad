@@ -1221,6 +1221,7 @@ function App() {
         {(view === "transcript" ||
           (view === "admin" && ["admin", "manager"].includes(role))) && (
           <Reports
+            session={session}
             key={"reports:" + session.sessionEpoch + view}
             administrative={view === "admin"}
             tick={tick}

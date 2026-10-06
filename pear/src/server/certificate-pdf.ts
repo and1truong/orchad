@@ -33,7 +33,10 @@ function certificateFields(c:any,award:boolean){
 }
 export function certificatePDFSupported(c:any,award:boolean,font:CertificateFont|undefined){if(!font)return false;try{for(const field of certificateFields(c,award))for(const ch of field.replace(/[\r\n\t]/g," ")){const cp=ch.codePointAt(0)!;if(!((cp>=32&&cp<=0x24f)||(cp>=0x300&&cp<=0x36f)||(cp>=0x1e00&&cp<=0x1eff)||(cp>=0x2000&&cp<=0x206f)))return false;font.glyph(cp);}return true;}catch{return false;}}
 export function certificatePDF(c:any,award:boolean,font:CertificateFont):Buffer{
- const fields=certificateFields(c,award);
+ return textDocumentPDF(certificateFields(c,award),font,{title:award?"Pear award completion certificate":"Pear completion certificate",maxPages:1,largeField:2});
+}
+export function textDocumentPDF(fields:string[],font:CertificateFont,options:{title:string;maxPages:number;largeField?:number}):Buffer{
+ if(!Number.isInteger(options.maxPages)||options.maxPages<1||options.maxPages>40||fields.length>4000||fields.some(s=>s.length>512)||fields.join("").length>65536)reject("INVALID_ARGUMENT","Original PDF text exceeds document bounds; use CSV or browser print");
  const characters=new Map<string,{cid:number;gid:number;width:number}>();
  const text=(s:string)=>s.replace(/[\r\n\t]/g," ");
  for(const line of fields)for(const ch of text(line)){
@@ -41,21 +44,25 @@ export function certificatePDF(c:any,award:boolean,font:CertificateFont):Buffer{
   if(!characters.has(ch)){const gid=font.glyph(cp);characters.set(ch,{cid:characters.size+1,gid,width:font.width(gid)});}
  }
  const lines:{value:string;size:number}[]=[];
- fields.forEach((field,index)=>{const size=index===0?20:index===2?18:12;let value="",width=0;for(const ch of text(field)){const w=characters.get(ch)!.width*size/1000;if(value&&width+w>480){lines.push({value,size});value="";width=0;}value+=ch;width+=w;}lines.push({value,size});});
- if(lines.length>28)reject("INVALID_ARGUMENT","Certificate exceeds single-page layout bounds");
+ fields.forEach((field,index)=>{const size=index===0?20:index===options.largeField?18:12;let value="",width=0;for(const ch of text(field)){const w=characters.get(ch)!.width*size/1000;if(value&&width+w>480){lines.push({value,size});value="";width=0;}value+=ch;width+=w;}lines.push({value,size});});
+ if(lines.length>28*options.maxPages)reject("INVALID_ARGUMENT","Original PDF exceeds page bounds; use CSV or browser print");
+ const pages:Array<typeof lines>=[];for(let i=0;i<lines.length;i+=28)pages.push(lines.slice(i,i+28));if(!pages.length)pages.push([]);
  const entries=[...characters.entries()],cidmap=Buffer.alloc((entries.length+1)*2);
  for(const [,v]of entries)cidmap.writeUInt16BE(v.gid,v.cid*2);
  let cmap="/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /PearCertificateUnicode def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <ffff>\nendcodespacerange\n";
  for(let i=0;i<entries.length;i+=100){const batch=entries.slice(i,i+100);cmap+=batch.length+" beginbfchar\n"+batch.map(([ch,v])=>"<"+v.cid.toString(16).padStart(4,"0")+"> <"+utf16(ch)+">").join("\n")+"\nendbfchar\n";}cmap+="endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n";
- let y=770;const stream=lines.map(line=>{const code=[...line.value].map(ch=>characters.get(ch)!.cid.toString(16).padStart(4,"0")).join(""),out="BT /F1 "+line.size+" Tf 1 0 0 1 54 "+y+" Tm <"+code+"> Tj ET";y-=line.size+12;return out;}).join("\n");
+ const streams=pages.map(page=>{let y=770;return page.map(line=>{const code=[...line.value].map(ch=>characters.get(ch)!.cid.toString(16).padStart(4,"0")).join(""),out="BT /F1 "+line.size+" Tf 1 0 0 1 54 "+y+" Tm <"+code+"> Tj ET";y-=line.size+12;return out;}).join("\n");});
+ const pageId=(index:number)=>index===0?3:12+(index-1)*2;
+ const pageObject=(index:number)=>"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents "+(index===0?4:pageId(index)+1)+" 0 R >>";
  const bbox=[36,38,40,42].map(at=>font.metric(font.head.readInt16BE(at))).join(" "),asc=font.metric(font.hhea.readInt16BE(4)),desc=font.metric(font.hhea.readInt16BE(6));
  const objects:Buffer[]=[];
  const add=(value:string|Buffer)=>objects.push(typeof value==="string"?Buffer.from(value,"ascii"):value);
  const data=(bytes:Buffer,extra="")=>Buffer.concat([Buffer.from("<< /Length "+bytes.length+" "+extra+" >>\nstream\n"),bytes,Buffer.from("\nendstream")]);
- add("<< /Type /Catalog /Pages 2 0 R >>");add("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");add("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>");add(data(Buffer.from(stream,"ascii")));
+ add("<< /Type /Catalog /Pages 2 0 R >>");add("<< /Type /Pages /Kids ["+pages.map((_,i)=>pageId(i)+" 0 R").join(" ")+"] /Count "+pages.length+" >>");add(pageObject(0));add(data(Buffer.from(streams[0]!,"ascii")));
  add("<< /Type /Font /Subtype /Type0 /BaseFont /PearCertificateFont /Encoding /Identity-H /DescendantFonts [6 0 R] /ToUnicode 9 0 R >>");
  add("<< /Type /Font /Subtype /CIDFontType2 /BaseFont /PearCertificateFont /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor 7 0 R /CIDToGIDMap 10 0 R /DW 1000 /W ["+entries.map(([,v])=>v.cid+" ["+v.width+"]").join(" ")+"] >>");
- add("<< /Type /FontDescriptor /FontName /PearCertificateFont /Flags 32 /FontBBox ["+bbox+"] /ItalicAngle 0 /Ascent "+asc+" /Descent "+desc+" /CapHeight "+asc+" /StemV 80 /FontFile2 8 0 R >>");add(data(font.bytes,"/Length1 "+font.bytes.length));add(data(Buffer.from(cmap,"ascii")));add(data(cidmap));add("<< /Title <feff"+utf16(fields[0]!) +"> /Producer (Pear original certificate renderer) >>");
+ add("<< /Type /FontDescriptor /FontName /PearCertificateFont /Flags 32 /FontBBox ["+bbox+"] /ItalicAngle 0 /Ascent "+asc+" /Descent "+desc+" /CapHeight "+asc+" /StemV 80 /FontFile2 8 0 R >>");add(data(font.bytes,"/Length1 "+font.bytes.length));add(data(Buffer.from(cmap,"ascii")));add(data(cidmap));add("<< /Title <feff"+utf16(options.title) +"> /Producer (Pear original certificate renderer) >>");
+ for(let i=1;i<pages.length;i++){add(pageObject(i));add(data(Buffer.from(streams[i]!,"ascii")));}
  const chunks=[Buffer.from("%PDF-1.7\n%\xe2\xe3\xcf\xd3\n","latin1")],offsets=[0];let length=chunks[0]!.length;
  objects.forEach((object,index)=>{offsets.push(length);const chunk=Buffer.concat([Buffer.from((index+1)+" 0 obj\n"),object,Buffer.from("\nendobj\n")]);chunks.push(chunk);length+=chunk.length;});
  const xref=length;chunks.push(Buffer.from("xref\n0 "+(objects.length+1)+"\n0000000000 65535 f \n"+offsets.slice(1).map(offset=>offset.toString().padStart(10,"0")+" 00000 n \n").join("")+"trailer\n<< /Size "+(objects.length+1)+" /Root 1 0 R /Info 11 0 R >>\nstartxref\n"+xref+"\n%%EOF\n"));
