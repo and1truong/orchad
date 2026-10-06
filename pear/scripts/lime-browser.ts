@@ -60,6 +60,7 @@ try {
       (await context.waitForEvent("serviceworker")),
     extensionId = new URL(worker.url()).hostname;
   const page = await context.newPage();
+  page.on("pageerror",(error:any)=>console.log("Pear fixture MAIN error:",error.message));
   await page.goto(origin);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).waitFor();
@@ -145,6 +146,8 @@ try {
   async function learningState(){return page.evaluate(async()=>{const ctx=await window.agentBridgeV1!.getContext();return window.agentBridgeV1!.invoke({requestId:crypto.randomUUID(),documentId:ctx.documentId,toolName:"learning_get_my_learning",arguments:{},expectedRevision:null,idempotencyKey:null});});}
   const beforePractice=await learningState(),enrollment=beforePractice.data.enrollments.find((e:any)=>e.courseId==="learning-vi"||e.course_id==="learning-vi");
   assert.ok(enrollment);
+  const directLesson=await page.evaluate(async(args:any)=>{const ctx=await window.agentBridgeV1!.getContext();return window.agentBridgeV1!.invoke({requestId:crypto.randomUUID(),documentId:ctx.documentId,toolName:"learning_get_lesson",arguments:args,expectedRevision:null,idempotencyKey:null});},{enrollmentId:enrollment.id,lessonId:"practice"});
+  assert.equal(directLesson.ok,true,JSON.stringify(directLesson));assert.equal(directLesson.data.title,"Luyện nhớ chủ động");
   await panel.getByRole("button",{name:"Pin target",exact:true}).click();
   await panel.getByLabel("Learning workflow",{exact:true}).selectOption("practice");
   await panel.getByLabel("Allow read: learning_get_lesson",{exact:true}).check();
