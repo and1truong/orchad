@@ -215,3 +215,7 @@ ADR-064: current own-ledger snapshot, bounded multi-page PDF with Latin/Vietname
 
 ## #124 scoped original administrator/direct-report server PDF candidate
 ADR-065: the four filtered/all-within-current-access × visible/all columns export modes use the original authoritative report snapshot and current roles/relationship/tenant checks, with CSRF/epoch guarded real downloads. CI PENDING. This closes the bounded internal admin server-download gap; document limits, production font, reference layout/PDF conformance and real delivery remain OPEN/NOT VERIFIED.
+
+
+## #125 original quality calibration candidate
+ADR-066 supplies 12 original bounded discovery/practice/report/group/curation cases and offline structured-recording evaluation, with exact hashes, missing-case accounting, negative calibration and redacted output. CI PENDING. Actual Lime/Mango inference, independent human quality, production traces and broad relevance/reference parity remain NOT RUN/NOT VERIFIED. A synthetic checked profile cannot make any model-quality row PASS. No credentials/provider calls or official mutations occur.
