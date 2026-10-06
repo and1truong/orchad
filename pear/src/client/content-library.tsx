@@ -276,9 +276,7 @@ export function StandaloneReader({
       )}
       {item.itemEnrollmentId && (
         <p>
-          {item.status === "completed"
-            ? "Reading confirmed"
-            : "Tracked · In progress"}
+          {translateUI(item.status === "completed" ? "Reading confirmed" : "Tracked · In progress")}
         </p>
       )}
       {item.itemEnrollmentId && item.status !== "completed" && onComplete && (
