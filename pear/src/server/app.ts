@@ -535,17 +535,21 @@ export async function createApp(opts: {
   app.post("/api/reports/pdf",{schema:{body:object({
     spec:reportSchema,rows:{type:"string",enum:["filtered","all"]},columns:{type:"string",enum:["visible","all"]},snapshotHash:{type:"string",pattern:"^[a-f0-9]{64}$"}
   })}},async(req,reply)=>{
+   try{
     const p=service.principal((req as any).session.principal);
     if(!certificateFont)throw new DomainError("FORBIDDEN","Server PDF font is not configured; original text and browser print remain available");
     const bytes=reportPDF(p,service.reports,req.body,certificateFont);
     return reply.header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Disposition",'attachment; filename="pear-report.pdf"').type("application/pdf").send(bytes);
+   }catch(e){return mediaFailure(e,reply);}
   });
   app.get("/api/transcript/pdf",async(req,reply)=>{
+   try{
     const p=service.principal((req as any).session.principal);
     if(!certificateFont)throw new DomainError("FORBIDDEN","Server PDF font is not configured; original text and browser print remain available");
     const snapshotHash=String((req.query as any).snapshotHash??"");
     const bytes=transcriptPDF(p,service.reports,snapshotHash,certificateFont);
     return reply.header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Disposition",'attachment; filename="pear-transcript.pdf"').type("application/pdf").send(bytes);
+   }catch(e){return mediaFailure(e,reply);}
   });
   app.get("/api/certificates/:id", async (req, reply) => {
     try {
