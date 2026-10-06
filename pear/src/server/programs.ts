@@ -191,7 +191,7 @@ export class ProgramService {
       const column=ref.kind==="course"?"course_id":"item_id",versionTable=ref.kind==="course"?"course_versions":"content_item_versions";
       const content=publishing?json((this.db.prepare("SELECT content FROM "+versionTable+" WHERE "+column+"=? AND version=?").get(row.id,ref.version??row.latest_version) as any)?.content??"null"):json(row.draft);
       if(!content)reject("NOT_FOUND","Referenced content version unavailable");
-      new ContentAccess(this.db).reference(p,ref.kind,row.id,content,rootAccess,rootOwner);
+      new ContentAccess(this.db).reference(p,ref.kind,row.id,content,rootAccess,rootOwner,publishing||row.latest_version>0);
     }
     if (ref.kind === "award") {
       const child = publishing

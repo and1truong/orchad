@@ -1,6 +1,6 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
-"Content audience":"Đối tượng xem nội dung","Author only":"Chỉ tác giả",
+"Content audience":"Đối tượng xem nội dung",
 "My learning digest":"Tóm tắt việc học của tôi","Time budget in minutes":"Thời gian dự kiến (phút)","Digest time zone":"Múi giờ tóm tắt","Read my digest":"Xem tóm tắt của tôi","Digest results":"Kết quả tóm tắt","unread notifications":"thông báo chưa đọc","Intended duration":"Thời lượng dự kiến","minutes":"phút","within whole-content budget":"trong thời gian dành cho toàn bộ nội dung","longer than whole-content budget":"vượt thời gian dành cho toàn bộ nội dung","More learning is available in your full learning lists.":"Còn nội dung học trong danh sách đầy đủ.","Read a bounded next-step digest when you choose. This does not send notifications or update your learning.":"Xem tóm tắt các bước tiếp theo khi bạn muốn. Thao tác này không gửi thông báo hay cập nhật việc học.","Intended duration is not remaining time, observed study or mastery. Official assessment and completion stay in the human learning controls.":"Thời lượng dự kiến không phải thời gian còn lại, thời gian học thực tế hay mức độ thành thạo. Đánh giá và hoàn tất chính thức vẫn do bạn thực hiện trong phần học.",
 "Unpublish":"Gỡ xuất bản","Unpublish item":"Gỡ xuất bản nội dung","Unpublish program":"Gỡ xuất bản chương trình",
 "Skip to learning content":"Bỏ qua đến nội dung học",

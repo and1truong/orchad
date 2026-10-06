@@ -28,8 +28,8 @@ export class ContentAccess {
   if(!row)reject("NOT_FOUND","Published content unavailable");
   this.requireVisible(p,kind,id,JSON.parse(row.content));
  }
- reference(p:Principal,kind:ContentKind,id:string,value:{access?:"tenant"|"author"},rootAccess:string,rootOwner:string){
-  this.current(p,kind,id);
+ reference(p:Principal,kind:ContentKind,id:string,value:{access?:"tenant"|"author"},rootAccess:string,rootOwner:string,currentRequired=true){
+  if(currentRequired)this.current(p,kind,id);
   this.requireVisible(p,kind,id,value);
   if(value.access==="author"&&(rootAccess!=="author"||this.owner(p,kind,id)!==rootOwner))reject("FORBIDDEN","Author-only content cannot be redistributed to a wider audience");
  }
