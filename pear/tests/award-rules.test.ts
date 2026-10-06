@@ -11,13 +11,14 @@ function setup(award:Award=value,path=":memory:"){
  const f=fixture(path);data(f.call("editor","learning_save_award",{collectionId:"rules-award",award}));data(f.call("editor","learning_publish_collection",{collectionId:"rules-award"}));data(f.call("admin","learning_set_award_assessor",{collectionId:"rules-award",assessorId:"assessor",enabled:true}));const e=data(f.call("learner-a","learning_enroll_award",{collectionId:"rules-award"}));return {...f,e};
 }
 const own=(f:ReturnType<typeof setup>)=>data(f.call("learner-a","learning_get_my_awards")).items.find((a:any)=>a.id===f.e.awardEnrollmentId);
-const submit=(f:ReturnType<typeof setup>,path:string,amount:number)=>data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:f.e.awardEnrollmentId,criterionPath:path,amount,evidence:"Original confirmed practice",confirmed:true},"human"));
+const submit=(f:ReturnType<typeof setup>,path:string,amount:number,evidence="Original confirmed practice")=>data(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:f.e.awardEnrollmentId,criterionPath:path,amount,evidence,confirmed:true},"human"));
 const review=(f:ReturnType<typeof setup>,id:string,accepted=true)=>f.call("assessor","learning_assess_external_record",{recordId:id,accepted,reason:"Original human review"});
 test("one-item award waits for a complete accepted criterion, ignoring numeric target; pending/rejected/partial evidence cannot produce completion or certificate",()=>{
  const f=setup();try{
   const first=submit(f,"first",1);assert.equal(own(f).earned,0);assert.equal(own(f).completed,false);data(review(f,first.recordId));assert.equal(own(f).earned,1);assert.equal(own(f).completed,false);
   const rejected=submit(f,"second",1);data(review(f,rejected.recordId,false));assert.equal(own(f).completed,false);
-  const second=submit(f,"second",1);data(review(f,second.recordId));const progress=own(f);assert.equal(progress.completed,true);assert.equal(progress.earned,2);assert.equal(progress.requirements[0].completed,false);assert.equal(progress.requirements[1].completed,true);assert.ok(progress.certificate_id);
+  assert.equal(f.call("learner-a","human_submit_external_record",{awardEnrollmentId:f.e.awardEnrollmentId,criterionPath:"second",amount:1,evidence:"Original confirmed practice",confirmed:true},"human").ok,false);
+  const second=submit(f,"second",1,"Corrected original second practice");data(review(f,second.recordId));const progress=own(f);assert.equal(progress.completed,true);assert.equal(progress.earned,2);assert.equal(progress.requirements[0].completed,false);assert.equal(progress.requirements[1].completed,true);assert.ok(progress.certificate_id);
   const certificate=f.service.programs.certificate(f.service.principal("learner-a"),progress.certificate_id);assert.equal(certificate.unitLabel,"practice points");assert.equal(certificate.accredited,false);assert.equal(certificate.completionMode,"one_item");
  }finally{f.db.close();}
 });
