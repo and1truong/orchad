@@ -38,10 +38,8 @@ try {
     await new Promise((r) => setTimeout(r, 100));
   }
   assert.ok(healthy, "Pear server must start");
-  gateway = await startMockGateway(4311, true, {
-    name: "learning_set_bookmark",
-    arguments: '{"courseId":"learning-vi","saved":true}',
-  });
+  const scriptedTool={name:"learning_set_bookmark",arguments:'{"courseId":"learning-vi","saved":true}'};
+  gateway = await startMockGateway(4311,true,scriptedTool);
   context = await chromium.launchPersistentContext(join(temp, "profile"), {
     channel: "chromium",
     headless: true,
@@ -139,6 +137,42 @@ try {
     path: "artifacts/lime-invalidated.png",
     fullPage: true,
   });
+  // Actual extension/UI source-read consent and skippable practice transport.
+  // Fake Mango chooses the calls; this is not an inference-quality claim.
+  await page.getByLabel("Content language",{exact:true}).selectOption("vi");
+  await expect(page.locator(".cards article")).toHaveCount(1);
+  await page.getByRole("button",{name:"Enroll",exact:true}).click();
+  async function learningState(){return page.evaluate(async()=>{const ctx=await window.agentBridgeV1!.getContext();return window.agentBridgeV1!.invoke({requestId:crypto.randomUUID(),documentId:ctx.documentId,toolName:"learning_get_my_learning",arguments:{},expectedRevision:null,idempotencyKey:null});});}
+  const beforePractice=await learningState(),enrollment=beforePractice.data.enrollments.find((e:any)=>e.courseId==="learning-vi"||e.course_id==="learning-vi");
+  assert.ok(enrollment);
+  await panel.getByRole("button",{name:"Pin target",exact:true}).click();
+  await panel.getByLabel("Learning workflow",{exact:true}).selectOption("practice");
+  await panel.getByLabel("Allow read: learning_get_lesson",{exact:true}).check();
+  await panel.getByRole("button",{name:"Consent to pinned target + model",exact:true}).click();
+  scriptedTool.name="learning_get_lesson";scriptedTool.arguments=JSON.stringify({enrollmentId:enrollment.id,lessonId:"practice"});
+  await panel.getByLabel("Message",{exact:true}).fill("Offer optional practice from this original permitted lesson.");
+  await panel.getByRole("button",{name:"Send",exact:true}).click();
+  await expect.poll(()=>gateway!.requests.some((r:any)=>r.messages?.some((m:any)=>m.role==="tool"&&m.content?.includes("Luyện nhớ chủ động")))).toBe(true);
+  const transcriptRequest=gateway.requests.find((r:any)=>r.messages?.some((m:any)=>m.role==="tool"&&m.content?.includes("Luyện nhớ chủ động")))!;
+  assert.ok(transcriptRequest.messages.some((m:any)=>m.role==="system"&&m.content.includes("unofficial and skippable")));
+  const toolResult=JSON.parse(transcriptRequest.messages.find((m:any)=>m.role==="tool"&&m.content?.includes("Luyện nhớ chủ động")).content);
+  assert.equal(toolResult.data.courseId,"learning-vi");assert.equal(toolResult.data.version,1);assert.equal(toolResult.data.enrollmentId,enrollment.id);
+  for(const key of ["correct","quiz","answers","password","csrf","sessionEpoch"])assert.equal(Object.hasOwn(toolResult.data,key),false);
+  await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
+  scriptedTool.name="learning_set_bookmark";scriptedTool.arguments='{"courseId":"learning-vi","saved":false}';
+  await panel.getByRole("button",{name:"Send",exact:true}).click();await panel.getByRole("button",{name:"Approve",exact:true}).waitFor();
+  await panel.getByRole("button",{name:"Skip practice",exact:true}).click();
+  await expect(panel.getByLabel("Learning workflow",{exact:true})).toHaveValue("general");
+  await expect(panel.getByRole("button",{name:"Approve",exact:true})).toHaveCount(0);
+  await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
+  const afterPractice=await learningState();assert.deepEqual(afterPractice.data,beforePractice.data);assert.equal(afterPractice.revision,beforePractice.revision);
+  scriptedTool.name="learning_get_lesson";scriptedTool.arguments=JSON.stringify({enrollmentId:enrollment.id,lessonId:"practice"});
+  const oldRequests=gateway.requests.length;
+  await panel.getByLabel("Message",{exact:true}).fill("Read the selected source again.");await panel.getByRole("button",{name:"Send",exact:true}).click();
+  await expect.poll(()=>gateway!.requests.length).toBeGreaterThan(oldRequests);
+  const fresh=gateway.requests[oldRequests];assert.equal(fresh.messages.some((m:any)=>m.role==="tool"),false);assert.equal(fresh.messages.some((m:any)=>m.role==="system"&&m.content.includes("Workflow: Optional AI practice")),false);
+  await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
+  await panel.screenshot({path:"artifacts/lime-optional-practice.png",fullPage:true});
   await writeFile(
     "artifacts/lime-report.json",
     JSON.stringify(
@@ -151,6 +185,9 @@ try {
           "denied write zero mutation",
           "reload invalidates host authority",
           "Pear bookmark survives reload",
+          "explicit lesson-read consent reaches actual shared Pi/Lime/Pear with source IDs/version",
+          "practice Skip aborts pending approval with zero bookmark/progress mutation",
+          "skipped workflow transcript does not reappear in the next turn",
         ],
       },
       null,

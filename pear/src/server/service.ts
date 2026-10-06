@@ -648,14 +648,14 @@ export class LearningService {
           reject("FORBIDDEN", "Complete prerequisite lessons first");
         if (source === "bridge" && !v.aiProcessingAllowed)
           return {
-            id: l.id,
+            id: l.id,courseId:e.course_id,version:e.version,enrollmentId:e.id,
             title: l.title,
             contentWithheld: true,
             reason:
               "This course does not permit model processing. Read in the human player.",
           };
         return {
-          id: l.id,
+          id: l.id,courseId:e.course_id,version:e.version,enrollmentId:e.id,
           title: l.title,
           kind: l.kind,
           text: l.text,

@@ -1,3 +1,4 @@
+import {learningInstructions,learningWorkflows,workflowLabels,type LearningWorkflow} from "../host/learning-workflows.js";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./sidepanel.css";
@@ -47,6 +48,7 @@ function App() {
     [token, setToken] = useState(""),
     [models, setModels] = useState<string[]>([]),
     [model, setModel] = useState(""),
+    [learningWorkflow,setLearningWorkflow]=useState<LearningWorkflow>("general"),
     [prompt, setPrompt] = useState('/tool demo_increment {"amount":1}'),
     [text, setText] = useState(""),
     [activity, setActivity] = useState<string[]>([]),
@@ -75,6 +77,7 @@ function App() {
     // model and tools — every approved app turn fails before the gateway).
     runTurnRef = useRef(runTurn),
     history = useRef<Message[]>([]),
+    workflowGeneration=useRef(0),
     externalPolicies = useRef(new Map<string, HostPolicy>()),
     transport = useRef<CompanionTransport | null>(null);
   runTurnRef.current = runTurn;
@@ -98,6 +101,7 @@ function App() {
       return yes;
     });
   const clearConsent = () => {
+    workflowGeneration.current++;
     history.current = [];
     session.current.abort();
     run.current?.abort();
@@ -372,7 +376,7 @@ function App() {
   ): Promise<{ ok: boolean; text?: string; error?: string }> {
     if (!policy.current || !adapter.current || runningRef.current)
       return { ok: false, error: "unavailable or busy" };
-    const p = policy.current;
+    const p = policy.current,capturedGeneration=workflowGeneration.current;
     runningRef.current = true;
     setRunning(true);
     setStatus("connecting");
@@ -384,12 +388,15 @@ function App() {
     try {
       const context = await p.context(signal);
       if (!context.ok) throw context;
+      if(capturedGeneration!==workflowGeneration.current||signal.aborted)return {ok:false,error:"workflow cancelled"};
       // CAS discipline: stamp the revision the agent was actually shown, and
       // advance it only from tool results — never silently re-read, or a
       // concurrent edit gets a mutation formed against unseen state.
       let revision = (context.data as { revision: number }).revision;
       // Re-supply bounded context every turn: revision/summary/selection can
       // change between messages (selection changes do not bump revision).
+      const guide=learningInstructions(p.consent.target.appId,learningWorkflow,tools);
+      if(guide&&!history.current.some(m=>m.role==="system"))history.current.unshift({role:"system",content:guide});
       history.current.push({
         role: "user",
         content:
@@ -429,11 +436,13 @@ function App() {
           return result as unknown as ClientResult;
         },
         onEvent: (e) => {
+          if(capturedGeneration!==workflowGeneration.current)return;
           if (e.type === "text_delta")
             setText((x) => x + String(e.payload.text));
           else log(e.type + " " + JSON.stringify(e.payload));
         },
       });
+      if(capturedGeneration!==workflowGeneration.current)return {ok:false,error:"workflow cancelled"};
       history.current = result.messages;
       setStatus(
         result.finishReason === "cancelled"
@@ -796,6 +805,12 @@ function App() {
       )}
       <section>
         <h2>Chat</h2>
+        {target?.appId==="orchard-pear"&&<fieldset>
+          <legend>Learning assistance</legend>
+          <label>Learning workflow<select disabled={running} aria-label="Learning workflow" value={learningWorkflow} onChange={e=>{workflowGeneration.current++;history.current=[];setLearningWorkflow(e.target.value as LearningWorkflow);}}>
+          {learningWorkflows.map(mode=><option key={mode} value={mode}>{workflowLabels[mode]}</option>)}</select></label>
+          {learningWorkflow==="practice"&&<><p>Optional AI practice · unofficial. Questions use only permitted lesson text. Skip at any time; official learning stays unchanged.</p><button className="secondary" onClick={()=>{workflowGeneration.current++;run.current?.abort();history.current=[];setText("");setLearningWorkflow("general");setStatus("practice skipped");}}>Skip practice</button></>}
+        </fieldset>
         <div className="transcript">{text || "No messages yet."}</div>
         <textarea
           aria-label="Message"
