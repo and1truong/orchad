@@ -156,6 +156,7 @@ export const courseSchema = object(
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
   "human_offer_assigned_quiz_restart",
+  "human_cancel_assigned_quiz_review",
   ...collectionSharingWrites,
   "human_assign_external_assessor",
   "human_review_provider_connection",

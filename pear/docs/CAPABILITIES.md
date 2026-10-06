@@ -203,3 +203,7 @@ All eight workflow jobs passed at the following exact heads. These are original 
 
 ## #121 coordinated direct-assignment objective quiz restart candidate
 ADR-062: separate current coordinator offer and addressed learner confirmation; pinned prior history preserved, due date/assigner copied, identical lessons retained and answers reset in a new successor. Exact-head CI PENDING. G06 remains OPEN for cycle/essay/submission/nonquiz changes, expired-offer renewal and exact reference migration semantics. No model may offer or accept these human-only actions. Migration 037 preserves existing delivery state.
+
+
+## #122 assignment review lifecycle candidate
+ADR-063 closes the bounded internal expired/cancelled same-version review renewal gap left in ADR-062: explicit latest-predecessor review, human cancellation, preserved historical records, no automatic replay or official completion changes. Migration 038 is tested from actual 037 records. CI PENDING; G06 remains OPEN for cycle/essay/submission/nonquiz and exact reference migration semantics.

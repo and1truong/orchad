@@ -11,5 +11,5 @@ export function assignedQuizFixture(path=":memory:"){
  data(f.call("editor","learning_update_course",{courseId:"assigned-quiz-course",course:next}));data(f.call("editor","learning_publish_course",{courseId:"assigned-quiz-course"}));
  return {...f,e,at,value,next};
 }
-export const offerAssigned=(f:ReturnType<typeof assignedQuizFixture>,overrides:any={})=>f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:f.e.enrollmentId,targetVersion:2,confirmed:true},"human",overrides);
+export const offerAssigned=(f:ReturnType<typeof assignedQuizFixture>,overrides:any={})=>f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:f.e.enrollmentId,previousReviewId:null,targetVersion:2,confirmed:true},"human",overrides);
 export const acceptAssigned=(f:ReturnType<typeof assignedQuizFixture>,reviewId:string,overrides:any={})=>f.call("learner-a","human_accept_assigned_quiz_restart",{reviewId,targetVersion:2,confirmed:true},"human",overrides);

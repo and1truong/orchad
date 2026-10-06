@@ -433,7 +433,7 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        ["human_offer_assigned_quiz_restart","human_accept_assigned_quiz_restart"].includes(c.toolName)
+        ["human_offer_assigned_quiz_restart","human_accept_assigned_quiz_restart","human_cancel_assigned_quiz_review"].includes(c.toolName)
           ? {reviewId:data.reviewId,sourceEnrollmentId:data.sourceEnrollmentId,targetVersion:c.arguments.targetVersion,newEnrollmentId:data.enrollmentId}
           : ["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(c.toolName)
           ? {offerId:data.offerId,collectionId:c.arguments.collectionId??c.arguments.destinationCollectionId,sourceVersion:c.arguments.sourceVersion,referenceCount:Array.isArray(c.arguments.references)?c.arguments.references.length:0,state:data.state}
@@ -1072,6 +1072,7 @@ export class LearningService {
     if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);
     if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);
     if(["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(name))return new CollectionSharing(this.db).write(p,name,a);
+    if(name==="human_cancel_assigned_quiz_review")return new AssignedQuiz(this.db).cancel(p,a);
     if(name==="human_offer_assigned_quiz_restart")return new AssignedQuiz(this.db).offer(p,a);
     if(name==="human_accept_assigned_quiz_restart")return new AssignedQuiz(this.db).accept(p,a);
     if(name==="human_restart_latest_quiz")return new RetakeService(this.db).writeUpgrade(p,a);

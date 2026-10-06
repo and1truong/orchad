@@ -24,9 +24,10 @@ export class AssignedQuiz{
   for(const who of [p,learner]){access.current(who,"course",course.id);access.requireVisible(who,"course",course.id,before);access.requireVisible(who,"course",course.id,after);}
   return {course,before,after,available:course.latest_version>e.version&&objectiveUpgradeProfile(before,after)};
  }
+ private latest(e:any,version:number){return this.db.prepare("SELECT * FROM assigned_quiz_reviews WHERE source_enrollment=? AND target_version=? AND tenant=? ORDER BY rowid DESC LIMIT 1").get(e.id,version,e.tenant) as any;}
  private review(p:Principal,id:string,accepted=false){
   const row=this.db.prepare("SELECT * FROM assigned_quiz_reviews WHERE id=? AND tenant=? AND learner=?").get(id,p.tenant,p.id) as any;
-  if(!row||Date.parse(row.expires_at)<=Date.now()||(!accepted&&row.state!=="pending"))reject("FORBIDDEN","Own current assignment review required");
+  if(!row||Date.parse(row.expires_at)<=Date.now()||!(row.state==="pending"||(accepted&&row.state==="accepted")))reject("FORBIDDEN","Own current assignment review required");
   const e=this.source(p,row.source_enrollment,accepted),owner=this.principal(row.owner,p.tenant);this.coordinator(owner,e);
   const value=this.versions(owner,e);this.versions(p,e);
   if(!value.available||value.course.latest_version!==row.target_version)reject("STALE_CONTEXT","Assigned quiz target changed; request a new coordinator review");
@@ -35,22 +36,42 @@ export class AssignedQuiz{
  }
  authorize(p:Principal,name:string,a:any){
   if(name==="human_get_assigned_quiz_review"){const e=this.source(p,a.sourceEnrollmentId);if(e.learner!==p.id)this.coordinator(p,e);this.versions(p,e);}
-  if(name==="human_offer_assigned_quiz_restart"){const e=this.source(p,a.sourceEnrollmentId);this.coordinator(p,e);const v=this.versions(p,e);if(!v.available||a.targetVersion!==v.course.latest_version)reject("STALE_CONTEXT","Assigned quiz target changed; request a new coordinator review");}
+  if(name==="human_offer_assigned_quiz_restart"){const e=this.source(p,a.sourceEnrollmentId);this.coordinator(p,e);const v=this.versions(p,e);if(!v.available||a.targetVersion!==v.course.latest_version)reject("STALE_CONTEXT","Assigned quiz target changed; request a new coordinator review");
+ const latest=this.latest(e,a.targetVersion),previous=a.previousReviewId??null;
+ const immediate=latest&&latest.state==="pending"&&Date.parse(latest.expires_at)>Date.now()&&latest.owner===p.id&&latest.previous_review===previous;
+ if(!immediate&&(latest?.id??null)!==previous)reject("STALE_CONTEXT","Assignment review changed; refresh before offering");
+ if(!immediate&&latest&&latest.state==="pending"&&Date.parse(latest.expires_at)>Date.now())reject("INVALID_ARGUMENT","A current coordinator review already exists");
+ if(latest?.state==="accepted")reject("FORBIDDEN","Accepted assignment review is immutable");
+ }
+  if(name==="human_cancel_assigned_quiz_review"){
+ const row=this.db.prepare("SELECT * FROM assigned_quiz_reviews WHERE id=? AND tenant=?").get(a.reviewId,p.tenant) as any;
+ if(!row||row.state==="accepted"||(row.owner!==p.id&&p.role!=="admin"))reject("FORBIDDEN","Own pending assignment review required");
+ const e=this.source(p,row.source_enrollment);this.coordinator(p,e);this.versions(p,e);
+ if(row.state==="cancelled"&&row.cancelled_by!==p.id)reject("FORBIDDEN","Own pending assignment review required");
+ }
   if(name==="human_accept_assigned_quiz_restart"){const {row}=this.review(p,a.reviewId,true);if(a.targetVersion!==row.target_version)reject("STALE_CONTEXT","Assigned quiz target changed; request a new coordinator review");}
  }
  read(p:Principal,a:any){
-  this.authorize(p,"human_get_assigned_quiz_review",a);const e=this.source(p,a.sourceEnrollmentId),v=this.versions(p,e),row=this.db.prepare("SELECT * FROM assigned_quiz_reviews WHERE source_enrollment=? AND target_version=? AND tenant=?").get(e.id,v.course.latest_version,p.tenant) as any;
+  this.authorize(p,"human_get_assigned_quiz_review",a);const e=this.source(p,a.sourceEnrollmentId),v=this.versions(p,e),row=this.latest(e,v.course.latest_version);
   let offer=null;if(row&&row.state==="pending"){try{const owner=this.principal(row.owner,p.tenant);this.coordinator(owner,e);this.versions(owner,e);if(Date.parse(row.expires_at)>Date.now())offer={id:row.id,targetVersion:row.target_version,expiresAt:row.expires_at};}catch{}}
-  return {sourceEnrollmentId:e.id,originalVersion:e.version,targetVersion:v.course.latest_version,title:v.after.title,dueDate:e.due_date,assignedBy:e.assigned_by,completedLessonCount:JSON.parse(e.completed_lessons).length,available:v.available,offer,policy:"Direct assignment only; separate current coordinator and learner confirmation. Due date, assigner and prior answers/results remain unchanged. Cycle, event, submission, essay and nonquiz changes are unsupported."};
+  return {sourceEnrollmentId:e.id,originalVersion:e.version,targetVersion:v.course.latest_version,title:v.after.title,dueDate:e.due_date,assignedBy:e.assigned_by,completedLessonCount:JSON.parse(e.completed_lessons).length,available:v.available,offer,previousReviewId:row?.id??null,policy:"Direct assignment only; separate current coordinator and learner confirmation. Due date, assigner and prior answers/results remain unchanged. Cycle, event, submission, essay and nonquiz changes are unsupported."};
  }
  offer(p:Principal,a:any){
   this.authorize(p,"human_offer_assigned_quiz_restart",a);const e=this.source(p,a.sourceEnrollmentId);
-  if(this.db.prepare("SELECT 1 FROM assigned_quiz_reviews WHERE source_enrollment=? AND target_version=?").get(e.id,a.targetVersion))reject("INVALID_ARGUMENT","A coordinator review already exists for this version");
+  const latest=this.latest(e,a.targetVersion);if(latest&&latest.state==="pending"&&Date.parse(latest.expires_at)>Date.now())reject("INVALID_ARGUMENT","A current coordinator review already exists");
   if(Number(this.db.prepare("SELECT count(*) n FROM assigned_quiz_reviews WHERE tenant=?").get(p.tenant)!.n)>=5000)reject("INVALID_ARGUMENT","Assignment review quota reached");
   const id=randomUUID(),now=new Date().toISOString(),expiry=new Date(Date.now()+86400000).toISOString();
-  this.db.prepare("INSERT INTO assigned_quiz_reviews(id,tenant,source_enrollment,owner,learner,target_version,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)").run(id,p.tenant,e.id,p.id,e.learner,a.targetVersion,now,expiry);
+  this.db.prepare("INSERT INTO assigned_quiz_reviews(id,tenant,source_enrollment,owner,learner,target_version,created_at,expires_at,previous_review) VALUES(?,?,?,?,?,?,?,?,?)").run(id,p.tenant,e.id,p.id,e.learner,a.targetVersion,now,expiry,a.previousReviewId??null);
   this.db.prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?").run("learning:"+p.tenant+":"+e.learner);
   return {reviewId:id,sourceEnrollmentId:e.id,targetVersion:a.targetVersion,expiresAt:expiry,officialLearningChanged:false};
+ }
+ cancel(p:Principal,a:any){
+  this.authorize(p,"human_cancel_assigned_quiz_review",a);
+  const row=this.db.prepare("SELECT * FROM assigned_quiz_reviews WHERE id=? AND tenant=?").get(a.reviewId,p.tenant) as any;
+  if(row.state!=="pending")reject("INVALID_ARGUMENT","Assignment review is no longer pending");
+  this.db.prepare("UPDATE assigned_quiz_reviews SET state='cancelled',cancelled_by=? WHERE id=? AND state='pending'").run(p.id,row.id);
+  this.db.prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?").run("learning:"+p.tenant+":"+row.learner);
+  return {reviewId:row.id,sourceEnrollmentId:row.source_enrollment,state:"cancelled",officialLearningChanged:false};
  }
  accept(p:Principal,a:any){
   const {row,e}=this.review(p,a.reviewId);if(a.targetVersion!==row.target_version)reject("STALE_CONTEXT","Assigned quiz target changed; request a new coordinator review");
