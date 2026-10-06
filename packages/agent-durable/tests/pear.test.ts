@@ -70,3 +70,27 @@ for(const revoke of ["consent","logout","deactivate"] as const)test("Pear durabl
   assert.equal(h.db.prepare("SELECT revision FROM workspaces WHERE id='learning:demo:learner-a'").get()!.revision,1);
  }finally{lost.release();await reopened?.close();await first?.close();await h.close();await gw.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test("actual Pear committed response lost: unresolved mutation blocks new durable admissions across cancel and reopen, then original authoritative reconciliation permits a follow-up",async()=>{
+ const {dir,db}=tmpDb(),h=await host(db+".pear"),gw=await fakeGateway([{toolCalls:[toolCall("pear-ambiguous")],usage:{input:10,output:5}},{content:"Outcome needs reconciliation.",usage:{input:10,output:5}},{toolCalls:[toolCall("pear-after-resolution",false)],usage:{input:10,output:5}},{content:"Removed.",usage:{input:10,output:5}}]);
+ let runner:DurableRunner|undefined;let originalResult:any,envelope:OpEnvelope|undefined;
+ try{
+  runner=await openRunner({storagePath:db});await runner.configure({baseUrl:gw.baseUrl,token:gw.token,model:MODEL});const policy=h.policy();
+  await runner.bind([h.binding(policy)],async e=>{envelope=e;originalResult=await h.call(policy,e);assert.equal(originalResult.ok,true);throw Error("fixture lost response after Pear commit");});
+  await runner.submit({prompt:"Save the selected course",requestId:"pear-unknown-admission"});await until(runner.status,s=>s.ops[0]?.status==="ambiguous"&&s.tasks.length===0,"unknown committed Pear response");
+  assert.equal(h.dispatches(),1);assert.equal(h.service.context("learner-a").revision,1);
+  await assert.rejects(runner.submit({prompt:"Save again with a replacement request",requestId:"pear-forbidden-replacement"}),/NEEDS_RECONCILIATION/);
+  assert.equal((await runner.transcript()).messages.some(m=>m.role==="user"&&String(m.content).includes("replacement request")),false);
+  await runner.cancel();await assert.rejects(runner.submit({prompt:"Retry after cancel",requestId:"pear-after-cancel"}),/NEEDS_RECONCILIATION/);
+  await runner.close();runner=await openRunner({storagePath:db});
+  await assert.rejects(runner.submit({prompt:"Retry after reopen",requestId:"pear-after-reopen"}),/NEEDS_RECONCILIATION/);
+  assert.equal(h.dispatches(),1);assert.equal(h.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE tool='learning_set_bookmark'").get()!.n,1);assert.ok(envelope);
+  const current=data(h.service.invoke("learner-a",{requestId:"read-outcome",documentId:"learning:demo:learner-a",toolName:"learning_get_my_learning",arguments:{},expectedRevision:null,idempotencyKey:null},"human"));
+  assert.ok(current.saved.some((r:any)=>r.course_id==="learning-vi"));
+  await runner.resolveOp(envelope!.requestId,{status:"reconciled",result:originalResult});
+  await runner.configure({baseUrl:gw.baseUrl,token:gw.token,model:MODEL});const fresh=h.policy();await runner.bind([h.binding(fresh)],e=>h.call(fresh,e));
+  await runner.submit({prompt:"Remove the reconciled bookmark",requestId:"pear-reviewed-follow-up"});await until(runner.status,s=>s.ops.length===2&&s.phase==="completed","resolved follow-up");
+  assert.equal(h.dispatches(),2);assert.equal(h.service.context("learner-a").revision,2);assert.equal(h.db.prepare("SELECT COUNT(*) AS n FROM bookmarks WHERE learner='learner-a' AND course_id='learning-vi'").get()!.n,0);
+  for(const table of ["enrollments","attempts","certificates"])assert.equal(h.db.prepare("SELECT COUNT(*) AS n FROM "+table).get()!.n,0);
+ }finally{await runner?.close();await h.close();await gw.close();rmSync(dir,{recursive:true,force:true});}
+});

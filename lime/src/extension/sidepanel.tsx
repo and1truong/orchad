@@ -35,6 +35,18 @@ import {
   type DurableStatus,
   type Paired,
 } from "./companion-transport.js";
+const durableGuidance:Record<string,string>={
+ running:"Work is in progress. Wait or cancel; sending the same mutation again can create another operation.",
+ queued:"Your request is queued. Do not submit a duplicate request while it waits.",
+ waiting_for_host:"Reconnect the same app, account and workspace. Pin the current target and renew consent before resuming.",
+ waiting_for_consent:"Review the live target and exact mutation arguments. Approval authorizes only that operation; restored conversation history does not restore consent.",
+ needs_reconciliation:"A mutation outcome is unknown. Reconnect and reconcile the original operation. Read the app's authoritative records before deciding whether it applied; do not create a replacement operation key.",
+ blocked_incompatible:"This saved conversation cannot run with this runtime. Keep its data and use a reviewed compatible recovery; do not reset it to guess the outcome.",
+ completed:"The assistant turn finished. Confirm learning, scores, attendance and certificates from the app's records.",
+ failed:"The assistant stopped with an error. A dispatched mutation may still have committed; reconcile its original outcome before retrying.",
+ cancelled:"Assistant work was cancelled. Previously committed app changes remain; cancellation does not undo them.",
+ idle:"No request is running. Review the current app records before choosing the next step."
+};
 function App() {
   const [status, setStatus] = useState("disconnected"),
     [bridgeStatus, setBridgeStatus] = useState("disconnected"),
@@ -679,6 +691,7 @@ function App() {
           </p>
           {dStatus && (
             <div className="pin">
+              <p role="status" aria-label="Durable recovery guidance">{durableGuidance[dStatus.phase]??"Refresh the current run status before continuing."}</p>
               phase: <b>{dStatus.phase}</b>
               {dStatus.reason ? ` · ${dStatus.reason}` : ""}
               <br />
@@ -709,7 +722,7 @@ function App() {
             rows={2}
           />
           <button
-            disabled={!dPrompt}
+            disabled={!dPrompt||dStatus?.ops.some(o=>o.status==="ambiguous"||o.status==="interrupted")}
             onClick={() =>
               void durableOp("submit", {
                 prompt: dPrompt,
@@ -762,6 +775,7 @@ function App() {
                 <p>
                   Resolve {o.toolName} ({o.status})
                 </p>
+                <p>Choose a verdict only after checking the authoritative app outcome. This decision does not apply, undo or grade learning.</p>
                 <button
                   onClick={() =>
                     void durableOp("resolve", {
