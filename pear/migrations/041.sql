@@ -11,4 +11,10 @@ ALTER TABLE item_enrollments_041 RENAME TO item_enrollments;
 CREATE INDEX item_enrollment_scope ON item_enrollments(tenant,learner);
 CREATE UNIQUE INDEX item_original_version ON item_enrollments(learner,item_id,version) WHERE retake_of IS NULL;
 CREATE UNIQUE INDEX item_retake_source ON item_enrollments(retake_of) WHERE retake_of IS NOT NULL;
+CREATE TRIGGER integration_item_enrolled AFTER INSERT ON item_enrollments WHEN COALESCE((SELECT json_extract(content,'$.access') FROM content_item_versions WHERE item_id=NEW.item_id AND version=NEW.version),'tenant')='tenant' BEGIN
+ INSERT INTO integration_events(tenant,topic,resource_id,data) VALUES(NEW.tenant,'item.enrolled',NEW.id,json_object('itemEnrollmentId',NEW.id,'learnerId',NEW.learner,'itemId',NEW.item_id,'version',NEW.version));
+END;
+CREATE TRIGGER integration_item_completed AFTER UPDATE OF completed_at ON item_enrollments WHEN NEW.completed_at IS NOT NULL AND OLD.completed_at IS NULL AND COALESCE((SELECT json_extract(content,'$.access') FROM content_item_versions WHERE item_id=NEW.item_id AND version=NEW.version),'tenant')='tenant' BEGIN
+ INSERT INTO integration_events(tenant,topic,resource_id,data) VALUES(NEW.tenant,'item.completed',NEW.id,json_object('itemEnrollmentId',NEW.id,'learnerId',NEW.learner,'itemId',NEW.item_id,'version',NEW.version,'completedAt',NEW.completed_at));
+END;
 INSERT INTO schema_version(version) VALUES(41);
