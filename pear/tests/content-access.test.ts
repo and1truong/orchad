@@ -30,7 +30,7 @@ test("author audience denies discovery, direct reads, draft edits, enrollment/as
   data(f.call("editor","learning_save_playlist",{collectionId:"private-playlist",playlist:{...playlist,access:"author"}}));data(f.call("editor","learning_publish_collection",{collectionId:"private-playlist"}));
   const e=data(f.call("editor","learning_enroll",{courseId:"private-course"}));
   assert.equal(data(f.call("editor","learning_get_lesson",{enrollmentId:e.enrollmentId,lessonId:c.lessons[0].id})).courseId,"private-course");
-  const ie=data(f.call("editor","learning_enroll_item",{itemId:"private-item",version:1}));data(f.call("editor","human_complete_item",{itemEnrollmentId:ie.itemEnrollmentId},"human"));
+  const ie=data(f.call("editor","learning_enroll_item",{itemId:"private-item",version:1}));data(f.call("editor","human_complete_item",{itemEnrollmentId:ie.itemEnrollmentId,confirmed:true},"human"));
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM integration_events WHERE resource_id IN ('private-course','private-copy','private-item','private-playlist',?,?)").get(e.enrollmentId,ie.itemEnrollmentId)!.n,0);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM courses WHERE id='public-copy'").get()!.n,0);
   const publicOwned=structuredClone(courses["systems-basics"]);data(f.call("editor","learning_create_course",{courseId:"retry-source",course:publicOwned}));
@@ -67,5 +67,19 @@ test("published audience changes preserve authorized immutable pins; private fil
   assert.equal(data(f.call("learner-a","learning_get_lesson",{enrollmentId:enrolled.enrollmentId,lessonId:c.lessons[0].id})).version,2);
   const old=f.db.prepare("SELECT content FROM course_versions WHERE course_id='audience-course' AND version=2").get()!.content;assert.equal(JSON.parse(String(old)).access,"tenant");
   assert.equal(data(f.call("learner-a","learning_get_my_learning")).enrollments.find((e:any)=>e.id===enrolled.enrollmentId).course.version,2);
+ }finally{f.db.close();}
+});
+
+test("draft planning may reference an owned unpublished source, while publication still requires an available matching audience",()=>{
+ const f=fixture();try{
+  data(f.call("editor","learning_create_course",{courseId:"planned-private",course:authored()}));
+  const playlist={title:"Original private plan",summary:"Original controlled fixture",access:"author",items:[{kind:"course",id:"planned-private"}]};
+  data(f.call("editor","learning_save_playlist",{collectionId:"planned-playlist",playlist}));
+  assert.equal(f.call("editor","learning_publish_collection",{collectionId:"planned-playlist"}).ok,false);
+  assert.equal(f.call("editor","learning_save_playlist",{collectionId:"wide-plan",playlist:{...playlist,access:"tenant"}}).ok,false);
+  data(f.call("editor","learning_publish_course",{courseId:"planned-private"}));
+  data(f.call("editor","learning_publish_collection",{collectionId:"planned-playlist"}));
+  assert.equal(data(f.call("editor","learning_get_collection",{collectionId:"planned-playlist"})).version,1);
+  assert.equal(f.call("learner-a","learning_get_collection",{collectionId:"planned-playlist"}).ok,false);
  }finally{f.db.close();}
 });
