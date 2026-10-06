@@ -4,7 +4,7 @@ import {parseCaptions} from "../src/shared/captions.ts";
 import {fixture,data} from "./helpers.ts";
 import {courses} from "../src/server/seed.ts";
 const original="WEBVTT\n\nfirst\n00:00.000 --> 00:01.000\nOriginal English caption\n\nsecond\n00:00.500 --> 00:02.000\nOverlapping cues are permitted\n";
-function upload(f:ReturnType<typeof fixture>,mime:string,bytes:Buffer,key=crypto.randomUUID()){
+function upload(f:ReturnType<typeof fixture>,mime:string,bytes:Buffer,key:string=crypto.randomUUID()){
  return f.service.media.upload(f.service.principal("editor"),{filename:mime==="text/vtt"?"original.vtt":"original.wav",mime,key,
   revision:String(f.service.context("editor","library:demo").revision),confirmed:"true"},bytes);
 }
