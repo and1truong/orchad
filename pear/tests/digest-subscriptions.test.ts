@@ -32,7 +32,7 @@ test("disabled default and human-only own confirmed preferences preserve origina
   assert.equal(data(f.call("learner-a","human_get_digest_preferences",{},"human")).effectiveEnabled,false);
   assert.equal(save(f,"learner-a",preferences,{expectedRevision:0}).error?.code,"STALE_CONTEXT");
   data(save(f));f.db.prepare("UPDATE accounts SET auth_version=auth_version+1 WHERE id='learner-a'").run();
-  assert.equal(data(f.call("learner-a","human_get_digest_preferences",{},"human")).reviewRequired,true);
+  const changed=data(f.call("learner-a","human_get_digest_preferences",{},"human"));assert.equal(changed.reviewRequired,true);assert.equal(changed.effectiveEnabled,false);assert.equal(changed.nextRun,null);
   const due=f.db.prepare("SELECT next_run FROM digest_subscriptions WHERE learner='learner-a'").get()!.next_run as string;
   assert.equal(f.service.digestSubscriptions.runBackground(due).generated,0);
   assert.equal(f.db.prepare("SELECT next_run FROM digest_subscriptions WHERE learner='learner-a'").get()!.next_run,null);

@@ -15,8 +15,8 @@ export class DigestSubscriptionService{
  read(p:Principal,name:string,a:any={}){
   const now=this.now().toISOString();
   if(name==="human_get_digest_preferences"){
-   const r=this.row(p),preferences=r?JSON.parse(r.definition):{...defaultDigestPreferences};
-   return {preferences,version:r?.version??0,nextRun:r?.next_run??null,reviewRequired:!!r&&r.auth_version!==p.auth_version,effectiveEnabled:!!r&&preferences.enabled&&r.auth_version===p.auth_version&&!!r.next_run,channel:"in_app",policy:"Own reviewed in-app delivery only. No email, Slack, Teams, calendar or official progress."};
+   const r=this.row(p),preferences=r?JSON.parse(r.definition):{...defaultDigestPreferences},effectiveEnabled=!!r&&preferences.enabled&&r.auth_version===p.auth_version&&!!r.next_run;
+   return {preferences,version:r?.version??0,nextRun:effectiveEnabled?r.next_run:null,reviewRequired:!!r&&r.auth_version!==p.auth_version,effectiveEnabled,channel:"in_app",policy:"Own reviewed in-app delivery only. No email, Slack, Teams, calendar or official progress."};
   }
   const rows=this.db.prepare("SELECT * FROM digest_notifications WHERE tenant=? AND learner=? AND auth_version=? AND expires_at>? ORDER BY created_at DESC,id LIMIT 1001").all(p.tenant,p.id,p.auth_version,now) as any[];
   const digest=new DigestService(this.db,this.now);
