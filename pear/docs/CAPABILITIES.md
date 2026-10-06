@@ -199,3 +199,7 @@ All eight workflow jobs passed at the following exact heads. These are original 
 | #119 | 06827902edd75d000a8f6026be3a7ce4395c97d3 | Two-admin review of original cross-tenant collection configuration |
 
 #120 (ADR-061) adds 522 exact known human diagnostic translations and unknown-write-outcome guidance; CI PENDING. Dynamic/unknown strings remain original. Bridge wire is unchanged. G16 remains OPEN for exhaustive runtime and professional linguistic validation. G06 remains OPEN for assigned/cycle/essay/nonquiz version migration. G08 remains OPEN for exact reference grouping/required semantics and recertification. G04 remains OPEN for cross-portal resources, licensing, users and retention. G14 original local PDF is tested at #118; accreditation/PDF/A/tagged/reference equivalence remain NOT VERIFIED. Semantic/model-quality and full standards-conformance validation remain OPEN, alongside named external dependencies.
+
+
+## #121 coordinated direct-assignment objective quiz restart candidate
+ADR-062: separate current coordinator offer and addressed learner confirmation; pinned prior history preserved, due date/assigner copied, identical lessons retained and answers reset in a new successor. Exact-head CI PENDING. G06 remains OPEN for cycle/essay/submission/nonquiz changes, expired-offer renewal and exact reference migration semantics. No model may offer or accept these human-only actions. Migration 037 preserves existing delivery state.

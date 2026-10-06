@@ -50,11 +50,9 @@ export class RetakeService{
  readUpgrade(p:Principal,a:any){
   const e=this.upgradeSource(p,a.enrollmentId),c=this.course(p,e),before=this.value(c.id,e.version),after=this.value(c.id,c.latest_version),access=new ContentAccess(this.db);
   access.requireVisible(p,"course",c.id,after);
-  const stable=(value:any):string=>JSON.stringify(value,(_key,v)=>v&&typeof v==="object"&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
-  const withoutQuiz=(value:any)=>{const {quiz,...body}=value;return body;};
-  const supported=!!before.quiz&&!!after.quiz&&!before.quiz.questions.some((q:any)=>q.kind==="long_answer")&&!after.quiz.questions.some((q:any)=>q.kind==="long_answer")&&!before.lessons.some((l:any)=>["event","submission"].includes(l.kind));
+  const eligible=objectiveUpgradeProfile(before,after);
   const successor=this.db.prepare("SELECT id,version FROM enrollments WHERE retake_of=?").get(e.id) as any;
-  return {enrollmentId:e.id,courseId:c.id,originalVersion:e.version,targetVersion:c.latest_version,acceptingNewLearning:c.state==="published",available:c.state==="published"&&c.latest_version>e.version&&stable(withoutQuiz(before))===stable(withoutQuiz(after))&&supported&&e.assignment_state==="active"&&!successor,successor:successor??null,completedLessonCount:JSON.parse(e.completed_lessons).length,policy:"Explicit objective-quiz-only upgrade for unfinished self-directed learning. A new immutable record retains identical completed lessons and resets answers; old answers and results remain in withdrawn history. Assigned/event/submission/essay or nonquiz edits are unsupported."};
+  return {enrollmentId:e.id,courseId:c.id,originalVersion:e.version,targetVersion:c.latest_version,acceptingNewLearning:c.state==="published",available:c.state==="published"&&c.latest_version>e.version&&eligible&&e.assignment_state==="active"&&!successor,successor:successor??null,completedLessonCount:JSON.parse(e.completed_lessons).length,policy:"Explicit objective-quiz-only upgrade for unfinished self-directed learning. A new immutable record retains identical completed lessons and resets answers; old answers and results remain in withdrawn history. Assigned/event/submission/essay or nonquiz edits are unsupported."};
  }
  writeUpgrade(p:Principal,a:any){
   this.authorize(p,"human_restart_latest_quiz",a);const e=this.upgradeSource(p,a.enrollmentId),id=randomUUID();
@@ -63,4 +61,10 @@ export class RetakeService{
   this.db.prepare("INSERT INTO enrollments(id,tenant,learner,course_id,version,completed_lessons,retake_of) VALUES(?,?,?,?,?,?,?)").run(id,p.tenant,p.id,e.course_id,a.targetVersion,e.completed_lessons,e.id);
   return {enrollmentId:id,courseId:e.course_id,version:a.targetVersion,priorEnrollmentId:e.id,completedLessonsPreserved:JSON.parse(e.completed_lessons).length,answersReset:true,priorOfficialLearningPreserved:true};
  }
+}
+
+export function objectiveUpgradeProfile(before:any,after:any){
+ const stable=(v:any):string=>JSON.stringify(v,(_k,x)=>x&&typeof x==="object"&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
+ const withoutQuiz=(v:any)=>{const {quiz,...body}=v;return body;};
+ return !!before.quiz&&!!after.quiz&&!before.quiz.questions.some((q:any)=>q.kind==="long_answer")&&!after.quiz.questions.some((q:any)=>q.kind==="long_answer")&&!before.lessons.some((l:any)=>["event","submission"].includes(l.kind))&&stable(withoutQuiz(before))===stable(withoutQuiz(after));
 }

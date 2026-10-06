@@ -1,3 +1,4 @@
+import {assignedQuizHumanTools} from "./assigned-quiz.ts";
 import {collectionSharingHumanTools,collectionSharingWrites} from "./collection-sharing.ts";
 import {primaryModerationHumanTools} from "./moderation-assignments.ts";
 import {digestHumanTools} from "./digest-subscriptions.ts";
@@ -154,6 +155,7 @@ export const courseSchema = object(
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
+  "human_offer_assigned_quiz_restart",
   ...collectionSharingWrites,
   "human_assign_external_assessor",
   "human_review_provider_connection",
@@ -419,6 +421,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  ...assignedQuizHumanTools,
   ...collectionSharingHumanTools,
   ...primaryModerationHumanTools,
   tool("human_check_question","write",{attemptId:string(64),questionId:string(64),fingerprint:{type:"string",pattern:"^[a-f0-9]{64}$"}},"Human checks a saved objective response. Does not submit, grade or complete learning."),

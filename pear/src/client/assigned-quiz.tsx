@@ -1,0 +1,18 @@
+import React,{useState,useEffect} from "react";
+import {translateUI as t} from "./i18n.ts";
+type Actions={busy:boolean;op:(name:string,args?:Record<string,unknown>)=>Promise<any>;mutate:(name:string,args:Record<string,unknown>)=>Promise<any>;run:(fn:()=>Promise<void>)=>Promise<boolean>;};
+function Review({value,actions,coordinator,onCreated}:{value:any;actions:Actions;coordinator:boolean;onCreated?:()=>void}){
+ const [confirmed,setConfirmed]=useState(false),[sent,setSent]=useState(false);
+ return <div><h4>{value.title}</h4><p>{t("Assigned quiz versions")}: {value.originalVersion} → {value.targetVersion}</p><p>{t("Assignment due date")}: {value.dueDate??t("None")}</p><p>{t("Separate coordinator and learner confirmation. The due date and assigner stay the same; prior answers remain in history. New answers start empty.")}</p>
+ {!sent&&value.available&&(coordinator?!value.offer:!!value.offer)?<form aria-label={t(coordinator?"Coordinator quiz restart confirmation":"Learner assigned quiz restart confirmation")} onSubmit={e=>{e.preventDefault();if(!confirmed)return;void actions.run(async()=>{await actions.mutate(coordinator?"human_offer_assigned_quiz_restart":"human_accept_assigned_quiz_restart",coordinator?{sourceEnrollmentId:value.sourceEnrollmentId,targetVersion:value.targetVersion,confirmed:true}:{reviewId:value.offer.id,targetVersion:value.offer.targetVersion,confirmed:true});setSent(true);onCreated?.();});}}>
+ <label><input type="checkbox" disabled={actions.busy} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>{t(coordinator?"I authorize offering this assigned objective quiz restart.":"I reviewed and accept restarting this assigned objective quiz.")}</label><button disabled={actions.busy||!confirmed}>{t(coordinator?"Offer assigned quiz restart":"Accept assigned quiz restart")}</button></form>:<p>{t(sent?"Assigned quiz review action recorded":"No current reviewed restart offer")}</p>}</div>;
+}
+export function AssignedQuizReview({sourceEnrollmentId,actions,tick,onCreated}:{sourceEnrollmentId:string;actions:Actions;tick:number;onCreated:()=>void}){
+ const [value,setValue]=useState<any>(null),[error,setError]=useState("");
+ useEffect(()=>{let current=true;actions.op("human_get_assigned_quiz_review",{sourceEnrollmentId}).then(v=>{if(current){setValue(v);setError("");}},e=>{if(current){setValue(null);setError(e instanceof Error?e.message:"");}});return()=>{current=false;};},[sourceEnrollmentId,tick]);
+ return <section aria-label={t("Assigned quiz review")}>{error&&<p role="alert">{error}</p>}{value&&<Review key={value.offer?.id??"none"} value={value} actions={actions} coordinator={false} onCreated={onCreated}/>}</section>;
+}
+export function AssignedQuizCoordinator({actions}:{actions:Actions}){
+ const [value,setValue]=useState<any>(null);
+ return <section className="panel" aria-label={t("Coordinate assigned quiz restart")}><h3>{t("Coordinate assigned quiz restart")}</h3><form aria-label={t("Review direct assignment quiz")} onSubmit={e=>{e.preventDefault();const id=String(new FormData(e.currentTarget).get("source"));setValue(null);void actions.run(async()=>setValue(await actions.op("human_get_assigned_quiz_review",{sourceEnrollmentId:id})));}}><label>{t("Direct assignment enrollment ID")}<input name="source" required maxLength={64}/></label><button disabled={actions.busy}>{t("Review direct assignment quiz")}</button></form>{value&&<Review key={value.sourceEnrollmentId+":"+value.targetVersion} value={value} actions={actions} coordinator/>}</section>;
+}
