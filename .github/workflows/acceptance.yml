@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: CONTRACT.md stays byte-identical to the root contract
         run: |
-          for poc in lime coconut guava mango; do cmp contract "$poc/CONTRACT.md"; done
+          for poc in lime coconut guava mango pear; do cmp contract "$poc/CONTRACT.md"; done
   agent-durable:
     runs-on: ubuntu-latest
     steps:
@@ -134,3 +134,40 @@ jobs:
           npm ci
           npm run build
           npm test
+  pear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: pear/package-lock.json }
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: pear
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+          npm test
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+          PEAR_E2E_PRODUCTION=1 npm run test:e2e
+      - working-directory: mango
+        run: npm ci
+      - working-directory: lime
+        run: |
+          npm ci
+          npm run build
+      - working-directory: pear
+        run: |
+          npm run typecheck:host
+          npm run test:host
+          PEAR_E2E_PRODUCTION=1 npm run test:browser-host
+          npm run test:lime
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pear-browser-evidence
+          path: |
+            pear/artifacts/
+            pear/test-results/

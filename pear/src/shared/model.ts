@@ -1,0 +1,71 @@
+import type {
+  Context,
+  Description,
+  Result,
+  Tool,
+} from "@orchard/bridge-contract";
+export type { Context, Description, Result, Tool };
+// Canonical contract permits null for read envelopes (shared helper Call is mutation-only).
+export interface Call {
+  requestId: string;
+  documentId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  expectedRevision: number | null;
+  idempotencyKey: string | null;
+}
+export const appId = "orchard-pear";
+export type Role =
+  | "learner"
+  | "manager"
+  | "content_admin"
+  | "admin"
+  | "assessor";
+export interface Principal {
+  id: string;
+  tenant: string;
+  name: string;
+  role: Role;
+  manager_id: string | null;
+  active: number;
+  auth_version: number;
+}
+export interface Lesson {
+  id: string;
+  title: string;
+  text: string;
+  kind: "text" | "video" | "link";
+  url?: string;
+  transcript?: string;
+  prerequisiteIds: string[];
+}
+export interface Question {
+  id: string;
+  prompt: string;
+  options: string[];
+  correct: number;
+}
+export interface Course {
+  title: string;
+  summary: string;
+  topic: string;
+  language: "en" | "vi";
+  duration: number;
+  level: "beginner" | "intermediate";
+  provider: string;
+  aiProcessingAllowed: boolean;
+  license: "self-authored";
+  completionPolicy: "human_attestation_and_quiz";
+  lessons: Lesson[];
+  quiz: { passScore: number; maxAttempts: number; questions: Question[] };
+}
+export interface Bridge {
+  describe(): Promise<Description>;
+  getContext(): Promise<Context>;
+  invoke(call: Call): Promise<Result>;
+}
+declare global {
+  interface Window {
+    agentBridgeV1?: Bridge;
+  }
+}

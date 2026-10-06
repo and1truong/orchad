@@ -1,0 +1,809 @@
+import type { DatabaseSync } from "node:sqlite";
+import { randomUUID } from "node:crypto";
+import {
+  Bounds,
+  canonical,
+  failure,
+  success,
+  validateArgs,
+  withinMessageCap,
+  type Code,
+} from "@orchard/bridge-contract";
+import {
+  catalog,
+  humanTools,
+  object,
+  courseSchema,
+} from "../shared/catalog.ts";
+import {
+  appId,
+  type Call,
+  type Course,
+  type Principal,
+  type Result,
+  type Role,
+} from "../shared/model.ts";
+const callSchema = object({
+  requestId: { type: "string", minLength: 1, maxLength: Bounds.id },
+  documentId: { type: "string", minLength: 1, maxLength: Bounds.documentId },
+  toolName: { type: "string", pattern: "^[A-Za-z0-9_-]{1,64}$" },
+  arguments: { type: "object" },
+  expectedRevision: { type: ["integer", "null"], minimum: 0 },
+  idempotencyKey: {
+    type: ["string", "null"],
+    minLength: 1,
+    maxLength: Bounds.id,
+  },
+});
+// Leave room for result envelope fields. Pages are capped by both rows and bytes.
+function pageRows(rows: any[], offset = 0, limit = 20) {
+  const items: any[] = [];
+  for (const row of rows.slice(offset, offset + limit)) {
+    if (Buffer.byteLength(JSON.stringify([...items, row])) > 48 * 1024) break;
+    items.push(row);
+  }
+  return {
+    items,
+    total: rows.length,
+    offset,
+    nextOffset:
+      offset + items.length < rows.length ? offset + items.length : null,
+  };
+}
+class DomainError extends Error {
+  constructor(
+    readonly code: Code,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+function reject(code: Code, message: string): never {
+  throw new DomainError(code, message);
+}
+const decode = (r: any) => JSON.parse(r);
+export class LearningService {
+  constructor(readonly db: DatabaseSync) {}
+  principal(id: string): Principal {
+    const p = this.db
+      .prepare(
+        "SELECT id,tenant,name,role,manager_id,active,auth_version FROM accounts WHERE id=?",
+      )
+      .get(id) as unknown as Principal;
+    if (!p?.active) reject("UNAUTHORIZED", "Active account required");
+    return p;
+  }
+  personal(p: Principal) {
+    return `learning:${p.tenant}:${p.id}`;
+  }
+  library(p: Principal) {
+    return `library:${p.tenant}`;
+  }
+  workspace(p: Principal, id: string) {
+    const w = this.db
+      .prepare("SELECT * FROM workspaces WHERE id=? AND tenant=?")
+      .get(id, p.tenant) as any;
+    if (
+      !w ||
+      (w.owner !== p.id &&
+        !(
+          id === this.library(p) &&
+          ["admin", "content_admin", "manager"].includes(p.role)
+        ))
+    )
+      reject("FORBIDDEN", "Workspace access denied");
+    return w;
+  }
+  context(id: string, documentId?: string) {
+    const p = this.principal(id),
+      doc = documentId ?? this.personal(p),
+      w = this.workspace(p, doc);
+    return {
+      appId,
+      documentId: doc,
+      revision: w.revision,
+      selectionIds: [],
+      summary: `Pear synthetic learning workspace for ${p.name}. Official progress is authoritative; practice does not change completion.`,
+    };
+  }
+  description(id: string) {
+    return {
+      protocolVersion: "0.1" as const,
+      appId,
+      tools: catalog(this.principal(id).role),
+    };
+  }
+  private course(p: Principal, id: string) {
+    const c = this.db
+      .prepare("SELECT * FROM courses WHERE id=? AND tenant=?")
+      .get(id, p.tenant) as any;
+    if (!c) reject("NOT_FOUND", "Course unavailable");
+    return c;
+  }
+  private version(id: string, version: number): Course {
+    const v = this.db
+      .prepare(
+        "SELECT content FROM course_versions WHERE course_id=? AND version=?",
+      )
+      .get(id, version) as any;
+    if (!v) reject("NOT_FOUND", "Course version unavailable");
+    return decode(v.content);
+  }
+  private enrollment(p: Principal, id: string) {
+    const e = this.db
+      .prepare(
+        "SELECT * FROM enrollments WHERE id=? AND learner=? AND tenant=?",
+      )
+      .get(id, p.id, p.tenant) as any;
+    if (!e) reject("FORBIDDEN", "Enrollment access denied");
+    return e;
+  }
+  private attempt(p: Principal, id: string) {
+    const a = this.db
+      .prepare("SELECT * FROM attempts WHERE id=?")
+      .get(id) as any;
+    if (!a) reject("FORBIDDEN", "Attempt access denied");
+    return { a, e: this.enrollment(p, a.enrollment_id) };
+  }
+  private recipient(p: Principal, id: string) {
+    const r = this.db
+      .prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1")
+      .get(id, p.tenant) as any;
+    if (
+      !r ||
+      (p.role !== "admin" && !(p.role === "manager" && r.manager_id === p.id))
+    )
+      reject("FORBIDDEN", "Assignment audience outside role scope");
+    return r;
+  }
+  private resourceAccess(p: Principal, c: Call) {
+    const a = c.arguments as any;
+    if (a.enrollmentId) this.enrollment(p, a.enrollmentId);
+    if (a.attemptId) this.attempt(p, a.attemptId);
+    if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
+    if (a.courseId && c.toolName !== "learning_create_course")
+      this.course(p, a.courseId);
+  }
+  invoke(
+    principalId: string,
+    raw: unknown,
+    source: "bridge" | "human" = "bridge",
+  ): Result {
+    let transaction = false;
+    try {
+      if (!withinMessageCap(raw) || !validateArgs(callSchema, raw))
+        reject("INVALID_ARGUMENT", "Invalid call envelope");
+      const c = raw as Call,
+        p = this.principal(principalId),
+        w = this.workspace(p, c.documentId);
+      const t = [
+        ...catalog(p.role),
+        ...(source === "human" ? humanTools : []),
+      ].find((t) => t.name === c.toolName);
+      if (!t)
+        reject("FORBIDDEN", "Tool unavailable for current role and channel");
+      if (!validateArgs(t.inputSchema, c.arguments))
+        reject("INVALID_ARGUMENT", "Arguments fail tool schema");
+      const write = t.effect !== "read";
+      if (
+        write
+          ? c.expectedRevision === null || c.idempotencyKey === null
+          : c.expectedRevision !== null || c.idempotencyKey !== null
+      )
+        reject("INVALID_ARGUMENT", "Invalid revision or idempotency fields");
+      const admin = [
+        "learning_create_course",
+        "learning_update_course",
+        "learning_publish_course",
+        "learning_retire_course",
+        "learning_assign",
+      ].includes(c.toolName);
+      if (
+        write &&
+        c.documentId !== (admin ? this.library(p) : this.personal(p))
+      )
+        reject("STALE_CONTEXT", "Mutation targets the wrong aggregate");
+      if (!write) {
+        this.resourceAccess(p, c);
+        const result = success(
+          this.read(p, c.toolName, c.arguments, source),
+          w.revision,
+        );
+        if (!withinMessageCap(result))
+          reject("INVALID_ARGUMENT", "Result exceeds envelope limit");
+        return result;
+      }
+      this.db.exec("BEGIN IMMEDIATE");
+      transaction = true;
+      const live = this.principal(principalId);
+      if (
+        live.tenant !== p.tenant ||
+        live.role !== p.role ||
+        live.auth_version !== p.auth_version
+      )
+        reject("STALE_CONTEXT", "Account authority changed before transaction");
+      this.workspace(live, c.documentId);
+      this.resourceAccess(live, c);
+      const payload = canonical({
+        toolName: c.toolName,
+        arguments: c.arguments,
+        expectedRevision: c.expectedRevision,
+        source,
+      });
+      const old = this.db
+        .prepare(
+          "SELECT * FROM idempotency WHERE principal=? AND document_id=? AND key=?",
+        )
+        .get(p.id, c.documentId, c.idempotencyKey!) as any;
+      if (old) {
+        if (old.payload !== payload)
+          reject(
+            "IDEMPOTENCY_CONFLICT",
+            "Operation key reused with another payload",
+          );
+        this.db.exec("COMMIT");
+        transaction = false;
+        return decode(old.result);
+      }
+      const current = this.workspace(p, c.documentId).revision;
+      if (current !== c.expectedRevision)
+        reject(
+          "STALE_CONTEXT",
+          "Workspace changed; refresh before proposing another mutation",
+        );
+      const data = this.write(p, c.toolName, c.arguments);
+      this.db
+        .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
+        .run(c.documentId);
+      const result = success(data, current + 1);
+      if (!withinMessageCap(result))
+        reject("INVALID_ARGUMENT", "Result exceeds envelope limit");
+      this.db
+        .prepare("INSERT INTO idempotency VALUES(?,?,?,?,?)")
+        .run(
+          p.id,
+          c.documentId,
+          c.idempotencyKey!,
+          payload,
+          JSON.stringify(result),
+        );
+      // Private assessment answer values are not copied to operational audit.
+      const auditArgs =
+        c.toolName === "human_save_answer"
+          ? {
+              attemptId: c.arguments.attemptId,
+              questionId: c.arguments.questionId,
+            }
+          : c.toolName.includes("course")
+            ? { courseId: c.arguments.courseId }
+            : c.arguments;
+      this.db
+        .prepare(
+          "INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)",
+        )
+        .run(
+          p.tenant,
+          p.id,
+          c.documentId,
+          c.toolName,
+          JSON.stringify(auditArgs),
+          new Date().toISOString(),
+        );
+      this.db.exec("COMMIT");
+      transaction = false;
+      return result;
+    } catch (e) {
+      if (transaction) this.db.exec("ROLLBACK");
+      return e instanceof DomainError
+        ? failure(e.code, e.message)
+        : failure("INTERNAL", "Internal learning operation error");
+    }
+  }
+  private preview(row: any, content: Course) {
+    const { lessons, quiz, ...metadata } = content;
+    return {
+      id: row.id,
+      state: row.state,
+      version: row.latest_version,
+      ...metadata,
+      lessons: lessons.map(({ id, title, kind, prerequisiteIds }) => ({
+        id,
+        title,
+        kind,
+        prerequisiteIds,
+      })),
+      quiz: {
+        passScore: quiz.passScore,
+        maxAttempts: quiz.maxAttempts,
+        questionCount: quiz.questions.length,
+      },
+    };
+  }
+  private progress(e: any) {
+    const row = this.db
+      .prepare("SELECT id FROM certificates WHERE enrollment_id=?")
+      .get(e.id) as any;
+    return {
+      ...e,
+      completed_lessons: decode(e.completed_lessons),
+      certificateId: row?.id ?? null,
+      overdue:
+        e.status !== "completed" &&
+        !!e.due_date &&
+        e.due_date < new Date().toISOString(),
+    };
+  }
+  private read(
+    p: Principal,
+    name: string,
+    args: Record<string, unknown>,
+    source: string,
+  ): any {
+    const a = args as any;
+    switch (name) {
+      case "learning_search": {
+        const candidates = this.db
+          .prepare(
+            "SELECT * FROM courses WHERE tenant=? AND state='published' ORDER BY id",
+          )
+          .all(p.tenant) as any[];
+        const result = candidates
+          .map((c) => this.preview(c, this.version(c.id, c.latest_version)))
+          .filter(
+            (c) =>
+              (!a.query ||
+                (c.title + " " + c.summary + " " + c.topic)
+                  .toLocaleLowerCase()
+                  .includes(a.query.toLocaleLowerCase())) &&
+              (!a.topic || c.topic === a.topic) &&
+              (!a.language || c.language === a.language) &&
+              (!a.level || c.level === a.level) &&
+              (!a.provider || c.provider === a.provider) &&
+              (!a.maxDuration || c.duration <= a.maxDuration),
+          );
+        const offset = a.offset ?? 0,
+          limit = a.limit ?? 10;
+        return {
+          items: result.slice(offset, offset + limit),
+          total: result.length,
+          offset,
+        };
+      }
+      case "learning_get_item": {
+        const c = this.course(p, a.courseId);
+        if (c.state !== "published")
+          reject("NOT_FOUND", "Course is not available for discovery");
+        return this.preview(c, this.version(c.id, c.latest_version));
+      }
+      case "learning_get_my_learning": {
+        const rows = this.db
+          .prepare(
+            "SELECT e.*,c.id AS content_id FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.learner=? AND e.tenant=? ORDER BY e.status,COALESCE(e.due_date,'9999'),e.id",
+          )
+          .all(p.id, p.tenant) as any[];
+        const page = pageRows(
+          rows.map((e) => ({
+            ...this.progress(e),
+            course: this.preview(
+              {
+                id: e.course_id,
+                state: this.course(p, e.course_id).state,
+                latest_version: e.version,
+              },
+              this.version(e.course_id, e.version),
+            ),
+          })),
+          a.offset ?? 0,
+          a.limit ?? 20,
+        );
+        return {
+          enrollments: page.items,
+          total: page.total,
+          offset: page.offset,
+          nextOffset: page.nextOffset,
+          saved: this.db
+            .prepare(
+              "SELECT b.course_id FROM bookmarks b JOIN courses c ON c.id=b.course_id WHERE b.learner=? AND c.tenant=? ORDER BY b.course_id LIMIT 20",
+            )
+            .all(p.id, p.tenant),
+          bounded: true,
+        };
+      }
+      case "learning_get_progress":
+        return this.progress(this.enrollment(p, a.enrollmentId));
+      case "learning_get_lesson": {
+        const e = this.enrollment(p, a.enrollmentId),
+          v = this.version(e.course_id, e.version),
+          l = v.lessons.find((l) => l.id === a.lessonId);
+        if (!l) reject("NOT_FOUND", "Lesson unavailable");
+        const complete = decode(e.completed_lessons);
+        if (l.prerequisiteIds.some((id) => !complete.includes(id)))
+          reject("FORBIDDEN", "Complete prerequisite lessons first");
+        if (source === "bridge" && !v.aiProcessingAllowed)
+          return {
+            id: l.id,
+            title: l.title,
+            contentWithheld: true,
+            reason:
+              "This course does not permit model processing. Read in the human player.",
+          };
+        return {
+          id: l.id,
+          title: l.title,
+          kind: l.kind,
+          text: l.text,
+          url: l.url ?? null,
+          transcript: l.transcript ?? null,
+          completed: complete.includes(l.id),
+          policy: v.completionPolicy,
+        };
+      }
+      case "learning_get_attempt": {
+        const { a: at, e } = this.attempt(p, a.attemptId),
+          v = this.version(e.course_id, e.version);
+        if (source === "bridge" && !v.aiProcessingAllowed)
+          return {
+            id: at.id,
+            enrollmentId: e.id,
+            submitted: !!at.submitted,
+            score: at.score,
+            passed: at.passed === null ? null : !!at.passed,
+            contentWithheld: true,
+            reason:
+              "Assessment content does not permit model processing; use the human player.",
+          };
+        return {
+          id: at.id,
+          enrollmentId: e.id,
+          number: at.number,
+          submitted: !!at.submitted,
+          score: at.score,
+          passed: at.passed === null ? null : !!at.passed,
+          questions: v.quiz.questions.map(({ correct, ...q }) => q),
+          answers: decode(at.answers),
+        };
+      }
+      case "learning_get_drafts":
+        return pageRows(
+          (
+            this.db
+              .prepare("SELECT * FROM courses WHERE tenant=? ORDER BY id")
+              .all(p.tenant) as any[]
+          ).map(({ draft, ...c }) => {
+            const d = decode(draft);
+            return source === "bridge" && !d.aiProcessingAllowed
+              ? {
+                  ...c,
+                  contentWithheld: true,
+                  draft: {
+                    title: d.title,
+                    summary: d.summary,
+                    aiProcessingAllowed: false,
+                  },
+                }
+              : { ...c, draft: d };
+          }),
+          a.offset ?? 0,
+          a.limit ?? 20,
+        );
+      case "learning_report_query": {
+        const rows = this.db
+          .prepare(
+            "SELECT e.*,u.name,u.manager_id FROM enrollments e JOIN accounts u ON u.id=e.learner WHERE e.tenant=? AND (?='admin' OR u.manager_id=?) ORDER BY e.id",
+          )
+          .all(p.tenant, p.role, p.id) as any[];
+        const visible = rows
+          .map((e) => ({ ...this.progress(e), learnerName: e.name }))
+          .filter(
+            (e) =>
+              !a.status ||
+              (a.status === "overdue" ? e.overdue : e.status === a.status),
+          );
+        const offset = a.offset ?? 0;
+        return {
+          rows: visible.slice(offset, offset + (a.limit ?? 20)),
+          total: visible.length,
+          offset,
+        };
+      }
+      default:
+        reject("UNSUPPORTED", "Unknown read");
+    }
+  }
+  private validateCourse(value: unknown): Course {
+    if (
+      !validateArgs(courseSchema, value) ||
+      !withinMessageCap(value) ||
+      Buffer.byteLength(JSON.stringify(value)) > 44 * 1024
+    )
+      reject("INVALID_ARGUMENT", "Invalid course structure");
+    const c = value as Course;
+    if (
+      new Set(c.lessons.map((l) => l.id)).size !== c.lessons.length ||
+      new Set(c.quiz.questions.map((q) => q.id)).size !==
+        c.quiz.questions.length
+    )
+      reject("INVALID_ARGUMENT", "Duplicate lesson/question IDs");
+    const prior = new Set<string>();
+    for (const l of c.lessons) {
+      if (
+        l.prerequisiteIds.some((id) => !prior.has(id)) ||
+        new Set(l.prerequisiteIds).size !== l.prerequisiteIds.length
+      )
+        reject(
+          "INVALID_ARGUMENT",
+          "Prerequisites must reference distinct earlier lessons",
+        );
+      prior.add(l.id);
+      if (l.kind !== "text") {
+        if (!l.url) reject("INVALID_ARGUMENT", "External media URL required");
+        let u: URL;
+        try {
+          u = new URL(l.url);
+        } catch {
+          reject("INVALID_ARGUMENT", "Invalid media URL");
+        }
+        if (u!.protocol !== "https:" || u!.username || u!.password)
+          reject(
+            "INVALID_ARGUMENT",
+            "Media must use HTTPS without credentials",
+          );
+      }
+      if (l.kind === "video" && !l.transcript)
+        reject("INVALID_ARGUMENT", "Video transcript required");
+    }
+    for (const q of c.quiz.questions)
+      if (q.correct >= q.options.length)
+        reject("INVALID_ARGUMENT", "Correct choice outside options");
+    return c;
+  }
+  private enroll(
+    p: Principal,
+    courseId: string,
+    learner: string,
+    assignedBy: string | null,
+    dueDate: string | null,
+  ) {
+    const c = this.course(p, courseId);
+    if (c.state !== "published")
+      reject("FORBIDDEN", "Course is not accepting enrollments");
+    const existing = this.db
+      .prepare("SELECT * FROM enrollments WHERE learner=? AND course_id=?")
+      .get(learner, courseId) as any;
+    if (existing)
+      return {
+        enrollmentId: existing.id,
+        alreadyEnrolled: true,
+        version: existing.version,
+      };
+    const id = randomUUID();
+    this.db
+      .prepare(
+        "INSERT INTO enrollments(id,tenant,learner,course_id,version,assigned_by,due_date) VALUES(?,?,?,?,?,?,?)",
+      )
+      .run(
+        id,
+        p.tenant,
+        learner,
+        courseId,
+        c.latest_version,
+        assignedBy,
+        dueDate,
+      );
+    if (assignedBy)
+      this.db
+        .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
+        .run(`learning:${p.tenant}:${learner}`);
+    return {
+      enrollmentId: id,
+      alreadyEnrolled: false,
+      version: c.latest_version,
+    };
+  }
+  private write(
+    p: Principal,
+    name: string,
+    args: Record<string, unknown>,
+  ): any {
+    const a = args as any;
+    switch (name) {
+      case "learning_enroll":
+        return this.enroll(p, a.courseId, p.id, null, null);
+      case "learning_set_bookmark": {
+        const c = this.course(p, a.courseId);
+        if (c.state !== "published")
+          reject("FORBIDDEN", "Only available courses can be saved");
+        if (a.saved)
+          this.db
+            .prepare("INSERT OR IGNORE INTO bookmarks VALUES(?,?)")
+            .run(p.id, c.id);
+        else
+          this.db
+            .prepare("DELETE FROM bookmarks WHERE learner=? AND course_id=?")
+            .run(p.id, c.id);
+        return { courseId: c.id, saved: a.saved };
+      }
+      case "human_complete_lesson": {
+        const e = this.enrollment(p, a.enrollmentId),
+          v = this.version(e.course_id, e.version),
+          l = v.lessons.find((l) => l.id === a.lessonId);
+        if (!l) reject("NOT_FOUND", "Lesson unavailable");
+        const completed = decode(e.completed_lessons);
+        if (l.prerequisiteIds.some((id) => !completed.includes(id)))
+          reject("FORBIDDEN", "Complete prerequisites first");
+        if (!completed.includes(l.id)) completed.push(l.id);
+        this.db
+          .prepare("UPDATE enrollments SET completed_lessons=? WHERE id=?")
+          .run(JSON.stringify(completed), e.id);
+        return {
+          enrollmentId: e.id,
+          completedLessons: completed,
+          policy: v.completionPolicy,
+        };
+      }
+      case "learning_start_attempt": {
+        const e = this.enrollment(p, a.enrollmentId),
+          v = this.version(e.course_id, e.version);
+        if (e.status === "completed")
+          reject("FORBIDDEN", "Enrollment already completed");
+        if (v.lessons.some((l) => !decode(e.completed_lessons).includes(l.id)))
+          reject("FORBIDDEN", "Complete all lessons before assessment");
+        const pending = this.db
+          .prepare(
+            "SELECT * FROM attempts WHERE enrollment_id=? AND submitted=0",
+          )
+          .get(e.id) as any;
+        if (pending) return { attemptId: pending.id, number: pending.number };
+        const n =
+          (
+            this.db
+              .prepare(
+                "SELECT COUNT(*) AS n FROM attempts WHERE enrollment_id=?",
+              )
+              .get(e.id) as any
+          ).n + 1;
+        if (n > v.quiz.maxAttempts)
+          reject("FORBIDDEN", "Assessment attempt limit reached");
+        const id = randomUUID();
+        this.db
+          .prepare(
+            "INSERT INTO attempts(id,enrollment_id,number) VALUES(?,?,?)",
+          )
+          .run(id, e.id, n);
+        return { attemptId: id, number: n };
+      }
+      case "human_save_answer": {
+        const { a: at, e } = this.attempt(p, a.attemptId),
+          v = this.version(e.course_id, e.version),
+          q = v.quiz.questions.find((q) => q.id === a.questionId);
+        if (at.submitted)
+          reject("FORBIDDEN", "Submitted answers are immutable");
+        if (!q || a.answer >= q.options.length)
+          reject("INVALID_ARGUMENT", "Invalid question/answer");
+        const answers = decode(at.answers);
+        answers[q.id] = a.answer;
+        this.db
+          .prepare("UPDATE attempts SET answers=? WHERE id=?")
+          .run(JSON.stringify(answers), at.id);
+        return { attemptId: at.id, questionId: q.id, answer: a.answer };
+      }
+      case "human_submit_attempt": {
+        const { a: at, e } = this.attempt(p, a.attemptId),
+          v = this.version(e.course_id, e.version);
+        if (at.submitted)
+          reject(
+            "FORBIDDEN",
+            "Attempt already submitted; reconcile the original key",
+          );
+        const answers = decode(at.answers);
+        if (v.quiz.questions.some((q) => !Object.hasOwn(answers, q.id)))
+          reject("INVALID_ARGUMENT", "Answer every question before submitting");
+        const score = Math.floor(
+            (100 *
+              v.quiz.questions.filter((q) => answers[q.id] === q.correct)
+                .length) /
+              v.quiz.questions.length,
+          ),
+          passed = score >= v.quiz.passScore;
+        this.db
+          .prepare(
+            "UPDATE attempts SET submitted=1,score=?,passed=? WHERE id=?",
+          )
+          .run(score, passed ? 1 : 0, at.id);
+        if (passed) {
+          const now = new Date().toISOString();
+          this.db
+            .prepare(
+              "UPDATE enrollments SET status='completed',completed_at=? WHERE id=?",
+            )
+            .run(now, e.id);
+          this.db
+            .prepare("INSERT OR IGNORE INTO certificates VALUES(?,?,?)")
+            .run(randomUUID(), e.id, now);
+        }
+        return {
+          attemptId: at.id,
+          score,
+          passed,
+          progress: this.progress(this.enrollment(p, e.id)),
+        };
+      }
+      case "learning_create_course": {
+        const c = this.validateCourse(a.course);
+        if (this.db.prepare("SELECT 1 FROM courses WHERE id=?").get(a.courseId))
+          reject("INVALID_ARGUMENT", "Course ID already exists");
+        this.db
+          .prepare("INSERT INTO courses VALUES(?,?,'draft',?,0)")
+          .run(a.courseId, p.tenant, JSON.stringify(c));
+        return { courseId: a.courseId, state: "draft" };
+      }
+      case "learning_update_course": {
+        const c = this.validateCourse(a.course);
+        this.course(p, a.courseId);
+        this.db
+          .prepare("UPDATE courses SET draft=? WHERE id=?")
+          .run(JSON.stringify(c), a.courseId);
+        return { courseId: a.courseId, draftUpdated: true };
+      }
+      case "learning_publish_course": {
+        const c = this.course(p, a.courseId),
+          draft = this.validateCourse(decode(c.draft)),
+          v = c.latest_version + 1;
+        this.db
+          .prepare("INSERT INTO course_versions VALUES(?,?,?)")
+          .run(c.id, v, JSON.stringify(draft));
+        this.db
+          .prepare(
+            "UPDATE courses SET state='published',latest_version=? WHERE id=?",
+          )
+          .run(v, c.id);
+        return { courseId: c.id, version: v, state: "published" };
+      }
+      case "learning_retire_course": {
+        const c = this.course(p, a.courseId);
+        this.db
+          .prepare("UPDATE courses SET state='retired' WHERE id=?")
+          .run(c.id);
+        return {
+          courseId: c.id,
+          state: "retired",
+          existingEnrollmentsPreserved: true,
+        };
+      }
+      case "learning_assign": {
+        this.recipient(p, a.learnerId);
+        if (a.dueDate !== null) {
+          const date = new Date(a.dueDate);
+          if (
+            !Number.isFinite(date.getTime()) ||
+            date.toISOString() !== a.dueDate
+          )
+            reject(
+              "INVALID_ARGUMENT",
+              "Due date must be an exact UTC ISO timestamp",
+            );
+        }
+        return this.enroll(p, a.courseId, a.learnerId, p.id, a.dueDate);
+      }
+      default:
+        reject("UNSUPPORTED", "Unknown write");
+    }
+  }
+  certificate(id: string, certificateId: string) {
+    const p = this.principal(id),
+      row = this.db
+        .prepare(
+          "SELECT c.*,e.learner,e.tenant,e.course_id,e.version,e.status FROM certificates c JOIN enrollments e ON e.id=c.enrollment_id WHERE c.id=? AND e.learner=? AND e.tenant=?",
+        )
+        .get(certificateId, p.id, p.tenant) as any;
+    if (!row || row.status !== "completed")
+      reject("FORBIDDEN", "Certificate access denied");
+    return {
+      ...row,
+      title: this.version(row.course_id, row.version).title,
+      learnerName: p.name,
+      issuer: "Pear synthetic development portal",
+      accredited: false,
+    };
+  }
+}

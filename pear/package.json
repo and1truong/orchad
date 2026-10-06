@@ -1,0 +1,43 @@
+{
+  "name": "@orchard/pear",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "node --import tsx src/server/start.ts --dev",
+    "start": "node --import tsx src/server/start.ts",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/domain.test.ts tests/http.test.ts",
+    "test:e2e": "playwright test",
+    "test:lime": "node --import tsx scripts/lime-browser.ts",
+    "vendor:contract": "npm --prefix ../packages/bridge-contract run build",
+    "pretest": "npm run vendor:contract",
+    "prebuild": "npm run vendor:contract",
+    "pretypecheck": "npm run vendor:contract",
+    "test:host": "node --import tsx --test tests/host.test.ts",
+    "test:production": "npm run build && PEAR_E2E_PRODUCTION=1 playwright test",
+    "typecheck:host": "tsc --noEmit -p tsconfig.host.json",
+    "test:browser-host": "PEAR_HOST_LANE=1 playwright test tests/e2e/host.spec.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/static": "10.1.5",
+    "fastify": "5.12.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tsx": "4.23.15",
+    "@orchard/bridge-contract": "file:../packages/bridge-contract"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.2"
+  }
+}

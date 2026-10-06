@@ -1,0 +1,35 @@
+import { openDatabase } from "./database.ts";
+import { createApp } from "./app.ts";
+const dev = process.argv.includes("--dev"),
+  port = Number(process.env.PORT ?? 4314),
+  origin = process.env.APP_ORIGIN ?? `http://127.0.0.1:${port}`;
+const developmentAuth = dev || process.env.PEAR_DEVELOPMENT_AUTH === "true";
+if (
+  developmentAuth &&
+  !["127.0.0.1", "localhost", "[::1]"].includes(new URL(origin).hostname)
+)
+  throw new Error("Synthetic development accounts require a loopback origin");
+const host = process.env.HOST ?? "127.0.0.1";
+if (developmentAuth && !["127.0.0.1", "localhost", "::1"].includes(host))
+  throw new Error("Synthetic development accounts must bind loopback");
+const db = openDatabase(
+  process.env.DATABASE_PATH ?? ".data/pear.sqlite",
+  developmentAuth,
+);
+const { app } = await createApp({
+  db,
+  origin,
+  dev,
+  developmentAuth,
+  secureCookies: process.env.COOKIE_SECURE === "true",
+});
+await app.listen({ port, host });
+console.log(
+  `Pear: ${origin}${developmentAuth ? " · SYNTHETIC DEVELOPMENT ACCOUNTS" : ""}`,
+);
+for (const signal of ["SIGINT", "SIGTERM"])
+  process.once(signal, async () => {
+    await app.close();
+    db.close();
+    process.exit(0);
+  });
