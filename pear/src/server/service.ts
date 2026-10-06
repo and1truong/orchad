@@ -410,7 +410,9 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "learning_save_question_bank"
+        c.toolName === "human_retake_completed_course"
+          ? {enrollmentId:c.arguments.enrollmentId,newEnrollmentId:data.enrollmentId,mode:c.arguments.mode,targetVersion:c.arguments.targetVersion}
+          : c.toolName === "learning_save_question_bank"
           ? {bankId:c.arguments.bankId,title:(c.arguments.bank as any).title,access:(c.arguments.bank as any).access,questionCount:(c.arguments.bank as any).questions.length,sourceCourseId:c.arguments.sourceCourseId??null}
           : c.toolName === "human_save_course_feedback"
           ? {

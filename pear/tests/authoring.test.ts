@@ -586,10 +586,11 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
         db
           .prepare("SELECT * FROM enrollments")
           .all()
-          .map(({ assignment_cycle_id, assignment_state, ...row }: any) => row),
+          .map(({ assignment_cycle_id, assignment_state, retake_of, ...row }: any) => row),
       ),
       legacyEnrollment,
     );
+    assert.equal(db.prepare("SELECT retake_of FROM enrollments WHERE id='legacy-enrollment'").get()!.retake_of,null);
     assert.equal(service.context("learner-a").revision, 3);
     assert.equal(
       (
