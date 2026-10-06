@@ -16,13 +16,13 @@ function formatter(zone: string) {
   }
   return f;
 }
-function parts(ms: number, zone: string) {
+export function calendarParts(ms: number, zone: string) {
   const p = Object.fromEntries(formatter(zone).formatToParts(ms).map(p => [p.type, p.value]));
   return {year: Number(p.year), month: Number(p.month), day: Number(p.day),
     hour: Number(p.hour), minute: Number(p.minute), second: Number(p.second),
     millisecond: new Date(ms).getUTCMilliseconds()};
 }
-function wall(p: ReturnType<typeof parts>) {
+function wall(p: ReturnType<typeof calendarParts>) {
   const d = new Date(0);
   d.setUTCFullYear(p.year, p.month - 1, p.day);
   d.setUTCHours(p.hour, p.minute, p.second, p.millisecond);
@@ -32,29 +32,36 @@ export function calendarMonth(anchor: string, months: number, zone: string, choi
   const base = Date.parse(anchor);
   if (!Number.isFinite(base) || !Number.isInteger(months) || months < 0 ||
       !["earlier", "later"].includes(choice)) throw new RangeError("Invalid calendar recurrence");
-  const initial = parts(base, zone), absolute = initial.year * 12 + initial.month - 1 + months;
+  const initial = calendarParts(base, zone), absolute = initial.year * 12 + initial.month - 1 + months;
   const year = Math.floor(absolute / 12), month = absolute % 12 + 1;
   if (initial.year < 1970 || year > 9998) throw new RangeError("Calendar recurrence supports years 1970 to 9998");
   if (months === 0) return anchor; // The first instant is explicit, including a fold.
   const end = new Date(0); end.setUTCFullYear(year, month, 0);
   const desired = {...initial, year, month, day: Math.min(initial.day, end.getUTCDate())};
+  return calendarWallTime(desired, zone, choice);
+}
+export function calendarWallTime(desired: ReturnType<typeof calendarParts>, zone: string, choice: "earlier" | "later") {
+  if (!["earlier", "later"].includes(choice) || desired.year < 1970 || desired.year > 9998 || !Object.values(desired).every(Number.isInteger)) throw new RangeError("Invalid calendar wall time");
+  const checked=new Date(wall(desired));
+  if(checked.getUTCFullYear()!==desired.year||checked.getUTCMonth()+1!==desired.month||checked.getUTCDate()!==desired.day||checked.getUTCHours()!==desired.hour||checked.getUTCMinutes()!==desired.minute||checked.getUTCSeconds()!==desired.second||checked.getUTCMilliseconds()!==desired.millisecond)throw new RangeError("Invalid calendar fields");
   const target = wall(desired), offsets = new Set<number>();
   // Both sides of transitions, including half-hour and skipped-day changes.
   for (let delta = -48; delta <= 48; delta += 6) {
-    const sample = target + delta * hour; offsets.add(wall(parts(sample, zone)) - sample);
+    const sample = target + delta * hour; offsets.add(wall(calendarParts(sample, zone)) - sample);
   }
   const candidates = [...offsets].map(offset => target - offset).sort((a, b) => a - b);
-  const exact = candidates.filter(candidate => wall(parts(candidate, zone)) === target);
+  const exact = candidates.filter(candidate => wall(calendarParts(candidate, zone)) === target);
   if (exact.length) return new Date(choice === "earlier" ? exact[0]! : exact.at(-1)!).toISOString();
   // A missing local time advances by the gap, retaining minutes/seconds.
-  const forward = candidates.map(ms => ({ms, difference: wall(parts(ms, zone)) - target}))
+  const forward = candidates.map(ms => ({ms, difference: wall(calendarParts(ms, zone)) - target}))
     .filter(c => c.difference > 0).sort((a, b) => a.difference - b.difference || a.ms - b.ms)[0];
   if (!forward || forward.difference > 24 * hour) throw new RangeError("Calendar wall time cannot be resolved");
   return new Date(forward.ms).toISOString();
 }
+
 export function nextCalendarRun(plan: AssignmentPlan, after: string) {
-  const first = parts(Date.parse(plan.startsAt), plan.timeZone!);
-  const last = parts(Date.parse(after), plan.timeZone!);
+  const first = calendarParts(Date.parse(plan.startsAt), plan.timeZone!);
+  const last = calendarParts(Date.parse(after), plan.timeZone!);
   let index = Math.max(0, Math.floor(((last.year - first.year) * 12 + last.month - first.month) / plan.repeatMonths!));
   for (let n = 0; n < 4; n++, index++) {
     const next = calendarMonth(plan.startsAt, index * plan.repeatMonths!, plan.timeZone!, plan.dstChoice!);
@@ -63,7 +70,7 @@ export function nextCalendarRun(plan: AssignmentPlan, after: string) {
   throw new RangeError("Calendar recurrence did not advance");
 }
 export function calendarRunIndex(plan: AssignmentPlan, runAt: string) {
-  const first = parts(Date.parse(plan.startsAt), plan.timeZone!), run = parts(Date.parse(runAt), plan.timeZone!);
+  const first = calendarParts(Date.parse(plan.startsAt), plan.timeZone!), run = calendarParts(Date.parse(runAt), plan.timeZone!);
   const guess = Math.floor(((run.year - first.year) * 12 + run.month - first.month) / plan.repeatMonths!);
   for (let index = Math.max(0, guess - 1); index <= guess + 1; index++)
     if (calendarMonth(plan.startsAt, index * plan.repeatMonths!, plan.timeZone!, plan.dstChoice!) === runAt) return index;

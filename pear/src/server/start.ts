@@ -41,6 +41,11 @@ const assignmentTimer = setInterval(() => {
   }
 }, 30000);
 assignmentTimer.unref();
+const digestTimer=setInterval(()=>{
+  try { service.digestSubscriptions.runBackground(); }
+  catch { console.error("Digest scheduler failed; durable state retained for retry"); }
+},30000);
+digestTimer.unref();
 let delivering=false,delivery:Promise<any>|null=null;
 const outboxTimer=setInterval(()=>{if(delivering)return;delivering=true;delivery=outbox.run().catch(()=>console.error("Outbox delivery failed; durable state retained")).finally(()=>{delivering=false;});},1000);
 outboxTimer.unref();
@@ -50,6 +55,7 @@ console.log(
 for (const signal of ["SIGINT", "SIGTERM"])
   process.once(signal, async () => {
     clearInterval(assignmentTimer);
+    clearInterval(digestTimer);
     clearInterval(outboxTimer);
     outbox.stop();
     await delivery;

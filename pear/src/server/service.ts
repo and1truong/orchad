@@ -1,3 +1,4 @@
+import {DigestSubscriptionService} from "./digest-subscriptions.ts";
 import {ProviderCatalogService,type ProviderAdapter} from "./provider-catalog.ts";
 import {PortalService} from "./portal.ts";
 import {RetakeService} from "./retakes.ts";
@@ -72,6 +73,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly digestSubscriptions:DigestSubscriptionService;
   readonly providerCatalog:ProviderCatalogService;
   readonly scorm:SCORMService;
   readonly xapi:XAPIService;
@@ -88,6 +90,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync,origin="http://127.0.0.1:4314",providerAdapters:ProviderAdapter[] = []) {
+    this.digestSubscriptions=new DigestSubscriptionService(db);
     this.providerCatalog=new ProviderCatalogService(db,providerAdapters);
     this.scorm=new SCORMService(db);
     this.xapi=new XAPIService(db,origin);
@@ -237,6 +240,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call, source:"human"|"bridge"="human") {
     const a = c.arguments as any;
+    this.digestSubscriptions.authorize(p,c.toolName,a);
     this.providerCatalog.authorize(p,c.toolName,a,source);
     new PortalService(this.db).authorize(p,c.toolName);
     new RetakeService(this.db).authorize(p,c.toolName,a);
@@ -529,6 +533,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(["human_get_digest_preferences","human_get_digest_notifications"].includes(name))return this.digestSubscriptions.read(p,name,args);
     if(name==="human_get_provider_connections")return this.providerCatalog.settings(p);
     if(name==="learning_search_provider_content")return this.providerCatalog.search(p,a,source as "human"|"bridge");
     if(name==="learning_get_provider_item")return this.providerCatalog.item(p,a.providerId,a.sourceId,source as "human"|"bridge");
@@ -1026,6 +1031,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(["human_save_digest_preferences","human_read_digest_notification","human_delete_digest_history"].includes(name))return this.digestSubscriptions.write(p,name,args);
     if(name==="human_review_provider_connection")return this.providerCatalog.review(p,a);
     if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);
     if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);

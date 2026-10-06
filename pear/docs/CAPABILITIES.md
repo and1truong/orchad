@@ -99,7 +99,7 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 
 ## G06/G10 completed-course retake extension
 
-#99 implements explicit human-only enrolled/latest-version retakes as fresh linked self-directed records. Prior official completion, attempts, certificates and assignment history remain immutable; no automatic progress transfer. Four domain/HTTP and one mobile EN/VI browser regression are authored; exact-head CI pending. Exact reference reset/recertification semantics remain OPEN. See ADR-040.
+#99 implements explicit human-only enrolled/latest-version retakes as fresh linked self-directed records. Prior official completion, attempts, certificates and assignment history remain immutable; no automatic progress transfer. Four domain/HTTP and one mobile EN/VI browser regression passed exact #99 head 37c1cedae00485fed237961ec3c01726fd56b5e3, all eight jobs after a same-SHA native-job retry (192 domain; 34 dev + 34 built browser). Exact reference reset/recertification semantics remain OPEN. See ADR-040.
 
 ## G04 organization portal presentation extension
 
@@ -111,20 +111,25 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 
 ## G02/G03 provider metadata ledger extension
 
-#102 adds a disabled-by-default trusted provider/client binding, strict metadata-only ordered feed, canonical dedup, whole-page reconciliation and atomic per-person grants/revocations/retirement. Five backend/domain/real HTTP regressions are authored; exact-head CI pending. Metadata read primitives require live own rights and explicit model metadata permission. Reviewed admin UI and human launch/discovery/history are still next layers. No actual Go1 license, partner wire conformance, licensed body, provider launch or official learning outcome is claimed. See ADR-043.
+#102 adds a disabled-by-default trusted provider/client binding, strict metadata-only ordered feed, canonical dedup, whole-page reconciliation and atomic per-person grants/revocations/retirement. Five backend/domain/real HTTP regressions passed #102 head dc8b815f2d7d5843e4bbcc3827c5b80399119b4c, all eight jobs (200 domain; 35 dev + 35 built browser). Metadata read primitives require live own rights and explicit model metadata permission. Reviewed admin UI and human launch/discovery/history continue in #103–#104. No actual Go1 license, partner wire conformance, licensed body, provider launch or official learning outcome is claimed. See ADR-043.
 
 ## Provider discovery and human launch extension
 
-#103 adds own live-entitled metadata discovery, model metadata egress gates, separate launch history and a confirmed human-only exact-version 60-second launch with an explicit second-click link. Cookie/auth-version and live rights revalidate the local redirect; external provider session handling is not controlled. Three domain/actual HTTP and one mobile EN/VI browser regression are authored, exact-head CI pending. No official learning or actual commercial provider conformance is inferred. Reviewed configuration/binding UI and actual contract remain open. See ADR-044.
+#103 adds own live-entitled metadata discovery, model metadata egress gates, separate launch history and a confirmed human-only exact-version 60-second launch with an explicit second-click link. Cookie/auth-version and live rights revalidate the local redirect; external provider session handling is not controlled. Three domain/actual HTTP and one mobile EN/VI browser regression passed #103 head 03125b954f22dc22e14960702550ad9ef9f5aac1, all eight jobs (203 domain; 36 dev + 36 built browser). No official learning or actual commercial provider conformance is inferred. Reviewed configuration/binding UI continues in #104; actual contracted provider conformance remains open. See ADR-044.
 
 ## Reviewed provider settings and channel isolation extension
 
-#104 makes the configured provider disabled until explicit same-owner tenant-admin human review, bound to current auth-version and exact server policy. It adds settings UI, catalog-only credential issuance without enabling SCIM and secure startup configuration. Four domain/actual HTTP and one mobile EN/VI admin/learner browser regression are authored; exact-head CI pending. Actual contracted provider connection/launch/conformance and retention remain BLOCKED/NOT VERIFIED. See ADR-045.
+#104 makes the configured provider disabled until explicit same-owner tenant-admin human review, bound to current auth-version and exact server policy. It adds settings UI, catalog-only credential issuance without enabling SCIM and secure startup configuration. Four domain/actual HTTP and one mobile EN/VI admin/learner browser regression passed #104 head c7fc164390edd2f60aad0381bf0188dff0d287f2, all eight jobs (207 domain; 37 dev + 37 built browser). Actual contracted provider connection/launch/conformance and retention remain BLOCKED/NOT VERIFIED. See ADR-045.
 
 ## G04/G12/G13 live course/item group audience extension
 
-#105 adds explicit same-tenant static/dynamic group audiences for original courses/items, bounded group-set-safe reusable references, and current membership gates for pinned content/media/answers/completion/timers without deleting history. Four domain/actual HTTP and one EN/VI mobile author/learner browser regression are authored; exact-head CI pending. Collection/bank group sharing and cross-portal/reference entitlement policies remain OPEN. See ADR-046.
+#105 adds explicit same-tenant static/dynamic group audiences for original courses/items, bounded group-set-safe reusable references, and current membership gates for pinned content/media/answers/completion/timers without deleting history. Four domain/actual HTTP and one EN/VI mobile author/learner browser regression passed #105 head 1c48c1bf54ec7dee1e9a4a0a2b115edff0f1a47d, all eight jobs (211 domain; 38 dev + 38 built browser). Collection/bank group sharing continues in #106; cross-portal/reference entitlement policies remain OPEN. See ADR-046.
 
 ## Group collections/banks/scheduled obligations extension
 
 #106 extends current group audiences to playlists, awards and staff-only question banks with conservative reuse containment, immutable quiz provenance and current recipient scheduling/withdraw/rejoin checks. Six domain/actual HTTP/scheduler and one EN/VI mobile author/learner browser regression are authored; exact-head CI pending. Cross-portal sharing and exact reference/provider lifecycle/recertification semantics remain OPEN. See ADR-047.
+
+
+## Reviewed own scheduled in-app digest extension
+
+#107 adds opt-in own timezone/weekday/DST/retention preferences, independent bounded restart-safe delivery, current group rights at generation/history read, notification read/delete controls and whole-row pagination. Six domain/actual HTTP and one EN/VI mobile browser regression authored; exact-head CI pending. This does not install or send external channels, run an assistant loop, or change official learning. Operational retention/model quality/external channel parity remain OPEN/BLOCKED/NOT VERIFIED. See ADR-048.

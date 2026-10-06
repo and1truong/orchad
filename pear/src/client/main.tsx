@@ -1,3 +1,4 @@
+import {DigestSubscriptions} from "./digest-subscriptions.tsx";
 import {ProviderConnections} from "./provider-connections.tsx";
 import {ProviderContent} from "./provider-catalog.tsx";
 import {defaultPortal,portalPalettes,type PortalBranding} from "../shared/portal.ts";
@@ -802,6 +803,7 @@ function App() {
           <>
             <OwnInsights key={"insights:"+session.sessionEpoch} busy={busy} op={op} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <LearningDigest key={"digest:"+session.sessionEpoch} busy={busy} op={op} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
+            <DigestSubscriptions key={"scheduled-digest:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <ExternalActivity key={"external:"+session.sessionEpoch} session={session} busy={busy} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <div className="stats">
               <div>
