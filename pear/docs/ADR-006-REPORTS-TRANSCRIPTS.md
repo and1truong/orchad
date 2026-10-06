@@ -1,0 +1,15 @@
+# ADR 006 — Scoped reports and transcripts
+
+Status: internal structured reports and transcript exports implemented. Natural-language proposal/chart flows, delivery integrations and elapsed learning telemetry remain open.
+
+One ledger projection reads pinned course versions, acknowledged lessons, latest submitted quiz scores and authoritative award rule evaluation. Course lesson progress and quiz score are separate fields. Award earned/target progress does not imply that required criteria are satisfied. Direct and recurring enrollments remain distinct rows with cycle IDs, origin, version, deadlines, completion dates and withdrawn/cancelled states. Inactive accounts retain historical rows; managers see only current direct reports. Own transcript access never accepts another learner ID. Tenant and current principal checks apply independently to every page, including export-all requests.
+
+Reports have bounded typed templates, filters, columns and sort keys; no SQL or arbitrary expression is accepted. UTC completion dates are validated for actual calendar dates and ordered ranges. Saved definitions are creator-owned: even another administrator cannot update/delete one. Library CAS, authenticated idempotency and transactional audit apply through the existing controller. Deleting a definition preserves learning records. Existing definitions survive process/database restart.
+
+Export explicitly chooses filtered/all authorized rows and visible/all report columns. Both modes retain live audience restrictions. Each page is row/UTF-8 bounded and carries a SHA-256 snapshot of principal, specification, mode and source rows. Continuations fail with STALE_CONTEXT if data/scope changes. Browser collectors restart from offset zero, reject non-advancing pages, and verify the captured session/workspace before download or printing. Spreadsheet formula prefixes are escaped and quotes/newlines round-trip. A refresh action restarts a stale preview.
+
+The human print view uses escaped React text and contains the chosen rows/columns from the same export collector. Browser print supports Save as PDF; this is not a server PDF endpoint. The browser test intercepts the modal, creates an actual Chromium PDF from the rendered print layout, and checks authorized contents. Estimated duration is never presented as elapsed telemetry; no accreditation or full WCAG conformance is claimed.
+
+Migration 006 adds saved report definitions and persists award deadlines. It recovers existing fixed deadlines from the immutable cycle and rolling deadlines from actual delivery plus the pinned rolling-day policy, propagating them to cycle child courses. It preserves learning records and runs once atomically. Tests cover restart and recovery from the previous schema.
+
+This layer targets codex/pear-assignments-49 (PR #64). No AI SDK or provider loop is added to Pear. The administrator tool catalog is now 62 tools; further capabilities require bounded contextual tool groups rather than raising the canonical 64-tool contract limit.

@@ -125,7 +125,8 @@ test("admin creates/publishes/assigns; learner and manager scopes stay distinct"
   await expect(
     page.getByLabel("Learner", { exact: true }).locator("option"),
   ).toHaveCount(1);
-  await expect(page.locator("tbody")).not.toContainText("learner-b");
+  for (const body of await page.locator("tbody").all())
+    await expect(body).not.toContainText("learner-b");
 });
 
 test("responsive keyboard access and real page bridge, with session/page workspace invalidation", async ({

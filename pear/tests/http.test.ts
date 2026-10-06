@@ -711,3 +711,62 @@ test("assignment jobs use server time, deduplicate HTTP retries and keep notific
     f.db.close();
   }
 });
+
+test("report HTTP exports retain direct-report scope and revoked session denial", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  try {
+    data(f.call("learner-a", "learning_enroll", { courseId: "learning-vi" }));
+    data(
+      f.call("learner-b", "learning_enroll", { courseId: "systems-basics" }),
+    );
+    const manager = await login(app, "manager");
+    const { freshReport } = await import("../src/shared/reports.ts");
+    const payload = {
+      requestId: "report-http",
+      documentId: "library:demo",
+      toolName: "learning_export_report",
+      arguments: { spec: freshReport(), rows: "all", columns: "all" },
+      expectedRevision: null,
+      idempotencyKey: null,
+    };
+    const r = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: manager.headers,
+      payload,
+    });
+    assert.equal(r.statusCode, 200);
+    const csv = data(r.json()).csv;
+    assert.ok(csv.includes("learner-a"));
+    assert.ok(!csv.includes("learner-b"));
+    const forbidden = await app.inject({
+      method: "POST",
+      url: "/api/human/invoke",
+      headers: manager.headers,
+      payload: {
+        ...payload,
+        arguments: {
+          ...payload.arguments,
+          spec: { ...freshReport(), learnerId: "learner-b" },
+        },
+      },
+    });
+    assert.equal(forbidden.json().error.code, "FORBIDDEN");
+    f.db
+      .prepare(
+        "UPDATE accounts SET auth_version=auth_version+1 WHERE id='manager'",
+      )
+      .run();
+    const revoked = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: manager.headers,
+      payload,
+    });
+    assert.equal(revoked.statusCode, 401);
+  } finally {
+    await app.close();
+    f.db.close();
+  }
+});

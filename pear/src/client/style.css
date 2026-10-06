@@ -505,3 +505,64 @@ footer {
 .assignments button {
   max-width: 100%;
 }
+
+.reports p {
+  overflow-wrap: anywhere;
+}
+.reports button {
+  max-width: 100%;
+}
+.print-report {
+  border: 1px solid #cbd6cc;
+  padding: 20px;
+  margin-top: 20px;
+  background: white;
+}
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  body {
+    background: white;
+  }
+  body *:not(:has(.print-report)):not(.print-report):not(.print-report *) {
+    display: none !important;
+  }
+  .shell, main, .reports {
+    display: block;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    min-height: 0;
+  }
+  .print-report {
+    position: static;
+    margin: 0;
+    border: 0;
+    padding: 0;
+    width: 100%;
+  }
+  .print-report button {
+    display: none;
+  }
+  .print-report .table-wrap {
+    overflow: visible;
+  }
+  .print-report table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 8pt;
+  }
+  .print-report th,
+  .print-report td {
+    padding: 4px;
+    overflow-wrap: anywhere;
+  }
+  .print-report tr {
+    break-inside: avoid;
+  }
+  .print-report thead {
+    display: table-header-group;
+  }
+}

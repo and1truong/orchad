@@ -41,6 +41,7 @@ const callSchema = object({
   },
 });
 import { DomainError, reject, boundedPage as pageRows } from "./errors.ts";
+import { ReportService } from "./reports.ts";
 import { AssignmentService } from "./assignments.ts";
 import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
@@ -49,10 +50,12 @@ export class LearningService {
   readonly programs: ProgramService;
   readonly people: PeopleService;
   readonly assignments: AssignmentService;
+  readonly reports: ReportService;
   constructor(readonly db: DatabaseSync) {
     this.programs = new ProgramService(db);
     this.people = new PeopleService(db);
     this.assignments = new AssignmentService(db);
+    this.reports = new ReportService(db);
   }
   principal(id: string): Principal {
     const p = this.db
@@ -177,6 +180,7 @@ export class LearningService {
     this.programs.authorize(p, c.toolName, a);
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
+    this.reports.authorize(p, c.toolName, a);
     const scopedEnrollment = a.enrollmentId
       ? this.enrollment(p, a.enrollmentId)
       : a.attemptId
@@ -658,6 +662,15 @@ export class LearningService {
       default:
         if (
           [
+            "learning_get_transcript",
+            "learning_report_preview",
+            "learning_list_saved_reports",
+            "learning_export_report",
+          ].includes(name)
+        )
+          return this.reports.read(p, name, args);
+        if (
+          [
             "learning_get_notifications",
             "learning_preview_assignment_plan",
             "learning_list_assignment_plans",
@@ -1061,6 +1074,8 @@ export class LearningService {
         return this.enroll(p, a.courseId, a.learnerId, p.id, a.dueDate);
       }
       default:
+        if (["learning_save_report", "learning_delete_report"].includes(name))
+          return this.reports.write(p, name, args);
         if (
           [
             "learning_enroll_award_course",

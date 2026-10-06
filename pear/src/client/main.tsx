@@ -12,6 +12,7 @@ import {
   type ContentDraft,
 } from "./content-library.tsx";
 import "./style.css";
+import { Reports } from "./reports.tsx";
 import { Assignments } from "./assignments.tsx";
 import { People } from "./people.tsx";
 import { Programs } from "./programs.tsx";
@@ -371,6 +372,7 @@ function App() {
             ["learning", t.learning],
             ["programs", locale === "vi" ? "Chương trình" : "Programs"],
             ["notifications", locale === "vi" ? "Thông báo" : "Notifications"],
+            ["transcript", locale === "vi" ? "Bảng học tập" : "Transcript"],
             [
               "profile",
               locale === "vi" ? "Sở thích học" : "Learning preferences",
@@ -1008,6 +1010,21 @@ function App() {
               </section>
             )}
           </>
+        )}
+        {(view === "transcript" ||
+          (view === "admin" && ["admin", "manager"].includes(role))) && (
+          <Reports
+            key={"reports:" + session.sessionEpoch + view}
+            administrative={view === "admin"}
+            tick={tick}
+            busy={busy}
+            op={op}
+            mutate={mutate}
+            run={run}
+            isCurrent={() =>
+              sessionRef.current === session && docRef.current === doc
+            }
+          />
         )}
         {(view === "notifications" ||
           (view === "admin" && ["admin", "manager"].includes(role))) && (

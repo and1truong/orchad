@@ -418,6 +418,7 @@ export function Programs(props: Props) {
                 · Required learning{" "}
                 {a.requiredComplete ? "satisfied" : "still needed"}
               </p>
+              {a.due_date && <p>Due {new Date(a.due_date).toLocaleString()}</p>}
               <Progress
                 progress={a}
                 enrollmentId={a.id}

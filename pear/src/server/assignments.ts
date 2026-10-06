@@ -270,7 +270,7 @@ export class AssignmentService {
       else
         this.db
           .prepare(
-            "INSERT INTO award_enrollments(id,tenant,learner,award_id,version,assigned_by,assignment_cycle_id) VALUES(?,?,?,?,?,?,?)",
+            "INSERT INTO award_enrollments(id,tenant,learner,award_id,version,assigned_by,assignment_cycle_id,due_date) VALUES(?,?,?,?,?,?,?,?)",
           )
           .run(
             id,
@@ -280,6 +280,7 @@ export class AssignmentService {
             cycle.target_version,
             p.id,
             cycle.id,
+            due,
           );
       this.db
         .prepare(
@@ -388,7 +389,7 @@ export class AssignmentService {
     const id = randomUUID();
     this.db
       .prepare(
-        "INSERT INTO enrollments(id,tenant,learner,course_id,version,assigned_by,assignment_cycle_id) VALUES(?,?,?,?,?,?,?)",
+        "INSERT INTO enrollments(id,tenant,learner,course_id,version,assigned_by,assignment_cycle_id,due_date) VALUES(?,?,?,?,?,?,?,?)",
       )
       .run(
         id,
@@ -398,6 +399,7 @@ export class AssignmentService {
         version,
         award.assigned_by,
         award.assignment_cycle_id,
+        award.due_date,
       );
     return { enrollmentId: id, version, alreadyEnrolled: false };
   }

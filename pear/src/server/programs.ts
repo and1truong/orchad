@@ -730,6 +730,28 @@ export class ProgramService {
         reject("UNSUPPORTED", "Unknown learning write");
     }
   }
+  reportSummaries(tenant: string, learnerIds: string[]) {
+    const allowed = new Set(learnerIds);
+    return (
+      this.db
+        .prepare(
+          "SELECT e.* FROM award_enrollments e JOIN collections c ON c.id=e.award_id AND c.tenant=e.tenant WHERE e.tenant=? ORDER BY e.id",
+        )
+        .all(tenant) as any[]
+    )
+      .filter((row) => allowed.has(row.learner))
+      .map((row) => {
+        const progress = this.evaluation(row);
+        return {
+          ...row,
+          title: progress.title,
+          earned: progress.earned,
+          target: progress.target,
+          unit: progress.unit,
+          requiredComplete: progress.requiredComplete,
+        };
+      });
+  }
   certificate(p: Principal, id: string) {
     const row = this.db
       .prepare(
