@@ -1,0 +1,13 @@
+# ADR 039: scoped report aggregates and actual Lime admin workflows
+
+G11/G20 add a deterministic typed report summary and an accessible human status chart. ReportSpec validation, server tenant/direct-report scope and the same complete filtered/sorted row set as preview determine all counts. The summary uses the preview's exact snapshot hash; a changed scope/data set requires refreshing rather than mixing row and chart generations. Counts cover the entire authorized filtered report, independent of pagination or selected visible columns.
+
+The fixed five-state series counts learning records, including recurring cycles. It does not count unique people, infer mastery or collapse learner-confirmed item reading into course assessment. The chart displays exact counts, percentage of those filtered records and explicit scope/metric definitions; it clears when filters change or loading fails. No external benchmark or guessed data is displayed. Read operations create no audit, operation keys, progress or revision changes.
+
+Trusted Lime guidance requests the summary with the preview snapshot before describing a status chart. The actual unpacked-extension fixture switches into a manager's reports workspace and exercises typed preview/summary/CSV, host-approved creator-owned saved report and source/scope/count reconciliation. It then switches human identity to admin: dynamic ALL rule preview, denied group save with zero effects and a separately approved save; finally an authorized source read and host-approved playlist draft. At the end, the original learner's official learning data/revision is unchanged.
+
+Only the Mango HTTP boundary is scripted. The fixture uses actual Chromium extension UI, shared Pi, HostPolicy consent/approval, fixed MAIN-world serialized dispatch, Pear HTTP/ACL/schema/domain transactions and SQLite. The bounded gateway record ring has a separate monotonically increasing observation counter, avoiding assumptions about retained history length. This is structured workflow/transport evidence, not natural-language inference accuracy, recommended-content usefulness or an actual native Side Panel container claim.
+
+Validation authored: three domain/actual HTTP regressions reconcile entire-report counts, official completion, filters, no write effects, role/audience boundaries and exact snapshot continuity; one browser chart/filter/mobile/VI journey; expanded actual Lime report/group/curation fixture. Exact-head CI pending.
+
+Report delivery connectors, evaluated NL/model quality, commercial metric/benchmark definitions and production channels remain open or externally blocked.

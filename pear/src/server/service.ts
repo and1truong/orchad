@@ -779,6 +779,7 @@ export class LearningService {
           [
             "learning_get_transcript",
             "learning_report_preview",
+            "learning_report_summary",
             "learning_list_saved_reports",
             "learning_export_report",
           ].includes(name)

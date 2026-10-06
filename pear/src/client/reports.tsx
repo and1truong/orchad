@@ -85,6 +85,7 @@ function Table({ rows, columns }: { rows: any[]; columns: ReportColumn[] }) {
 export function Reports(p: Props) {
   const [spec, setSpec] = useState<ReportSpec>(freshReport),
     [rows, setRows] = useState<any[]>([]),
+    [summary,setSummary]=useState<any>(null),
     [columns, setColumns] = useState<ReportColumn[]>(freshReport().columns),
     [offset, setOffset] = useState(0),
     [next, setNext] = useState<number | null>(null),
@@ -134,15 +135,17 @@ export function Reports(p: Props) {
             : {}),
         },
       );
+      const summaryResult=p.administrative?await p.op("learning_report_summary",{spec,snapshotHash:response.snapshotHash}):null;
       const savedPage = p.administrative
         ? await p.op("learning_list_saved_reports", {
             offset: savedOffset,
             limit: 20,
           })
         : null;
-      if (!live || n !== generation.current) return;
+      if (!live || n !== generation.current || !p.isCurrent()) return;
       snapshot.current = response.snapshotHash;
       setRows(response.items);
+      setSummary(summaryResult);
       setColumns(p.administrative ? response.columns : spec.columns);
       setNext(response.nextOffset);
       setTotal(response.total);
@@ -152,9 +155,10 @@ export function Reports(p: Props) {
         setSavedNext(savedPage.nextOffset);
       }
     })().catch((e) => {
-      if (live) {
+      if (live && n === generation.current && p.isCurrent()) {
         setLoadError(e.message);
         setRows([]);
+        setSummary(null);
       }
     });
     return () => {
@@ -163,6 +167,7 @@ export function Reports(p: Props) {
   }, [p.administrative, p.tick, offset, savedOffset, spec, refresh]);
   const change = (next: ReportSpec) => {
     setSpec(next);
+    setSummary(null);
     setOffset(0);
     snapshot.current = undefined;
     setPrintModel(null);
@@ -230,12 +235,21 @@ export function Reports(p: Props) {
         disabled={p.busy}
         onClick={() => {
           snapshot.current = undefined;
+          setSummary(null);
           setOffset(0);
           setRefresh((n) => n + 1);
           setPrintModel(null);
         }}
       >{translateUI("Refresh report")}</button>
       {notice && <p role="status">{notice}</p>}
+      {p.administrative&&summary&&<figure className="panel" aria-label={translateUI("Filtered report status chart")}>
+        <figcaption>{translateUI("Filtered report status chart")} · {summary.rowTotal} {translateUI("learning records")}</figcaption>
+        <p>{translateUI("Counts cover the entire filtered authorized audience, including recurring cycles. These are learning records, not unique people or proficiency.")}</p>
+        <div className="table-wrap"><table aria-label={translateUI("Report status counts")}><thead><tr><th scope="col">{translateUI("Status")}</th><th scope="col">{translateUI("Record count")}</th><th scope="col">{translateUI("Share of filtered records")}</th></tr></thead><tbody>
+        {summary.statusCounts.map((r:any)=><tr key={r.status}><th scope="row">{translateUI(r.status)}</th><td>{r.count}</td><td><div aria-hidden="true" style={{background:"#e8e8e8",width:"100%",minWidth:80,height:12}}><div style={{background:"#37574a",height:12,width:(summary.rowTotal?100*r.count/summary.rowTotal:0)+"%"}}/></div><span>{summary.rowTotal?Math.round(100*r.count/summary.rowTotal):0}%</span></td></tr>)}</tbody></table></div>
+        {!summary.rowTotal&&<p>{translateUI("No matching learning records.")}</p>}
+        <p>{translateUI("Standalone completion is learner-confirmed reading. No skill mastery or external benchmark is inferred.")}</p>
+      </figure>}
       {p.administrative && (
         <>
           <h3>{translateUI("Saved reports")}</h3>

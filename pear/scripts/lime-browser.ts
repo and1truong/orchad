@@ -1,3 +1,4 @@
+import {freshReport} from "../src/shared/reports.ts";
 // Real unpacked Lime + MAIN-world Pear bridge + real HTTP backend. Scripted
 // Mango boundary only: no paid provider and no app-owned agent loop.
 import { chromium, expect } from "@playwright/test";
@@ -183,6 +184,81 @@ try {
   const fresh=gateway.requests[oldRequests];assert.equal(fresh.messages.some((m:any)=>m.role==="tool"),false);assert.equal(fresh.messages.some((m:any)=>m.role==="system"&&m.content.includes("Workflow: Optional AI practice")),false);
   await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
   await panel.screenshot({path:"artifacts/lime-optional-practice.png",fullPage:true});
+  // Actual typed admin workflows through the unpacked host, with a scripted
+  // provider boundary. This verifies schema/scope/approval, not NL inference.
+  async function directRead(name:string,args:Record<string,unknown>={}){
+    return page.evaluate(async({name,args}:any)=>{const ctx=await window.agentBridgeV1!.getContext();return window.agentBridgeV1!.invoke({requestId:crypto.randomUUID(),documentId:ctx.documentId,toolName:name,arguments:args,expectedRevision:null,idempotencyKey:null});},{name,args});
+  }
+  async function identity(user:string,workspace:string){
+    await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
+    await page.getByRole("button",{name:"Sign out",exact:true}).click();
+    await page.getByLabel("Account",{exact:true}).fill(user);await page.getByLabel("Password",{exact:true}).fill(user+"-dev");
+    await page.getByRole("button",{name:"Sign in",exact:true}).click();await page.getByRole("button",{name:"Sign out",exact:true}).waitFor();
+    await page.getByRole("button",{name:"Administration",exact:true}).click();
+    await page.getByLabel("Assistant workspace",{exact:true}).selectOption(workspace);
+    await expect.poll(()=>page.evaluate(async()=>String((await window.agentBridgeV1!.getContext()).documentId))).toBe("library:demo::"+workspace);
+  }
+  async function bind(mode:string,reads:string[]){
+    await panel.getByRole("button",{name:"Pin target",exact:true}).click();
+    await panel.getByLabel("Learning workflow",{exact:true}).selectOption(mode);
+    for(const name of reads)await panel.getByLabel("Allow read: "+name,{exact:true}).check();
+    await panel.getByRole("button",{name:"Consent to pinned target + model",exact:true}).click();
+  }
+  async function hostCall(name:string,args:Record<string,unknown>,decision?:"Approve"|"Deny"){
+    scriptedTool.name=name;scriptedTool.arguments=JSON.stringify(args);
+    const start=gateway!.requestCount;
+    await panel.getByLabel("Message",{exact:true}).fill("Use the selected typed "+name+" operation with this reviewed fixture definition.");
+    await panel.getByRole("button",{name:"Send",exact:true}).click();
+    if(decision)await panel.getByRole("button",{name:decision,exact:true}).click();
+    await expect.poll(()=>gateway!.requestCount>=start+2&&gateway!.requests.at(-1)?.messages?.at(-1)?.role==="tool").toBe(true);
+    const request=gateway!.requests.at(-1)!;
+    const result=JSON.parse(request.messages.at(-1).content);
+    await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
+    return {request,result};
+  }
+  await identity("manager","reports");
+  await bind("report",["learning_report_preview","learning_report_summary","learning_export_report","learning_list_saved_reports"]);
+  const reportSpec={...freshReport(),title:"Original Lime direct-report progress",kind:"course" as const,columns:["learnerId","contentId","title","version","status","estimatedMinutes","observedSeconds"] as any,sortBy:"contentId" as const};
+  const preview=await hostCall("learning_report_preview",{spec:reportSpec,limit:20});
+  assert.equal(preview.result.ok,true,JSON.stringify(preview.result));assert.ok(preview.result.data.items.length);
+  assert.ok(preview.result.data.items.every((row:any)=>row.learnerId==="learner-a"));
+  assert.ok(preview.request.messages.some((m:any)=>m.role==="system"&&m.content.includes("explicit ReportSpec")));
+  const summary=await hostCall("learning_report_summary",{spec:reportSpec,snapshotHash:preview.result.data.snapshotHash});
+  assert.equal(summary.result.ok,true,JSON.stringify(summary.result));assert.equal(summary.result.data.rowTotal,preview.result.data.total);
+  assert.equal(summary.result.data.statusCounts.reduce((n:number,row:any)=>n+row.count,0),summary.result.data.rowTotal);
+  assert.equal(summary.result.data.snapshotHash,preview.result.data.snapshotHash);
+  const savedReport=await hostCall("learning_save_report",{reportId:"lime-reviewed-report",spec:reportSpec},"Approve");
+  assert.equal(savedReport.result.ok,true,JSON.stringify(savedReport.result));
+  const ownReports=await hostCall("learning_list_saved_reports",{limit:20});
+  assert.equal(ownReports.result.ok,true);assert.ok(ownReports.result.data.items.some((r:any)=>r.id==="lime-reviewed-report"&&r.owner==="manager"));
+  const exported=await hostCall("learning_export_report",{spec:reportSpec,rows:"filtered",columns:"visible",limit:20});
+  assert.equal(exported.result.ok,true);assert.ok(exported.result.data.csv.includes("learning-vi"));assert.equal(exported.result.data.csv.includes("learner-b"),false);
+  await panel.screenshot({path:"artifacts/lime-typed-scoped-report.png",fullPage:true});
+  await identity("admin","people");await bind("group",["learning_preview_group"]);
+  const group={name:"Original Lime reviewed direct reports",kind:"dynamic",memberIds:[],mode:"ALL",rules:[{field:"role",customField:"",operator:"equals",value:"learner"},{field:"managerId",customField:"",operator:"equals",value:"manager"}]};
+  const groupPreview=await hostCall("learning_preview_group",{group,limit:20});
+  assert.equal(groupPreview.result.ok,true,JSON.stringify(groupPreview.result));assert.deepEqual(groupPreview.result.data.items.map((u:any)=>u.id),["learner-a"]);
+  const groupBefore=await page.evaluate(()=>window.agentBridgeV1!.getContext());
+  const deniedGroup=await hostCall("learning_save_group",{groupId:"lime-reviewed-group",group},"Deny");
+  assert.notEqual(deniedGroup.result.ok,true);assert.equal((await directRead("learning_get_group",{groupId:"lime-reviewed-group"})).ok,false);
+  assert.equal((await page.evaluate(()=>window.agentBridgeV1!.getContext())).revision,groupBefore.revision);
+  const savedGroup=await hostCall("learning_save_group",{groupId:"lime-reviewed-group",group},"Approve");
+  assert.equal(savedGroup.result.ok,true,JSON.stringify(savedGroup.result));
+  const persistedGroup=await directRead("learning_get_group",{groupId:"lime-reviewed-group"});assert.equal(persistedGroup.ok,true);assert.equal(persistedGroup.data.group.kind,"dynamic");
+  await panel.screenshot({path:"artifacts/lime-reviewed-group.png",fullPage:true});
+  await page.getByLabel("Assistant workspace",{exact:true}).selectOption("programs");
+  await expect.poll(()=>page.evaluate(async()=>String((await window.agentBridgeV1!.getContext()).documentId))).toBe("library:demo::programs");
+  await bind("curate",["learning_search"]);
+  const found=await hostCall("learning_search",{query:"Học tập",language:"vi",limit:20});
+  assert.equal(found.result.ok,true,JSON.stringify(found.result));assert.ok(found.result.data.items.some((r:any)=>r.id==="learning-vi"));
+  const playlist={title:"Original Lime reviewed reading",summary:"Reviewed original permitted source only",access:"tenant",items:[{kind:"course",id:"learning-vi"}]};
+  const curated=await hostCall("learning_save_playlist",{collectionId:"lime-reviewed-playlist",playlist},"Approve");
+  assert.equal(curated.result.ok,true,JSON.stringify(curated.result));
+  const drafts=await directRead("learning_get_collection_drafts",{limit:20});assert.equal(drafts.ok,true);assert.ok(drafts.data.items.some((r:any)=>r.id==="lime-reviewed-playlist"&&r.kind==="playlist"&&r.state==="draft"));
+  await panel.screenshot({path:"artifacts/lime-reviewed-playlist.png",fullPage:true});
+  await page.getByRole("button",{name:"Sign out",exact:true}).click();await page.getByLabel("Account",{exact:true}).fill("learner-a");await page.getByLabel("Password",{exact:true}).fill("learner-a-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();await page.getByRole("button",{name:"Sign out",exact:true}).waitFor();
+  const finalLearning=await learningState();assert.deepEqual(finalLearning.data,afterPractice.data);assert.equal(finalLearning.revision,afterPractice.revision);
+  await writeFile("artifacts/lime-admin-workflows.json",JSON.stringify({passed:true,boundary:"Scripted Mango; actual unpacked Lime/shared Pi/HostPolicy/Pear HTTP/SQLite",report:{principal:"manager",authorizedLearners:["learner-a"],spec:reportSpec,summary:summary.result.data},group:{previewed:["learner-a"],deniedSaveZeroEffects:true,approvedDynamicGroup:true},curation:{sourceId:"learning-vi",version:1,playlistDraftOnly:true},officialLearningUnchanged:true,inferenceQuality:"NOT VERIFIED"},null,2));
   await writeFile(
     "artifacts/lime-report.json",
     JSON.stringify(
@@ -198,6 +274,9 @@ try {
           "explicit lesson-read consent reaches actual shared Pi/Lime/Pear with source IDs/version",
           "practice Skip aborts pending approval with zero bookmark/progress mutation",
           "skipped workflow transcript does not reappear in the next turn",
+          "manager typed report preview/summary/export and approved creator-owned save remain direct-report scoped",
+          "admin dynamic group preview; denied save zero effect and separately approved save",
+          "source-based playlist draft through explicit host approval; official learning unchanged",
         ],
       },
       null,

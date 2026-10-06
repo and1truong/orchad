@@ -281,6 +281,13 @@ export class ReportService {
           snapshotHash: hash,
         };
       }
+      case "learning_report_summary": {
+        const spec=this.validate(p,a.spec),rows=this.ordered(this.filtered(this.rows(p),spec),spec),snapshotHash=this.snapshot(p,rows,spec,"filtered:visible",a.snapshotHash);
+        const statuses=["in_progress","overdue","completed","withdrawn","cancelled"],counts=new Map<string,number>();
+        for(const row of rows)counts.set(row.status,(counts.get(row.status)??0)+1);
+        if([...counts.keys()].some(status=>!statuses.includes(status)))reject("INTERNAL","Unsupported report status");
+        return {title:spec.title,rowTotal:rows.length,statusCounts:statuses.map(status=>({status,count:counts.get(status)??0})),snapshotHash,scope:"entire_filtered_authorized_audience",unit:"learning_records",includesRecurringCycles:true,definition:"Status counts of filtered own organization/direct-report learning records. Standalone completion is learner-confirmed; these are not unique learners, mastery or benchmark values."};
+      }
       case "learning_report_preview": {
         const spec = this.validate(p, a.spec),
           rows = this.ordered(this.filtered(this.rows(p), spec), spec),

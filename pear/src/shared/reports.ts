@@ -86,6 +86,7 @@ export function reportTools(role: Role): Tool[] {
     ),
     ...(["admin", "manager"].includes(role)
       ? [
+          tool("learning_report_summary","read",{spec:reportSchema,snapshotHash:string(64)},"Count statuses for the entire filtered current authorized audience, tied to the exact report preview snapshot. Counts are learning records, not unique people, mastery or external benchmarks.",["spec"]),
           tool(
             "learning_report_preview",
             "read",
