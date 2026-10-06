@@ -60,6 +60,7 @@ try {
       (await context.waitForEvent("serviceworker")),
     extensionId = new URL(worker.url()).hostname;
   const page = await context.newPage();
+  page.on("console",(message:any)=>{if(message.type()==="error")console.log("Pear fixture MAIN console:",message.text());});
   page.on("pageerror",(error:any)=>console.log("Pear fixture MAIN error:",error.message));
   await page.goto(origin);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
