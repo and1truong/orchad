@@ -76,7 +76,7 @@ test("late skip, cross-preference spam bound survives history deletion, TTL read
   assert.equal(later.runBackground(due).generated,1);
   const id=f.db.prepare("SELECT id FROM digest_notifications").get()!.id as string;
   const expired=new DigestSubscriptionService(f.db,()=>new Date(Date.parse(due)+86400000));
-  assert.equal(expired.read(p,"human_get_digest_notifications").total,0);
+  const hidden=expired.read(p,"human_get_digest_notifications");assert.ok("total" in hidden);assert.equal(hidden.total,0);
   assert.throws(()=>expired.authorize(p,"human_read_digest_notification",{notificationId:id}));
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM digest_notifications").get()!.n,1);
   expired.runBackground();assert.equal(f.db.prepare("SELECT 1 FROM digest_notifications WHERE id=?").get(id),undefined);
