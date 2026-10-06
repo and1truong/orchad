@@ -31,6 +31,7 @@ export interface Award {
   target: number;
   ongoing: boolean;
   moderatedExternal: boolean;
+  primaryModeration?:boolean;
   requirements: Requirement[];
 }
 const metadata = {
@@ -41,7 +42,7 @@ const metadata = {
 };
 const reference = (kinds: string[]) =>
   object({ kind: enumeration(...kinds), id: string(64) });
-const optionalAudience=(properties:Record<string,unknown>)=>object(properties,Object.keys(properties).filter(k=>!["groupIds","unitSingular","unitPlural","completionMode"].includes(k)));
+const optionalAudience=(properties:Record<string,unknown>)=>object(properties,Object.keys(properties).filter(k=>!["groupIds","unitSingular","unitPlural","completionMode","primaryModeration"].includes(k)));
 export const playlistSchema = optionalAudience({
   ...metadata,
   items: array(reference(["course", "item"]), 16, 1),
@@ -55,6 +56,7 @@ export const awardSchema = optionalAudience({
   target: integer(10000, 1),
   ongoing: { type: "boolean" },
   moderatedExternal: { type: "boolean" },
+  primaryModeration:{type:"boolean"},
   requirements: array(
     object({
       id: string(64),

@@ -1,3 +1,4 @@
+import {ModerationAssignments} from "./moderation-assignments.ts";
 import {awardUnitLabel} from "../shared/programs.ts";
 import {PeopleService} from "./people.ts";
 import {ContentAccess} from "./content-access.ts";
@@ -90,6 +91,7 @@ export class ProgramService {
       e,
       policy: criterion.alternatives.find((ref: any) => ref.kind === "external")
         .moderated,
+      primaryRequired:!!criterion.alternatives.find((ref:any)=>ref.kind==="external").primaryRequired,
     };
   }
   private assessor(p: Principal, awardId: string) {
@@ -161,6 +163,7 @@ export class ProgramService {
         .get(a.recordId, p.tenant) as any;
       if (!row) reject("FORBIDDEN", "External record scope denied");
       this.assessor(p, row.award_id);
+      new ModerationAssignments(this.db).requireDecision(p,new ModerationAssignments(this.db).record(p,a.recordId));
     }
     if (["learning_save_playlist", "learning_save_award"].includes(name)) {
       const row = this.db
@@ -247,6 +250,7 @@ export class ProgramService {
       prefix = "",
     ) => {
       new ContentAccess(this.db).validate(p,content);
+      if(content.primaryModeration&&!content.moderatedExternal)reject("INVALID_ARGUMENT","Primary assessment requires moderated external learning");
       if(content.unit==="custom"?(!content.unitSingular?.trim()||!content.unitPlural?.trim()):content.unitSingular!==undefined||content.unitPlural!==undefined)reject("INVALID_ARGUMENT","Custom units require original nonblank singular and plural labels; built-in units have fixed labels");
       if(content.completionMode==="one_item"&&content.requirements.some(r=>r.required))reject("INVALID_ARGUMENT","One-item awards use alternative criteria without required flags");
       if (
@@ -442,6 +446,7 @@ export class ProgramService {
               (record) => record.state === "rejected",
             ).length,
             moderated: award.moderatedExternal,
+            primaryRequired:!!award.primaryModeration,
           };
         });
         return {
@@ -615,9 +620,9 @@ export class ProgramService {
                 "SELECT r.*,e.learner,e.award_id FROM external_records r JOIN award_enrollments e ON e.id=r.enrollment_id WHERE e.award_id=? AND e.tenant=? ORDER BY r.created_at,r.id",
               )
               .all(a.collectionId, p.tenant) as any[]
-          ).map(({ evidence, evidence_hash, asset_id, ...row }) =>
+          ).filter(row=>new ModerationAssignments(this.db).canSee(p,{...row,tenant:p.tenant})).map(({ evidence, evidence_hash, asset_id, ...row }) =>
             source === "human"
-              ? { ...row, evidence, ...(asset_id ? { assetId: asset_id } : {}) }
+              ? { ...row,...new ModerationAssignments(this.db).metadata(row.id), evidence, ...(asset_id ? { assetId: asset_id } : {}) }
               : {
                   ...row,
                   evidenceWithheld: true,
@@ -718,7 +723,7 @@ export class ProgramService {
         };
       }
       case "human_submit_external_record": {
-        const { e, policy } = this.evidenceScope(
+        const { e, policy,primaryRequired } = this.evidenceScope(
           p,
           a.awardEnrollmentId,
           a.criterionPath,
@@ -774,6 +779,7 @@ export class ProgramService {
             new Date().toISOString(),
             a.assetId ?? null,
           );
+        new ModerationAssignments(this.db).initialize(id,primaryRequired);
         this.refreshLearner(p.tenant, p.id);
         return { recordId: id, state, selfAttested: !policy };
       }

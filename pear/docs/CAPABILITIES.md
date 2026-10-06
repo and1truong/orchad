@@ -164,3 +164,7 @@ Optional literal 255-character question title and flat original formatting profi
 
 ## One-criterion awards and custom units (PR #114)
 Optional complete-one-configured-criterion policy alongside existing target-plus-required and ongoing rules; pending/rejected/partial evidence gives no completion. Bounded original singular/plural quantity labels render literally in progress and synthetic certificate text/print, with no unit conversion/accreditation claim. Editor disables incompatible required/target settings; immutable prior versions and current ACL/CAS/audit/receipt bounds preserved. Five domain/reopen and one EN/VI browser fixture authored; exact-head CI pending. Reference grouping/required semantics, actual nested credit accumulation, primary assessor reassignment/crossportal/commercial/production audits remain OPEN.
+
+
+## Primary assessor assignment (PR #115)
+Optional pinned primary policy, explicit admin assignment/reassignment to existing delegated active same-tenant assessor, live queue/file/decision ACL and version CAS. Own in-app notices have human acknowledgment and omit revoked record identity; no external messages or official grading from assignment. Six domain/reopen/rollback regressions and one EN/VI browser fixture authored; exact-head CI pending. Original bounded profile; provider notifications/crossportal/retention/manual audits remain OPEN.

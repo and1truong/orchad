@@ -1,3 +1,4 @@
+import {ModerationAssignments} from "./moderation-assignments.ts";
 import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
@@ -261,7 +262,7 @@ export class MediaService {
         )
         .get(c.recordId ?? "", id, p.tenant) as any;
       if (
-        e &&
+        e && new ModerationAssignments(this.db).canSee(p,new ModerationAssignments(this.db).record(p,c.recordId??"")) &&
         (a.role === "admin" ||
           (a.role === "assessor" &&
             this.db

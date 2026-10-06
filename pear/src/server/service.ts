@@ -1,3 +1,4 @@
+import {ModerationAssignments} from "./moderation-assignments.ts";
 import {QuizRetries} from "./quiz-retries.ts";
 import {QuestionProgression} from "./question-progression.ts";
 import {DigestSubscriptionService} from "./digest-subscriptions.ts";
@@ -253,6 +254,7 @@ export class LearningService {
     this.blended.authorize(p, c.toolName, a);
     new QuestionBankService(this.db).authorize(p,c.toolName,a);
     this.programs.authorize(p, c.toolName, a);
+    new ModerationAssignments(this.db).authorize(p,c.toolName,a);
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
     this.reports.authorize(p, c.toolName, a);
@@ -454,6 +456,7 @@ export class LearningService {
                 : [
                       "human_save_answer",
                       "human_check_question",
+                      "human_assign_external_assessor",
                       "human_assess_answer",
                       "human_assess_submission",
                       "human_mark_attendance",
@@ -463,6 +466,9 @@ export class LearningService {
                       questionId: c.arguments.questionId,
                       submissionId: c.arguments.submissionId,
                       bookingId: c.arguments.bookingId,
+                      recordId:c.arguments.recordId,
+                      assessorId:c.arguments.assessorId,
+                      expectedVersion:c.arguments.expectedVersion,
                     }
                   : c.toolName === "learning_set_course_assessor"
                     ? {
@@ -541,6 +547,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="human_get_assessment_notices")return new ModerationAssignments(this.db).read(p,a);
     if(["human_get_digest_preferences","human_get_digest_notifications"].includes(name))return this.digestSubscriptions.read(p,name,args);
     if(name==="human_get_provider_connections")return this.providerCatalog.settings(p);
     if(name==="learning_search_provider_content")return this.providerCatalog.search(p,a,source as "human"|"bridge");
@@ -1047,6 +1054,8 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(name==="human_assign_external_assessor")return new ModerationAssignments(this.db).assign(p,a);
+    if(name==="human_read_assessment_notice")return new ModerationAssignments(this.db).acknowledge(p,a);
     if(["human_save_digest_preferences","human_read_digest_notification","human_delete_digest_history"].includes(name))return this.digestSubscriptions.write(p,name,args);
     if(name==="human_review_provider_connection")return this.providerCatalog.review(p,a);
     if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);

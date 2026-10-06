@@ -1,3 +1,4 @@
+import {PrimaryAssignment,AssessmentNotices} from "./moderation-assignments.tsx";
 import {awardUnitLabel} from "../shared/programs.ts";
 import {translateUI} from "./i18n.ts";
 import { Certificate } from "./certificate.tsx";
@@ -641,9 +642,11 @@ export function Programs(props: Props) {
                         setAward({
                           ...award,
                           moderatedExternal: e.target.checked,
+                          ...(!e.target.checked?{primaryModeration:false}:{}),
                         })
                       }
                     />{translateUI("Require assessor approval for external learning")}</label>
+                  <label><input type="checkbox" disabled={!award.moderatedExternal} checked={!!award.primaryModeration} onChange={e=>setAward({...award,primaryModeration:e.target.checked})}/>{translateUI("Require designated primary assessor for external records")}</label>
                   {award.requirements.map((r, i) => (
                     <fieldset key={i}>
                       <legend>{translateUI("Requirement")}{" "}{i + 1}</legend>
@@ -787,6 +790,7 @@ export function Programs(props: Props) {
           <button disabled={busy}>{translateUI("Assign award")}</button>
         </form>
       )}
+      {["admin","assessor"].includes(role)&&<AssessmentNotices actions={props} tick={tick}/>}
       {administrative && role === "admin" && (
         <form
           className="panel"
@@ -843,7 +847,7 @@ export function Programs(props: Props) {
             <button disabled={busy}>{translateUI("Load submissions")}</button>
           </form>
           {records.map((r) => (
-            <form
+            <React.Fragment key={r.id}><form
               key={r.id}
               onSubmit={(e) => {
                 e.preventDefault();
@@ -865,6 +869,7 @@ export function Programs(props: Props) {
                 {r.amount} claimed · {r.state}
               </p>
               <p>{r.evidence}</p>
+              {r.primaryRequired&&<p>{translateUI("Designated primary assessor")}: {r.primaryAssessorId??translateUI("Awaiting administrator assignment")}</p>}
               {r.assetId && (
                 <UploadedMedia
                   session={props.session}
@@ -876,7 +881,7 @@ export function Programs(props: Props) {
                   context={{ recordId: r.id }}
                 />
               )}
-              {r.state === "pending" && (
+              {r.state === "pending" && (!r.primaryRequired||r.primaryAssessorId===props.session.principal.id) && (
                 <>
                   <label>{translateUI("Decision")}<select aria-label={translateUI("Decision")} name="decision">
                       <option value="accept">{translateUI("Accept")}</option>
@@ -889,6 +894,8 @@ export function Programs(props: Props) {
                 </>
               )}
             </form>
+            {role==="admin"&&r.state==="pending"&&<PrimaryAssignment record={r} actions={props} onUpdate={async()=>{const page=await op("learning_get_external_records",{collectionId:scope,offset:recordOffset,limit:10});setRecords(page.items);setRecordNext(page.nextOffset);}}/>}
+            </React.Fragment>
           ))}
           <button
             className="ghost"
