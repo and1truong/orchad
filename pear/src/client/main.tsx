@@ -12,6 +12,7 @@ import {
   type ContentDraft,
 } from "./content-library.tsx";
 import "./style.css";
+import { Programs } from "./programs.tsx";
 const labels = {
   en: {
     catalog: "Explore",
@@ -338,7 +339,7 @@ function App() {
       </main>
     );
   const role = session.principal.role,
-    canAdmin = ["admin", "manager", "content_admin"].includes(role),
+    canAdmin = ["admin", "manager", "content_admin", "assessor"].includes(role),
     canEdit = ["admin", "content_admin"].includes(role);
   return (
     <div className="shell">
@@ -349,6 +350,7 @@ function App() {
           {[
             ["catalog", t.catalog],
             ["learning", t.learning],
+            ["programs", locale === "vi" ? "Chương trình" : "Programs"],
             ...(canAdmin ? [["admin", t.admin]] : []),
           ].map(([id, text]) => (
             <button
@@ -967,6 +969,24 @@ function App() {
               </section>
             )}
           </>
+        )}
+        {["programs", "admin"].includes(view) && (
+          <Programs
+            key={session.sessionEpoch + view}
+            role={role}
+            administrative={view === "admin"}
+            tick={tick}
+            busy={busy}
+            op={op}
+            mutate={mutate}
+            run={run}
+            certificate={(id) =>
+              request(
+                "/api/award-certificates/" + encodeURIComponent(id),
+                session,
+              )
+            }
+          />
         )}
         {view === "admin" && (
           <>

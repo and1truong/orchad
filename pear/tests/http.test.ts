@@ -315,3 +315,164 @@ test("synthetic credentials require explicit opt-in; API response hides credenti
     g.db.close();
   }
 });
+
+test("program evidence and certificate HTTP routes preserve learner and assessor scope", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  try {
+    const award = {
+      title: "HTTP program",
+      summary: "Original evidence",
+      access: "tenant",
+      unit: "credits",
+      target: 1,
+      ongoing: false,
+      moderatedExternal: true,
+      requirements: [
+        {
+          id: "evidence",
+          title: "Practice",
+          required: true,
+          credits: 1,
+          alternatives: [{ kind: "external", id: "practice" }],
+        },
+      ],
+    };
+    data(
+      f.call("admin", "learning_save_award", {
+        collectionId: "http-program",
+        award,
+      }),
+    );
+    data(
+      f.call("admin", "learning_publish_collection", {
+        collectionId: "http-program",
+      }),
+    );
+    const id = data(
+      f.call("learner-a", "learning_enroll_award", {
+        collectionId: "http-program",
+      }),
+    ).awardEnrollmentId;
+    const learner = await login(app);
+    const payload = {
+      requestId: "evidence",
+      documentId: "learning:demo:learner-a",
+      toolName: "human_submit_external_record",
+      arguments: {
+        awardEnrollmentId: id,
+        criterionPath: "evidence",
+        amount: 1,
+        evidence: "Private learner evidence",
+        confirmed: true,
+      },
+      expectedRevision: f.service.context("learner-a").revision,
+      idempotencyKey: "http-evidence",
+    };
+    const denied = await app.inject({
+      method: "POST",
+      url: "/api/bridge/invoke",
+      headers: learner.headers,
+      payload,
+    });
+    assert.equal(denied.statusCode, 403);
+    const submitted = await app.inject({
+      method: "POST",
+      url: "/api/human/invoke",
+      headers: learner.headers,
+      payload,
+    });
+    const recordId = data(submitted.json()).recordId;
+    const assessor = await login(app, "assessor");
+    const read = {
+      requestId: "read",
+      documentId: "library:demo",
+      toolName: "learning_get_external_records",
+      arguments: { collectionId: "http-program" },
+      expectedRevision: null,
+      idempotencyKey: null,
+    };
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/human/invoke",
+          headers: assessor.headers,
+          payload: read,
+        })
+      ).statusCode,
+      403,
+    );
+    data(
+      f.call("admin", "learning_set_award_assessor", {
+        collectionId: "http-program",
+        assessorId: "assessor",
+        enabled: true,
+      }),
+    );
+    assert.equal(
+      JSON.stringify(
+        (
+          await app.inject({
+            method: "POST",
+            url: "/api/bridge/invoke",
+            headers: assessor.headers,
+            payload: read,
+          })
+        ).json(),
+      ).includes("Private learner evidence"),
+      false,
+    );
+    data(
+      f.call("assessor", "learning_assess_external_record", {
+        recordId,
+        accepted: true,
+        reason: "Verified",
+      }),
+    );
+    const certificate = (
+      f.db
+        .prepare("SELECT certificate_id FROM award_enrollments WHERE id=?")
+        .get(id) as any
+    ).certificate_id;
+    assert.equal(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/award-certificates/" + certificate,
+          headers: learner.headers,
+        })
+      ).statusCode,
+      200,
+    );
+    const other = await login(app, "learner-b");
+    assert.equal(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/award-certificates/" + certificate,
+          headers: other.headers,
+        })
+      ).statusCode,
+      403,
+    );
+    f.db
+      .prepare(
+        "UPDATE accounts SET active=0,auth_version=auth_version+1 WHERE id='learner-a'",
+      )
+      .run();
+    assert.equal(
+      (
+        await app.inject({
+          method: "GET",
+          url: "/api/award-certificates/" + certificate,
+          headers: learner.headers,
+        })
+      ).statusCode,
+      401,
+    );
+  } finally {
+    await app.close();
+    f.db.close();
+  }
+});

@@ -18,7 +18,7 @@ export function fixture() {
       write = tool?.effect !== "read",
       admin =
         libraryWrites.has(name) &&
-        ["admin", "manager", "content_admin"].includes(p.role),
+        ["admin", "manager", "content_admin", "assessor"].includes(p.role),
       documentId = admin ? service.library(p) : service.personal(p);
     return service.invoke(
       user,

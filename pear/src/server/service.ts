@@ -40,35 +40,14 @@ const callSchema = object({
     maxLength: Bounds.id,
   },
 });
-// Leave room for result envelope fields. Pages are capped by both rows and bytes.
-function pageRows(rows: any[], offset = 0, limit = 20) {
-  const items: any[] = [];
-  for (const row of rows.slice(offset, offset + limit)) {
-    if (Buffer.byteLength(JSON.stringify([...items, row])) > 48 * 1024) break;
-    items.push(row);
-  }
-  return {
-    items,
-    total: rows.length,
-    offset,
-    nextOffset:
-      offset + items.length < rows.length ? offset + items.length : null,
-  };
-}
-class DomainError extends Error {
-  constructor(
-    readonly code: Code,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-function reject(code: Code, message: string): never {
-  throw new DomainError(code, message);
-}
+import { DomainError, reject, boundedPage as pageRows } from "./errors.ts";
+import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
-  constructor(readonly db: DatabaseSync) {}
+  readonly programs: ProgramService;
+  constructor(readonly db: DatabaseSync) {
+    this.programs = new ProgramService(db);
+  }
   principal(id: string): Principal {
     const p = this.db
       .prepare(
@@ -93,7 +72,7 @@ export class LearningService {
       (w.owner !== p.id &&
         !(
           id === this.library(p) &&
-          ["admin", "content_admin", "manager"].includes(p.role)
+          ["admin", "content_admin", "manager", "assessor"].includes(p.role)
         ))
     )
       reject("FORBIDDEN", "Workspace access denied");
@@ -189,6 +168,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    this.programs.authorize(p, c.toolName, a);
     if (a.enrollmentId) this.enrollment(p, a.enrollmentId);
     if (a.attemptId) this.attempt(p, a.attemptId);
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
@@ -279,6 +259,8 @@ export class LearningService {
           "Workspace changed; refresh before proposing another mutation",
         );
       const data = this.write(p, c.toolName, c.arguments);
+      if (c.toolName === "human_submit_attempt")
+        this.programs.refreshLearner(p.tenant, p.id);
       this.db
         .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
         .run(c.documentId);
@@ -296,16 +278,21 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "human_save_answer"
+        c.toolName === "human_submit_external_record"
           ? {
-              attemptId: c.arguments.attemptId,
-              questionId: c.arguments.questionId,
+              awardEnrollmentId: c.arguments.awardEnrollmentId,
+              criterionPath: c.arguments.criterionPath,
             }
-          : c.toolName.includes("content_item")
-            ? { itemId: c.arguments.itemId }
-            : c.toolName.includes("course")
-              ? { courseId: c.arguments.courseId }
-              : c.arguments;
+          : c.toolName === "human_save_answer"
+            ? {
+                attemptId: c.arguments.attemptId,
+                questionId: c.arguments.questionId,
+              }
+            : c.toolName.includes("content_item")
+              ? { itemId: c.arguments.itemId }
+              : c.toolName.includes("course")
+                ? { courseId: c.arguments.courseId }
+                : c.arguments;
       this.db
         .prepare(
           "INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)",
@@ -621,7 +608,7 @@ export class LearningService {
         };
       }
       default:
-        reject("UNSUPPORTED", "Unknown read");
+        return this.programs.read(p, name, args, source);
     }
   }
   private validateMedia(l: Pick<Lesson, "kind" | "url" | "transcript">) {
@@ -1006,7 +993,7 @@ export class LearningService {
         return this.enroll(p, a.courseId, a.learnerId, p.id, a.dueDate);
       }
       default:
-        reject("UNSUPPORTED", "Unknown write");
+        return this.programs.write(p, name, args);
     }
   }
   certificate(id: string, certificateId: string) {

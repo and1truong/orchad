@@ -247,6 +247,18 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Certificate access denied"));
     }
   });
+  app.get("/api/award-certificates/:id", async (req, reply) => {
+    try {
+      return service.programs.certificate(
+        service.principal((req as any).session.principal),
+        (req.params as any).id,
+      );
+    } catch {
+      return reply
+        .code(403)
+        .send(failure("FORBIDDEN", "Award certificate access denied"));
+    }
+  });
   app.get("/health", async () => ({ ok: true }));
   app.setErrorHandler((e: any, _req, reply) =>
     reply

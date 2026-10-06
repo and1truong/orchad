@@ -1,25 +1,11 @@
 import { type Tool, type Role } from "./model.ts";
-const string = (maxLength = 128) => ({
-  type: "string",
-  minLength: 1,
-  maxLength,
-});
-const integer = (maximum: number, minimum = 0) => ({
-  type: "integer",
-  minimum,
-  maximum,
-});
-const array = (items: unknown, maxItems: number, minItems = 0) => ({
-  type: "array",
-  items,
-  maxItems,
-  minItems,
-});
-const enumeration = (...values: string[]) => ({ type: "string", enum: values });
-export const object = (
-  properties: Record<string, unknown>,
-  required = Object.keys(properties),
-) => ({ type: "object", properties, required, additionalProperties: false });
+import { string, integer, array, enumeration, object, tool } from "./schema.ts";
+export { object } from "./schema.ts";
+import {
+  programTools,
+  programLibraryWrites,
+  programHumanTools,
+} from "./programs.ts";
 const lesson = object(
   {
     id: string(64),
@@ -97,6 +83,7 @@ export const courseSchema = object(
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
+  ...programLibraryWrites,
   "learning_create_course",
   "learning_update_course",
   "learning_publish_course",
@@ -107,18 +94,6 @@ export const libraryWrites = new Set([
   "learning_publish_content_item",
   "learning_retire_content_item",
 ]);
-const tool = (
-  name: string,
-  effect: Tool["effect"],
-  properties: Record<string, unknown>,
-  description: string,
-  required = Object.keys(properties),
-): Tool => ({
-  name,
-  effect,
-  inputSchema: object(properties, required),
-  description,
-});
 const id = { courseId: string() };
 const enrollment = { enrollmentId: string() };
 export const learnerTools: Tool[] = [
@@ -299,6 +274,7 @@ const report = tool(
 export function catalog(role: Role): Tool[] {
   return [
     ...learnerTools,
+    ...programTools(role),
     ...(["admin", "content_admin"].includes(role) ? adminTools : []),
     ...(["admin", "manager"].includes(role) ? [assignment, report] : []),
   ];
@@ -306,6 +282,7 @@ export function catalog(role: Role): Tool[] {
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  ...programHumanTools,
   tool(
     "human_complete_lesson",
     "write",
