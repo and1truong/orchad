@@ -1,3 +1,4 @@
+import {QuizPreview} from "./quiz-preview.tsx";
 import {translateUI} from "./i18n.ts";
 import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { LessonSettings, newEventSession } from "./lesson-settings.tsx";
@@ -838,16 +839,7 @@ export function CourseEditor({
             {course.quiz.questions.length} questions · Pass{" "}
             {course.quiz.passScore}% · {course.quiz.unlimitedAttempts?translateUI("Unlimited quiz attempts"):course.quiz.maxAttempts+" "+translateUI("attempts")}
           </p>
-          {course.quiz.questions.map((q) => (
-            <div key={q.id}>
-              <p>{q.prompt}</p>
-              <ol>
-                {q.options.map((option, oi) => (
-                  <li key={oi}>{option}</li>
-                ))}
-              </ol>
-            </div>
-          ))}
+          <QuizPreview course={course}/>
         </section>
       )}
     </section>

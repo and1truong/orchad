@@ -1,5 +1,17 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Interactive quiz preview":"Xem thử câu hỏi tương tác",
+"Practice with this unsaved snapshot. No enrollment, attempt, official score or certificate is created.":"Thực hành với bản nháp chưa lưu này. Không tạo đăng ký học, lượt thi, điểm chính thức hay chứng chỉ.",
+"Restart preview with current draft":"Bắt đầu lại với bản nháp hiện tại",
+"Check preview response":"Kiểm tra câu trả lời thử",
+"Preview response correct":"Câu trả lời thử đúng",
+"Preview response incorrect":"Câu trả lời thử sai",
+"Calculate practice result":"Tính kết quả thực hành",
+"Preview awaits human assessment; no simulated essay score.":"Bản xem thử cần người đánh giá; không tạo điểm bài viết giả định.",
+"Practice result":"Kết quả thực hành",
+"Practice passed":"Thực hành đạt",
+"Practice failed":"Thực hành chưa đạt",
+"Preview answer feedback":"Phản hồi câu trả lời thử",
 "Require correct objective response before continuing":"Yêu cầu câu trả lời khách quan đúng trước khi tiếp tục",
 "Question checks do not submit, grade or complete learning. Essays need final human assessment.":"Kiểm tra câu trả lời không nộp bài, chấm điểm chính thức hay hoàn thành việc học. Bài viết cần người đánh giá chấm cuối cùng.",
 "After checking each objective question · human player only":"Sau khi kiểm tra từng câu khách quan · chỉ trong giao diện người học",
