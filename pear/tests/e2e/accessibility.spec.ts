@@ -28,5 +28,6 @@ test("mobile, tablet and desktop reflow; keyboard skip/navigation/lesson/quiz an
   await keyboardButton("Sign out");await login("admin");await keyboardButton("Administration");
   for(const width of [320,768,1440]){await page.setViewportSize({width,height:960});await expect(page.getByRole("heading",{name:"Create course draft",exact:true})).toBeVisible();await reflow("administration-"+width);}
   await testInfo.attach("accessibility-evidence",{body:JSON.stringify({checks,keyboard:["skip link","current navigation and focus","lesson acknowledgment","radio choice and official human submission"],semantics:await page.getByRole("main").ariaSnapshot(),limits:["Chromium synthetic journeys only","Not a WCAG conformance audit","Manual screen reader, contrast and third-party media audit not run"]},null,2),contentType:"application/json"});
- }finally{await app.close();f.db.close();}
+ console.log("accessibility.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();}
 });

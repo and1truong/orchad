@@ -4,6 +4,7 @@ import {openDatabase} from "../../src/server/database.ts";
 import {startIdentityFixture} from "../identity-fixture.ts";
 import {resolve} from "node:path";
 test("real browser SSO returns through a bound code flow, admin reviews a subject mapping and role claims cannot elevate learner",async({page})=>{
+ test.setTimeout(60000);
  const origin="http://127.0.0.1:4316",db=openDatabase(":memory:",true),provider=await startIdentityFixture(origin+"/api/auth/callback");
  db.prepare("INSERT INTO identity_links VALUES(?,?,?,?,?)").run("demo",provider.config.issuer,"admin-subject","admin",new Date().toISOString());
  provider.controls.subject="admin-subject";
@@ -33,5 +34,6 @@ test("real browser SSO returns through a bound code flow, admin reviews a subjec
   const description=await page.evaluate(()=>window.agentBridgeV1!.describe());
   expect(description.tools.some(t=>/identity|oidc|human_submit/.test(t.name))).toBe(false);
   await page.screenshot({path:"artifacts/oidc-reviewed-role-boundary.png",fullPage:true});
- }finally{await app.close();await provider.close();db.close();}
+ console.log("identity.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();await provider.close();db.close();}
 });

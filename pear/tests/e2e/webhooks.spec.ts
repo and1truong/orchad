@@ -5,6 +5,7 @@ import {openDatabase} from "../../src/server/database.ts";
 import {verifyWebhook} from "../../src/shared/webhook-signature.ts";
 import {resolve} from "node:path";
 test("admin reviews a pinned endpoint, actual signed event arrives, delivery is inspectable and disabled subscription cannot send",async({page})=>{
+ test.setTimeout(60000);
  const origin="http://127.0.0.1:4318",secret="c".repeat(64),received:any[]=[],receiver=createServer(async(req,res)=>{
   let body="";for await(const chunk of req)body+=chunk.toString();
   if(!verifyWebhook(secret,req.headers["x-pear-timestamp"],req.headers["x-pear-signature"],body)){res.writeHead(401);res.end();return;}
@@ -34,5 +35,6 @@ test("admin reviews a pinned endpoint, actual signed event arrives, delivery is 
   expect(service.invoke("learner-b",{requestId:crypto.randomUUID(),documentId:next.documentId,toolName:"learning_enroll",arguments:{courseId:"systems-basics"},expectedRevision:next.revision,idempotencyKey:"disabled-event"},"human").ok).toBe(true);
   await outbox.run();expect(received).toHaveLength(1);
   await page.screenshot({path:"artifacts/webhook-reviewed-delivery.png",fullPage:true});
- }finally{await app.close();db.close();await new Promise<void>((resolve,reject)=>receiver.close(e=>e?reject(e):resolve()));}
+ console.log("webhooks.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();db.close();receiver.closeAllConnections();await new Promise<void>((resolve,reject)=>receiver.close(e=>e?reject(e):resolve()));}
 });

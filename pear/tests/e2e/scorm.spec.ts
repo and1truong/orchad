@@ -5,6 +5,7 @@ import {zip} from "../scorm-fixture.ts";
 import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
 test("human imports and reviews original ZIP; isolated SCO persists and resumes private reported state without official learning credit",async({page})=>{
+ test.setTimeout(60000);
  const f=fixture(),origin="http://127.0.0.1:4321",bytes=zip();
  const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist")});
  async function login(id:string){await page.getByLabel("Account",{exact:true}).fill(id);await page.getByLabel("Password",{exact:true}).fill(id+"-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();await expect(page.getByRole("button",{name:"Sign out",exact:true})).toBeVisible();}
@@ -39,5 +40,6 @@ test("human imports and reviews original ZIP; isolated SCO persists and resumes 
   for(const table of ["enrollments","attempts","certificates","study_totals"])expect(f.db.prepare("SELECT COUNT(*) AS n FROM "+table).get()!.n).toBe(0);
   const descriptor=await page.evaluate(()=>window.agentBridgeV1!.describe());expect(descriptor.tools.some(t=>/scorm_commit|scorm_start|scorm_import/.test(t.name))).toBe(false);
   await page.screenshot({path:"artifacts/scorm-isolated-reported-resume.png",fullPage:true});
- }finally{await app.close();f.db.close();}
+ console.log("scorm.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();}
 });

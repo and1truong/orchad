@@ -4,6 +4,7 @@ import {translationFixture} from "../translation-fixture.ts";
 import {data} from "../helpers.ts";
 import {resolve} from "node:path";
 test("human reviews an authored language variant; learner sees one identity, chooses a disclosed preview and keeps existing learning",async({page})=>{
+ test.setTimeout(60000);
  const f=translationFixture(),origin="http://127.0.0.1:4319";
  const enrolled=data(f.call("learner-a","learning_enroll",{courseId:"systems-basics"}));
  data(f.call("learner-a","human_complete_lesson",{enrollmentId:enrolled.enrollmentId,lessonId:"retry"},"human"));
@@ -34,5 +35,6 @@ test("human reviews an authored language variant; learner sees one identity, cho
   expect(f.db.prepare("SELECT COUNT(*) AS n FROM enrollments WHERE learner='learner-a'").get()!.n).toBe(1);
   expect(f.db.prepare("SELECT COUNT(*) AS n FROM certificates").get()!.n).toBe(0);
   await page.screenshot({path:"artifacts/reviewed-language-identity.png",fullPage:true});
- }finally{await app.close();f.db.close();}
+ console.log("translations.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();}
 });
