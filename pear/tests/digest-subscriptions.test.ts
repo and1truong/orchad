@@ -1,3 +1,6 @@
+import {mkdtempSync,rmSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {fixture,data} from "./helpers.ts";
@@ -110,4 +113,21 @@ test("actual cookie human HTTP requires CSRF/epoch and rejects bridge access and
   const due=f.db.prepare("SELECT next_run FROM digest_subscriptions WHERE learner='learner-a'").get()!.next_run as string;assert.equal(f.service.digestSubscriptions.runBackground(due).generated,1);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM webhook_deliveries").get()!.n,0);
  }finally{if(app)await app.close();f.db.close();}
+});
+test("actual SQLite close/reopen retains reviewed schedule, original approval receipt, notification and occurrence dedup",()=>{
+ const dir=mkdtempSync(join(tmpdir(),"pear-digest-restart-")),path=join(dir,"learning.sqlite");let f=fixture(path);
+ try{
+  const key={idempotencyKey:"digest-disk-review",expectedRevision:f.service.context("learner-a").revision},first=save(f,"learner-a",preferences,key),due=data(first).nextRun;
+  assert.equal(f.service.digestSubscriptions.runBackground(due).generated,1);
+  const subscription=f.db.prepare("SELECT * FROM digest_subscriptions WHERE learner='learner-a'").get(),notifications=f.db.prepare("SELECT * FROM digest_notifications").all(),audit=f.db.prepare("SELECT * FROM audit WHERE tool='digest_in_app_delivery'").all(),revision=f.service.context("learner-a").revision;
+  f.db.close();f=fixture(path);
+  assert.deepEqual(f.db.prepare("SELECT * FROM digest_subscriptions WHERE learner='learner-a'").get(),subscription);
+  assert.deepEqual(f.db.prepare("SELECT * FROM digest_notifications").all(),notifications);
+  assert.deepEqual(save(f,"learner-a",preferences,key),first);
+  assert.equal(f.service.digestSubscriptions.runBackground(due).generated,0);
+  assert.deepEqual(f.db.prepare("SELECT * FROM digest_notifications").all(),notifications);
+  assert.deepEqual(f.db.prepare("SELECT * FROM audit WHERE tool='digest_in_app_delivery'").all(),audit);
+  assert.equal(f.service.context("learner-a").revision,revision);
+  assert.equal(f.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,32);
+ }finally{f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
