@@ -1,3 +1,4 @@
+import {QuizUpgrade} from "./quiz-upgrade.tsx";
 import {PreviousResponse} from "./previous-response.tsx";
 import {DigestSubscriptions} from "./digest-subscriptions.tsx";
 import {ProviderConnections} from "./provider-connections.tsx";
@@ -867,6 +868,7 @@ function App() {
                   </span>
                   <h3>{e.course.title}</h3>
                   {e.retake_of&&<p>{translateUI("Fresh course retake")} · {e.retake_of}</p>}
+                  {e.status==="in_progress"&&e.assignment_state==="active"&&!e.assigned_by&&!e.assignment_cycle_id&&<QuizUpgrade key={"quiz-upgrade:"+session.sessionEpoch+e.id} enrollmentId={e.id} busy={busy} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onCreated={clearLearning}/>}
                   {e.status==="completed"&&<CourseRetake key={"retake:"+session.sessionEpoch+e.id} enrollmentId={e.id} busy={busy} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onCreated={clearLearning}/>}
                   {e.status === "completed" && (
                     <CourseFeedback
