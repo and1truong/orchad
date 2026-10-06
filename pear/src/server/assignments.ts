@@ -384,13 +384,13 @@ export class AssignmentService {
           .get(award.award_id, award.version) as any
       ).content,
     );
-    let version = 0;
+    const versions = new Set<number>();
     const walk = (content: any, depth: number) => {
       if (depth > 4) reject("INTERNAL", "Award graph invalid");
       for (const r of content.requirements)
         for (const ref of r.alternatives) {
           if (ref.kind === "course" && ref.id === a.courseId)
-            version = Math.max(version, ref.version);
+            versions.add(ref.version);
           else if (ref.kind === "award")
             walk(
               JSON.parse(
@@ -407,24 +407,19 @@ export class AssignmentService {
         }
     };
     walk(root, 1);
-    if (!version) reject("FORBIDDEN", "Course outside enrolled award rules");
-    const old = this.db
-      .prepare(
-        "SELECT id,version FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS ?",
-      )
-      .get(p.id, a.courseId, award.assignment_cycle_id) as any;
-    if (old)
-      return {
-        enrollmentId: old.id,
-        version: old.version,
-        alreadyEnrolled: true,
-      };
-    const course = this.db
-      .prepare("SELECT tenant FROM courses WHERE id=?")
-      .get(a.courseId) as any;
+    if (!versions.size) reject("FORBIDDEN", "Course outside enrolled award rules");
+    if(versions.size!==1)reject("FORBIDDEN","Award references conflicting course versions; author review is required");
+    const version=[...versions][0]!;
+    const course = this.db.prepare("SELECT tenant FROM courses WHERE id=?").get(a.courseId) as any;
     if (course?.tenant !== p.tenant) reject("FORBIDDEN", "Course unavailable");
     const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(a.courseId,version) as any).content);
     new ContentAccess(this.db).current(p,"course",a.courseId);new ContentAccess(this.db).requireVisible(p,"course",a.courseId,value);
+    const old=this.db.prepare("SELECT id,version,assignment_state FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND assignment_cycle_id IS ? ORDER BY rowid DESC LIMIT 1").get(p.id,p.tenant,a.courseId,award.assignment_cycle_id) as any;
+    if(old){
+      if(old.version!==version)reject("FORBIDDEN","Existing course version differs from the award; reviewed learning changes are required");
+      if(old.assignment_state!=="active")reject("FORBIDDEN","Current award course obligation is not active");
+      return {enrollmentId:old.id,version:old.version,alreadyEnrolled:true};
+    }
     if (authorizeOnly) return { authorized: true };
     const id = randomUUID();
     this.db

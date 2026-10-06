@@ -210,7 +210,7 @@ function Progress({
                 </>
               ) : ref.kind === "course" ? (
                 <div>
-                  <p>{translateUI("Course:")}{" "}{ref.id} ·{" "}
+                  <p>{translateUI("Course:")}{" "}{ref.id} · {translateUI("Version")} {ref.version} ·{" "}
                     {ref.completed ? "Completed" : "In progress"}
                   </p>
                   {!ref.completed && (

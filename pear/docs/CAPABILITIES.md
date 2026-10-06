@@ -240,3 +240,7 @@ ADR-071/Migration 041 adds a separately confirmed new reading record with no cop
 
 ## #131 exact course award proof candidate
 ADR-072 closes the internal course-ID-only proof defect: pinned course version, own completed authoritative ledger, active learner, pinned/current audiences and existing cycle freshness are required. Four real domain regressions authored; exact-head CI PENDING. Existing original course/award history is preserved. G08 reference equivalence/recertification and external dependencies remain OPEN/NOT VERIFIED.
+
+
+## #132 authorized exact award course opening candidate
+ADR-073 adds live pinned/current audience checks before returning existing enrollment or receipt, exact newest active same-cycle version, conflict/mismatch human diagnostics and visible course pins. Three domain and one EN/VI browser regressions authored; exact-head CI PENDING. Multiple explicit nested pins, completed-course requalification and award-cycle child version migration remain OPEN; no implicit reset or copied progress.
