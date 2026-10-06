@@ -1,3 +1,4 @@
+import { Certificate } from "./certificate.tsx";
 import React, { useEffect, useState } from "react";
 import type { Session } from "./api.ts";
 import { UploadField, UploadedMedia } from "./media.tsx";
@@ -516,23 +517,11 @@ export function Programs(props: Props) {
             </button>
           </div>
           {certificate && (
-            <section className="panel">
-              <h3>Award completion certificate</h3>
-              <p>
-                {certificate.learnerName} completed {certificate.title}, version{" "}
-                {certificate.version}, on {certificate.issuedAt}.
-              </p>
-              <p>{certificate.issuer} · Not accredited.</p>
-              <a
-                download={`pear-award-${certificate.id}.txt`}
-                href={
-                  "data:text/plain;charset=utf-8," +
-                  encodeURIComponent(JSON.stringify(certificate, null, 2))
-                }
-              >
-                Download award certificate
-              </a>
-            </section>
+            <Certificate
+              key={props.session.sessionEpoch + certificate.id}
+              certificate={certificate}
+              award
+            />
           )}
         </>
       )}

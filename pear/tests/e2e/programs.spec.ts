@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { test, expect, type Page } from "@playwright/test";
 async function login(page: Page, user: string) {
   await page.goto("/");
@@ -80,13 +81,11 @@ test("human program authoring, external evidence, scoped assessor moderation and
   await page
     .getByLabel("I own this content and may upload it", { exact: true })
     .check();
-  await page
-    .getByLabel("Content file", { exact: true })
-    .setInputFiles({
-      name: "personal-practice.pdf",
-      mimeType: "application/pdf",
-      buffer: bytes,
-    });
+  await page.getByLabel("Content file", { exact: true }).setInputFiles({
+    name: "personal-practice.pdf",
+    mimeType: "application/pdf",
+    buffer: bytes,
+  });
   await expect(
     page.getByRole("status").filter({ hasText: "Evidence PDF attached" }),
   ).toBeVisible();
@@ -164,6 +163,25 @@ test("human program authoring, external evidence, scoped assessor moderation and
   await expect(
     page.getByRole("link", { name: "Download award certificate", exact: true }),
   ).toHaveAttribute("download", /pear-award-/);
+  await page.evaluate(() => {
+    window.print = () => {};
+  });
+  await page
+    .getByRole("button", { name: "Print / save certificate PDF", exact: true })
+    .click();
+  await page.pdf({
+    path: "artifacts/award-certificate.pdf",
+    preferCSSPageSize: true,
+  });
+  const certificateText = execFileSync(
+    "pdftotext",
+    ["artifacts/award-certificate.pdf", "-"],
+    { encoding: "utf8" },
+  );
+  expect(certificateText).toContain("Award completion certificate");
+  expect(certificateText).toContain("Evidence practice award");
+  expect(certificateText).not.toContain("personal statement");
+  expect(certificateText).not.toContain("Your awards");
   await page.reload();
   await page.getByRole("button", { name: "Programs", exact: true }).click();
   await expect(

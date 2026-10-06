@@ -1,3 +1,5 @@
+import { Certificate } from "./certificate.tsx";
+import { CourseFeedback, CourseRatings, FeedbackReview } from "./feedback.tsx";
 import { BlendedPlayer, BlendedReviews } from "./blended.tsx";
 import { UploadedMedia } from "./media.tsx";
 import { Assessments } from "./assessments.tsx";
@@ -712,6 +714,12 @@ function App() {
         {preview && (
           <section className="panel" aria-label="Course preview">
             <h2>{preview.title}</h2>
+            <CourseRatings
+              key={session.sessionEpoch + preview.id + preview.version}
+              courseId={preview.id}
+              version={preview.version}
+              op={op}
+            />
             <p>{preview.summary}</p>
             <ul>
               {preview.lessons.map((l: any) => (
@@ -783,6 +791,13 @@ function App() {
                     {e.assignment_cycle_id ? " · Scheduled cycle" : ""}
                   </span>
                   <h3>{e.course.title}</h3>
+                  {e.status === "completed" && (
+                    <CourseFeedback
+                      key={session.sessionEpoch + e.id}
+                      enrollmentId={e.id}
+                      ops={{ op, mutate, run, busy }}
+                    />
+                  )}
                   <p>
                     {e.completed_lessons.length}/{e.course.lessons.length}{" "}
                     lessons ·{" "}
@@ -1067,34 +1082,18 @@ function App() {
               </section>
             )}
             {certificate && (
-              <section className="panel">
-                <h2>Completion certificate</h2>
-                <p>
-                  {certificate.learnerName} completed {certificate.title},
-                  version {certificate.version}.
-                </p>
-                <p>
-                  {new Date(certificate.issued_at).toLocaleString()} ·{" "}
-                  {certificate.issuer}
-                </p>
-                <p>
-                  Self-authored development content. This certificate is not
-                  accredited.
-                </p>
-                <a
-                  download={"pear-certificate-" + certificate.id + ".txt"}
-                  href={
-                    "data:text/plain;charset=utf-8," +
-                    encodeURIComponent(
-                      `Pear completion certificate\n${certificate.learnerName}\n${certificate.title}\nVersion ${certificate.version}\nIssued ${certificate.issued_at}\nID ${certificate.id}\nIssuer ${certificate.issuer}\nNot accredited`,
-                    )
-                  }
-                >
-                  Download certificate
-                </a>
-              </section>
+              <Certificate
+                key={session.sessionEpoch + certificate.id}
+                certificate={certificate}
+              />
             )}
           </>
+        )}
+        {view === "admin" && role === "admin" && (
+          <FeedbackReview
+            key={"feedback:" + session.sessionEpoch}
+            ops={{ op, mutate, run, busy }}
+          />
         )}
         {view === "admin" &&
           ["admin", "content_admin", "assessor"].includes(role) && (

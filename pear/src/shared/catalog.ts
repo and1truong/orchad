@@ -5,6 +5,7 @@ import {
   submissionSchema,
   sessionsSchema,
 } from "./blended.ts";
+import { feedbackTools, feedbackHumanTools } from "./feedback.ts";
 import {
   questionSchema,
   answerSchema,
@@ -320,6 +321,7 @@ const report = tool(
 export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
+    ...feedbackTools,
     ...blendedTools(role),
     ...assessmentTools(role),
     ...programTools(role),
@@ -343,7 +345,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
     group === "operations"
       ? blendedTools(role)
       : group === "learning"
-        ? learnerTools
+        ? [...learnerTools, ...feedbackTools]
         : group === "content"
           ? [
               ...learnerTools.filter(
@@ -373,6 +375,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  ...feedbackHumanTools,
   ...blendedHumanTools,
   ...programHumanTools,
   ...assessmentHumanTools,

@@ -1,4 +1,5 @@
 import { BlendedService, releaseInactiveBookings } from "./blended.ts";
+import { FeedbackService } from "./feedback.ts";
 import { MediaService } from "./media.ts";
 import {
   AssessmentService,
@@ -58,6 +59,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly feedback: FeedbackService;
   readonly blended: BlendedService;
   readonly media: MediaService;
   readonly programs: ProgramService;
@@ -66,6 +68,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
+    this.feedback = new FeedbackService(db);
     this.blended = new BlendedService(db);
     this.media = new MediaService(db);
     this.programs = new ProgramService(db);
@@ -203,6 +206,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    this.feedback.authorize(p, c.toolName, a);
     this.blended.authorize(p, c.toolName, a);
     this.programs.authorize(p, c.toolName, a);
     this.people.authorize(p, c.toolName, a);
@@ -367,42 +371,47 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "learning_import_users"
-          ? { previewHash: c.arguments.previewHash }
-          : c.toolName === "learning_save_user"
-            ? {
-                userId: (c.arguments.user as any).id,
-                role: (c.arguments.user as any).role,
-                active: (c.arguments.user as any).active,
-              }
-            : c.toolName === "human_submit_external_record"
+        c.toolName === "human_save_course_feedback"
+          ? {
+              enrollmentId: c.arguments.enrollmentId,
+              rating: c.arguments.rating,
+            }
+          : c.toolName === "learning_import_users"
+            ? { previewHash: c.arguments.previewHash }
+            : c.toolName === "learning_save_user"
               ? {
-                  awardEnrollmentId: c.arguments.awardEnrollmentId,
-                  criterionPath: c.arguments.criterionPath,
+                  userId: (c.arguments.user as any).id,
+                  role: (c.arguments.user as any).role,
+                  active: (c.arguments.user as any).active,
                 }
-              : [
-                    "human_save_answer",
-                    "human_assess_answer",
-                    "human_assess_submission",
-                    "human_mark_attendance",
-                  ].includes(c.toolName)
+              : c.toolName === "human_submit_external_record"
                 ? {
-                    attemptId: c.arguments.attemptId,
-                    questionId: c.arguments.questionId,
-                    submissionId: c.arguments.submissionId,
-                    bookingId: c.arguments.bookingId,
+                    awardEnrollmentId: c.arguments.awardEnrollmentId,
+                    criterionPath: c.arguments.criterionPath,
                   }
-                : c.toolName === "learning_set_course_assessor"
+                : [
+                      "human_save_answer",
+                      "human_assess_answer",
+                      "human_assess_submission",
+                      "human_mark_attendance",
+                    ].includes(c.toolName)
                   ? {
-                      courseId: c.arguments.courseId,
-                      assessorId: c.arguments.assessorId,
-                      enabled: c.arguments.enabled,
+                      attemptId: c.arguments.attemptId,
+                      questionId: c.arguments.questionId,
+                      submissionId: c.arguments.submissionId,
+                      bookingId: c.arguments.bookingId,
                     }
-                  : c.toolName.includes("content_item")
-                    ? { itemId: c.arguments.itemId }
-                    : c.toolName.includes("course")
-                      ? { courseId: c.arguments.courseId }
-                      : c.arguments;
+                  : c.toolName === "learning_set_course_assessor"
+                    ? {
+                        courseId: c.arguments.courseId,
+                        assessorId: c.arguments.assessorId,
+                        enabled: c.arguments.enabled,
+                      }
+                    : c.toolName.includes("content_item")
+                      ? { itemId: c.arguments.itemId }
+                      : c.toolName.includes("course")
+                        ? { courseId: c.arguments.courseId }
+                        : c.arguments;
       this.db
         .prepare(
           "INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)",
@@ -467,6 +476,14 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if (
+      [
+        "learning_get_course_ratings",
+        "human_get_course_feedback",
+        "human_list_course_feedback",
+      ].includes(name)
+    )
+      return this.feedback.read(p, name, a);
     switch (name) {
       case "learning_search_items": {
         const rows = (
@@ -951,6 +968,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if (name === "human_save_course_feedback") return this.feedback.write(p, a);
     switch (name) {
       case "learning_book_session":
       case "learning_cancel_booking":

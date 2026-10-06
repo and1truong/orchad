@@ -526,10 +526,15 @@ footer {
   body {
     background: white;
   }
-  body *:not(:has(.print-report)):not(.print-report):not(.print-report *) {
+  body
+    *:not(:has([data-print-active])):not([data-print-active]):not(
+      [data-print-active] *
+    ) {
     display: none !important;
   }
-  .shell, main, .reports {
+  .shell,
+  main,
+  .reports {
     display: block;
     padding: 0;
     margin: 0;
@@ -567,8 +572,48 @@ footer {
   }
 }
 
-.assessments p, .assessments blockquote { overflow-wrap:anywhere; white-space:pre-wrap; }
-.assessments button { max-width:100%; }
+.assessments p,
+.assessments blockquote {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.assessments button {
+  max-width: 100%;
+}
 
-[aria-label="Uploaded learning content"] iframe { width: 100%; min-height: 20rem; border: 1px solid var(--border, #bbb); background: white; }
-[aria-label="Uploaded learning content"] audio { max-width: 100%; }
+[aria-label="Uploaded learning content"] iframe {
+  width: 100%;
+  min-height: 20rem;
+  border: 1px solid var(--border, #bbb);
+  background: white;
+}
+[aria-label="Uploaded learning content"] audio {
+  max-width: 100%;
+}
+
+@media print {
+  @page certificate {
+    size: A4 portrait;
+    margin: 24mm;
+  }
+  .print-certificate {
+    page: certificate;
+    break-inside: avoid;
+    margin: 0;
+    padding: 20mm 10mm;
+    border: 2px solid #30513d;
+    color: #18271d;
+    text-align: center;
+  }
+  .print-certificate h2 {
+    font-size: 24pt;
+    margin-bottom: 20mm;
+  }
+  .print-certificate p {
+    font-size: 13pt;
+    overflow-wrap: anywhere;
+  }
+  .print-certificate .print-controls {
+    display: none !important;
+  }
+}

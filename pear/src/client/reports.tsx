@@ -1,3 +1,4 @@
+import { printView } from "./print.ts";
 import React, { useEffect, useRef, useState } from "react";
 import {
   freshReport,
@@ -100,6 +101,7 @@ export function Reports(p: Props) {
       columns: ReportColumn[];
       snapshot: string;
     } | null>(null);
+  const printRef = useRef<HTMLElement>(null);
   const alive = useRef(true),
     generation = useRef(0),
     snapshot = useRef<string | undefined>(undefined);
@@ -203,7 +205,8 @@ export function Reports(p: Props) {
   useEffect(() => {
     if (printModel) {
       requestAnimationFrame(() => {
-        if (alive.current && p.isCurrent()) window.print();
+        if (alive.current && p.isCurrent() && printRef.current)
+          printView(printRef.current);
       });
     }
   }, [printModel]);
@@ -580,7 +583,11 @@ export function Reports(p: Props) {
         </p>
       </section>
       {printModel && (
-        <section className="print-report" aria-label="Export print view">
+        <section
+          ref={printRef}
+          className="print-report"
+          aria-label="Export print view"
+        >
           <h2>{printModel.title}</h2>
           <p>
             Authorized ledger snapshot · {new Date().toISOString()} ·{" "}

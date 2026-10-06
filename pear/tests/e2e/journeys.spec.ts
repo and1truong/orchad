@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { test, expect } from "@playwright/test";
 async function login(page: any, user = "learner-a") {
   await page.goto("/");
@@ -56,6 +57,45 @@ test("human learning: filter, preview, save/enroll, prerequisite, quiz, reload/r
   await expect(
     page.getByText("not accredited", { exact: false }),
   ).toBeVisible();
+  await page.evaluate(() => {
+    window.print = () => {};
+  });
+  await page
+    .getByRole("button", { name: "Print / save certificate PDF", exact: true })
+    .click();
+  await page.pdf({
+    path: "artifacts/course-certificate.pdf",
+    preferCSSPageSize: true,
+  });
+  const certificateText = execFileSync(
+    "pdftotext",
+    ["artifacts/course-certificate.pdf", "-"],
+    { encoding: "utf8" },
+  );
+  expect(certificateText).toContain("Học tập có chủ đích");
+  expect(certificateText).toContain("Certificate ID:");
+  expect(certificateText).not.toContain("Your next steps");
+  expect(certificateText).not.toContain("Private feedback");
+  await page.getByText("Rate this completed version", { exact: true }).click();
+  const feedback = page.getByRole("form", {
+    name: "Course feedback",
+    exact: true,
+  });
+  await feedback
+    .getByRole("combobox", { name: "Your rating", exact: true })
+    .selectOption("4");
+  await feedback
+    .getByLabel("Private feedback", { exact: true })
+    .fill("Luyện tập rất hữu ích. Private comment, not an official score.");
+  await feedback
+    .getByLabel("I confirm this rating and feedback express my own opinion.", {
+      exact: true,
+    })
+    .check();
+  await feedback
+    .getByRole("button", { name: "Save course feedback", exact: true })
+    .click();
+  await expect(feedback.getByRole("status")).toContainText("Feedback saved");
   await page.screenshot({
     path: "artifacts/human-completion.png",
     fullPage: true,
@@ -65,6 +105,28 @@ test("human learning: filter, preview, save/enroll, prerequisite, quiz, reload/r
   await expect(
     page.getByRole("button", { name: "Certificate", exact: true }),
   ).toBeVisible();
+  await page.getByText("Rate this completed version", { exact: true }).click();
+  await expect(
+    page.getByLabel("Private feedback", { exact: true }),
+  ).toHaveValue(
+    "Luyện tập rất hữu ích. Private comment, not an official score.",
+  );
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await login(page, "admin");
+  await page
+    .getByRole("button", { name: "Administration", exact: true })
+    .click();
+  const review = page.getByRole("region", {
+    name: "Private course feedback",
+    exact: true,
+  });
+  await review
+    .getByLabel("Feedback course ID", { exact: true })
+    .fill("learning-vi");
+  await review
+    .getByRole("button", { name: "Load private feedback", exact: true })
+    .click();
+  await expect(review).toContainText("Luyện tập rất hữu ích.");
 });
 
 test("admin creates/publishes/assigns; learner and manager scopes stay distinct", async ({
