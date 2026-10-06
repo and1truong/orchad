@@ -123,3 +123,11 @@ details {
 summary {
   cursor: pointer;
 }
+.chip {
+  display: inline-block;
+  border: 1px solid #8885;
+  border-radius: 9px;
+  padding: 0 7px;
+  margin: 2px 4px 2px 0;
+  font: 11px ui-monospace, monospace;
+}

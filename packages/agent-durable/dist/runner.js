@@ -51,29 +51,66 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
     const owned = await openOwnedStorage(options.storagePath, context);
     const credentials = new MemoryCredentials();
     const gateway = {};
+    // Every target ever bound this session keeps its tools published: a model
+    // call for an offline host mints a parked op instead of "unknown tool",
+    // which is what 'waiting_for_host' means. boundTargets is the live subset.
+    const knownTargets = new Map();
     let boundTargets = new Map();
     const revisionByTarget = new Map();
-    const waiters = new Set();
-    const park = () => new Promise((resolve) => waiters.add(resolve));
+    // Parked ops wait on their own target: bind() wakes only ops whose target
+    // actually came back; other targets stay parked, provably undispatched.
+    const waiters = new Map();
+    const park = (targetId) => boundTargets.has(targetId)
+        ? Promise.resolve()
+        : new Promise((resolve) => {
+            const set = waiters.get(targetId) ?? new Set();
+            set.add(resolve);
+            waiters.set(targetId, set);
+        });
+    const wake = (targetId) => {
+        for (const resolve of waiters.get(targetId) ?? [])
+            resolve();
+        waiters.delete(targetId);
+    };
+    const wakeAll = () => {
+        for (const set of waiters.values())
+            for (const resolve of set)
+                resolve();
+        waiters.clear();
+    };
     const provider = createMangoProvider({
         getGatewayBaseUrl: () => gateway.current?.baseUrl ?? "",
         fetcher: options.fetcher,
-        modelIds: ["orchard-model"],
-        tools: () => [...boundTargets.values()].flatMap((b) => b.binding.tools),
+        modelIds: () => [gateway.current?.model ?? "orchard-model"],
+        tools: () => [...knownTargets.values()].flatMap((b) => b.tools),
         maxSteps: options.maxSteps ?? 8,
         maxToolCalls: options.maxToolCalls ?? 16,
     });
     const models = createModels({ credentials });
     models.setProvider(provider);
     const registry = createRegistry();
-    const buildTools = () => [...boundTargets.values()].flatMap(({ binding, dispatch }) => binding.tools.map((descriptor) => orchardTool(descriptor, {
+    const buildTools = () => [...knownTargets.values()].flatMap((binding) => binding.tools.map((descriptor) => orchardTool(descriptor, {
         targetId: binding.targetId,
         idempotent: binding.idempotentTools?.includes(descriptor.name) ?? false,
         getRevision: () => revisionByTarget.get(binding.targetId) ?? null,
         revalidate: binding.revalidate,
-        whenBound: park,
+        whenBound: () => park(binding.targetId),
         dispatch: async (envelope, attempt, ctx) => {
-            const result = await dispatch(envelope, attempt, ctx);
+            // Resolved at dispatch time so a recovered op rides the CURRENT
+            // binding, not whatever closure was live when the task started.
+            const live = boundTargets.get(envelope.targetId);
+            if (!live)
+                return {
+                    ok: false,
+                    revision: null,
+                    data: null,
+                    error: {
+                        code: "TARGET_CLOSED",
+                        message: "Host target is not bound",
+                        retryable: true,
+                    },
+                };
+            const result = await live.dispatch(envelope, attempt, ctx);
             if (result.ok && typeof result.revision === "number")
                 revisionByTarget.set(envelope.targetId, result.revision);
             return result;
@@ -141,29 +178,34 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
             state: t.state.kind,
         }));
         let lastError;
+        let tailSettled = false;
+        let inputPending = false;
         for (const m of [...view.messages].reverse()) {
             if (m.role === "assistant") {
                 const a = m;
                 if (a.errorMessage)
                     lastError = a.errorMessage;
+                else if (a.stopReason === "stop")
+                    tailSettled = true;
+                break;
+            }
+            if (m.role === "user") {
+                inputPending = true;
                 break;
             }
         }
         const { phase, reason } = phaseOf({
-            scheduling: inspection.scheduling,
             tasks,
             submissions,
             ops,
             hostBound: boundTargets.size > 0,
-            cancelled: false,
+            cancelled: ctrl?.cancelledAt != null,
+            inputPending,
+            tailSettled,
             lastError,
         });
         return {
-            phase: ctrl?.cancelledAt != null
-                ? "cancelled"
-                : ops.some((o) => o.status === "parked") && boundTargets.size === 0
-                    ? "waiting_for_host"
-                    : phase,
+            phase,
             conversationId: String(root.id),
             submissions,
             ops,
@@ -201,15 +243,25 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
                 key: g.token,
             }));
             await root.configure({ model: { provider: "mango", modelId: g.model } }, context);
+            // Publish the (possibly new) model id into Models' catalog.
+            await models.refresh({ providers: ["mango"] }).catch(() => { });
         },
         async bind(bindings, dispatch) {
-            for (const b of bindings)
+            for (const b of bindings) {
                 boundTargets.set(b.targetId, { binding: b, dispatch });
+                knownTargets.set(b.targetId, b);
+                // Seed the CAS baseline once per rebind; after that, successful
+                // results carry the authoritative revision forward.
+                if (b.revision) {
+                    const rev = b.revision();
+                    if (typeof rev === "number")
+                        revisionByTarget.set(b.targetId, rev);
+                }
+            }
             republish();
             await root.configure({ extensions: [orchardExt] }, context);
-            for (const wake of [...waiters])
-                wake();
-            waiters.clear();
+            for (const b of bindings)
+                wake(b.targetId);
             publish();
         },
         unbind() {
@@ -240,8 +292,7 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
                 return undefined;
             }, context);
             await root.abort(context);
-            for (const wake of [...waiters])
-                wake();
+            wakeAll();
             publish();
             return statusOf();
         },
@@ -319,9 +370,7 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
             };
         },
         async close() {
-            for (const wake of [...waiters])
-                wake();
-            waiters.clear();
+            wakeAll();
             await harness.close(context);
             owned.release();
         },

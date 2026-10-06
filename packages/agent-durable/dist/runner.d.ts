@@ -21,6 +21,11 @@ export type RunnerGateway = {
 export type HostBinding = {
     targetId: string;
     tools: ToolDescriptor[];
+    /**
+     * Current committed revision of this target at bind time. Write ops CAS on
+     * it (expectedRevision); refreshed from host results after each dispatch.
+     */
+    revision?: () => number | null;
     /** Names of write tools whose backend dedups by idempotencyKey. */
     idempotentTools?: readonly string[];
     /** Host consent/approval gate consulted before any re-dispatch. */

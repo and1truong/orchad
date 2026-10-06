@@ -22,7 +22,11 @@ import {
   type Result as ClientResult,
 } from "@orchard/agent-client";
 import { listModels } from "../agent-client/gateway-adapter.js";
-import { CompanionTransport, type Paired } from "./companion-transport.js";
+import {
+  CompanionTransport,
+  type DurableStatus,
+  type Paired,
+} from "./companion-transport.js";
 function App() {
   const [status, setStatus] = useState("disconnected"),
     [bridgeStatus, setBridgeStatus] = useState("disconnected"),
@@ -47,6 +51,9 @@ function App() {
       no: () => void;
     } | null>(null),
     [paired, setPaired] = useState<Paired | null>(null),
+    [dStatus, setDStatus] = useState<DurableStatus | null>(null),
+    [dTranscript, setDTranscript] = useState<Message[] | null>(null),
+    [dPrompt, setDPrompt] = useState("Increment the counter by one"),
     [running, setRunning] = useState(false);
   const adapter = useRef<ChromePageAdapter | null>(null),
     session = useRef(new AbortController()),
@@ -173,7 +180,9 @@ function App() {
             : p.call((b as unknown as { call: unknown }).call, signal);
       },
     );
+    const unsubDurable = transport.current.onDurableStatus(setDStatus);
     return () => {
+      unsubDurable?.();
       clearConsent();
       chrome.tabs.onUpdated.removeListener(updated);
       chrome.tabs.onRemoved.removeListener(removed);
@@ -344,6 +353,32 @@ function App() {
       setRunning(false);
     }
   }
+  // Trusted durable ops over the paired bridge. The run lives in the
+  // companion process — closing this panel unbinds the host (ops park) and
+  // reopening rebinds + wakes them; nothing is entrusted to the page.
+  async function durableOp(
+    op:
+      | "submit"
+      | "status"
+      | "resume"
+      | "cancel"
+      | "transcript"
+      | "reconcile"
+      | "resolve",
+    params: Record<string, unknown> = {},
+  ) {
+    try {
+      const res = await transport.current?.durable(op, params);
+      if (op === "status" || op === "resume" || op === "cancel" || op === "reconcile" || op === "resolve")
+        setDStatus(res as DurableStatus);
+      if (op === "transcript")
+        setDTranscript((res as { messages: Message[] }).messages);
+      return res;
+    } catch (e) {
+      log("durable " + op + ": " + String(e));
+      return undefined;
+    }
+  }
   return (
     <main>
       <header>
@@ -485,6 +520,139 @@ function App() {
           >
             Deny
           </button>
+        </section>
+      )}
+      {paired && (
+        <section>
+          <h2>Durable run · companion-owned</h2>
+          <p className="muted">
+            Survives panel close and process restart. Writes still need this
+            sidebar's approval; parked work waits for the host to come back.
+          </p>
+          {dStatus && (
+            <div className="pin">
+              phase: <b>{dStatus.phase}</b>
+              {dStatus.reason ? ` · ${dStatus.reason}` : ""}
+              <br />
+              {dStatus.ops.length > 0 && (
+                <>
+                  ops:{" "}
+                  {dStatus.ops
+                    .map(
+                      (o) =>
+                        `${o.toolName}=${o.status}` +
+                        (o.attempts > 1 ? ` x${o.attempts}` : ""),
+                    )
+                    .join(" · ")}
+                  <br />
+                </>
+              )}
+              {dStatus.tasks.map((t) => (
+                <span key={t.name} className="chip">
+                  {t.name}:{t.state}
+                </span>
+              ))}
+            </div>
+          )}
+          <textarea
+            aria-label="Durable prompt"
+            value={dPrompt}
+            onChange={(e) => setDPrompt(e.target.value)}
+            rows={2}
+          />
+          <button
+            disabled={!dPrompt}
+            onClick={() =>
+              void durableOp("submit", {
+                prompt: dPrompt,
+                requestId: crypto.randomUUID(),
+              }).then(() => durableOp("status"))
+            }
+          >
+            Run durable
+          </button>
+          <button
+            className="secondary"
+            onClick={() => void durableOp("resume")}
+          >
+            Resume
+          </button>
+          <button
+            className="danger"
+            onClick={() => void durableOp("cancel")}
+          >
+            Cancel
+          </button>
+          <button
+            className="secondary"
+            onClick={() => void durableOp("status")}
+          >
+            Refresh
+          </button>
+          <button
+            className="secondary"
+            onClick={() => void durableOp("transcript")}
+          >
+            Transcript
+          </button>
+          {dStatus?.ops.some(
+            (o) => o.status === "ambiguous" || o.status === "interrupted",
+          ) && (
+            <button
+              className="secondary"
+              onClick={() => void durableOp("reconcile")}
+            >
+              Reconcile
+            </button>
+          )}
+          {dStatus?.ops
+            .filter(
+              (o) => o.status === "ambiguous" || o.status === "interrupted",
+            )
+            .map((o) => (
+              <div className="approval" key={o.opId}>
+                <p>
+                  Resolve {o.toolName} ({o.status})
+                </p>
+                <button
+                  onClick={() =>
+                    void durableOp("resolve", {
+                      callId: o.opId,
+                      verdict: { status: "reconciled" },
+                    })
+                  }
+                >
+                  Host says it applied
+                </button>
+                <button
+                  className="danger"
+                  onClick={() =>
+                    void durableOp("resolve", {
+                      callId: o.opId,
+                      verdict: {
+                        status: "failed",
+                        error: "Host says it did not apply",
+                      },
+                    })
+                  }
+                >
+                  Not applied
+                </button>
+              </div>
+            ))}
+          {dTranscript && (
+            <details open>
+              <summary>Persisted transcript</summary>
+              <div className="transcript">
+                {dTranscript
+                  .map(
+                    (m) =>
+                      `${m.role}: ${typeof m.content === "string" ? m.content : JSON.stringify(m)}`,
+                  )
+                  .join("\n")}
+              </div>
+            </details>
+          )}
         </section>
       )}
       <section>

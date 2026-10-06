@@ -9,7 +9,7 @@ import { transcriptToWire, turnUsage } from "./transcript.js";
  * calls an upstream model API directly.
  */
 export function createMangoProvider(opts) {
-    const models = opts.modelIds.map((id) => ({
+    const makeModel = (id) => ({
         id,
         name: id,
         api: "openai-completions",
@@ -20,7 +20,9 @@ export function createMangoProvider(opts) {
         reasoning: false,
         contextWindow: 0,
         maxTokens: 0,
-    }));
+    });
+    const modelIds = () => typeof opts.modelIds === "function" ? opts.modelIds() : opts.modelIds;
+    const models = modelIds().map(makeModel);
     const streamSimple = (model, context, options) => {
         const token = options?.apiKey;
         if (typeof token !== "string" || !token)
@@ -79,6 +81,7 @@ export function createMangoProvider(opts) {
             },
         },
         models,
+        fetchModels: async () => modelIds().map(makeModel),
         api: { stream: streamSimple, streamSimple },
     });
 }

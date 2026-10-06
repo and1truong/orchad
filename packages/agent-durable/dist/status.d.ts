@@ -1,4 +1,4 @@
-import type { HarnessInspection, SubmissionRecord } from "@earendil-works/pi-durable";
+import type { SubmissionRecord } from "@earendil-works/pi-durable";
 import type { OpRecord } from "./journal.js";
 /**
  * User-facing run states (issue #48): everything the trusted UI needs to show
@@ -8,7 +8,7 @@ export type RunPhase = "running" | "queued" | "waiting_for_host" | "waiting_for_
 export type RunStatus = {
     phase: RunPhase;
     conversationId: string;
-    /** Latest user-input submission states, oldest first (bounded). */
+    /** User-input submissions still tracked by the scheduler (bounded). */
     submissions: {
         requestId?: string;
         status: SubmissionRecord["status"];
@@ -31,9 +31,14 @@ export type RunStatus = {
     reason?: string;
     detail?: string;
 };
-/** Map persisted + inspection state onto the app-level phase. */
+/**
+ * Map persisted + inspection state onto the app-level phase. `inspection`
+ * only tracks non-terminal submissions, so completion is derived from the
+ * committed transcript tail: input admitted with a non-error assistant
+ * message after it is "completed"; input admitted with nothing after it is
+ * queued/running; nothing admitted is "idle".
+ */
 export declare function phaseOf(input: {
-    scheduling: HarnessInspection["scheduling"];
     tasks: {
         name: string;
         state: string;
@@ -42,6 +47,10 @@ export declare function phaseOf(input: {
     ops: RunStatus["ops"];
     hostBound: boolean;
     cancelled: boolean;
+    /** A user input exists but the turn produced nothing committed yet. */
+    inputPending: boolean;
+    /** Latest committed assistant message is a clean stop (turn finished). */
+    tailSettled: boolean;
     lastError?: string;
 }): {
     phase: RunPhase;

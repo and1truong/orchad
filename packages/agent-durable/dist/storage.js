@@ -39,7 +39,10 @@ export async function openOwnedStorage(path, context) {
                 ownerPid = JSON.parse(readFileSync(lockPath, "utf8")).pid;
             }
             catch { }
-            if (ownerPid !== undefined && ownerPid !== process.pid && pidAlive(ownerPid))
+            // Any live owner blocks a second open — including this same process.
+            // A same-pid hit means the previous runner never released; running two
+            // Harnesses over one DB would split the journal's brain.
+            if (ownerPid !== undefined && pidAlive(ownerPid))
                 throw new StorageOwnerConflict(path, ownerPid);
             rmSync(lockPath, { force: true });
             if (attempt === 1)

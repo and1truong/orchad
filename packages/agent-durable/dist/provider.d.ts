@@ -4,8 +4,12 @@ export type MangoProviderOptions = {
     /** Live base URL thunk: reconfigure never rebuilds the provider. */
     getGatewayBaseUrl: () => string;
     fetcher?: typeof fetch;
-    /** Model ids the runner may select, e.g. ["fixture-model"]. */
-    modelIds: readonly string[];
+    /**
+     * Model ids the runner may select. A thunk is resolved on every Models
+     * refresh, so a gateway reconfigure can publish the new model id without
+     * rebuilding the provider.
+     */
+    modelIds: readonly string[] | (() => readonly string[]);
     /**
      * Current host tool descriptors (name/description/inputSchema/effect) at
      * request time. The runner republishes this on every host rebind; the
