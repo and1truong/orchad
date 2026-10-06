@@ -33,7 +33,7 @@ test("review alone keeps enrolled quiz; invalid target/nonquiz edits and assigne
 test("original upgrade receipt survives immediate retry but duplicate new operation and lost current content rights are denied",()=>{
  const f=setup();try{
   const override={idempotencyKey:"upgrade-original",expectedRevision:f.service.context("learner-a").revision},result=upgrade(f,override);data(result);assert.deepEqual(upgrade(f,override),result);assert.equal(upgrade(f).ok,false);
-  f.db.prepare("UPDATE accounts SET tenant='other' WHERE id='learner-a'").run();assert.equal(upgrade(f,override).ok,false);
+  f.db.prepare("UPDATE accounts SET tenant='other' WHERE id='learner-a'").run();assert.equal(f.service.invoke("learner-a",{requestId:"revoked-original-upgrade",documentId:"learning:demo:learner-a",toolName:"human_restart_latest_quiz",arguments:{enrollmentId:f.e.enrollmentId,targetVersion:2,confirmed:true},...override},"human").ok,false);
  }finally{f.db.close();}
 });
 test("audit failure rolls withdrawal, successor, key and revision back atomically",()=>{
