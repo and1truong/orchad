@@ -1,3 +1,4 @@
+import {CollectionSharing} from "./collection-sharing.ts";
 import {ModerationAssignments} from "./moderation-assignments.ts";
 import {QuizRetries} from "./quiz-retries.ts";
 import {QuestionProgression} from "./question-progression.ts";
@@ -255,6 +256,7 @@ export class LearningService {
     new QuestionBankService(this.db).authorize(p,c.toolName,a);
     this.programs.authorize(p, c.toolName, a);
     new ModerationAssignments(this.db).authorize(p,c.toolName,a);
+    new CollectionSharing(this.db).authorize(p,c.toolName,a);
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
     this.reports.authorize(p, c.toolName, a);
@@ -429,7 +431,9 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "human_open_provider_content"
+        ["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(c.toolName)
+          ? {offerId:data.offerId,collectionId:c.arguments.collectionId??c.arguments.destinationCollectionId,sourceVersion:c.arguments.sourceVersion,referenceCount:Array.isArray(c.arguments.references)?c.arguments.references.length:0,state:data.state}
+          : c.toolName === "human_open_provider_content"
           ? {providerId:c.arguments.providerId,sourceId:c.arguments.sourceId,sourceVersion:c.arguments.version,launchId:data.launchId,confirmed:true}
           : ["human_retake_completed_course","human_restart_latest_quiz"].includes(c.toolName)
           ? {enrollmentId:c.arguments.enrollmentId,newEnrollmentId:data.enrollmentId,mode:c.arguments.mode,targetVersion:c.arguments.targetVersion}
@@ -554,6 +558,7 @@ export class LearningService {
     if(name==="learning_get_provider_item")return this.providerCatalog.item(p,a.providerId,a.sourceId,source as "human"|"bridge");
     if(name==="learning_get_my_provider_launches")return this.providerCatalog.history(p,a.offset??0,source as "human"|"bridge");
     if(name==="human_get_portal_branding")return new PortalService(this.db).read(p);
+    if(name==="human_get_original_collection_offers")return new CollectionSharing(this.db).read(p,a);
     if(name==="human_get_latest_quiz_options")return new RetakeService(this.db).readUpgrade(p,a);
     if(name==="human_get_course_retake_options")return new RetakeService(this.db).read(p,a);
     if(["learning_get_question_banks","learning_get_question_bank"].includes(name))return new QuestionBankService(this.db).read(p,name,a,source);
@@ -1061,6 +1066,7 @@ export class LearningService {
     if(name==="human_review_provider_connection")return this.providerCatalog.review(p,a);
     if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);
     if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);
+    if(["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(name))return new CollectionSharing(this.db).write(p,name,a);
     if(name==="human_restart_latest_quiz")return new RetakeService(this.db).writeUpgrade(p,a);
     if(name==="human_retake_completed_course")return new RetakeService(this.db).write(p,a);
     if(["learning_save_question_bank","learning_retire_question_bank"].includes(name))return new QuestionBankService(this.db).write(p,name,a);

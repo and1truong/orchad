@@ -180,3 +180,7 @@ Optional human-reviewed quiz-only successor for unfinished self-directed objecti
 
 ## Server certificate PDF (PR #118)
 Authenticated read-only original course/award PDF from authoritative own completed records, actual embedded-font Vietnamese text extraction and literal markup; private no-store attachment, no active PDF content. Explicit production font configuration and bounded Latin/Vietnamese profile; unsupported scripts/missing fonts retain text/browser exports. Five font/PDF reader/HTTP/config tests and one actual EN/VI browser download fixture authored; exact-head CI pending. Accreditation, PDF/A/tagged-PDF and manual accessibility/provider/production deployment audits remain NOT VERIFIED.
+
+
+## Reviewed original collection configuration sharing (PR #119)
+Two explicit administrators offer/review one published original configuration; receiver maps current authorized local references and creates an author-private draft. No media/licenses/users/history/groups/assessor grants/publication transfer. Current source/destination authority, version CAS, expiry, redacted audit/counterpart revisions and definition withholding on revocation. Seven domain/live-rights/HTTP/reopen regressions and one actual EN/VI two-admin browser fixture authored; exact-head CI pending. Live/provider crossportal equivalence, retention/invitation/user synchronization/production audits remain OPEN/NOT VERIFIED.

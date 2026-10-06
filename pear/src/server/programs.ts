@@ -223,6 +223,7 @@ export class ProgramService {
       ...(publishing ? { version: ref.version ?? row.latest_version } : {}),
     };
   }
+  validateSharedDraft(p:Principal,id:string,kind:"award"|"playlist",value:unknown){return this.validate(p,id,kind,value);}
   private validate(
     p: Principal,
     id: string,

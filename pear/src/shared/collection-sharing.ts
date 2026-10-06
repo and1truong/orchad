@@ -1,0 +1,8 @@
+import {tool,string,integer,array,object,enumeration} from "./schema.ts";
+export const collectionSharingHumanTools=[
+ tool("human_offer_original_collection","write",{collectionId:string(64),sourceVersion:integer(1000000,1),destinationTenant:string(64),destinationAdminId:string(64),destinationCollectionId:string(64),confirmed:{type:"boolean",enum:[true]}},"Source administrator explicitly offers original immutable collection configuration to one active other-tenant administrator. No media, users, answers, grants or automatic publication transferred."),
+ tool("human_get_original_collection_offers","read",{direction:enumeration("incoming","outgoing"),offset:integer(100000),limit:integer(20,1)},"Read only own explicitly addressed or created original collection offers, without provider content or learner evidence.",["direction"]),
+ tool("human_cancel_original_collection_offer","write",{offerId:string(64),expectedVersion:integer(1),reason:string(300)},"Source administrator cancels an own pending offer; accepted copies/history remain unchanged."),
+ tool("human_accept_original_collection_offer","write",{offerId:string(64),expectedVersion:integer(1),references:array(object({kind:enumeration("course","item","award"),sourceId:string(64),destinationId:string(64),version:integer(1000000,1)}),64),confirmed:{type:"boolean",enum:[true]}},"Addressed receiving administrator reviews original configuration and maps every content reference to a currently authorized local published version; creates author-only draft, never publishes or transfers grades/grants.")
+];
+export const collectionSharingWrites=["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"];

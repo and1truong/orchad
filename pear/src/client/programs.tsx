@@ -1,3 +1,4 @@
+import {OriginalCollectionSharing} from "./collection-sharing.tsx";
 import {PrimaryAssignment,AssessmentNotices} from "./moderation-assignments.tsx";
 import {awardUnitLabel} from "../shared/programs.ts";
 import {translateUI} from "./i18n.ts";
@@ -792,6 +793,7 @@ export function Programs(props: Props) {
           <button disabled={busy}>{translateUI("Assign award")}</button>
         </form>
       )}
+      {role==="admin"&&administrative&&<OriginalCollectionSharing actions={props} tick={tick}/>}
       {["admin","assessor"].includes(role)&&<AssessmentNotices actions={{...props,mutate:(name,args)=>props.mutate(name,args,`learning:${props.session.principal.tenant}:${props.session.principal.id}`)}} tick={tick}/>}
       {administrative && role === "admin" && (
         <form
