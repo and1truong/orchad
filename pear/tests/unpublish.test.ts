@@ -22,8 +22,10 @@ test("unpublish withdraws new enrollment/discovery/references while immutable le
   assert.equal(data(f.call("learner-b","learning_search_collections")).items.some((x:any)=>x.id==="withdraw-award"),false);
   for(const [tool,args] of [["learning_enroll",{courseId:"systems-basics"}],["learning_enroll_item",{itemId:"withdraw-item",version:1}],["learning_enroll_award",{collectionId:"withdraw-award"}]] as const)assert.equal(f.call("learner-b",tool,args).ok,false);
   assert.equal(f.call("admin","learning_assign",{courseId:"systems-basics",learnerId:"learner-b",dueDate:null}).ok,false);
-  assert.equal(f.call("admin","learning_save_playlist",{collectionId:"invalid-reference",playlist:{title:"Unavailable reference",summary:"Original",access:"tenant",items:[{kind:"course",id:"systems-basics"}]}}).ok,false);
-  assert.equal(f.call("admin","learning_save_playlist",{collectionId:"invalid-item-reference",playlist:{title:"Unavailable item",summary:"Original",access:"tenant",items:[{kind:"item",id:"withdraw-item"}]}}).ok,false);
+  data(f.call("admin","learning_save_playlist",{collectionId:"invalid-reference",playlist:{title:"Unavailable reference",summary:"Original",access:"tenant",items:[{kind:"course",id:"systems-basics"}]}}));
+  assert.equal(f.call("admin","learning_publish_collection",{collectionId:"invalid-reference"}).ok,false);
+  data(f.call("admin","learning_save_playlist",{collectionId:"invalid-item-reference",playlist:{title:"Unavailable item",summary:"Original",access:"tenant",items:[{kind:"item",id:"withdraw-item"}]}}));
+  assert.equal(f.call("admin","learning_publish_collection",{collectionId:"invalid-item-reference"}).ok,false);
   data(f.call("learner-a","learning_get_progress",{enrollmentId:course}));
   assert.equal(data(f.call("learner-a","learning_get_item_enrollment",{itemEnrollmentId:standalone},"human")).item.text,item.text);
   data(f.call("learner-a","human_complete_item",{itemEnrollmentId:standalone,confirmed:true},"human"));
