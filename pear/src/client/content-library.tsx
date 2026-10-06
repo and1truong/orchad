@@ -270,11 +270,18 @@ export function StandaloneReader({
   session,
   item,
   onClose,
+  onTrack,
+  onComplete,
+  busy = false,
 }: {
   session: Session;
   item: any;
   onClose: () => void;
+  onTrack?: () => void;
+  onComplete?: () => void;
+  busy?: boolean;
 }) {
+  const [confirmed, setConfirmed] = useState(false);
   return (
     <section className="panel" aria-label="Standalone item reader">
       <h2>{item.title}</h2>
@@ -283,10 +290,42 @@ export function StandaloneReader({
         certificate
       </p>
       <p className="lesson-text">{item.text}</p>
+      {!item.itemEnrollmentId && onTrack && (
+        <button disabled={busy} onClick={onTrack}>
+          Track this standalone version
+        </button>
+      )}
+      {item.itemEnrollmentId && (
+        <p>
+          {item.status === "completed"
+            ? "Reading confirmed"
+            : "Tracked · In progress"}
+        </p>
+      )}
+      {item.itemEnrollmentId && item.status !== "completed" && onComplete && (
+        <fieldset disabled={busy}>
+          <legend>Confirm reading</legend>
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />
+            I confirm I have studied this standalone version.
+          </label>
+          <button disabled={!confirmed} onClick={onComplete}>
+            Confirm standalone reading
+          </button>
+        </fieldset>
+      )}
       <UploadedMedia
         session={session}
         content={item}
-        context={{ itemId: item.id, version: item.version }}
+        context={
+          item.itemEnrollmentId
+            ? { itemEnrollmentId: item.itemEnrollmentId }
+            : { itemId: item.id, version: item.version }
+        }
       />
       {item.kind === "video" && !item.assetId && (
         <video controls preload="none" src={item.url} aria-label={item.title} />
@@ -302,7 +341,7 @@ export function StandaloneReader({
           <p className="lesson-text">{item.transcript}</p>
         </details>
       )}
-      <button className="ghost" onClick={onClose}>
+      <button className="ghost" disabled={busy} onClick={onClose}>
         Close item
       </button>
     </section>

@@ -121,6 +121,7 @@ export function UploadedMedia({
   session: Session;
   content: { assetId?: string; kind: string; title: string };
   context: {
+    itemEnrollmentId?: string;
     recordId?: string;
     submissionId?: string;
     itemId?: string;

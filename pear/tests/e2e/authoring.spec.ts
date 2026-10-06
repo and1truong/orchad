@@ -232,7 +232,7 @@ test("human authoring: reusable version, two modules, three lessons, two questio
     .getByRole("button", { name: "Read item", exact: true })
     .click();
   await expect(
-    discovery.getByRole("region", { name: "Standalone item reader" }),
+    page.getByRole("region", { name: "Standalone item reader" }),
   ).toContainText("Version two is not silently propagated");
   const courseCard = page.locator("article").filter({
     has: page.getByRole("heading", {

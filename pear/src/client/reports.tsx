@@ -351,7 +351,7 @@ export function Reports(p: Props) {
                     change({ ...spec, kind: e.target.value as any })
                   }
                 >
-                  {["all", "course", "award"].map((t) => (
+                  {["all", "course", "award", "item"].map((t) => (
                     <option key={t}>{t}</option>
                   ))}
                 </select>

@@ -24,7 +24,7 @@ export interface ReportSpec {
   title: string;
   template: "progress" | "completions" | "overdue" | "awards";
   query: string;
-  kind: "all" | "course" | "award";
+  kind: "all" | "course" | "award" | "item";
   status:
     | "all"
     | "in_progress"
@@ -45,7 +45,7 @@ export const reportSchema = object({
   title: string(160),
   template: enumeration("progress", "completions", "overdue", "awards"),
   query: string(200, 0),
-  kind: enumeration("all", "course", "award"),
+  kind: enumeration("all", "course", "award", "item"),
   status: enumeration(
     "all",
     "in_progress",
@@ -78,7 +78,7 @@ export function reportTools(role: Role): Tool[] {
       "learning_get_transcript",
       "read",
       page,
-      "Read own course and award ledger, including recurring cycles and completion source/version; no estimated-duration-as-telemetry claim.",
+      "Read own course, standalone and award ledger, including recurring cycles and completion source/version; standalone completion is learner-confirmed reading, not an assessment or certificate.",
       [],
     ),
     ...(["admin", "manager"].includes(role)

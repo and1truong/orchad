@@ -150,7 +150,35 @@ export class ReportService {
         score: null,
         requiredComplete: e.requiredComplete,
       }));
-    return [...courses, ...awards];
+    const items = (
+      this.db
+        .prepare(
+          "SELECT e.*,v.content FROM item_enrollments e JOIN content_item_versions v ON v.item_id=e.item_id AND v.version=e.version JOIN content_items i ON i.id=e.item_id AND i.tenant=e.tenant WHERE e.tenant=? ORDER BY e.id",
+        )
+        .all(p.tenant) as any[]
+    )
+      .filter((e) => names.has(e.learner))
+      .map((e) => ({
+        id: e.id,
+        learnerId: e.learner,
+        learnerName: names.get(e.learner),
+        contentId: e.item_id,
+        title: JSON.parse(e.content).title,
+        kind: "item",
+        version: e.version,
+        status: e.completed_at ? "completed" : "in_progress",
+        source: "self",
+        dueDate: null,
+        completedAt: e.completed_at,
+        progress: e.completed_at ? 100 : 0,
+        earned: null,
+        target: null,
+        unit: null,
+        cycleId: null,
+        score: null,
+        requiredComplete: null,
+      }));
+    return [...courses, ...awards, ...items];
   }
   private filtered(rows: any[], s: ReportSpec) {
     const q = s.query.normalize("NFKC").toLowerCase();

@@ -6,6 +6,7 @@ import { reject } from "./errors.ts";
 import { ProgramService } from "./programs.ts";
 export const uploadLimit = 8 * 1024 * 1024;
 export type MediaContext = {
+  itemEnrollmentId?: string;
   recordId?: string;
   submissionId?: string;
   itemId?: string;
@@ -284,7 +285,14 @@ export class MediaService {
       reject("FORBIDDEN", "Submission file review scope denied");
     }
     let content: { assetId?: string } | undefined;
-    if (c.itemId && !c.enrollmentId && Number.isInteger(c.version)) {
+    if (c.itemEnrollmentId) {
+      const e = this.db
+        .prepare(
+          "SELECT v.content FROM item_enrollments e JOIN content_item_versions v ON v.item_id=e.item_id AND v.version=e.version JOIN content_items i ON i.id=e.item_id AND i.tenant=e.tenant WHERE e.id=? AND e.tenant=? AND e.learner=?",
+        )
+        .get(c.itemEnrollmentId, p.tenant, p.id) as any;
+      if (e) content = JSON.parse(e.content);
+    } else if (c.itemId && !c.enrollmentId && Number.isInteger(c.version)) {
       const item = this.db
         .prepare(
           "SELECT v.content FROM content_item_versions v JOIN content_items i ON i.id=v.item_id WHERE i.id=? AND i.tenant=? AND i.state='published' AND v.version=?",

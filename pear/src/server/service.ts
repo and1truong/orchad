@@ -1,5 +1,6 @@
 import { BlendedService, releaseInactiveBookings } from "./blended.ts";
 import { FeedbackService } from "./feedback.ts";
+import { StandaloneService } from "./standalone.ts";
 import { MediaService } from "./media.ts";
 import {
   AssessmentService,
@@ -59,6 +60,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly standalone: StandaloneService;
   readonly feedback: FeedbackService;
   readonly blended: BlendedService;
   readonly media: MediaService;
@@ -68,6 +70,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
+    this.standalone = new StandaloneService(db);
     this.feedback = new FeedbackService(db);
     this.blended = new BlendedService(db);
     this.media = new MediaService(db);
@@ -206,6 +209,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    this.standalone.authorize(p, c.toolName, a);
     this.feedback.authorize(p, c.toolName, a);
     this.blended.authorize(p, c.toolName, a);
     this.programs.authorize(p, c.toolName, a);
@@ -476,6 +480,10 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if (
+      ["learning_get_my_items", "learning_get_item_enrollment"].includes(name)
+    )
+      return this.standalone.read(p, name, a, source);
     if (
       [
         "learning_get_course_ratings",
@@ -968,6 +976,8 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if (["learning_enroll_item", "human_complete_item"].includes(name))
+      return this.standalone.write(p, name, a);
     if (name === "human_save_course_feedback") return this.feedback.write(p, a);
     switch (name) {
       case "learning_book_session":

@@ -1,3 +1,4 @@
+import { StandaloneLearning } from "./standalone-learning.tsx";
 import { Certificate } from "./certificate.tsx";
 import { CourseFeedback, CourseRatings, FeedbackReview } from "./feedback.tsx";
 import { BlendedPlayer, BlendedReviews } from "./blended.tsx";
@@ -306,12 +307,14 @@ function App() {
       personal(session!),
     );
     if (sessionRef.current !== session) return;
+    setReadingItem(null);
     setActive(e);
     setLesson(r);
     setAttempt(null);
     setPreview(null);
   };
   const clearLearning = () => {
+    setReadingItem(null);
     setActive(null);
     setLesson(null);
     setAttempt(null);
@@ -702,15 +705,58 @@ function App() {
                 Next standalone
               </button>
             </div>
-            {readingItem && (
-              <StandaloneReader
-                session={session}
-                item={readingItem}
-                onClose={() => setReadingItem(null)}
-              />
-            )}
           </section>
         )}
+        {readingItem &&
+          (view === "catalog" ||
+            (view === "learning" && readingItem.itemEnrollmentId)) && (
+            <StandaloneReader
+              key={
+                session.sessionEpoch +
+                readingItem.id +
+                readingItem.version +
+                (readingItem.itemEnrollmentId ?? "untracked")
+              }
+              session={session}
+              item={readingItem}
+              busy={busy}
+              onClose={() => setReadingItem(null)}
+              onTrack={() =>
+                void run(async () => {
+                  const enrolled = await mutate("learning_enroll_item", {
+                    itemId: readingItem.id,
+                    version: readingItem.version,
+                  });
+                  const value = await op("learning_get_item_enrollment", {
+                    itemEnrollmentId: enrolled.itemEnrollmentId,
+                  });
+                  if (sessionRef.current === session)
+                    setReadingItem({
+                      ...value.item,
+                      itemEnrollmentId: enrolled.itemEnrollmentId,
+                      status: value.status,
+                    });
+                })
+              }
+              onComplete={() =>
+                void run(async () => {
+                  await mutate("human_complete_item", {
+                    itemEnrollmentId: readingItem.itemEnrollmentId,
+                    confirmed: true,
+                  });
+                  const value = await op("learning_get_item_enrollment", {
+                    itemEnrollmentId: readingItem.itemEnrollmentId,
+                  });
+                  if (sessionRef.current === session)
+                    setReadingItem({
+                      ...value.item,
+                      itemEnrollmentId: readingItem.itemEnrollmentId,
+                      status: value.status,
+                    });
+                })
+              }
+            />
+          )}
         {preview && (
           <section className="panel" aria-label="Course preview">
             <h2>{preview.title}</h2>
@@ -774,6 +820,19 @@ function App() {
                 <span>Saved</span>
               </div>
             </div>
+            <StandaloneLearning
+              key={"items:" + session.sessionEpoch}
+              tick={tick}
+              busy={busy}
+              op={op}
+              run={run}
+              onRead={(value) => {
+                if (sessionRef.current === session) {
+                  clearLearning();
+                  setReadingItem(value);
+                }
+              }}
+            />
             <h2>Your next steps</h2>
             <p className="muted">
               Showing up to 20 enrollments. Counts above are for this page;
