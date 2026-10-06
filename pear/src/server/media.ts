@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import type { Principal, Course, ContentItem } from "../shared/model.ts";
@@ -228,7 +229,7 @@ export class MediaService {
     const row = this.db
       .prepare("SELECT * FROM assets WHERE id=? AND tenant=?")
       .get(id, p.tenant) as any;
-    if (!row || row.purpose !== "content")
+    if (!row || row.purpose !== "content" || !new ContentAccess(this.db).assetForAuthor(p,id))
       reject("FORBIDDEN", "Asset unavailable in this tenant");
     const allowed: Record<string, string[]> = {
       caption: ["text/vtt"],
@@ -249,7 +250,7 @@ export class MediaService {
     if (!row) reject("FORBIDDEN", "Asset access denied");
     if (
       row.owner === p.id ||
-      (row.purpose === "content" && ["admin", "content_admin"].includes(a.role))
+      (row.purpose === "content" && new ContentAccess(this.db).assetForAuthor(p,id))
     )
       return row;
     if (row.purpose === "award_evidence") {
@@ -304,7 +305,7 @@ export class MediaService {
           "SELECT v.content FROM content_item_versions v JOIN content_items i ON i.id=v.item_id WHERE i.id=? AND i.tenant=? AND i.state='published' AND v.version=?",
         )
         .get(c.itemId, p.tenant, c.version!) as any;
-      if (item) content = JSON.parse(item.content);
+      if (item) {new ContentAccess(this.db).current(p,"item",c.itemId);new ContentAccess(this.db).requireVisible(p,"item",c.itemId,JSON.parse(item.content));content = JSON.parse(item.content);}
     } else if (c.enrollmentId && c.lessonId && !c.itemId) {
       const e = this.db
         .prepare(

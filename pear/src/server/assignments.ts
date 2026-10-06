@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import { releaseInactiveBookings } from "./blended.ts";
 import { calendarMonth, nextCalendarRun, calendarRunIndex, calendarPreview } from "../shared/calendar.ts";
 import type { DatabaseSync } from "node:sqlite";
@@ -84,6 +85,7 @@ export class AssignmentService {
       .get(row.id, selected) as any;
     if (!v) reject("NOT_FOUND", "Target version unavailable");
     const content = JSON.parse(v.content);
+    if(s.targetKind==="course"){new ContentAccess(this.db).current(p,"course",row.id);new ContentAccess(this.db).requireVisible(p,"course",row.id,content);}
     if (s.targetKind === "award" && content.access !== "tenant")
       reject("FORBIDDEN", "Scheduled awards require organization access");
     return { version: selected, title: content.title };
@@ -136,6 +138,10 @@ export class AssignmentService {
       );
     const recipients = this.recipients(p, s),
       target = this.target(p, s);
+    if(s.targetKind==="course"){
+      const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(s.targetId,target.version) as any).content);
+      for(const id of recipients){const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;new ContentAccess(this.db).requireVisible(recipient,"course",s.targetId,value);new ContentAccess(this.db).current(recipient,"course",s.targetId);}
+    }
     return { ...target, recipients };
   }
   authorize(p: Principal, name: string, a: any) {
@@ -215,7 +221,13 @@ export class AssignmentService {
       .prepare("SELECT * FROM assignment_deliveries WHERE cycle_id=?")
       .all(cycle.id) as any[];
     const desired = new Set(
-      members.filter((id) => this.recipientAvailable(p, id)),
+      members.filter((id) => {
+        if(!this.recipientAvailable(p,id))return false;
+        if(s.targetKind!=="course")return true;
+        const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(id,p.tenant) as unknown as Principal;
+        const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(cycle.target_id,cycle.target_version) as any).content);
+        try{new ContentAccess(this.db).current(recipient,"course",cycle.target_id);return new ContentAccess(this.db).visible(recipient,"course",cycle.target_id,value);}catch{return false;}
+      }),
     );
     for (const d of current) {
       const table = d.enrollment_id ? "enrollments" : "award_enrollments",
@@ -407,6 +419,8 @@ export class AssignmentService {
       .prepare("SELECT tenant FROM courses WHERE id=?")
       .get(a.courseId) as any;
     if (course?.tenant !== p.tenant) reject("FORBIDDEN", "Course unavailable");
+    const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(a.courseId,version) as any).content);
+    new ContentAccess(this.db).current(p,"course",a.courseId);new ContentAccess(this.db).requireVisible(p,"course",a.courseId,value);
     if (authorizeOnly) return { authorized: true };
     const id = randomUUID();
     this.db

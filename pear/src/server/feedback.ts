@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import type { Principal } from "../shared/model.ts";
 import { reject, boundedPage } from "./errors.ts";
@@ -37,6 +38,8 @@ export class FeedbackService {
         .get(c.id, version, p.id, p.tenant)
     )
       reject("FORBIDDEN", "Rating scope denied");
+    const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(c.id,version) as any).content);
+    new ContentAccess(this.db).requireVisible(p,"course",c.id,value);
     return version;
   }
   authorize(p: Principal, name: string, a: any) {

@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import {randomUUID} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
@@ -16,6 +17,7 @@ export class TranslationService{
   const row=this.db.prepare("SELECT c.*,v.content FROM "+table+" c JOIN "+versions+" v ON v."+column+"=c.id AND v.version=c.latest_version WHERE c.tenant=? AND c.id=? AND c.state='published'").get(p.tenant,id) as any;
   if(!row)reject("NOT_FOUND","Published authorized content required");
   const value=JSON.parse(row.content);
+  new ContentAccess(this.db).requireVisible(p,kind as "course"|"item",id,value);
   return {id:row.id,version:row.latest_version,title:value.title,language:value.language,license:value.license,aiProcessingAllowed:!!value.aiProcessingAllowed,provider:value.provider};
  }
  read(p:Principal,kind:string,sourceId:string,preferredLanguage:string,access="human"){
@@ -42,7 +44,10 @@ export class TranslationService{
  }
  settings(p:Principal,offset=0){
   this.live(p,true);const rows=this.db.prepare("SELECT v.id,i.original_id AS originalId,v.kind,v.source_id AS sourceId,v.source_version AS sourceVersion,v.original_version AS originalVersion,v.language,v.provenance,v.quality_review AS qualityReview,v.active,v.created_at AS createdAt FROM translation_variants v JOIN translation_identities i ON i.id=v.identity_id WHERE v.tenant=? ORDER BY v.created_at,v.id").all(p.tenant);
-  return boundedPage(rows,offset,20);
+  return boundedPage((rows as any[]).filter(row=>{
+   if(p.role==="admin")return true;
+   try{new ContentAccess(this.db).current(p,row.kind,row.originalId);new ContentAccess(this.db).current(p,row.kind,row.sourceId);return true;}catch{return false;}
+  }),offset,20);
  }
  mutate(p:Principal,a:any){
   this.db.exec("BEGIN IMMEDIATE");
@@ -61,6 +66,8 @@ export class TranslationService{
    }else{
     oldRow=this.db.prepare("SELECT * FROM translation_variants WHERE id=? AND tenant=?").get(a.variantId,p.tenant);
     if(!oldRow)reject("FORBIDDEN","Authorized translation required");
+    const table=oldRow.kind==="course"?"courses":"content_items",source=this.db.prepare("SELECT draft FROM "+table+" WHERE tenant=? AND id=?").get(p.tenant,oldRow.source_id) as any;
+    if(!source)reject("FORBIDDEN","Authorized translation source required");new ContentAccess(this.db).author(p,oldRow.kind,oldRow.source_id,JSON.parse(source.draft));
    }
    const doc="library:"+p.tenant,payload=tokenHash(JSON.stringify(Object.fromEntries(Object.entries(a).filter(([k])=>k!=="revision"))));
    const previous=this.db.prepare("SELECT * FROM idempotency WHERE principal=? AND document_id=? AND key=?").get(p.id,doc,a.key) as any;

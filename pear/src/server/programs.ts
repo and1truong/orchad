@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID, createHash } from "node:crypto";
 import { validateArgs } from "@orchard/bridge-contract";
@@ -168,6 +169,7 @@ export class ProgramService {
     ref: Reference,
     rootAccess: string,
     publishing: boolean,
+    rootOwner=p.id,
   ): Reference {
     if (!identifier.test(ref.id))
       reject("INVALID_ARGUMENT", "Invalid reference ID");
@@ -185,6 +187,12 @@ export class ProgramService {
       reject("NOT_FOUND", "Referenced content unavailable");
     if (publishing && row.state !== "published")
       reject("FORBIDDEN", "Publish only available published references");
+    if(ref.kind==="course"||ref.kind==="item"){
+      const column=ref.kind==="course"?"course_id":"item_id",versionTable=ref.kind==="course"?"course_versions":"content_item_versions";
+      const content=publishing?json((this.db.prepare("SELECT content FROM "+versionTable+" WHERE "+column+"=? AND version=?").get(row.id,ref.version??row.latest_version) as any)?.content??"null"):json(row.draft);
+      if(!content)reject("NOT_FOUND","Referenced content version unavailable");
+      new ContentAccess(this.db).reference(p,ref.kind,row.id,content,rootAccess,rootOwner);
+    }
     if (ref.kind === "award") {
       const child = publishing
         ? this.version(row.id, ref.version ?? row.latest_version)
@@ -261,7 +269,7 @@ export class ProgramService {
             "Invalid or duplicate criterion alternatives",
           );
         for (const ref of r.alternatives) {
-          this.reference(p, ref, content.access, publishing);
+          this.reference(p, ref, content.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(awardId,p.tenant) as any)?.owner??p.id);
           if (ref.kind === "award") {
             const child = this.collection(p, ref.id);
             // Draft cycle checks are deliberately conservative, including drafts
@@ -283,7 +291,7 @@ export class ProgramService {
       walk(id, value as Award, [], 1);
       for (const r of (value as Award).requirements)
         r.alternatives = r.alternatives.map((ref) =>
-          this.reference(p, ref, value.access, publishing),
+          this.reference(p, ref, value.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(id,p.tenant) as any)?.owner??p.id),
         );
     } else {
       const playlist = value as Playlist;
@@ -293,7 +301,7 @@ export class ProgramService {
       )
         reject("INVALID_ARGUMENT", "Duplicate playlist items");
       playlist.items = playlist.items.map((ref) =>
-        this.reference(p, ref, value.access, publishing),
+        this.reference(p, ref, value.access, publishing, (this.db.prepare("SELECT owner FROM collections WHERE id=? AND tenant=?").get(id,p.tenant) as any)?.owner??p.id),
       );
     }
     if (Buffer.byteLength(JSON.stringify(value)) > 28 * 1024)

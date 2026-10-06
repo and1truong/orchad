@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type {DatabaseSync} from "node:sqlite";
 import {createHash} from "node:crypto";
 import type {Principal} from "../shared/model.ts";
@@ -15,6 +16,7 @@ export class CurationService {
   const content=JSON.parse((this.db.prepare(kind==="course"
     ?"SELECT content FROM course_versions WHERE course_id=? AND version=?"
     :"SELECT content FROM content_item_versions WHERE item_id=? AND version=?").get(id,row.latest_version) as any).content);
+  new ContentAccess(this.db).requireVisible(p,kind as "course"|"item",id,content);
   return {kind,id,version:row.latest_version,title:content.title,summary:content.summary,
     language:content.language,provider:content.provider,license:content.license,
     ...(kind==="course"?{estimatedMinutes:content.duration}:{}),aiProcessingAllowed:content.aiProcessingAllowed};
@@ -22,7 +24,7 @@ export class CurationService {
  private editor(p:Principal){if(!["admin","content_admin"].includes(p.role))reject("FORBIDDEN","Content administrator required");}
  authorize(p:Principal,name:string,a:any){
   if(["learning_get_curation","learning_save_curation","learning_preview_retirement","learning_retire_with_replacement"].includes(name)){
-   this.editor(p);this.target(p,a.kind,a.contentId);
+   this.editor(p);const row=this.target(p,a.kind,a.contentId);new ContentAccess(this.db).author(p,a.kind,row.id,JSON.parse(row.draft));
   }
  }
  private impact(p:Principal,a:any){
@@ -66,6 +68,7 @@ export class CurationService {
   if(name==="learning_preview_retirement")return this.impact(p,a);
   if(name==="learning_get_retirement_alternative"){
    const source=this.target(p,a.kind,a.contentId);
+   new ContentAccess(this.db).current(p,a.kind,a.contentId);
    if(source.state!=="retired")reject("NOT_FOUND","Source is not retired");
    const policy=this.db.prepare("SELECT replacement_id FROM content_curation WHERE tenant=? AND kind=? AND content_id=?").get(p.tenant,a.kind,a.contentId) as any;
    if(!policy?.replacement_id)return {available:false,reason:"No reviewed replacement is configured."};

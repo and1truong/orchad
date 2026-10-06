@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import {DigestService} from "./digest.ts";
 import {SCORMService} from "./scorm.ts";
 import {XAPIService} from "./xapi.ts";
@@ -259,10 +260,18 @@ export class LearningService {
     )
       reject("FORBIDDEN", "Assignment obligation is no longer active");
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
-    if (a.courseId && c.toolName !== "learning_create_course")
-      this.course(p, a.courseId);
-    if (a.itemId && c.toolName !== "learning_create_content_item")
-      this.contentItem(p, a.itemId);
+    if (a.courseId && c.toolName !== "learning_create_course") {
+      const row=this.course(p,a.courseId);
+      if(["learning_update_course","learning_publish_course","learning_unpublish_course","learning_retire_course","learning_get_course_draft","learning_set_course_assessor"].includes(c.toolName))
+        new ContentAccess(this.db).author(p,"course",row.id,decode(row.draft));
+      else if(row.latest_version&&!(c.toolName==="learning_set_bookmark"&&a.saved===false))new ContentAccess(this.db).requireVisible(p,"course",row.id,this.version(row.id,row.latest_version));
+    }
+    if (a.itemId && c.toolName !== "learning_create_content_item") {
+      const row=this.contentItem(p,a.itemId);
+      if(["learning_update_content_item","learning_publish_content_item","learning_unpublish_content_item","learning_retire_content_item"].includes(c.toolName))
+        new ContentAccess(this.db).author(p,"item",row.id,decode(row.draft));
+      else if(row.latest_version)new ContentAccess(this.db).requireVisible(p,"item",row.id,this.itemVersion(p,row.id,row.latest_version));
+    }
   }
   invoke(
     principalId: string,
@@ -522,6 +531,7 @@ export class LearningService {
     switch (name) {
       case "learning_search_items": {
         const rows=(this.db.prepare("SELECT * FROM content_items WHERE tenant=? AND state='published' ORDER BY id").all(p.tenant) as any[])
+          .filter(row=>new ContentAccess(this.db).visible(p,"item",row.id,this.itemVersion(p,row.id,row.latest_version)))
           .map(row=>({...this.itemPreview(row,this.itemVersion(p,row.id,row.latest_version),source),identityId:this.translations.identityId(p,"item",row.id)}))
           .filter(item=>(!a.query||(item.title+" "+item.summary).toLocaleLowerCase().includes(a.query.toLocaleLowerCase()))&&(!a.language||item.language===a.language));
         const preferred=a.language??(this.db.prepare("SELECT preferred_language FROM user_profiles WHERE user_id=?").get(p.id) as any)?.preferred_language??"en";
@@ -554,7 +564,7 @@ export class LearningService {
             this.db
               .prepare("SELECT * FROM content_items WHERE tenant=? ORDER BY id")
               .all(p.tenant) as any[]
-          ).map(({ draft, ...row }) => {
+          ).filter((row)=>p.role==="admin"||new ContentAccess(this.db).visible(p,"item",row.id,decode(row.draft))).map(({ draft, ...row }) => {
             const sanitize = (item: ContentItem) =>
               source === "bridge" && !item.aiProcessingAllowed
                 ? {
@@ -567,7 +577,7 @@ export class LearningService {
             return {
               ...row,
               draft: sanitize(decode(draft)),
-              published: row.latest_version
+              published: row.latest_version && (p.role==="admin"||new ContentAccess(this.db).visible(p,"item",row.id,this.itemVersion(p,row.id,row.latest_version)))
                 ? sanitize(this.itemVersion(p, row.id, row.latest_version))
                 : null,
             };
@@ -702,7 +712,7 @@ export class LearningService {
             this.db
               .prepare("SELECT * FROM courses WHERE tenant=? ORDER BY id")
               .all(p.tenant) as any[]
-          ).map(({ draft, ...c }) => {
+          ).filter((row)=>p.role==="admin"||new ContentAccess(this.db).visible(p,"course",row.id,decode(row.draft))).map(({ draft, ...c }) => {
             const d = decode(draft);
             return source === "bridge" && !d.aiProcessingAllowed
               ? {
@@ -837,7 +847,7 @@ export class LearningService {
         reject("INVALID_ARGUMENT","Discovery metadata must have distinct nonblank entries");
     }
   }
-  private validateCourse(p: Principal, value: unknown): Course {
+  private validateCourse(p: Principal, value: unknown, courseId?:string): Course {
     if (
       !validateArgs(courseSchema, value) ||
       !withinMessageCap(value) ||
@@ -860,6 +870,7 @@ export class LearningService {
       if (row.state !== "published")
         reject("FORBIDDEN", "Reusable item must be published and available");
       const item = this.itemVersion(p, ref.itemId, ref.version);
+      new ContentAccess(this.db).reference(p,"item",ref.itemId,item,c.access??"tenant",courseId?new ContentAccess(this.db).owner(p,"course",courseId)??p.id:p.id);
       l.title = item.title;
       l.text = item.text;
       l.kind = item.kind;
@@ -940,6 +951,7 @@ export class LearningService {
     const c = this.course(p, courseId);
     if (c.state !== "published")
       reject("FORBIDDEN", "Course is not accepting enrollments");
+    new ContentAccess(this.db).requireVisible(this.principal(learner),"course",courseId,this.version(c.id,c.latest_version));
     const existing = this.db
       .prepare(
         "SELECT * FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS NULL",
@@ -1007,11 +1019,13 @@ export class LearningService {
         this.db
           .prepare("INSERT INTO content_items VALUES(?,?,'draft',?,0)")
           .run(a.itemId, p.tenant, JSON.stringify(item));
+        new ContentAccess(this.db).register(p,"item",a.itemId);
         return { itemId: a.itemId, state: "draft" };
       }
       case "learning_update_content_item": {
         this.contentItem(p, a.itemId);
         const item = this.validateItem(p, a.item);
+        new ContentAccess(this.db).change(p,"item",a.itemId,item);
         this.db
           .prepare("UPDATE content_items SET draft=? WHERE id=?")
           .run(JSON.stringify(item), a.itemId);
@@ -1170,11 +1184,13 @@ export class LearningService {
         this.db
           .prepare("INSERT INTO courses VALUES(?,?,'draft',?,0)")
           .run(a.courseId, p.tenant, JSON.stringify(c));
+        new ContentAccess(this.db).register(p,"course",a.courseId);
         return { courseId: a.courseId, state: "draft" };
       }
       case "learning_update_course": {
-        const c = this.validateCourse(p, a.course);
+        const c = this.validateCourse(p, a.course,a.courseId);
         this.course(p, a.courseId);
+        new ContentAccess(this.db).change(p,"course",a.courseId,c);
         this.db
           .prepare("UPDATE courses SET draft=? WHERE id=?")
           .run(JSON.stringify(c), a.courseId);
@@ -1182,7 +1198,7 @@ export class LearningService {
       }
       case "learning_publish_course": {
         const c = this.course(p, a.courseId),
-          draft = this.validateCourse(p, decode(c.draft)),
+          draft = this.validateCourse(p, decode(c.draft),a.courseId),
           v = c.latest_version + 1;
         this.blended.pin(p, a.courseId, draft);
         this.db

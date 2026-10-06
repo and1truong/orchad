@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import type { Principal, ContentItem } from "../shared/model.ts";
@@ -28,6 +29,10 @@ export class StandaloneService {
         .get(item.id, version)
     )
       reject("FORBIDDEN", "Standalone version unavailable");
+    const selected=this.db.prepare("SELECT content FROM content_item_versions WHERE item_id=? AND version=?").get(item.id,version) as any;
+    const current=this.db.prepare("SELECT content FROM content_item_versions WHERE item_id=? AND version=?").get(item.id,item.latest_version) as any;
+    new ContentAccess(this.db).requireVisible(p,"item",item.id,JSON.parse(selected.content));
+    new ContentAccess(this.db).requireVisible(p,"item",item.id,JSON.parse(current.content));
     return { item, version };
   }
   authorize(p: Principal, name: string, a: any) {

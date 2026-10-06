@@ -219,6 +219,7 @@ export function ContentLibrary({
                 />
               </label>
             )}
+            <label>{translateUI("Content audience")}<select aria-label={translateUI("Content audience")} value={item.access??"tenant"} onChange={e=>setItem({...item,access:e.target.value as "tenant"|"author"})}><option value="tenant">{translateUI("Organization")}</option><option value="author">{translateUI("Author only")}</option></select></label>
             <label className="choice">
               <input
                 type="checkbox"

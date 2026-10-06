@@ -208,6 +208,11 @@ export function openDatabase(path: string, seed = false) {
     try {db.exec(readFileSync(new URL("../../migrations/023.sql",import.meta.url),"utf8"));db.exec("COMMIT");}
     catch(e){db.exec("ROLLBACK");db.close();throw e;}
   }
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=24").get()) {
+    db.exec("BEGIN IMMEDIATE");
+    try {db.exec(readFileSync(new URL("../../migrations/024.sql",import.meta.url),"utf8"));db.exec("COMMIT");}
+    catch(e){db.exec("ROLLBACK");db.close();throw e;}
+  }
   if (seed) {
     db.exec("BEGIN IMMEDIATE");
     try {
@@ -252,6 +257,7 @@ export function openDatabase(path: string, seed = false) {
             JSON.stringify(c),
           );
       }
+      db.prepare("INSERT OR IGNORE INTO content_authors SELECT tenant,'course',id,'admin' FROM courses WHERE tenant='demo'").run();
       db.exec("COMMIT");
     } catch (e) {
       db.exec("ROLLBACK");

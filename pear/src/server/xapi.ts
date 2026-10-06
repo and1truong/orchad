@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
 import {IntegrationCredentials,tokenHash} from "./integration-credentials.ts";
@@ -25,9 +26,12 @@ export class XAPIService{
   if(typeof s.object.id!=="string"||!s.object.id.startsWith(this.origin+"/content/course/"))reject("FORBIDDEN","Authorized Pear course activity required");
   const match=/^([A-Za-z0-9_-]{1,64})\?version=([1-9]\d{0,5})$/.exec(s.object.id.slice((this.origin+"/content/course/").length));
   if(!match)reject("INVALID_ARGUMENT","Use exact versioned course Activity IRI");const courseId=match![1]!,version=Number(match![2]);
-  const source=this.db.prepare("SELECT c.state FROM courses c JOIN course_versions v ON v.course_id=c.id WHERE c.id=? AND c.tenant=? AND v.version=?").get(courseId,client.tenant,version) as any;
+  const source=this.db.prepare("SELECT c.state,v.content FROM courses c JOIN course_versions v ON v.course_id=c.id WHERE c.id=? AND c.tenant=? AND v.version=?").get(courseId,client.tenant,version) as any;
   const enrolled=this.db.prepare("SELECT 1 FROM enrollments WHERE course_id=? AND tenant=? AND learner=? AND version=?").get(courseId,client.tenant,actor.user_id,version);
   if(!source||source.state!=="published"&&!enrolled)reject("FORBIDDEN","Authorized published or enrolled pinned course required");
+  const learner=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(actor.user_id,client.tenant) as unknown as Principal;
+  new ContentAccess(this.db).requireVisible(learner,"course",courseId,JSON.parse(source.content));
+  if(!enrolled)new ContentAccess(this.db).current(learner,"course",courseId);
   object(s.context,["registration"],["registration"]);if(typeof s.context.registration!=="string"||!uuid.test(s.context.registration))reject("INVALID_ARGUMENT","Explicit registration UUID required");
   if(typeof s.timestamp!=="string"||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(s.timestamp)||!Number.isFinite(Date.parse(s.timestamp))||Date.parse(s.timestamp)>Date.now()+300000||Date.parse(s.timestamp)<0)reject("INVALID_ARGUMENT","Use valid UTC profile timestamp, at most five minutes ahead");
   const timestamp=new Date(s.timestamp).toISOString();if(timestamp!==s.timestamp&&timestamp.replace(".000Z","Z")!==s.timestamp)reject("INVALID_ARGUMENT","Invalid UTC calendar timestamp");

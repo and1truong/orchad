@@ -1,3 +1,4 @@
+import {ContentAccess} from "./content-access.ts";
 import {TranslationService} from "./translations.ts";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
@@ -6,7 +7,7 @@ import {reject,boundedPage} from "./errors.ts";
 export class DiscoveryService {
  constructor(readonly db:DatabaseSync){}
  private candidates(p:Principal,source:string){
-  return (this.db.prepare("SELECT c.id,c.latest_version AS version,v.content FROM courses c JOIN course_versions v ON v.course_id=c.id AND v.version=c.latest_version WHERE c.tenant=? AND c.state='published' ORDER BY c.id").all(p.tenant) as any[]).map(row=>{
+  return (this.db.prepare("SELECT c.id,c.latest_version AS version,v.content FROM courses c JOIN course_versions v ON v.course_id=c.id AND v.version=c.latest_version WHERE c.tenant=? AND c.state='published' ORDER BY c.id").all(p.tenant) as any[]).filter(row=>new ContentAccess(this.db).visible(p,"course",row.id,JSON.parse(row.content))).map(row=>{
    const c=JSON.parse(row.content),md=c.discovery??{skills:[],industries:[],outcomes:[],accessibility:{features:[],provenance:"author_declared"}};
    const rating=this.db.prepare("SELECT COUNT(*) AS count,AVG(rating) AS average FROM course_feedback WHERE tenant=? AND course_id=? AND version=?").get(p.tenant,row.id,row.version) as any;
    const publication=this.db.prepare("SELECT published_at FROM content_publications WHERE tenant=? AND kind='course' AND content_id=? AND version=?").get(p.tenant,row.id,row.version) as any;

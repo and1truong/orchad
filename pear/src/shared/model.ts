@@ -56,6 +56,7 @@ export interface Lesson {
   contentRef?: { itemId: string; version: number };
 }
 export interface ContentItem {
+  access?: "tenant" | "author";
   captions?: CaptionTrack[];
   discovery?: DiscoveryMetadata;
   title: string;
@@ -89,6 +90,7 @@ export interface Question {
   correct: number;
 }
 export interface Course {
+  access?: "tenant" | "author";
   discovery?: DiscoveryMetadata;
   title: string;
   summary: string;
