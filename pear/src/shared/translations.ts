@@ -1,0 +1,2 @@
+import {tool,string,enumeration} from "./schema.ts";
+export const translationTools=[tool("learning_get_language_variants","read",{kind:enumeration("course","item"),sourceId:string(64),preferredLanguage:enumeration("en","vi")},"Read one reviewed content identity and authorized original/translated version metadata. Explicit provenance, human quality review and original fallback; no full text, hidden files or automatic enrollment.")];

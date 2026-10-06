@@ -1,3 +1,4 @@
+import {LanguageVariants,TranslationSettings} from "./translations.tsx";
 import {WebhookSettings} from "./webhooks.tsx";
 import {ProvisioningClients} from "./provisioning.tsx";
 import {IdentityLinks} from "./identity.tsx";
@@ -692,6 +693,7 @@ function App() {
             </div>
           </section>
         )}
+        {readingItem&&view==="catalog"&&!readingItem.itemEnrollmentId&&<LanguageVariants key={"variants:"+readingItem.id+":"+session.sessionEpoch} kind="item" sourceId={readingItem.id} busy={busy} op={op} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onChoose={id=>void run(async()=>{const value=await op("learning_get_content_item",{itemId:id});if(sessionRef.current===session)setReadingItem(value);})}/>}
         {readingItem &&
           (view === "catalog" ||
             (view === "learning" && readingItem.itemEnrollmentId)) && (
@@ -745,6 +747,7 @@ function App() {
         {preview && (
           <section className="panel" aria-label={translateUI("Course preview")}>
             <h2>{preview.title}</h2>
+            <LanguageVariants key={"variants:"+preview.id+":"+session.sessionEpoch} kind="course" sourceId={preview.id} busy={busy} op={op} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onChoose={id=>void run(async()=>{const value=await op("learning_get_item",{courseId:id});if(sessionRef.current===session)setPreview(value);})}/>
             <CourseRatings
               key={session.sessionEpoch + preview.id + preview.version}
               courseId={preview.id}
@@ -1124,6 +1127,7 @@ function App() {
         )}
         {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<ProvisioningClients key={"provisioning:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
+        {view==="admin"&&canEdit&&<TranslationSettings key={"translations:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<WebhookSettings key={"webhooks:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view === "admin" && canEdit && (
           <CurationPanel key={"curation:"+session.sessionEpoch} tick={tick} busy={busy} op={op} mutate={mutate} run={run}

@@ -1,3 +1,4 @@
+import {registerTranslations} from "./translations-routes.ts";
 import {OutboxService,type WebhookEndpoint} from "./outbox.ts";
 import {registerOutbox} from "./outbox-routes.ts";
 import {registerSCIM} from "./scim-routes.ts";
@@ -535,6 +536,7 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  registerTranslations(app,service.translations,req=>service.principal(req.session.principal));
   registerOutbox(app,outbox,opts.origin,req=>service.principal(req.session.principal));
   registerSCIM(app,opts.db,opts.origin,!!opts.scimEnabled,req=>service.principal(req.session.principal));
   app.get("/health", async () => ({ ok: true }));

@@ -1,3 +1,4 @@
+import {TranslationService} from "./translations.ts";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
 import {normalize,relevance} from "../shared/discovery.ts";
@@ -10,7 +11,7 @@ export class DiscoveryService {
    const rating=this.db.prepare("SELECT COUNT(*) AS count,AVG(rating) AS average FROM course_feedback WHERE tenant=? AND course_id=? AND version=?").get(p.tenant,row.id,row.version) as any;
    const publication=this.db.prepare("SELECT published_at FROM content_publications WHERE tenant=? AND kind='course' AND content_id=? AND version=?").get(p.tenant,row.id,row.version) as any;
    const policy=this.db.prepare("SELECT endorsed,featured,spotlight,retiring FROM content_curation WHERE tenant=? AND kind='course' AND content_id=?").get(p.tenant,row.id) as any;
-   return {id:row.id,version:row.version,title:c.title,summary:c.summary,topic:c.topic,language:c.language,duration:c.duration,level:c.level,
+   return {identityId:new TranslationService(this.db).identityId(p,"course",row.id),id:row.id,version:row.version,title:c.title,summary:c.summary,topic:c.topic,language:c.language,duration:c.duration,level:c.level,
     provider:c.provider,license:c.license,aiProcessingAllowed:c.aiProcessingAllowed,completionPolicy:c.completionPolicy,
     discovery:{...md,outcomes:source==="bridge"&&!c.aiProcessingAllowed?[]:md.outcomes},outcomesWithheld:source==="bridge"&&!c.aiProcessingAllowed,formats:[...new Set(c.lessons.map((l:any)=>l.kind))],
     rating:{count:Number(rating.count),average:rating.average===null?null:Math.round(rating.average*100)/100},
@@ -39,7 +40,11 @@ export class DiscoveryService {
   const value=(c:any)=>key==="relevance"?c.relevance.score:key==="title"?normalize(c.title):key==="rating"?c.rating.average:key==="published"?c.publishedAt:c.duration;
   rows.sort((a,b)=>{const x=value(a),y=value(b);if(x===null)return y===null?a.id.localeCompare(b.id):1;if(y===null)return -1;
     const delta=x<y?-1:x>y?1:0;return delta?(descending?-delta:delta):a.id<b.id?-1:a.id>b.id?1:0;});
-  return {...boundedPage(rows,a.offset??0,a.limit??10),retrieval:a.queryMode==="concepts"?"controlled_concepts_v1":"keyword",
+  const preferred=a.language??(this.db.prepare("SELECT preferred_language FROM user_profiles WHERE user_id=?").get(p.id) as any)?.preferred_language??"en";
+  const identities=new Map<string,(typeof rows)[number]>();
+  for(const row of rows){const previous=identities.get(row.identityId);if(!previous||previous.language!==preferred&&row.language===preferred)identities.set(row.identityId,row);}
+  const unique=rows.filter(row=>identities.get(row.identityId)===row);
+  return {...boundedPage(unique,a.offset??0,a.limit??10),retrieval:a.queryMode==="concepts"?"controlled_concepts_v1":"keyword",
     accessibilityPolicy:"Author-declared metadata, not audited compliance; unknown publication dates never satisfy date filters."};
  }
  read(p:Principal,name:string,a:any,source:string){
@@ -52,14 +57,16 @@ export class DiscoveryService {
   const profile=this.db.prepare("SELECT preferred_language,interests FROM user_profiles WHERE user_id=?").get(p.id) as any;
   const interests=JSON.parse(profile?.interests??"[]") as string[],language=profile?.preferred_language??"en";
   const enrolled=new Set((this.db.prepare("SELECT course_id FROM enrollments WHERE tenant=? AND learner=?").all(p.tenant,p.id) as any[]).map(e=>e.course_id));
-  const rows=this.candidates(p,source).filter(c=>!enrolled.has(c.id)).map(c=>{
+  const candidates=this.candidates(p,source),enrolledIdentities=new Set(candidates.filter(c=>enrolled.has(c.id)).map(c=>c.identityId));
+  const rows=candidates.filter(c=>!enrolledIdentities.has(c.identityId)).map(c=>{
    const matched=interests.filter(interest=>relevance(interest,this.text(c),"concepts").score>0);
    const reasons=[...matched.map(interest=>"Declared interest: "+interest),
      ...(c.language===language?["Preferred language: "+language]:[]),
      ...(c.curation.spotlight?["Organization spotlight"]:[]),...(c.curation.featured?["Organization featured"]:[])];
    return {...c,reasons,sourceIds:[c.id],rankingScore:matched.length*10+(c.language===language?3:0)+(c.curation.spotlight?2:0)+(c.curation.featured?1:0)};
   }).filter(c=>c.reasons.length>0).sort((a,b)=>b.rankingScore-a.rankingScore||(a.id<b.id?-1:a.id>b.id?1:0));
-  return {...boundedPage(rows,a.offset??0,a.limit??10),method:"Explicit profile/organization rules; no inferred skill or market benchmark",
+  const seen=new Set<string>(),unique=rows.filter(row=>{if(seen.has(row.identityId))return false;seen.add(row.identityId);return true;});
+  return {...boundedPage(unique,a.offset??0,a.limit??10),method:"Explicit profile/organization rules; no inferred skill or market benchmark",
     noMatchReason:rows.length?null:"No currently available not-yet-enrolled content matches declared preferences."};
  }
 }
