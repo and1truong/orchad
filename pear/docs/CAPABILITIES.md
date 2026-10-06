@@ -219,3 +219,7 @@ ADR-065: the four filtered/all-within-current-access × visible/all columns expo
 
 ## #125 original quality calibration candidate
 ADR-066 supplies 12 original bounded discovery/practice/report/group/curation cases and offline structured-recording evaluation, with exact hashes, missing-case accounting, negative calibration and redacted output. CI PENDING. Actual Lime/Mango inference, independent human quality, production traces and broad relevance/reference parity remain NOT RUN/NOT VERIFIED. A synthetic checked profile cannot make any model-quality row PASS. No credentials/provider calls or official mutations occur.
+
+
+## #126 reviewed fresh latest self-directed course candidate
+ADR-067 implements a human-only full-change fresh restart, including resolved essay/submission/event formats; no lesson/answer/result/attendance/timer progress is copied. Pending human assessment and booked events explicitly block, preserving official work. CI PENDING. G06 original self-directed full-change restart is implemented; assigned/cycle full-change and exact reference/reset/recertification semantics remain OPEN. Original objective-only retention remains a distinct explicit choice.

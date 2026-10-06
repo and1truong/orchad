@@ -1,0 +1,10 @@
+import React,{useState} from "react";
+import {translateUI as t} from "./i18n.ts";
+export function CourseFreshRestart(p:{enrollmentId:string;busy:boolean;op:(name:string,args:Record<string,unknown>)=>Promise<any>;mutate:(name:string,args:Record<string,unknown>)=>Promise<any>;run:(fn:()=>Promise<void>)=>Promise<boolean>;isCurrent:()=>boolean;onCreated:()=>void}){
+ const [review,setReview]=useState<any>(null),[confirmed,setConfirmed]=useState(false);
+ return <section aria-label={t("Fresh latest course review")}><button disabled={p.busy} onClick={()=>void p.run(async()=>{const value=await p.op("human_get_latest_course_restart",{enrollmentId:p.enrollmentId});if(p.isCurrent()){setReview(value);setConfirmed(false);}})}>{t("Review fresh latest course restart")}</button>
+ {review&&<form aria-label={t("Fresh course restart confirmation")} onSubmit={event=>{event.preventDefault();if(!confirmed||!review.available)return;void p.run(async()=>{await p.mutate("human_restart_latest_course",{enrollmentId:p.enrollmentId,targetVersion:review.targetVersion,confirmed:true});if(p.isCurrent()){setReview(null);p.onCreated();}});}}>
+ <strong>{review.title}</strong><p>{review.summary}</p><p>v{review.originalVersion} → v{review.targetVersion} · {review.lessonCount} {t("lessons")} · {review.lessonTypes.join(", ")}</p><p>{t("Start the latest course from zero. Previous lessons, answers, submission results, event attendance and study time remain only in prior history. No completion is granted.")}</p>
+ {review.pendingOfficialWork&&<p>{t("Resolve pending assessor work and cancel existing bookings before a fresh course restart.")}</p>}
+ <label><input type="checkbox" disabled={p.busy||!review.available} checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>{t("I reviewed the latest course and choose a fresh start with no carried progress.")}</label><button disabled={p.busy||!review.available||!confirmed}>{t("Start latest course from zero")}</button><button type="button" onClick={()=>setReview(null)}>{t("Keep enrolled course version")}</button></form>}</section>;
+}
