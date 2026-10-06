@@ -158,6 +158,7 @@ export const libraryWrites = new Set([
 const id = { courseId: string() };
 const enrollment = { enrollmentId: string() };
 export const learnerTools: Tool[] = [
+  tool("learning_get_digest","read",{minutes:integer(1440,1),timeZone:string(100),limit:integer(5,1)},"Read up to five own next-learning steps with pinned IDs, due dates/time zone, prerequisites, intended duration and explicit recommendation limits. No automatic delivery or official progress mutation.",[]),
   ...discoveryTools,
   tool(
     "learning_search_items",

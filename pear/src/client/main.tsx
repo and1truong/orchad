@@ -1,3 +1,4 @@
+import {LearningDigest} from "./digest.tsx";
 import {ExternalActivity} from "./external-activity.tsx";
 import {PackageLearning} from "./scorm.tsx";
 import {LanguageVariants,TranslationSettings} from "./translations.tsx";
@@ -787,6 +788,7 @@ function App() {
         {view==="packages"&&<PackageLearning key={"packages:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view === "learning" && (
           <>
+            <LearningDigest key={"digest:"+session.sessionEpoch} busy={busy} op={op} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <ExternalActivity key={"external:"+session.sessionEpoch} session={session} busy={busy} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <div className="stats">
               <div>

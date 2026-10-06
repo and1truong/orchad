@@ -1,3 +1,4 @@
+import {DigestService} from "./digest.ts";
 import {SCORMService} from "./scorm.ts";
 import {XAPIService} from "./xapi.ts";
 import {TranslationService} from "./translations.ts";
@@ -581,6 +582,7 @@ export class LearningService {
           reject("NOT_FOUND", "Course is not available for discovery");
         return this.preview(c, this.version(c.id, c.latest_version));
       }
+      case "learning_get_digest": return new DigestService(this.db).read(p,a,source);
       case "learning_get_my_learning": {
         const rows = this.db
           .prepare(
