@@ -199,10 +199,21 @@ try {
     await expect.poll(()=>page.evaluate(async()=>String((await window.agentBridgeV1!.getContext()).documentId))).toBe("library:demo::"+workspace);
   }
   async function bind(mode:string,reads:string[]){
+    // pin() sets target before describe() finishes and clears selected reads afterwards.
+    // Wait for the actual completed discovery event, not merely a visible stale checkbox.
+    const discovered=panel.getByText(/Discovered .*; consent required/),before=await discovered.count();
+    const expectedDocument=await page.evaluate(async()=>String((await window.agentBridgeV1!.getContext()).documentId));
     await panel.getByRole("button",{name:"Pin target",exact:true}).click();
+    await expect(discovered).toHaveCount(before+1);
+    await expect(panel.locator(".status")).toHaveText("connected");
+    await expect(panel.locator(".pin")).toContainText("Document: "+expectedDocument);
     await panel.getByLabel("Learning workflow",{exact:true}).selectOption(mode);
     for(const name of reads)await panel.getByLabel("Allow read: "+name,{exact:true}).check();
+    for(const name of reads)await expect(panel.getByLabel("Allow read: "+name,{exact:true})).toBeChecked();
     await panel.getByRole("button",{name:"Consent to pinned target + model",exact:true}).click();
+    await expect(panel.getByRole("button",{name:"Consent granted",exact:true})).toBeVisible();
+    for(const name of reads)await expect(panel.getByLabel("Allow read: "+name,{exact:true})).toBeChecked();
+    await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
   }
   async function hostCall(name:string,args:Record<string,unknown>,decision?:"Approve"|"Deny"){
     scriptedTool.name=name;scriptedTool.arguments=JSON.stringify(args);
