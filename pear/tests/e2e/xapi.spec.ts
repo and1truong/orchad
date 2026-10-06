@@ -26,5 +26,5 @@ test("real xAPI client reports completed activity; SSO learner sees disclosed ex
   expect(f.db.prepare("SELECT COUNT(*) AS n FROM xapi_statements").get()!.n).toBe(2);
   const descriptor=await page.evaluate(()=>window.agentBridgeV1!.describe());expect(descriptor.tools.some(t=>/xapi_statement|set_score|human_submit/.test(t.name))).toBe(false);
   await page.screenshot({path:"artifacts/xapi-reported-official-separation.png",fullPage:true});
- }finally{await app.close();await provider.close();f.db.close();}
+ }finally{console.log("xAPI fixture cleanup: Pear close");await app.close();console.log("xAPI fixture cleanup: identity close");await provider.close();console.log("xAPI fixture cleanup: database close");f.db.close();console.log("xAPI fixture cleanup: complete");}
 });
