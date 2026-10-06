@@ -29,7 +29,7 @@ function setup(url:string,path?:string){
  const f=fixture(path),outbox=new OutboxService(f.db,[{id:"original-fixture",url,secret}],true),p=f.service.principal("admin");
  const action=(args:any)=>outbox.mutate(p,{reason:"Reviewed event delivery",revision:f.service.context("admin","library:demo").revision,key:crypto.randomUUID(),...args});
  const subscribe=(extra:any={})=>action({action:"subscribe",endpointId:"original-fixture",topics:["enrollment.created","enrollment.completed","content.published","content.retired"],...extra});
- const enroll=(learner="learner-a",key=crypto.randomUUID())=>data(f.call(learner,"learning_enroll",{courseId:"systems-basics"},"bridge",{idempotencyKey:key}));
+ const enroll=(learner="learner-a",key:string=crypto.randomUUID())=>data(f.call(learner,"learning_enroll",{courseId:"systems-basics"},"bridge",{idempotencyKey:key}));
  return {...f,outbox,p,action,subscribe,enroll};
 }
 test("HMAC receiver rejects altered bytes/signature, old/future timestamps and invalid syntax",()=>{
