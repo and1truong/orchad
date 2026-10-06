@@ -18,7 +18,7 @@ test("mobile, tablet and desktop reflow; keyboard skip/navigation/lesson/quiz an
    for(const name of ["My learning","Programs","Imported packages","Notifications","Transcript","Learning preferences"]){await keyboardButton(name);await expect(page.locator("main h1")).toBeFocused();await reflow(name+"-"+width);}
   }
   await page.setViewportSize({width:390,height:844});await keyboardButton("Explore");
-  await page.getByLabel("Content language",{exact:true}).selectOption("vi");
+  await page.getByLabel("Content language").selectOption("vi");
   await expect(page.locator(".cards article")).toHaveCount(1);await keyboardButton("Enroll");await expect(page.getByRole("heading",{name:"Học tập có chủ đích",exact:true})).toBeVisible();
   await keyboardButton("Continue learning");await expect(page.locator(".lesson-text")).toBeVisible();
   await keyboardButton("I have studied this lesson");await expect(page.getByRole("button",{name:"Lesson acknowledged ✓",exact:true})).toBeDisabled();await keyboardButton("Start assessment");

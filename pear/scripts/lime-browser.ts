@@ -139,7 +139,7 @@ try {
   });
   // Actual extension/UI source-read consent and skippable practice transport.
   // Fake Mango chooses the calls; this is not an inference-quality claim.
-  await page.getByLabel("Content language",{exact:true}).selectOption("vi");
+  await page.getByLabel("Content language").selectOption("vi");
   await expect(page.locator(".cards article")).toHaveCount(1);
   await page.getByRole("button",{name:"Enroll",exact:true}).click();
   async function learningState(){return page.evaluate(async()=>{const ctx=await window.agentBridgeV1!.getContext();return window.agentBridgeV1!.invoke({requestId:crypto.randomUUID(),documentId:ctx.documentId,toolName:"learning_get_my_learning",arguments:{},expectedRevision:null,idempotencyKey:null});});}
