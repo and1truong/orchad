@@ -236,6 +236,7 @@ function App() {
       view === "catalog"
         ? await op("learning_search_items", {
             query,
+            ...(language?{language}:{}),
             offset: standaloneOffset,
             limit: 20,
           })

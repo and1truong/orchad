@@ -162,10 +162,11 @@ export const learnerTools: Tool[] = [
     "read",
     {
       query: { type: "string", maxLength: 160 },
+      language:enumeration("en","vi"),
       offset: integer(100000),
       limit: integer(20, 1),
     },
-    "Discover published standalone item metadata. Items have no course completion or certificate.",
+    "Discover published standalone metadata, collapsing active exact-version reviewed language identities after query/language filters. Items have no course completion or certificate.",
     [],
   ),
   tool(

@@ -106,3 +106,24 @@ test("translation identities/review evidence survive restart and human HTTP muta
   assert.deepEqual(s.db.prepare("PRAGMA foreign_key_check").all(),[]);
  }finally{if(app)await app.close();s.db.close();rmSync(dir,{recursive:true,force:true});}
 });
+
+test("standalone discovery collapses reviewed identities after filters, prefers profile language and retains original enrollment pins",()=>{
+ const s=translationFixture();try{
+  const item={title:"Original guide",summary:"Original reviewed learning guide",language:"en",provider:"Pear Originals",license:"self-authored",aiProcessingAllowed:false,kind:"text",text:"Human-only original body",url:"",transcript:""};
+  for(const [id,language,title] of [["guide-en","en","Original guide"],["guide-vi","vi","Hướng dẫn tự soạn"]]){data(s.call("admin","learning_create_content_item",{itemId:id,item:{...item,language,title}}));data(s.call("admin","learning_publish_content_item",{itemId:id}));}
+  const enrolled=data(s.call("learner-a","learning_enroll_item",{itemId:"guide-en"})),before=JSON.stringify(s.db.prepare("SELECT * FROM item_enrollments").all());
+  const linked=s.link({kind:"item",originalId:"guide-en",sourceId:"guide-vi"});
+  let rows=data(s.call("learner-a","learning_search_items",{limit:20}));assert.equal(rows.total,1);assert.equal(rows.items[0].id,"guide-en");assert.equal(rows.items[0].identityId,linked.identityId);
+  data(s.call("learner-a","learning_save_profile",{preferredLanguage:"vi",interests:[]}));
+  rows=data(s.call("learner-a","learning_search_items",{limit:20}));assert.equal(rows.total,1);assert.equal(rows.items[0].id,"guide-vi");
+  assert.equal(data(s.call("learner-a","learning_search_items",{query:"Original guide",limit:20})).items[0].id,"guide-en");
+  assert.equal(data(s.call("learner-a","learning_search_items",{language:"en",limit:20})).items[0].id,"guide-en");
+  assert.equal(data(s.call("learner-a","learning_search_items",{language:"vi",limit:20})).items[0].id,"guide-vi");
+  for(const forbidden of ["Human-only original body","assetId","qualityReview"])assert.equal(JSON.stringify(rows).includes(forbidden),false);
+  assert.equal(data(s.call("outsider","learning_search_items",{limit:20})).total,0);
+  assert.equal(JSON.stringify(s.db.prepare("SELECT * FROM item_enrollments").all()),before);assert.ok(enrolled.itemEnrollmentId);
+  data(s.call("admin","learning_publish_content_item",{itemId:"guide-vi"}));assert.equal(data(s.call("learner-a","learning_search_items",{limit:20})).total,2);
+  data(s.call("admin","learning_retire_content_item",{itemId:"guide-vi"}));assert.equal(data(s.call("learner-a","learning_search_items",{limit:20})).items[0].id,"guide-en");
+  assert.equal(JSON.stringify(s.db.prepare("SELECT * FROM item_enrollments").all()),before);
+ }finally{s.db.close();}
+});

@@ -520,27 +520,13 @@ export class LearningService {
       return this.feedback.read(p, name, a);
     switch (name) {
       case "learning_search_items": {
-        const rows = (
-          this.db
-            .prepare(
-              "SELECT * FROM content_items WHERE tenant=? AND state='published' ORDER BY id",
-            )
-            .all(p.tenant) as any[]
-        )
-          .map((row) =>
-            this.itemPreview(
-              row,
-              this.itemVersion(p, row.id, row.latest_version),
-            ),
-          )
-          .filter(
-            (item) =>
-              !a.query ||
-              (item.title + " " + item.summary)
-                .toLocaleLowerCase()
-                .includes(a.query.toLocaleLowerCase()),
-          );
-        return pageRows(rows, a.offset ?? 0, a.limit ?? 20);
+        const rows=(this.db.prepare("SELECT * FROM content_items WHERE tenant=? AND state='published' ORDER BY id").all(p.tenant) as any[])
+          .map(row=>({...this.itemPreview(row,this.itemVersion(p,row.id,row.latest_version),source),identityId:this.translations.identityId(p,"item",row.id)}))
+          .filter(item=>(!a.query||(item.title+" "+item.summary).toLocaleLowerCase().includes(a.query.toLocaleLowerCase()))&&(!a.language||item.language===a.language));
+        const preferred=a.language??(this.db.prepare("SELECT preferred_language FROM user_profiles WHERE user_id=?").get(p.id) as any)?.preferred_language??"en";
+        const chosen=new Map<string,(typeof rows)[number]>();
+        for(const row of rows){const previous=chosen.get(row.identityId);if(!previous||previous.language!==preferred&&row.language===preferred)chosen.set(row.identityId,row);}
+        return pageRows(rows.filter(row=>chosen.get(row.identityId)===row),a.offset??0,a.limit??20);
       }
       case "learning_get_content_item": {
         const row = this.contentItem(p, a.itemId);
