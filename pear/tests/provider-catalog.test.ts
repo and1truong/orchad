@@ -29,7 +29,7 @@ test("strict metadata feed is ordered, canonically deduplicated, auditable and s
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM provider_events").get()!.n,1);
   assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE tool='provider_catalog_event'").get()!.n,1);
   assert.deepEqual(JSON.stringify(f.db.prepare("SELECT * FROM enrollments").all()),official);
-  const page:any=f.s.reconcile(f.header,f.policy.id);assert.ok(Buffer.byteLength(JSON.stringify(page))<=49152);assert.equal(JSON.stringify(page).includes(f.issued.token),false);assert.equal(JSON.stringify(page).includes("No licensed lesson body"),false);
+  const page:any=f.s.reconcile(f.header,f.policy.id);assert.ok(Buffer.byteLength(JSON.stringify(page))<=49152);assert.equal(JSON.stringify(page).includes(f.issued.token!),false);assert.equal(JSON.stringify(page).includes("No licensed lesson body"),false);
  }finally{f.db.close();}
 });
 test("entitlements, retirement, account/version/client/license and model metadata rights are live gates without fallback or grant resurrection",()=>{
