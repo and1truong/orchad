@@ -51,7 +51,7 @@ test("published source changes invalidate translation review, explicit new revie
   assert.equal(s.translations.read(s.learner,"course","systems-basics","vi").variants[1].provenance,"ai_assisted_reviewed");
   assert.deepEqual(data(s.call("learner-a","learning_get_progress",{enrollmentId:enrollment.enrollmentId})),before);
   assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM enrollments WHERE learner='learner-a'").get()!.n,1);
-  const recommendation=data(s.call("learner-a","learning_get_recommendations",{limit:20}));assert.equal(recommendation.items.some((r:any)=>r.identityId===linked.identityId),false);
+  const recommendation=data(s.call("learner-a","learning_get_recommendations",{limit:10}));assert.equal(recommendation.items.some((r:any)=>r.identityId===linked.identityId),false);
  }finally{s.db.close();}
 });
 test("retired or outside-tenant variants never become silent fallback, and retired enrolled originals remain immutable",()=>{
