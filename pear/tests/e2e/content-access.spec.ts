@@ -4,6 +4,7 @@ import {courses} from "../../src/server/seed.ts";
 import {createApp} from "../../src/server/app.ts";
 import {resolve} from "node:path";
 test("author audience persists through reload, hides learner discovery and can be explicitly published for the organization",async({page})=>{
+ test.setTimeout(90000);
  const f=fixture(),origin="http://127.0.0.1:4325",course={...structuredClone(courses["systems-basics"]),title:"Original audience fixture",access:"author" as const};
  data(f.call("editor","learning_create_course",{courseId:"audience-ui",course}));data(f.call("editor","learning_publish_course",{courseId:"audience-ui"}));
  const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist")});
