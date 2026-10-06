@@ -770,3 +770,167 @@ test("report HTTP exports retain direct-report scope and revoked session denial"
     f.db.close();
   }
 });
+
+test("essay details and grading use authenticated human channel and live scoped assessor authority", async () => {
+  const f = fixture(),
+    { app } = await createApp({ db: f.db, origin, developmentAuth: true });
+  try {
+    const { courses } = await import("../src/server/seed.ts"),
+      course = structuredClone(courses["learning-vi"]);
+    course.quiz.questions = [
+      {
+        id: "essay-http",
+        kind: "long_answer",
+        prompt: "Describe your own study",
+        options: [],
+        correct: 0,
+        points: 2,
+        rubric: "Two points for explanation",
+      },
+    ];
+    data(
+      f.call("editor", "learning_create_course", {
+        courseId: "http-essay",
+        course,
+      }),
+    );
+    data(
+      f.call("editor", "learning_publish_course", { courseId: "http-essay" }),
+    );
+    data(
+      f.call("editor", "learning_set_course_assessor", {
+        courseId: "http-essay",
+        assessorId: "assessor",
+        enabled: true,
+      }),
+    );
+    const enrollmentId = data(
+      f.call("learner-a", "learning_enroll", { courseId: "http-essay" }),
+    ).enrollmentId;
+    data(
+      f.call(
+        "learner-a",
+        "human_complete_lesson",
+        { enrollmentId, lessonId: "practice" },
+        "human",
+      ),
+    );
+    const attemptId = data(
+      f.call("learner-a", "learning_start_attempt", { enrollmentId }),
+    ).attemptId;
+    data(
+      f.call(
+        "learner-a",
+        "human_save_answer",
+        {
+          attemptId,
+          questionId: "essay-http",
+          answer: "Private original essay body",
+        },
+        "human",
+      ),
+    );
+    data(
+      f.call(
+        "learner-a",
+        "human_submit_attempt",
+        { attemptId, confirmed: true },
+        "human",
+      ),
+    );
+    const assessor = await login(app, "assessor"),
+      payload = {
+        requestId: "grade-http",
+        documentId: "library:demo::assessments",
+        toolName: "human_assess_answer",
+        arguments: {
+          attemptId,
+          questionId: "essay-http",
+          points: 2,
+          reason: "Reviewed own explanation",
+        },
+        expectedRevision: f.service.context("assessor", "library:demo")
+          .revision,
+        idempotencyKey: "grade-http",
+      };
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/bridge/invoke",
+          headers: assessor.headers,
+          payload,
+        })
+      ).statusCode,
+      403,
+    );
+    const detail = await app.inject({
+      method: "POST",
+      url: "/api/human/invoke",
+      headers: assessor.headers,
+      payload: {
+        ...payload,
+        toolName: "human_get_assessment_submission",
+        arguments: { attemptId },
+        expectedRevision: null,
+        idempotencyKey: null,
+      },
+    });
+    assert.equal(
+      data(detail.json()).questions[0].answer,
+      "Private original essay body",
+    );
+    data(
+      f.call("editor", "learning_set_course_assessor", {
+        courseId: "http-essay",
+        assessorId: "assessor",
+        enabled: false,
+      }),
+    );
+    assert.equal(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/human/invoke",
+          headers: assessor.headers,
+          payload,
+        })
+      ).statusCode,
+      403,
+    );
+    assert.equal(
+      (f.db.prepare("SELECT COUNT(*) n FROM essay_reviews").get() as any).n,
+      0,
+    );
+    data(
+      f.call("editor", "learning_set_course_assessor", {
+        courseId: "http-essay",
+        assessorId: "assessor",
+        enabled: true,
+      }),
+    );
+    payload.expectedRevision = f.service.context(
+      "assessor",
+      "library:demo",
+    ).revision;
+    const result = await app.inject({
+      method: "POST",
+      url: "/api/human/invoke",
+      headers: assessor.headers,
+      payload,
+    });
+    assert.equal(data(result.json()).score, 100);
+    assert.equal(
+      (f.db.prepare("SELECT COUNT(*) n FROM certificates").get() as any).n,
+      1,
+    );
+    assert.ok(
+      !JSON.stringify(f.db.prepare("SELECT * FROM audit").all()).includes(
+        "Private original essay body",
+      ),
+    );
+  } finally {
+    await app.close();
+    f.db.close();
+  }
+});

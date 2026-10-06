@@ -3,7 +3,12 @@ import { randomUUID } from "node:crypto";
 import { openDatabase } from "../src/server/database.ts";
 import { LearningService } from "../src/server/service.ts";
 import type { Call, Result } from "../src/shared/model.ts";
-import { allCatalog, catalog, libraryWrites } from "../src/shared/catalog.ts";
+import {
+  allCatalog,
+  catalog,
+  humanTools,
+  libraryWrites,
+} from "../src/shared/catalog.ts";
 export function fixture(path = ":memory:") {
   const db = openDatabase(path, true),
     service = new LearningService(db);
@@ -15,7 +20,10 @@ export function fixture(path = ":memory:") {
     overrides: Partial<Call> = {},
   ): Result {
     const p = service.principal(user),
-      tool = allCatalog(p.role).find((t) => t.name === name),
+      tool = [
+        ...allCatalog(p.role),
+        ...(source === "human" ? humanTools : []),
+      ].find((t) => t.name === name),
       write = tool?.effect !== "read",
       admin =
         libraryWrites.has(name) &&

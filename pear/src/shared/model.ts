@@ -60,6 +60,12 @@ export interface CourseModule {
 }
 export interface Question {
   id: string;
+  kind?: "mcq" | "matching" | "blanks" | "long_answer";
+  points?: number;
+  prompts?: string[];
+  matches?: number[];
+  correctAnswers?: string[];
+  rubric?: string;
   prompt: string;
   options: string[];
   correct: number;
@@ -77,7 +83,14 @@ export interface Course {
   completionPolicy: "human_attestation_and_quiz";
   lessons: Lesson[];
   modules?: CourseModule[];
-  quiz: { passScore: number; maxAttempts: number; questions: Question[] };
+  quiz: {
+    passScore: number;
+    maxAttempts: number;
+    questions: Question[];
+    shuffleQuestions?: boolean;
+    shuffleOptions?: boolean;
+    answerRelease?: "never" | "after_pass" | "after_exhausted";
+  };
 }
 export interface Bridge {
   describe(): Promise<Description>;

@@ -566,3 +566,6 @@ footer {
     display: table-header-group;
   }
 }
+
+.assessments p, .assessments blockquote { overflow-wrap:anywhere; white-space:pre-wrap; }
+.assessments button { max-width:100%; }

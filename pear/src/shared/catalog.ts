@@ -1,3 +1,10 @@
+import {
+  questionSchema,
+  answerSchema,
+  assessmentTools,
+  assessmentHumanTools,
+  assessmentLibraryWrites,
+} from "./assessments.ts";
 import type { ToolGroup } from "./tool-groups.ts";
 import { reportTools, reportLibraryWrites } from "./reports.ts";
 import { assignmentTools, assignmentLibraryWrites } from "./assignments.ts";
@@ -23,12 +30,6 @@ const lesson = object(
   },
   ["id", "title", "text", "kind", "prerequisiteIds"],
 );
-const question = object({
-  id: string(64),
-  prompt: string(400),
-  options: array(string(240), 6, 2),
-  correct: integer(5),
-});
 export const itemSchema = object(
   {
     title: string(160),
@@ -75,11 +76,17 @@ const courseProperties = {
     8,
     1,
   ),
-  quiz: object({
-    passScore: integer(100, 1),
-    maxAttempts: integer(10, 1),
-    questions: array(question, 8, 1),
-  }),
+  quiz: object(
+    {
+      passScore: integer(100, 1),
+      maxAttempts: integer(10, 1),
+      questions: array(questionSchema, 8, 1),
+      shuffleQuestions: { type: "boolean" },
+      shuffleOptions: { type: "boolean" },
+      answerRelease: enumeration("never", "after_pass", "after_exhausted"),
+    },
+    ["passScore", "maxAttempts", "questions"],
+  ),
 };
 export const courseSchema = object(
   courseProperties,
@@ -87,6 +94,7 @@ export const courseSchema = object(
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
+  ...assessmentLibraryWrites,
   ...programLibraryWrites,
   ...peopleLibraryWrites,
   ...assignmentLibraryWrites,
@@ -281,6 +289,7 @@ const report = tool(
 export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
+    ...assessmentTools(role),
     ...programTools(role),
     ...peopleTools(role),
     ...assignmentTools(role),
@@ -308,25 +317,30 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
             ),
             ...(["admin", "content_admin"].includes(role) ? adminTools : []),
           ]
-        : group === "programs"
-          ? programTools(role)
-          : group === "people"
-            ? peopleTools(role)
-            : group === "assignments"
-              ? [
-                  ...assignmentTools(role),
-                  ...(["admin", "manager"].includes(role) ? [assignment] : []),
-                ]
-              : [
-                  ...reportTools(role),
-                  ...(["admin", "manager"].includes(role) ? [report] : []),
-                ];
+        : group === "assessments"
+          ? assessmentTools(role)
+          : group === "programs"
+            ? programTools(role)
+            : group === "people"
+              ? peopleTools(role)
+              : group === "assignments"
+                ? [
+                    ...assignmentTools(role),
+                    ...(["admin", "manager"].includes(role)
+                      ? [assignment]
+                      : []),
+                  ]
+                : [
+                    ...reportTools(role),
+                    ...(["admin", "manager"].includes(role) ? [report] : []),
+                  ];
   return [...new Map([...common, ...domain].map((t) => [t.name, t])).values()];
 }
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
   ...programHumanTools,
+  ...assessmentHumanTools,
   tool(
     "human_complete_lesson",
     "write",
@@ -336,7 +350,7 @@ export const humanTools: Tool[] = [
   tool(
     "human_save_answer",
     "write",
-    { attemptId: string(), questionId: string(), answer: integer(5) },
+    { attemptId: string(), questionId: string(), answer: answerSchema },
     "Save learner-selected answer.",
   ),
   tool(

@@ -1,10 +1,6 @@
+import { QuestionSettings, ExtendedQuestion } from "./question-editor.tsx";
 import React, { useState } from "react";
-import type {
-  ContentItem,
-  Course,
-  Lesson,
-  Question,
-} from "../shared/model.ts";
+import type { ContentItem, Course, Lesson, Question } from "../shared/model.ts";
 import { requiredLessonIds } from "../shared/progression.ts";
 export interface DraftSelection {
   id: string;
@@ -631,6 +627,50 @@ export function CourseEditor({
               />
             </label>
           </div>
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={!!course.quiz.shuffleQuestions}
+              onChange={(e) =>
+                update((c) => {
+                  c.quiz.shuffleQuestions = e.target.checked;
+                })
+              }
+            />
+            Shuffle question order per attempt
+          </label>
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={!!course.quiz.shuffleOptions}
+              onChange={(e) =>
+                update((c) => {
+                  c.quiz.shuffleOptions = e.target.checked;
+                })
+              }
+            />
+            Shuffle choices per attempt
+          </label>
+          <label>
+            Answer release
+            <select
+              aria-label="Answer release"
+              value={course.quiz.answerRelease ?? "never"}
+              onChange={(e) =>
+                update((c) => {
+                  c.quiz.answerRelease = e.target.value as any;
+                })
+              }
+            >
+              <option value="never">Never release answer keys</option>
+              <option value="after_pass">
+                After passing · human player only
+              </option>
+              <option value="after_exhausted">
+                After all allowed attempts · human player only
+              </option>
+            </select>
+          </label>
           {course.quiz.questions.map((q, qi) => (
             <fieldset key={q.id} aria-label={`Question ${qi + 1}`}>
               <legend>Question {qi + 1}</legend>
@@ -647,62 +687,89 @@ export function CourseEditor({
                   }
                 />
               </label>
-              {q.options.map((option, oi) => (
-                <div className="option-row" key={oi}>
+              <QuestionSettings
+                q={q}
+                update={(value) =>
+                  updateQuestion(q.id, (next) => {
+                    for (const key of Object.keys(next))
+                      delete (next as any)[key];
+                    Object.assign(next, value);
+                  })
+                }
+              />
+              {(q.kind ?? "mcq") === "mcq" ? (
+                <>
+                  {q.options.map((option, oi) => (
+                    <div className="option-row" key={oi}>
+                      <label>
+                        Option {String.fromCharCode(65 + oi)}
+                        <input
+                          required
+                          maxLength={240}
+                          value={option}
+                          onChange={(e) =>
+                            updateQuestion(q.id, (next) => {
+                              next.options[oi] = e.target.value;
+                            })
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={q.options.length <= 2}
+                        onClick={() =>
+                          updateQuestion(q.id, (next) => {
+                            next.options.splice(oi, 1);
+                            next.correct =
+                              next.correct === oi
+                                ? 0
+                                : next.correct > oi
+                                  ? next.correct - 1
+                                  : next.correct;
+                          })
+                        }
+                      >
+                        Remove option {String.fromCharCode(65 + oi)}
+                      </button>
+                    </div>
+                  ))}
                   <label>
-                    Option {String.fromCharCode(65 + oi)}
-                    <input
-                      required
-                      maxLength={240}
-                      value={option}
+                    Correct option
+                    <select
+                      value={q.correct}
                       onChange={(e) =>
                         updateQuestion(q.id, (next) => {
-                          next.options[oi] = e.target.value;
+                          next.correct = Number(e.target.value);
                         })
                       }
-                    />
+                    >
+                      {q.options.map((_, oi) => (
+                        <option value={oi} key={oi}>
+                          {String.fromCharCode(65 + oi)}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                  <button
-                    type="button"
-                    className="ghost"
-                    disabled={q.options.length <= 2}
-                    onClick={() =>
-                      updateQuestion(q.id, (next) => {
-                        next.options.splice(oi, 1);
-                        next.correct =
-                          next.correct === oi
-                            ? 0
-                            : next.correct > oi
-                              ? next.correct - 1
-                              : next.correct;
-                      })
-                    }
-                  >
-                    Remove option {String.fromCharCode(65 + oi)}
-                  </button>
-                </div>
-              ))}
-              <label>
-                Correct option
-                <select
-                  value={q.correct}
-                  onChange={(e) =>
+                </>
+              ) : (
+                <ExtendedQuestion
+                  q={q}
+                  update={(value) =>
                     updateQuestion(q.id, (next) => {
-                      next.correct = Number(e.target.value);
+                      for (const key of Object.keys(next))
+                        delete (next as any)[key];
+                      Object.assign(next, value);
                     })
                   }
-                >
-                  {q.options.map((_, oi) => (
-                    <option value={oi} key={oi}>
-                      {String.fromCharCode(65 + oi)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+              )}
               <div className="actions">
                 <button
                   type="button"
-                  disabled={q.options.length >= 6}
+                  disabled={
+                    (q.kind ?? "mcq") !== "mcq" || q.options.length >= 6
+                  }
                   onClick={() =>
                     updateQuestion(q.id, (next) => {
                       next.options.push("");

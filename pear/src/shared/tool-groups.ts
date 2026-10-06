@@ -6,6 +6,7 @@ export const toolGroups = [
   "people",
   "assignments",
   "reports",
+  "assessments",
 ] as const;
 export type ToolGroup = (typeof toolGroups)[number];
 export function defaultGroup(documentId: string): ToolGroup {

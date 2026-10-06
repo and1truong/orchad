@@ -1,3 +1,5 @@
+import { Assessments } from "./assessments.tsx";
+import { AssessmentQuestion, completeResponse } from "./assessment-player.tsx";
 import {
   availableGroups,
   scopedWorkspace,
@@ -938,52 +940,64 @@ function App() {
                   <div>
                     <h3>Assessment · Attempt {attempt.number}</h3>
                     {attempt.questions.map((q: any) => (
-                      <fieldset
-                        key={q.id}
+                      <AssessmentQuestion
+                        key={attempt.id + q.id}
+                        q={q}
+                        answer={attempt.answers[q.id]}
                         disabled={
                           attempt.submitted ||
                           busy ||
                           active.assignment_state !== "active"
                         }
-                      >
-                        <legend>{q.prompt}</legend>
-                        {q.options.map((o: string, i: number) => (
-                          <label className="choice" key={i}>
-                            <input
-                              type="radio"
-                              name={q.id}
-                              checked={attempt.answers[q.id] === i}
-                              onChange={() => {
-                                const previous = attempt;
-                                setAttempt({
-                                  ...attempt,
-                                  answers: { ...attempt.answers, [q.id]: i },
-                                });
-                                void run(async () => {
-                                  try {
-                                    await mutate("human_save_answer", {
-                                      attemptId: attempt.id,
-                                      questionId: q.id,
-                                      answer: i,
-                                    });
-                                  } catch (e) {
-                                    setAttempt(previous);
-                                    throw e;
-                                  }
-                                });
-                              }}
-                            />
-                            {o}
-                          </label>
-                        ))}
-                      </fieldset>
+                        save={(answer) => {
+                          const previous = attempt;
+                          setAttempt({
+                            ...previous,
+                            answers: { ...previous.answers, [q.id]: answer },
+                          });
+                          void run(async () => {
+                            try {
+                              await mutate("human_save_answer", {
+                                attemptId: attempt.id,
+                                questionId: q.id,
+                                answer,
+                              });
+                            } catch (e) {
+                              setAttempt(previous);
+                              throw e;
+                            }
+                          });
+                        }}
+                      />
                     ))}
+                    {attempt.feedback?.length > 0 && (
+                      <details>
+                        <summary>Released answer feedback</summary>
+                        {attempt.feedback.map((f: any) => (
+                          <p key={f.questionId}>
+                            {f.questionId}:{" "}
+                            {f.correctAnswers?.join(" · ") ??
+                              (f.matches
+                                ? f.matches
+                                    .map((i: number) => f.options[i])
+                                    .join(" · ")
+                                : f.options[f.correct])}
+                          </p>
+                        ))}
+                      </details>
+                    )}
                     {attempt.submitted ? (
                       <p role="status">
-                        Score: {attempt.score}% ·{" "}
-                        {attempt.passed
-                          ? "Passed. Completion committed."
-                          : "Not passed."}
+                        {attempt.gradingState === "pending_manual" ? (
+                          "Awaiting human assessment. No official score or certificate yet."
+                        ) : (
+                          <>
+                            Score: {attempt.score}% ·{" "}
+                            {attempt.passed
+                              ? "Passed. Completion committed."
+                              : "Not passed."}
+                          </>
+                        )}
                       </p>
                     ) : (
                       <button
@@ -991,7 +1005,8 @@ function App() {
                           busy ||
                           active.assignment_state !== "active" ||
                           attempt.questions.some(
-                            (q: any) => attempt.answers[q.id] === undefined,
+                            (q: any) =>
+                              !completeResponse(q, attempt.answers[q.id]),
                           )
                         }
                         onClick={() =>
@@ -1000,12 +1015,11 @@ function App() {
                               attemptId: attempt.id,
                               confirmed: true,
                             });
-                            setAttempt({
-                              ...attempt,
-                              submitted: true,
-                              score: r.score,
-                              passed: r.passed,
-                            });
+                            setAttempt(
+                              await op("learning_get_attempt", {
+                                attemptId: attempt.id,
+                              }),
+                            );
                           })
                         }
                       >
@@ -1046,6 +1060,18 @@ function App() {
             )}
           </>
         )}
+        {view === "admin" &&
+          ["admin", "content_admin", "assessor"].includes(role) && (
+            <Assessments
+              key={"assessments:" + session.sessionEpoch + view}
+              role={role}
+              tick={tick}
+              busy={busy}
+              op={op}
+              mutate={mutate}
+              run={run}
+            />
+          )}
         {(view === "transcript" ||
           (view === "admin" && ["admin", "manager"].includes(role))) && (
           <Reports

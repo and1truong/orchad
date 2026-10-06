@@ -1,3 +1,10 @@
+import {
+  AssessmentService,
+  validateQuestion,
+  presentation,
+  visibleQuestions,
+  validateAnswer,
+} from "./assessments.ts";
 import { splitWorkspace } from "../shared/tool-groups.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
@@ -53,11 +60,13 @@ export class LearningService {
   readonly people: PeopleService;
   readonly assignments: AssignmentService;
   readonly reports: ReportService;
+  readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
     this.programs = new ProgramService(db);
     this.people = new PeopleService(db);
     this.assignments = new AssignmentService(db);
     this.reports = new ReportService(db);
+    this.assessments = new AssessmentService(db);
   }
   principal(id: string): Principal {
     const p = this.db
@@ -192,11 +201,17 @@ export class LearningService {
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
     this.reports.authorize(p, c.toolName, a);
-    const scopedEnrollment = a.enrollmentId
-      ? this.enrollment(p, a.enrollmentId)
-      : a.attemptId
-        ? this.attempt(p, a.attemptId).e
-        : null;
+    this.assessments.authorize(p, c.toolName, a);
+    const scopedEnrollment =
+      a.enrollmentId && c.toolName !== "human_reset_assessment"
+        ? this.enrollment(p, a.enrollmentId)
+        : a.attemptId &&
+            ![
+              "human_get_assessment_submission",
+              "human_assess_answer",
+            ].includes(c.toolName)
+          ? this.attempt(p, a.attemptId).e
+          : null;
     if (
       scopedEnrollment &&
       [
@@ -319,6 +334,14 @@ export class LearningService {
           false,
         );
       }
+      if (c.toolName === "human_assess_answer") {
+        this.programs.refreshLearner(p.tenant, data.learnerId);
+        this.assignments.refreshCompletionNotifications(
+          p.tenant,
+          data.learnerId,
+          false,
+        );
+      }
       this.db
         .prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?")
         .run(w.id);
@@ -349,16 +372,24 @@ export class LearningService {
                   awardEnrollmentId: c.arguments.awardEnrollmentId,
                   criterionPath: c.arguments.criterionPath,
                 }
-              : c.toolName === "human_save_answer"
+              : ["human_save_answer", "human_assess_answer"].includes(
+                    c.toolName,
+                  )
                 ? {
                     attemptId: c.arguments.attemptId,
                     questionId: c.arguments.questionId,
                   }
-                : c.toolName.includes("content_item")
-                  ? { itemId: c.arguments.itemId }
-                  : c.toolName.includes("course")
-                    ? { courseId: c.arguments.courseId }
-                    : c.arguments;
+                : c.toolName === "learning_set_course_assessor"
+                  ? {
+                      courseId: c.arguments.courseId,
+                      assessorId: c.arguments.assessorId,
+                      enabled: c.arguments.enabled,
+                    }
+                  : c.toolName.includes("content_item")
+                    ? { itemId: c.arguments.itemId }
+                    : c.toolName.includes("course")
+                      ? { courseId: c.arguments.courseId }
+                      : c.arguments;
       this.db
         .prepare(
           "INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)",
@@ -561,6 +592,9 @@ export class LearningService {
           bounded: true,
         };
       }
+      case "learning_get_assessment_queue":
+      case "human_get_assessment_submission":
+        return this.assessments.read(p, name, a, source);
       case "learning_get_progress":
         return this.progress(this.enrollment(p, a.enrollmentId));
       case "learning_get_lesson": {
@@ -611,8 +645,22 @@ export class LearningService {
           submitted: !!at.submitted,
           score: at.score,
           passed: at.passed === null ? null : !!at.passed,
-          questions: v.quiz.questions.map(({ correct, ...q }) => q),
-          answers: decode(at.answers),
+          gradingState: at.grading_state,
+          questions: visibleQuestions(v, at),
+          answers: source === "human" ? decode(at.answers) : {},
+          responsesWithheld: source === "bridge",
+          feedback:
+            source === "human" && !!at.feedback_released
+              ? v.quiz.questions
+                  .filter((q) => (q.kind ?? "mcq") !== "long_answer")
+                  .map((q) => ({
+                    questionId: q.id,
+                    correct: q.correct,
+                    matches: q.matches,
+                    correctAnswers: q.correctAnswers,
+                    options: q.options,
+                  }))
+              : [],
         };
       }
       case "learning_get_drafts":
@@ -798,9 +846,9 @@ export class LearningService {
         earlier.add(m.id);
       }
     }
-    for (const q of c.quiz.questions)
-      if (q.correct >= q.options.length)
-        reject("INVALID_ARGUMENT", "Correct choice outside options");
+    for (const q of c.quiz.questions) validateQuestion(q);
+    if (Buffer.byteLength(JSON.stringify(c.quiz)) > 16 * 1024)
+      reject("INVALID_ARGUMENT", "Assessment content exceeds 16 KiB budget");
     if (
       !validateArgs(courseSchema, c) ||
       Buffer.byteLength(JSON.stringify(c)) > 44 * 1024
@@ -863,6 +911,10 @@ export class LearningService {
   ): any {
     const a = args as any;
     switch (name) {
+      case "learning_set_course_assessor":
+      case "human_assess_answer":
+      case "human_reset_assessment":
+        return this.assessments.write(p, name, a);
       case "learning_create_content_item": {
         const item = this.validateItem(a.item);
         if (
@@ -964,14 +1016,25 @@ export class LearningService {
               )
               .get(e.id) as any
           ).n + 1;
-        if (n > v.quiz.maxAttempts)
+        if (
+          this.db
+            .prepare(
+              "SELECT 1 FROM attempts WHERE enrollment_id=? AND grading_state='pending_manual'",
+            )
+            .get(e.id)
+        )
+          reject(
+            "FORBIDDEN",
+            "Wait for human assessment review before retrying",
+          );
+        if (n > v.quiz.maxAttempts + this.assessments.extra(e.id))
           reject("FORBIDDEN", "Assessment attempt limit reached");
         const id = randomUUID();
         this.db
           .prepare(
-            "INSERT INTO attempts(id,enrollment_id,number) VALUES(?,?,?)",
+            "INSERT INTO attempts(id,enrollment_id,number,presentation) VALUES(?,?,?,?)",
           )
-          .run(id, e.id, n);
+          .run(id, e.id, n, JSON.stringify(presentation(v)));
         return { attemptId: id, number: n };
       }
       case "human_save_answer": {
@@ -980,10 +1043,12 @@ export class LearningService {
           q = v.quiz.questions.find((q) => q.id === a.questionId);
         if (at.submitted)
           reject("FORBIDDEN", "Submitted answers are immutable");
-        if (!q || a.answer >= q.options.length)
-          reject("INVALID_ARGUMENT", "Invalid question/answer");
+        if (!q) reject("INVALID_ARGUMENT", "Invalid question");
+        validateAnswer(q!, a.answer);
         const answers = decode(at.answers);
         answers[q.id] = a.answer;
+        if (Buffer.byteLength(JSON.stringify(answers)) > 32 * 1024)
+          reject("INVALID_ARGUMENT", "Combined responses exceed 32 KiB budget");
         this.db
           .prepare("UPDATE attempts SET answers=? WHERE id=?")
           .run(JSON.stringify(answers), at.id);
@@ -1000,35 +1065,10 @@ export class LearningService {
         const answers = decode(at.answers);
         if (v.quiz.questions.some((q) => !Object.hasOwn(answers, q.id)))
           reject("INVALID_ARGUMENT", "Answer every question before submitting");
-        const score = Math.floor(
-            (100 *
-              v.quiz.questions.filter((q) => answers[q.id] === q.correct)
-                .length) /
-              v.quiz.questions.length,
-          ),
-          passed = score >= v.quiz.passScore;
-        this.db
-          .prepare(
-            "UPDATE attempts SET submitted=1,score=?,passed=? WHERE id=?",
-          )
-          .run(score, passed ? 1 : 0, at.id);
-        if (passed) {
-          const now = new Date().toISOString();
-          this.db
-            .prepare(
-              "UPDATE enrollments SET status='completed',completed_at=? WHERE id=?",
-            )
-            .run(now, e.id);
-          this.db
-            .prepare("INSERT OR IGNORE INTO certificates VALUES(?,?,?)")
-            .run(randomUUID(), e.id, now);
-        }
-        return {
-          attemptId: at.id,
-          score,
-          passed,
-          progress: this.progress(this.enrollment(p, e.id)),
-        };
+        for (const q of v.quiz.questions)
+          validateAnswer(q, answers[q.id], true);
+        const result = this.assessments.grade(at, v);
+        return { ...result, progress: this.progress(this.enrollment(p, e.id)) };
       }
       case "learning_create_course": {
         const c = this.validateCourse(p, a.course);
