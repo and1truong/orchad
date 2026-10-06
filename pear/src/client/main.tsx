@@ -1097,7 +1097,8 @@ function App() {
                         {attempt.feedback.map((f: any) => (
                           <p key={f.questionId}>
                             {f.questionId}:{" "}
-                            {f.correctAnswers?.join(" · ") ??
+                            {f.optionFeedback?.filter((entry:any)=>entry.message).map((entry:any)=><span key={entry.optionIndex}>{entry.message}{" · "}</span>)}
+                            {f.correctIndices?.map((index:number)=>f.options[index]).join(" · ") ?? f.correctAnswers?.join(" · ") ??
                               (f.matches
                                 ? f.matches
                                     .map((i: number) => f.options[i])
