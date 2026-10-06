@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+test.use({timezoneId:"UTC"});
 async function login(page: Page, user: string) {
   await page.goto("/");
   await page.getByLabel("Account", { exact: true }).fill(user);
@@ -190,4 +191,33 @@ test("human reviewed recurring assignment, due job dedup, private notification, 
     path: "artifacts/recurring-assignment-mobile.png",
     fullPage: true,
   });
+});
+
+test("human reviews calendar-month timezone/DST policy and keeps future cycles undelivered", async ({page}) => {
+  await page.emulateMedia({media:"screen"});
+  await login(page,"admin");
+  await page.getByRole("button",{name:"Administration",exact:true}).click();
+  const editor=page.getByRole("form",{name:"Assignment plan editor",exact:true});
+  await editor.getByLabel("Plan ID",{exact:true}).fill("e2e-calendar-months");
+  await editor.getByLabel("Assignment title",{exact:true}).fill("Calendar month workflow");
+  await editor.getByLabel("Starts · your local time",{exact:true}).fill("2027-01-31T13:00");
+  await editor.getByLabel("Use calendar-month recurrence",{exact:true}).check();
+  await editor.getByLabel("Recurrence timezone · IANA region or UTC",{exact:true}).fill("America/New_York");
+  await editor.getByRole("combobox",{name:"Repeated DST wall time",exact:true}).selectOption("later");
+  await editor.getByLabel("Assignment change reason",{exact:true}).fill("Reviewed monthly timezone and fold choice");
+  await editor.getByRole("button",{name:"Preview assignment audience",exact:true}).click();
+  await expect(editor).toContainText("Calendar anchor and sample runs");
+  await expect(editor).toContainText("America/New_York");
+  await expect(editor).toContainText("later");
+  await expect(editor).toContainText("2027-02-28T13:00:00.000Z");
+  await expect(editor).toContainText("2027-03-31T12:00:00.000Z");
+  await editor.getByRole("button",{name:"Save reviewed assignment plan",exact:true}).click();
+  const row=page.getByRole("region",{name:"Assignment operations",exact:true}).locator("section.panel")
+    .filter({has:page.getByRole("heading",{name:"Calendar month workflow",exact:true})});
+  await expect(row).toContainText("0 cycles");
+  await page.getByRole("button",{name:"Run due assignment jobs",exact:true}).click();
+  await expect(row).toContainText("0 cycles");
+  await page.reload(); await page.getByRole("button",{name:"Administration",exact:true}).click();
+  await expect(row).toContainText("0 cycles");
+  await page.screenshot({path:"artifacts/calendar-month-policy.png",fullPage:true});
 });

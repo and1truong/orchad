@@ -10,6 +10,9 @@ export interface AssignmentPlan {
   membership: "fixed" | "dynamic";
   startsAt: string;
   repeatDays: number;
+  repeatMonths?: number;
+  timeZone?: string;
+  dstChoice?: "earlier" | "later";
   endAt: string | null;
   dueKind: "none" | "fixed" | "rolling";
   fixedDueAt: string | null;
@@ -25,11 +28,14 @@ export const planSchema = object({
   membership: enumeration("fixed", "dynamic"),
   startsAt: string(40),
   repeatDays: integer(366, 0),
+  repeatMonths: integer(12, 1),
+  timeZone: string(80),
+  dstChoice: enumeration("earlier", "later"),
   endAt: { type: ["string", "null"], maxLength: 40 },
   dueKind: enumeration("none", "fixed", "rolling"),
   fixedDueAt: { type: ["string", "null"], maxLength: 40 },
   rollingDays: integer(366, 0),
-});
+}, ["title", "targetKind", "targetId", "audienceKind", "learnerIds", "groupId", "membership", "startsAt", "repeatDays", "endAt", "dueKind", "fixedDueAt", "rollingDays"]);
 const page = { offset: integer(100000), limit: integer(20, 1) };
 export const assignmentLibraryWrites = [
   "learning_save_assignment_plan",
@@ -63,7 +69,7 @@ export function assignmentTools(role: Role): Tool[] {
             "learning_preview_assignment_plan",
             "read",
             { plan: planSchema, ...page },
-            "Validate target, audience, fixed/dynamic membership and UTC due/recurrence policy; preview current authorized recipients without dispatch.",
+            "Validate target, audience, fixed/dynamic membership and UTC-day or timezone/calendar-month due/recurrence policy; preview current authorized recipients without dispatch.",
             ["plan"],
           ),
           tool(

@@ -300,18 +300,40 @@ export function Assignments(p: Props) {
                   }
                 />
               </label>
-              <label>
-                Repeat every UTC days · 0 for once
-                <input
-                  type="number"
-                  min={0}
-                  max={366}
-                  value={spec.repeatDays}
-                  onChange={(e) =>
-                    change({ ...spec, repeatDays: Number(e.target.value) })
+              <label className="choice">
+                <input type="checkbox" checked={!!spec.repeatMonths} onChange={(e) => {
+                  if (e.target.checked) change({...spec, repeatDays: 0, repeatMonths: 1,
+                    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, dstChoice: "earlier"});
+                  else {
+                    const {repeatMonths, timeZone, dstChoice, ...legacy} = spec;
+                    change(legacy);
                   }
-                />
+                }} />
+                Use calendar-month recurrence
               </label>
+              {spec.repeatMonths ? <>
+                <label>Repeat every calendar months
+                  <input type="number" min={1} max={12} required value={spec.repeatMonths}
+                    onChange={e => change({...spec, repeatMonths: Number(e.target.value)})} />
+                </label>
+                <label>Recurrence timezone · IANA region or UTC
+                  <input required maxLength={80} value={spec.timeZone ?? ""}
+                    onChange={e => change({...spec, timeZone: e.target.value})} />
+                </label>
+                <label>Repeated DST wall time
+                  <select aria-label="Repeated DST wall time" value={spec.dstChoice ?? "earlier"}
+                    onChange={e => change({...spec, dstChoice: e.target.value as "earlier" | "later"})}>
+                    <option value="earlier">Earlier occurrence</option>
+                    <option value="later">Later occurrence</option>
+                  </select>
+                </label>
+                <p>Month ends clamp to the last day. A missing wall time shifts forward by its DST gap.
+                  Start/deadline inputs use your browser timezone; future repeats use the named recurrence timezone shown below.</p>
+              </> : <label>
+                Repeat every UTC days · 0 for once
+                <input type="number" min={0} max={366} value={spec.repeatDays}
+                  onChange={e => change({...spec, repeatDays: Number(e.target.value)})} />
+              </label>}
               <label>
                 Ends · your local time · optional
                 <input
@@ -401,7 +423,7 @@ export function Assignments(p: Props) {
                 </label>
               )}
               <p>
-                Recurring fixed deadlines advance with the same UTC-day cadence.
+                Recurring fixed deadlines advance with the selected day or calendar-month cadence.
                 Rolling deadlines start when each member actually receives the
                 assignment. Every cycle pins its content and rules.
               </p>
@@ -421,6 +443,12 @@ export function Assignments(p: Props) {
                     {preview.total} authorized active recipients · Target
                     version {preview.version}
                   </p>
+                  {preview.policy.nextRuns && <div>
+                    <h4>Calendar anchor and sample runs</h4>
+                    <ul>{preview.policy.nextRuns.map((r: any) => <li key={r.utc}>{r.local} · {r.timeZone} · UTC {r.utc}</li>)}</ul>
+                    <p>Repeated times: {preview.policy.dstChoice}. Missing times: shift forward.
+                      Month ends: last day. Existing delivered cycles keep their original rules.</p>
+                  </div>}
                   {preview.items.map((u: any) => (
                     <p key={u.id}>{u.id}</p>
                   ))}

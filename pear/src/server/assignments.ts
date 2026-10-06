@@ -1,4 +1,5 @@
 import { releaseInactiveBookings } from "./blended.ts";
+import { calendarMonth, nextCalendarRun, calendarRunIndex, calendarPreview } from "../shared/calendar.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import { validateArgs } from "@orchard/bridge-contract";
@@ -94,6 +95,12 @@ export class AssignmentService {
     )
       reject("INVALID_ARGUMENT", "Invalid assignment plan");
     const start = date(s.startsAt);
+    if (s.repeatMonths !== undefined) {
+      if (s.repeatDays !== 0 || !s.timeZone || !s.dstChoice)
+        reject("INVALID_ARGUMENT", "Monthly recurrence requires a timezone, DST choice and no UTC-day cadence");
+      try { calendarPreview(s); } catch (e) { reject("INVALID_ARGUMENT", (e as Error).message); }
+    } else if (s.timeZone !== undefined || s.dstChoice !== undefined)
+      reject("INVALID_ARGUMENT", "Calendar settings require monthly recurrence");
     if (s.endAt && date(s.endAt) < start)
       reject("INVALID_ARGUMENT", "End must not precede start");
     if (s.dueKind === "fixed") {
@@ -108,6 +115,14 @@ export class AssignmentService {
       (s.dueKind === "rolling" && s.rollingDays < 1)
     )
       reject("INVALID_ARGUMENT", "Invalid due date policy");
+    if (s.repeatMonths && s.dueKind === "fixed") {
+      try {
+        for (let index = 0; index <= Math.ceil(12 / s.repeatMonths); index++) {
+          const runAt = calendarMonth(s.startsAt, index * s.repeatMonths, s.timeZone!, s.dstChoice!);
+          this.due(s, runAt, runAt);
+        }
+      } catch (e) { reject("INVALID_ARGUMENT", (e as Error).message); }
+    }
     if (s.audienceKind === "individuals") {
       if (!s.learnerIds.length || s.groupId || s.membership !== "fixed")
         reject(
@@ -175,6 +190,11 @@ export class AssignmentService {
     return u?.active && (p.role === "admin" || u.manager_id === p.id);
   }
   private due(s: AssignmentPlan, runAt: string, deliveredAt: string) {
+    if (s.dueKind === "fixed" && s.repeatMonths) {
+      const due = calendarMonth(s.fixedDueAt!, calendarRunIndex(s, runAt) * s.repeatMonths, s.timeZone!, s.dstChoice!);
+      if (due < runAt) reject("INVALID_ARGUMENT", "Calendar deadline precedes its cycle");
+      return due;
+    }
     return s.dueKind === "none"
       ? null
       : new Date(
@@ -518,14 +538,14 @@ export class AssignmentService {
             now,
           ) + Number(inserted.changes);
         cycles++;
-        if (!s.repeatDays) {
+        if (!s.repeatDays && !s.repeatMonths) {
           this.db
             .prepare("UPDATE assignment_plans SET next_run=? WHERE id=?")
             .run("9999-12-31T23:59:59.999Z", row.id);
           changes++;
           break;
         }
-        runAt = new Date(date(runAt) + s.repeatDays * day).toISOString();
+        runAt = s.repeatMonths ? nextCalendarRun(s, runAt) : new Date(date(runAt) + s.repeatDays * day).toISOString();
         this.db
           .prepare("UPDATE assignment_plans SET next_run=? WHERE id=?")
           .run(runAt, row.id);
@@ -624,6 +644,10 @@ export class AssignmentService {
             membership: a.plan.membership,
             dueKind: a.plan.dueKind,
             recurrenceDays: a.plan.repeatDays,
+            ...(a.plan.repeatMonths ? {
+              recurrenceMonths: a.plan.repeatMonths, timeZone: a.plan.timeZone, dstChoice: a.plan.dstChoice,
+              gapPolicy: "shift_forward", monthEndPolicy: "clamp_to_last_day", nextRuns: calendarPreview(a.plan),
+            } : {}),
           },
         };
       }
@@ -693,7 +717,7 @@ export class AssignmentService {
               .get(old.id) as any)
           : null;
         if (last && next <= last.run_at) {
-          next = a.plan.repeatDays
+          next = a.plan.repeatMonths ? nextCalendarRun(a.plan, last.run_at) : a.plan.repeatDays
             ? new Date(
                 date(next) +
                   (Math.floor(
