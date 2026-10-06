@@ -1,3 +1,4 @@
+import {externalActivityTools} from "./xapi.ts";
 import {translationTools} from "./translations.ts";
 import { discoveryFilters, discoveryMetadataSchema, discoveryTools } from "./discovery.ts";
 import { curationTools, curationLibraryWrites } from "./curation.ts";
@@ -326,6 +327,7 @@ export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
     ...translationTools,
+    ...externalActivityTools,
     ...curationTools(role),
     ...feedbackTools,
     ...standaloneTools,
@@ -379,7 +381,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
                       ...reportTools(role),
                       ...(["admin", "manager"].includes(role) ? [report] : []),
                     ];
-  return [...new Map([...common, ...translationTools, ...domain].map((t) => [t.name, t])).values()];
+  return [...new Map([...common, ...translationTools, ...externalActivityTools, ...domain].map((t) => [t.name, t])).values()];
 }
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.

@@ -25,6 +25,7 @@ const { app, service, outbox } = await createApp({
   developmentAuth,
   oidc,
   webhookEndpoints: process.env.PEAR_WEBHOOK_ENDPOINTS?JSON.parse(process.env.PEAR_WEBHOOK_ENDPOINTS):undefined,
+  xapiEnabled: process.env.PEAR_XAPI_ENABLED === "true",
   scimEnabled: process.env.PEAR_SCIM_ENABLED === "true",
   secureCookies: process.env.COOKIE_SECURE === "true",
 });

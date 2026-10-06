@@ -1,3 +1,4 @@
+import {XAPIService} from "./xapi.ts";
 import {TranslationService} from "./translations.ts";
 import { DiscoveryService } from "./discovery.ts";
 import { CurationService } from "./curation.ts";
@@ -63,6 +64,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly xapi:XAPIService;
   readonly translations:TranslationService;
   readonly discovery: DiscoveryService;
   readonly curation: CurationService;
@@ -75,7 +77,8 @@ export class LearningService {
   readonly assignments: AssignmentService;
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
-  constructor(readonly db: DatabaseSync) {
+  constructor(readonly db: DatabaseSync,origin="http://127.0.0.1:4314") {
+    this.xapi=new XAPIService(db,origin);
     this.translations=new TranslationService(db);
     this.discovery = new DiscoveryService(db);
     this.curation = new CurationService(db);
@@ -494,6 +497,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="learning_get_external_activity")return this.xapi.learning(p,a.offset??0,a.limit??20);
     if(name==="learning_get_language_variants")return this.translations.read(p,a.kind,a.sourceId,a.preferredLanguage,source);
     if (["learning_compare_courses","learning_get_recommendations"].includes(name)) return this.discovery.read(p,name,a,source);
     if (["learning_get_curated_content","learning_get_retirement_alternative","learning_get_curation","learning_preview_retirement"].includes(name)) return this.curation.read(p,name,a);

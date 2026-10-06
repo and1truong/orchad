@@ -1,3 +1,4 @@
+import {ExternalActivity} from "./external-activity.tsx";
 import {LanguageVariants,TranslationSettings} from "./translations.tsx";
 import {WebhookSettings} from "./webhooks.tsx";
 import {ProvisioningClients} from "./provisioning.tsx";
@@ -774,6 +775,7 @@ function App() {
         )}
         {view === "learning" && (
           <>
+            <ExternalActivity key={"external:"+session.sessionEpoch} session={session} busy={busy} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <div className="stats">
               <div>
                 <strong>

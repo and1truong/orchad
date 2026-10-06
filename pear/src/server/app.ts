@@ -1,3 +1,4 @@
+import {registerXAPI} from "./xapi-routes.ts";
 import {registerTranslations} from "./translations-routes.ts";
 import {OutboxService,type WebhookEndpoint} from "./outbox.ts";
 import {registerOutbox} from "./outbox-routes.ts";
@@ -34,6 +35,7 @@ export async function createApp(opts: {
   identityFixture?: boolean;
   scimEnabled?: boolean;
   webhookEndpoints?: WebhookEndpoint[];
+  xapiEnabled?: boolean;
 }) {
   const parsed = new URL(opts.origin);
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
@@ -44,6 +46,7 @@ export async function createApp(opts: {
   if(opts.identityFixture&&!["127.0.0.1","localhost","[::1]"].includes(parsed.hostname))throw Error("Identity fixtures require loopback");
   if(opts.scimEnabled&&!opts.identityFixture&&!opts.secureCookies)throw Error("SCIM requires HTTPS and secure session cookies");
   if(opts.webhookEndpoints?.length&&!opts.identityFixture&&!opts.secureCookies)throw Error("Webhook configuration requires HTTPS and secure session cookies");
+  if(opts.xapiEnabled&&(!opts.scimEnabled||!opts.identityFixture&&!opts.secureCookies))throw Error("xAPI requires reviewed SCIM actors and secure configuration");
   const outbox=new OutboxService(opts.db,opts.webhookEndpoints,!!opts.identityFixture);
   const identity=new IdentityService(opts.db,opts.oidc,opts.origin,!!opts.identityFixture);
   const app = Fastify({
@@ -58,7 +61,7 @@ export async function createApp(opts: {
     },
   });
   await app.register(cookie);
-  const service = new LearningService(opts.db),
+  const service = new LearningService(opts.db,opts.origin),
     name = opts.secureCookies ? "__Host-pear-session" : "pear-session";
   const launchSecret = randomBytes(32);
   const loginBudget = new Map<
@@ -536,6 +539,7 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
   registerTranslations(app,service.translations,req=>service.principal(req.session.principal));
   registerOutbox(app,outbox,opts.origin,req=>service.principal(req.session.principal));
   registerSCIM(app,opts.db,opts.origin,!!opts.scimEnabled,req=>service.principal(req.session.principal));

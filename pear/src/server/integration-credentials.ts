@@ -2,7 +2,7 @@ import {createHash,randomBytes,randomUUID} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
 import {reject,boundedPage} from "./errors.ts";
-export const integrationScopes=["provisioning.read","provisioning.write","events.read"] as const;
+export const integrationScopes=["provisioning.read","provisioning.write","events.read","xapi.read","xapi.write"] as const;
 export const tokenHash=(value:string)=>createHash("sha256").update(value).digest("hex");
 export class IntegrationCredentials{
  constructor(readonly db:DatabaseSync){}
@@ -20,7 +20,7 @@ export class IntegrationCredentials{
   try{
    this.live(p);
    if(!a||!["issue","revoke"].includes(a.action)||typeof a.reason!=="string"||!a.reason.trim()||a.reason.length>300||
-    typeof a.key!=="string"||!/^[A-Za-z0-9_-]{1,128}$/.test(a.key)||!Number.isSafeInteger(a.revision)||a.revision<0)reject("INVALID_ARGUMENT","Invalid reviewed integration credential");
+    !/^[A-Za-z0-9_-]{1,128}$/.test(a.key)||!Number.isSafeInteger(a.revision)||a.revision<0)reject("INVALID_ARGUMENT","Invalid reviewed integration credential");
    const allowed=a.action==="issue"?["action","reason","key","revision","name","scopes","ttlDays"]:["action","reason","key","revision","clientId"];
    if(Object.keys(a).some(k=>!allowed.includes(k)))reject("INVALID_ARGUMENT","Unsupported credential field");
    if(a.action==="issue"&&(typeof a.name!=="string"||!a.name.trim()||a.name.length>100||!Number.isInteger(a.ttlDays)||a.ttlDays<1||a.ttlDays>30||
