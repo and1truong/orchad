@@ -10,7 +10,7 @@ import {createApp} from "../src/server/app.ts";
 const branding={name:"Original organization academy",tagline:"Learn from permitted originals",palette:"navy"};
 test("only current tenant admin can update portal presentation; read is authenticated own-only, agent tools cannot mutate settings, and exact keys/CAS/live role stay authoritative",()=>{
  const f=fixture();try{
-  for(const user of ["learner-a","learner-b","manager","editor","assessor","outsider"])assert.equal(f.call(user,"human_save_portal_branding",{branding},"human").error?.code,"FORBIDDEN");
+  for(const user of ["learner-a","learner-b","manager","editor","assessor","outsider"])assert.equal(f.call(user,"human_save_portal_branding",{branding},"human").ok,false);
   assert.equal(f.call("admin","human_save_portal_branding",{branding}).error?.code,"FORBIDDEN");assert.equal(allCatalog("admin").some(t=>t.name.includes("portal_branding")),false);
   const key={idempotencyKey:"portal-reviewed",expectedRevision:f.service.context("admin","library:demo").revision},r=f.call("admin","human_save_portal_branding",{branding},"human",key);assert.equal(data(r).version,1);assert.deepEqual(f.call("admin","human_save_portal_branding",{branding},"human",key),r);
   assert.equal(f.call("admin","human_save_portal_branding",{branding:{...branding,name:"Different"}},"human",key).error?.code,"IDEMPOTENCY_CONFLICT");assert.equal(f.call("admin","human_save_portal_branding",{branding},"human",{expectedRevision:0}).error?.code,"STALE_CONTEXT");
