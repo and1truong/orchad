@@ -388,10 +388,10 @@ export class LearningService {
         );
       const data = this.write(p, c.toolName, c.arguments);
       releaseInactiveBookings(this.db, p.tenant);
-      if (c.toolName === "human_submit_attempt")
+      if (["human_submit_attempt","human_complete_item"].includes(c.toolName))
         this.programs.refreshLearner(p.tenant, p.id);
       if (
-        ["human_submit_attempt", "human_submit_external_record"].includes(
+        ["human_submit_attempt", "human_complete_item", "human_submit_external_record"].includes(
           c.toolName,
         )
       )

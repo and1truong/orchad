@@ -29,6 +29,6 @@ export const standaloneHumanTools = [
       itemEnrollmentId: string(128),
       confirmed: { type: "boolean", enum: [true] },
     },
-    "Learner explicitly confirms studying a tracked standalone item. No quiz score, award credit or course certificate is created.",
+    "Learner explicitly confirms studying a tracked standalone item. No quiz score or course certificate is created; configured awards may derive credit from this real human-confirmed reading.",
   ),
 ];

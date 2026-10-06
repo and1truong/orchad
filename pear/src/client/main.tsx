@@ -1277,6 +1277,7 @@ function App() {
             op={op}
             mutate={mutate}
             run={run}
+            studyItem={()=>{clearLearning();setLearningOffset(0);setView("learning");}}
             studyCourse={() => {
               clearLearning();
               setLearningOffset(0);

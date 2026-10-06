@@ -1,4 +1,3 @@
-import {OriginalCollectionSharing} from "./collection-sharing.tsx";
 import {PrimaryAssignment,AssessmentNotices} from "./moderation-assignments.tsx";
 import {awardUnitLabel} from "../shared/programs.ts";
 import {translateUI} from "./i18n.ts";
@@ -23,6 +22,7 @@ type Props = {
   run: (fn: () => Promise<void>) => Promise<boolean>;
   certificate: (id: string) => Promise<any>;
   studyCourse?: () => void;
+  studyItem?:()=>void;
 };
 const requirement = (n: number): Requirement => ({
   id: `criterion-${n}`,
@@ -227,7 +227,10 @@ function Progress({
                     >{translateUI("Study course for this award")}</button>
                   )}
                 </div>
-              ) : (
+              ) : ref.kind==="item"?(
+                <div><p>{translateUI("Standalone item:")} {ref.id} · {translateUI("Version")} {ref.version} · {translateUI(ref.completed?"Reading confirmed":"In progress")}</p><p>{translateUI("Only real human-confirmed reading of the pinned item version counts. No assessment score is inferred.")}</p>
+                {!ref.completed&&<button disabled={props.busy||!active} onClick={()=>void props.run(async()=>{await props.mutate("learning_enroll_item",{itemId:ref.id,version:ref.version});props.studyItem?.();})}>{translateUI("Study standalone item for this award")}</button>}</div>
+              ):(
                 <>
                   <p>{translateUI("External learning:")}{" "}{ref.id} ·{" "}
                     {ref.moderated
@@ -484,7 +487,7 @@ export function Programs(props: Props) {
           {certificate && (
             <Certificate
               key={props.session.sessionEpoch + certificate.id}
-              certificate={certificate} session={props.session}
+              certificate={certificate}
               award
             />
           )}
@@ -706,7 +709,7 @@ export function Programs(props: Props) {
                         onChange={(alternatives) =>
                           updateRequirement(i, { ...r, alternatives })
                         }
-                        kinds={r.creditMode==="nested_earned"?["award"]:["course", "award", "external"]}
+                        kinds={r.creditMode==="nested_earned"?["award"]:["course", "item", "award", "external"]}
                         busy={busy}
                       />
                       <button
@@ -793,7 +796,6 @@ export function Programs(props: Props) {
           <button disabled={busy}>{translateUI("Assign award")}</button>
         </form>
       )}
-      {role==="admin"&&administrative&&<OriginalCollectionSharing actions={props} tick={tick}/>}
       {["admin","assessor"].includes(role)&&<AssessmentNotices actions={{...props,mutate:(name,args)=>props.mutate(name,args,`learning:${props.session.principal.tenant}:${props.session.principal.id}`)}} tick={tick}/>}
       {administrative && role === "admin" && (
         <form

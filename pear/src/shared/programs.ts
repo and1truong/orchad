@@ -65,7 +65,7 @@ export const awardSchema = optionalAudience({
       required: { type: "boolean" },
       credits: integer(1000, 1),
       creditMode:enumeration("fixed","nested_earned"),
-      alternatives: array(reference(["course", "award", "external"]), 8, 1),
+      alternatives: array(reference(["course", "item", "award", "external"]), 8, 1),
     },["id","title","required","credits","alternatives"]),
     16,
     1,

@@ -230,3 +230,6 @@ ADR-068/Migration 039 adds an immutable reviewed mode and exact-mode learner acc
 
 ## #128 reviewed original root course-cycle candidate
 ADR-069/Migration 040 provides separately confirmed objective/full-course version changes for one active root course delivery, preserving original cycle/future pins and due/assigner. Scheduler membership/cancellation/completion follows the current pointer and keeps archived ancestors withdrawn. CI PENDING. Original G06 self-directed/direct/root-course-cycle modes are implemented candidates; award-cycle/reference/reset/recertification semantics remain OPEN/NOT VERIFIED.
+
+## #129 pinned original standalone item award proof candidate
+ADR-070 adds exact versioned item alternatives and derives only real human-confirmed reading under current rights. Required/elective/ongoing/one-item/nested rules and cycle freshness remain enforced, with no assessment grade inferred. CI PENDING. Fresh same-version standalone retakes for recurring awards, exact reference/item assessment/reset/recertification and external-learning availability remain OPEN/NOT VERIFIED.

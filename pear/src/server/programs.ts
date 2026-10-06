@@ -223,7 +223,6 @@ export class ProgramService {
       ...(publishing ? { version: ref.version ?? row.latest_version } : {}),
     };
   }
-  validateSharedDraft(p:Principal,id:string,kind:"award"|"playlist",value:unknown){return this.validate(p,id,kind,value);}
   private validate(
     p: Principal,
     id: string,
@@ -412,6 +411,14 @@ export class ProgramService {
               );
             if (completed) earned = r.credits;
             return { ...ref, completed };
+          }
+          if (ref.kind === "item") {
+            const recipient=this.db.prepare("SELECT id,tenant,name,role,manager_id,active,auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(enrollment.learner,enrollment.tenant) as unknown as Principal;
+            let permitted=false;
+            if(recipient){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"item",ref.id,ref.version!);access.current(recipient,"item",ref.id);permitted=true;}catch{}}
+            const completed=permitted&&!!this.db.prepare("SELECT 1 FROM item_enrollments WHERE learner=? AND tenant=? AND item_id=? AND version=? AND completed_at IS NOT NULL AND (? IS NULL OR completed_at>=?)").get(enrollment.learner,enrollment.tenant,ref.id,ref.version!,cycleStart,cycleStart);
+            if(completed)earned=r.credits;
+            return {...ref,completed,proof:"human_confirmed_standalone_reading",assessmentScore:false};
           }
           if (ref.kind === "award") {
             const child = evaluate(
