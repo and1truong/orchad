@@ -1,3 +1,4 @@
+import {ProviderContent} from "./provider-catalog.tsx";
 import {defaultPortal,portalPalettes,type PortalBranding} from "../shared/portal.ts";
 import {PortalSettings} from "./portal.tsx";
 import {CourseRetake} from "./retakes.tsx";
@@ -518,6 +519,7 @@ function App() {
         {notice && <p role="status">{notice}</p>}
         {view === "catalog" && (
           <>
+            <ProviderContent key={"provider:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
             <Discovery key={"discovery:"+session.sessionEpoch} tick={tick} busy={busy} op={op} run={run}
               isCurrent={()=>sessionRef.current===session && docRef.current===doc}
               onChoose={id=>void run(async()=>setPreview(await op("learning_get_item",{courseId:id})))} />

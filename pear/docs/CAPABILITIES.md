@@ -52,7 +52,7 @@ A source/test file is a regression definition, not proof of a passing run. CI ar
 | #97 question banks | Current head `c7f4033f75ca9b21752a93af11d5aae08a879413` needs fresh exact-head evidence. Previous runs passed 185 domain/HTTP but exposed unstable authoring reads; authoritative draft reads and prompt labels are fixed. |
 | #98 report charts/admin workflows | Head `4334de59f1a330c146ad3fb31b86f6d88d29d43c`, [run 37518117375](https://github.com/and1truong/orchad/actions/runs/37518117375): all eight jobs successful; 188 domain/HTTP, 33 dev/33 built, actual Lime manager-report/admin-group/admin-playlist/native/MCP and 24 durable checks. Current head `d1d5388bc793550193b9b51ef0c7b7086a8d39a4` includes the predecessor fresh-draft fix, CI pending. |
 | #99 completed-course retakes | Current head `37c1cedae00485fed237961ec3c01726fd56b5e3` pending; prior domain run exposed missing exact-version audit and additive migration default expectation, now fixed. |
-| #100 portal presentation | Current head `877d4a5263e6a6b4eb45cf5a4a0739c923a8f7f1` pending; bounded tenant-admin human settings and three domain/HTTP plus one browser regression authored. |
+| #100 portal presentation | Current head `48ecb6b934526740cd8814fa7abecfa13e3f039e`, run 37520504081 all eight jobs passed; bounded tenant-admin human settings and three domain/HTTP plus one browser regression authored. |
 | #101 durable guidance/admission | Guidance and authoritative journal admission guard with actual Pear lost-response/cancel/reopen regression authored; exact-head CI pending. |
 
 The stack is unmerged. Every PR targets the preceding feature branch. Updating a predecessor carries its changes into descendants through controlled fast-forward merge commits without force-pushing or merging PRs. A passing descendant does not relabel a failing historical parent.
@@ -103,12 +103,16 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 
 ## G04 organization portal presentation extension
 
-#100 adds tenant-admin-only signed-in portal name/tagline/fixed palette, scoped to current authenticated tenant and cleared on identity change. Three domain/real HTTP and one mobile EN/VI browser regression are authored; exact-head CI pending. Cross-portal sharing and complete reference branding/settings remain OPEN. See ADR-041.
+#100 adds tenant-admin-only signed-in portal name/tagline/fixed palette, scoped to current authenticated tenant and cleared on identity change. Three domain/real HTTP and one mobile EN/VI browser regression are authored; exact-head 48ecb6b934526740cd8814fa7abecfa13e3f039e passed all eight jobs (195 domain, 35 dev + 35 built browser). Cross-portal sharing and complete reference branding/settings remain OPEN. See ADR-041.
 
 ## G22 durable recovery guidance and new-request admission
 
-#101 explains persisted run state and original-outcome reconciliation in Lime. Authoritative runner admission denies a new input while an uncertain mutation remains unresolved, including after cancel/reopen. One additional actual Pi/Mango/Lime HostPolicy/Pear HTTP regression is authored; exact-head CI pending. This is not evaluated planning or channel/background delivery. See ADR-042.
+#101 explains persisted run state and original-outcome reconciliation in Lime. Authoritative runner admission denies a new input while an uncertain mutation remains unresolved, including after cancel/reopen. One additional actual Pi/Mango/Lime HostPolicy/Pear HTTP regression passed current head 1cdf7737331f424060ba1381edd19e082a185c7f, run 37520510261, with all eight jobs and 25 durable regressions. This is not evaluated planning or channel/background delivery. See ADR-042.
 
 ## G02/G03 provider metadata ledger extension
 
 #102 adds a disabled-by-default trusted provider/client binding, strict metadata-only ordered feed, canonical dedup, whole-page reconciliation and atomic per-person grants/revocations/retirement. Five backend/domain/real HTTP regressions are authored; exact-head CI pending. Metadata read primitives require live own rights and explicit model metadata permission. Reviewed admin UI and human launch/discovery/history are still next layers. No actual Go1 license, partner wire conformance, licensed body, provider launch or official learning outcome is claimed. See ADR-043.
+
+## Provider discovery and human launch extension
+
+#103 adds own live-entitled metadata discovery, model metadata egress gates, separate launch history and a confirmed human-only exact-version 60-second launch with an explicit second-click link. Cookie/auth-version and live rights revalidate the local redirect; external provider session handling is not controlled. Three domain/actual HTTP and one mobile EN/VI browser regression are authored, exact-head CI pending. No official learning or actual commercial provider conformance is inferred. Reviewed configuration/binding UI and actual contract remain open. See ADR-044.

@@ -1,3 +1,4 @@
+import {ProviderCatalogService,type ProviderAdapter} from "./provider-catalog.ts";
 import {PortalService} from "./portal.ts";
 import {RetakeService} from "./retakes.ts";
 import {QuestionBankService} from "./question-banks.ts";
@@ -71,6 +72,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly providerCatalog:ProviderCatalogService;
   readonly scorm:SCORMService;
   readonly xapi:XAPIService;
   readonly translations:TranslationService;
@@ -85,7 +87,8 @@ export class LearningService {
   readonly assignments: AssignmentService;
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
-  constructor(readonly db: DatabaseSync,origin="http://127.0.0.1:4314") {
+  constructor(readonly db: DatabaseSync,origin="http://127.0.0.1:4314",providerAdapters:ProviderAdapter[] = []) {
+    this.providerCatalog=new ProviderCatalogService(db,providerAdapters);
     this.scorm=new SCORMService(db);
     this.xapi=new XAPIService(db,origin);
     this.translations=new TranslationService(db);
@@ -231,8 +234,9 @@ export class LearningService {
       reject("FORBIDDEN", "Assignment audience outside role scope");
     return r;
   }
-  private resourceAccess(p: Principal, c: Call) {
+  private resourceAccess(p: Principal, c: Call, source:"human"|"bridge"="human") {
     const a = c.arguments as any;
+    this.providerCatalog.authorize(p,c.toolName,a,source);
     new PortalService(this.db).authorize(p,c.toolName);
     new RetakeService(this.db).authorize(p,c.toolName,a);
     this.curation.authorize(p, c.toolName, a);
@@ -318,7 +322,7 @@ export class LearningService {
       )
         reject("STALE_CONTEXT", "Mutation targets the wrong aggregate");
       if (!write) {
-        this.resourceAccess(p, c);
+        this.resourceAccess(p, c, source);
         const result = success(
           this.read(p, c.toolName, c.arguments, source),
           w.revision,
@@ -337,7 +341,7 @@ export class LearningService {
       )
         reject("STALE_CONTEXT", "Account authority changed before transaction");
       this.workspace(live, c.documentId);
-      this.resourceAccess(live, c);
+      this.resourceAccess(live, c, source);
       const payload = canonical({
         toolName: c.toolName,
         arguments: c.arguments,
@@ -412,7 +416,9 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        c.toolName === "human_retake_completed_course"
+        c.toolName === "human_open_provider_content"
+          ? {providerId:c.arguments.providerId,sourceId:c.arguments.sourceId,sourceVersion:c.arguments.version,launchId:data.launchId,confirmed:true}
+          : c.toolName === "human_retake_completed_course"
           ? {enrollmentId:c.arguments.enrollmentId,newEnrollmentId:data.enrollmentId,mode:c.arguments.mode,targetVersion:c.arguments.targetVersion}
           : c.toolName === "learning_save_question_bank"
           ? {bankId:c.arguments.bankId,title:(c.arguments.bank as any).title,access:(c.arguments.bank as any).access,questionCount:(c.arguments.bank as any).questions.length,sourceCourseId:c.arguments.sourceCourseId??null}
@@ -522,6 +528,9 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if(name==="learning_search_provider_content")return this.providerCatalog.search(p,a,source as "human"|"bridge");
+    if(name==="learning_get_provider_item")return this.providerCatalog.item(p,a.providerId,a.sourceId,source as "human"|"bridge");
+    if(name==="learning_get_my_provider_launches")return this.providerCatalog.history(p,a.offset??0,source as "human"|"bridge");
     if(name==="human_get_portal_branding")return new PortalService(this.db).read(p);
     if(name==="human_get_course_retake_options")return new RetakeService(this.db).read(p,a);
     if(["learning_get_question_banks","learning_get_question_bank"].includes(name))return new QuestionBankService(this.db).read(p,name,a,source);
@@ -1013,6 +1022,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);
     if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);
     if(name==="human_retake_completed_course")return new RetakeService(this.db).write(p,a);
     if(["learning_save_question_bank","learning_retire_question_bank"].includes(name))return new QuestionBankService(this.db).write(p,name,a);

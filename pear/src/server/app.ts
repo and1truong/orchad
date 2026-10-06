@@ -69,7 +69,7 @@ export async function createApp(opts: {
     },
   });
   await app.register(cookie);
-  const service = new LearningService(opts.db,opts.origin),
+  const service = new LearningService(opts.db,opts.origin,opts.catalogAdapters),
     name = opts.secureCookies ? "__Host-pear-session" : "pear-session";
   const launchSecret = randomBytes(32);
   const loginBudget = new Map<
@@ -139,7 +139,7 @@ export async function createApp(opts: {
       req.url.split("?")[0] !== "/api/session" &&
       !(
         req.method === "GET" &&
-        (req.url.split("?")[0].startsWith("/api/interactive/")||req.url.split("?")[0].startsWith("/api/scorm/launch/"))
+        (req.url.split("?")[0].startsWith("/api/interactive/")||req.url.split("?")[0].startsWith("/api/scorm/launch/")||req.url.split("?")[0].startsWith("/api/provider-launch/"))
       ) &&
       req.headers["x-pear-epoch"] !==
         hash("binding:" + s.token_hash + ":" + s.auth_version)
@@ -546,6 +546,9 @@ export async function createApp(opts: {
         .code(403)
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
+  });
+  app.get("/api/provider-launch/:id",async(req,reply)=>{
+    try{return reply.header("Cache-Control","no-store").header("Referrer-Policy","no-referrer").redirect(service.providerCatalog.launch(service.principal((req as any).session.principal),(req.params as any).id));}catch(e){return mediaFailure(e,reply);}
   });
   await registerProviderCatalog(app,providerCatalog,opts.origin,!!opts.catalogAdapters?.length);
   await registerSCORM(app,service.scorm,opts.origin,!!opts.developmentAuth||!!opts.identityFixture,req=>service.principal(req.session.principal));

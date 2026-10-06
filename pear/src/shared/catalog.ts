@@ -1,3 +1,4 @@
+import {providerTools,providerHumanTools} from "./provider-catalog.ts";
 import {portalHumanTools} from "./portal.ts";
 import {retakeHumanTools} from "./retakes.ts";
 import {questionBankTools,questionBankLibraryWrites,questionBankRefSchema} from "./question-banks.ts";
@@ -341,6 +342,7 @@ const report = tool(
 export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
+    ...providerTools,
     ...translationTools,
     ...externalActivityTools,
     ...packageTools,
@@ -371,7 +373,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
     group === "operations"
       ? blendedTools(role)
       : group === "learning"
-        ? [...learnerTools, ...curationTools("learner"), ...feedbackTools, ...standaloneTools]
+        ? [...learnerTools, ...providerTools, ...curationTools("learner"), ...feedbackTools, ...standaloneTools]
         : group === "content"
           ? [
               ...curationTools(role),
@@ -403,6 +405,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  ...providerHumanTools,
   ...portalHumanTools,
   ...retakeHumanTools,
   ...standaloneHumanTools,

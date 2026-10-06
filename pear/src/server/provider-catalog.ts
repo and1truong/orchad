@@ -1,8 +1,9 @@
+import {randomUUID} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
 import {IntegrationCredentials,tokenHash} from "./integration-credentials.ts";
 import {boundedPage,reject} from "./errors.ts";
-export type ProviderAdapter={id:string;tenant:string;clientId:string;licenseUntil:string;metadataForModels:boolean};
+export type ProviderAdapter={id:string;tenant:string;clientId:string;licenseUntil:string;metadataForModels:boolean;launchOrigin:string};
 // This internal metadata profile is not a commercial provider's wire protocol.
 // Connections are supplied by trusted server configuration, never by model arguments.
 const id=/^[A-Za-z0-9_-]{1,64}$/;
@@ -18,7 +19,9 @@ export class ProviderCatalogService {
   if(!Array.isArray(adapters)||adapters.length>32)throw Error("Invalid reviewed provider configuration");
   const seen=new Set<string>();
   this.adapters=Object.freeze(adapters.map(p=>{
-   if(!exact(p,["id","tenant","clientId","licenseUntil","metadataForModels"])||!id.test(p.id)||!id.test(p.tenant)||!uuid.test(p.clientId)||!utc(p.licenseUntil)||typeof p.metadataForModels!=="boolean"||seen.has(p.tenant+":"+p.id))throw Error("Invalid reviewed provider configuration");
+   if(!exact(p,["id","tenant","clientId","licenseUntil","metadataForModels","launchOrigin"])||!id.test(p.id)||!id.test(p.tenant)||!uuid.test(p.clientId)||!utc(p.licenseUntil)||typeof p.metadataForModels!=="boolean"||seen.has(p.tenant+":"+p.id))throw Error("Invalid reviewed provider configuration");
+   const origin=new URL(p.launchOrigin);
+   if(origin.protocol!=="https:"||origin.origin!==p.launchOrigin||origin.username||origin.password)throw Error("Provider launch requires exact reviewed HTTPS origin");
    seen.add(p.tenant+":"+p.id);return Object.freeze({...p});
   }));
   this.credentials=new IntegrationCredentials(db);
@@ -96,6 +99,48 @@ export class ProviderCatalogService {
   if(!Number.isSafeInteger(offset)||offset<0)reject("INVALID_ARGUMENT","Invalid provider event page");
   const rows=this.db.prepare("SELECT sequence,event_id,source_time,result,received_at FROM provider_events WHERE tenant=? AND provider=? ORDER BY sequence").all(p.tenant,provider) as any[];
   return boundedPage(rows.map(r=>({sequence:r.sequence,eventId:r.event_id,sourceTime:r.source_time,receivedAt:r.received_at,...JSON.parse(r.result)})),offset,20);
+ }
+ authorize(p:Principal,name:string,a:any,source:"human"|"bridge"="human"){
+  if(name==="learning_get_provider_item")this.item(p,a.providerId,a.sourceId,source);
+  if(name==="human_open_provider_content"){
+   const row=this.item(p,a.providerId,a.sourceId,"human");
+   if(row.version!==a.version)reject("STALE_CONTEXT","Provider source changed; review again");
+  }
+ }
+ search(p:Principal,a:any,source:"human"|"bridge"){
+  // Validate the current account even when no provider is configured.
+  const current=this.db.prepare("SELECT auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(p.id,p.tenant) as any;
+  if(!current||current.auth_version!==p.auth_version)reject("UNAUTHORIZED","Current account required");
+  const rows=this.db.prepare("SELECT i.provider,i.source_id FROM provider_items i JOIN provider_grants g ON g.tenant=i.tenant AND g.provider=i.provider AND g.source_id=i.source_id WHERE i.tenant=? AND g.learner=? AND i.active=1 AND g.active=1 AND g.valid_until>? ORDER BY i.provider,i.source_id").all(p.tenant,p.id,Date.now()) as any[];
+  const result:any[]=[];
+  for(const r of rows){let item:any;try{item=this.item(p,r.provider,r.source_id,source);}catch(e:any){if(["FORBIDDEN","NOT_FOUND"].includes(e.code))continue;throw e;}
+   if((!a.query||(item.title+" "+item.summary+" "+item.topic).toLocaleLowerCase().includes(a.query.toLocaleLowerCase()))&&(!a.language||a.language===item.language))result.push(item);
+  }
+  return boundedPage(result,a.offset??0,10);
+ }
+ history(p:Principal,offset=0,source:"human"|"bridge"="human"){
+  const current=this.db.prepare("SELECT auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(p.id,p.tenant) as any;
+  if(!current||current.auth_version!==p.auth_version)reject("UNAUTHORIZED","Current account required");
+  const rows=this.db.prepare("SELECT * FROM provider_launches WHERE tenant=? AND learner=? ORDER BY created_at DESC,id").all(p.tenant,p.id) as any[];
+  return boundedPage(rows.map(r=>{
+   let metadata:any=null;try{metadata=this.item(p,r.provider,r.source_id,source);}catch(e:any){if(!["FORBIDDEN","NOT_FOUND"].includes(e.code))throw e;}
+   return {id:r.id,providerId:r.provider,sourceId:r.source_id,sourceVersion:r.source_version,createdAt:r.created_at,metadataAvailable:!!metadata,title:metadata?.title??null,recordType:"provider-launch",officialLearning:false};
+  }),offset,20);
+ }
+ open(p:Principal,a:any){
+  this.authorize(p,"human_open_provider_content",a,"human");
+  if(!a.confirmed)reject("INVALID_ARGUMENT","Explicit human confirmation required");
+  if(Number((this.db.prepare("SELECT COUNT(*) AS n FROM provider_launches WHERE tenant=? AND learner=?").get(p.tenant,p.id) as any).n)>=2500)reject("INVALID_ARGUMENT","Own provider launch quota reached");
+  const launchId=randomUUID(),createdAt=new Date().toISOString();
+  this.db.prepare("INSERT INTO provider_launches VALUES(?,?,?,?,?,?,?,?,?)").run(launchId,p.tenant,p.id,p.auth_version,a.providerId,a.sourceId,a.version,createdAt,Date.now()+60000);
+  return {launchId,href:"/api/provider-launch/"+launchId,expiresInSeconds:60,recordType:"provider-launch",officialLearning:false};
+ }
+ launch(p:Principal,launchId:string){
+  const r=this.db.prepare("SELECT * FROM provider_launches WHERE id=? AND tenant=? AND learner=?").get(launchId,p.tenant,p.id) as any;
+  if(!r||r.expires<=Date.now()||r.auth_version!==p.auth_version)reject("FORBIDDEN","Own current unexpired launch required");
+  const item=this.item(p,r.provider,r.source_id,"human"),policy=this.live(p,r.provider);
+  if(item.version!==r.source_version)reject("STALE_CONTEXT","Provider source changed; review again");
+  return policy.launchOrigin+"/content/"+encodeURIComponent(r.source_id);
  }
  item(p:Principal,provider:string,sourceId:string,source:"human"|"bridge"="human"){
   const policy=this.live(p,provider);
