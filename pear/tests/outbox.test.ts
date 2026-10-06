@@ -152,3 +152,46 @@ test("HTTP event API accepts only scoped bearer, exact Host and metadata-only hu
   assert.equal(s.service.description("admin","library:demo").tools.some(t=>/webhook|integration/.test(t.name)),false);
  }finally{if(app)await app.close();s.db.close();await r.close();}
 });
+
+test("item/award/assignment notification lifecycle emits only minimal official transactional facts to explicitly selected signed topics",async()=>{
+ const r=await receiver(),s=setup(r.url);try{
+  const topics=["item.published","item.enrolled","item.completed","item.retired","collection.published","award.enrolled","award.completed","collection.retired","assignment.changed","assignment.notification_created","enrollment.assignment_changed"];
+  const sub=s.subscribe({topics});
+  const item={title:"Original private body guide",summary:"Self-authored metadata",language:"en",provider:"Pear Originals",license:"self-authored",aiProcessingAllowed:true,kind:"text",text:"Private body must never enter events",url:"",transcript:""};
+  data(s.call("admin","learning_create_content_item",{itemId:"events-guide",item}));data(s.call("admin","learning_publish_content_item",{itemId:"events-guide"}));
+  const enrolled=data(s.call("learner-a","learning_enroll_item",{itemId:"events-guide"}));const completeRevision=s.service.context("learner-a","learning:demo:learner-a").revision;
+  for(let n=0;n<2;n++)data(s.call("learner-a","human_complete_item",{itemEnrollmentId:enrolled.itemEnrollmentId,confirmed:true},"human",{idempotencyKey:"item-event-once",expectedRevision:completeRevision}));
+  data(s.call("admin","learning_retire_content_item",{itemId:"events-guide"}));
+  const award={title:"Original minimal event award",summary:"No evidence egress",access:"tenant",unit:"credits",target:1,ongoing:false,moderatedExternal:false,requirements:[{id:"activity",title:"Self-attested original activity",required:true,credits:1,alternatives:[{kind:"external",id:"manual"}]}]};
+  data(s.call("admin","learning_save_award",{collectionId:"events-award",award}));data(s.call("admin","learning_publish_collection",{collectionId:"events-award"}));
+  const awarded=data(s.call("learner-a","learning_enroll_award",{collectionId:"events-award"}));
+  data(s.call("learner-a","human_submit_external_record",{awardEnrollmentId:awarded.awardEnrollmentId,criterionPath:"activity",amount:1,evidence:"Private evidence must never enter events",confirmed:true},"human"));
+  data(s.call("admin","learning_retire_collection",{collectionId:"events-award"}));
+  const plan={title:"Private notification title must never enter events",targetKind:"course",targetId:"systems-basics",audienceKind:"individuals",learnerIds:["learner-b"],groupId:"",membership:"fixed",startsAt:"2026-10-01T10:00:00.000Z",repeatDays:0,endAt:null,dueKind:"none",fixedDueAt:null,rollingDays:0};
+  data(s.call("admin","learning_save_assignment_plan",{planId:"events-plan",plan,reason:"Reviewed original event plan"}));
+  s.service.assignments.runBackground("2026-10-01T10:00:00.000Z");s.service.assignments.runBackground("2026-10-01T10:00:00.000Z");
+  data(s.call("admin","learning_set_assignment_plan_state",{planId:"events-plan",state:"cancelled",reason:"Reviewed cancellation"}));
+  await s.outbox.run();
+  const received=r.received.map(x=>x.event);
+  for(const topic of topics)assert.ok(received.some(e=>e.topic===topic),topic);
+  assert.equal(received.filter(e=>e.topic==="item.completed").length,1);assert.equal(received.filter(e=>e.topic==="award.completed").length,1);assert.equal(received.filter(e=>e.topic==="assignment.notification_created").length,2);
+  for(const forbidden of ["Private body","Private evidence","Private notification title","answers","suspend_data","email","password"])assert.equal(JSON.stringify(received).includes(forbidden),false);
+  assert.ok(received.every((e,i)=>!i||e.sequence>received[i-1].sequence));
+  assert.ok(s.outbox.deliveries(s.p,sub.id).items.every(e=>e.state==="delivered"));
+ }finally{s.db.close();await r.close();}
+});
+test("new lifecycle facts roll back with domain audit and author-only collections never enter integration events",async()=>{
+ const r=await receiver(),s=setup(r.url);try{
+  s.subscribe({topics:["collection.published","collection.retired","item.published"]});
+  const playlist={title:"Private author reading",summary:"Not integration visible",access:"author",items:[{kind:"course",id:"systems-basics"}]};
+  data(s.call("editor","learning_save_playlist",{collectionId:"private-events",playlist}));data(s.call("editor","learning_publish_collection",{collectionId:"private-events"}));data(s.call("editor","learning_retire_collection",{collectionId:"private-events"}));
+  assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM integration_events WHERE resource_id='private-events'").get()!.n,0);
+  const item={title:"Rollback fixture",summary:"Original",language:"en",provider:"Pear Originals",license:"self-authored",aiProcessingAllowed:true,kind:"text",text:"Original",url:"",transcript:""};
+  data(s.call("admin","learning_create_content_item",{itemId:"rollback-event",item}));
+  const before=s.db.prepare("SELECT COUNT(*) AS n FROM integration_events").get()!.n;
+  s.db.exec("CREATE TRIGGER deny_lifecycle_audit BEFORE INSERT ON audit WHEN NEW.tool='learning_publish_content_item' BEGIN SELECT RAISE(ABORT,'lifecycle audit failed'); END");
+  assert.equal(s.call("admin","learning_publish_content_item",{itemId:"rollback-event"}).ok,false);
+  assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM integration_events").get()!.n,before);assert.equal(s.db.prepare("SELECT state FROM content_items WHERE id='rollback-event'").get()!.state,"draft");
+  await s.outbox.run();assert.equal(r.received.length,0);assert.deepEqual(s.db.prepare("PRAGMA foreign_key_check").all(),[]);
+ }finally{s.db.close();await r.close();}
+});

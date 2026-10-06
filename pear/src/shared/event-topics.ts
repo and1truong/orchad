@@ -1,0 +1,1 @@
+export const eventTopics=["enrollment.created","enrollment.completed","content.published","content.retired","item.published","item.retired","item.enrolled","item.completed","collection.published","collection.retired","award.enrolled","award.completed","assignment.changed","assignment.notification_created","enrollment.assignment_changed","award.assignment_changed"] as const;

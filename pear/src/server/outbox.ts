@@ -4,7 +4,8 @@ import type {Principal} from "../shared/model.ts";
 import {IntegrationCredentials,tokenHash} from "./integration-credentials.ts";
 import {reject,boundedPage} from "./errors.ts";
 import {signWebhook} from "../shared/webhook-signature.ts";
-export const eventTopics=["enrollment.created","enrollment.completed","content.published","content.retired"] as const;
+import {eventTopics} from "../shared/event-topics.ts";
+export {eventTopics} from "../shared/event-topics.ts";
 export interface WebhookEndpoint{id:string;url:string;secret:string;}
 export class OutboxService{
  private stopping=false;
@@ -43,7 +44,7 @@ export class OutboxService{
    const allowed=a.action==="subscribe"?["action","reason","key","revision","endpointId","topics"]:a.action==="retry"?["action","reason","key","revision","subscriptionId","eventSequence"]:["action","reason","key","revision","subscriptionId"];
    if(Object.keys(a).some(k=>!allowed.includes(k)))reject("INVALID_ARGUMENT","Unsupported webhook field");
    const endpoint=a.action==="subscribe"?this.endpoints.get(a.endpointId):null;
-   if(a.action==="subscribe"&&(!endpoint||!Array.isArray(a.topics)||!a.topics.length||a.topics.length>4||new Set(a.topics).size!==a.topics.length||a.topics.some((t:any)=>!eventTopics.includes(t))))reject("INVALID_ARGUMENT","Select reviewed endpoint and explicit event topics");
+   if(a.action==="subscribe"&&(!endpoint||!Array.isArray(a.topics)||!a.topics.length||a.topics.length>eventTopics.length||new Set(a.topics).size!==a.topics.length||a.topics.some((t:any)=>!eventTopics.includes(t))))reject("INVALID_ARGUMENT","Select reviewed endpoint and explicit event topics");
    let row:any;
    if(a.action!=="subscribe"){
     row=this.db.prepare("SELECT * FROM webhook_subscriptions WHERE id=? AND tenant=? AND owner=?").get(a.subscriptionId,p.tenant,p.id);

@@ -1,7 +1,7 @@
 import React,{useEffect,useState} from "react";
 import {request,type Session} from "./api.ts";
 import {translateUI as t} from "./i18n.ts";
-const topics=["enrollment.created","enrollment.completed","content.published","content.retired"];
+import {eventTopics as topics} from "../shared/event-topics.ts";
 export function WebhookSettings(p:{session:Session;busy:boolean;run:(fn:()=>Promise<void>)=>Promise<boolean>;isCurrent:()=>boolean;tick:number}){
  const [data,setData]=useState<any>(null),[deliveries,setDeliveries]=useState<any>(null),[selected,setSelected]=useState(""),[offset,setOffset]=useState(0),[deliveryOffset,setDeliveryOffset]=useState(0),[refresh,setRefresh]=useState(0),[error,setError]=useState("");
  const [endpoint,setEndpoint]=useState(""),[reason,setReason]=useState(""),[chosen,setChosen]=useState<string[]>(["enrollment.created"]);
