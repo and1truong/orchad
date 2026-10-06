@@ -9,7 +9,7 @@ export function CurationPanel(p:Ops){
  return <section className="panel" aria-label="Content curation">
   <h2>Content curation and retirement</h2>
   <fieldset disabled={p.busy}>
-   <label>Curation content type<select value={kind} onChange={e=>{setKind(e.target.value);invalidate();}}>
+   <label>Curation content type<select aria-label="Curation content type" value={kind} onChange={e=>{setKind(e.target.value);invalidate();}}>
     <option value="course">Course</option><option value="item">Standalone item</option></select></label>
    <label>Curation content ID<input value={id} maxLength={64} onChange={e=>{setId(e.target.value);invalidate();}} /></label>
    <button type="button" onClick={()=>void p.run(async()=>{
@@ -65,7 +65,7 @@ export function CuratedContent(p:Ops&{onChoose:(kind:string,id:string)=>void}){
   <form aria-label="Retired content alternatives" onSubmit={e=>{e.preventDefault();void p.run(async()=>{
    setAlternative(null);const result=await p.op("learning_get_retirement_alternative",{kind,contentId:id});if(p.isCurrent())setAlternative(result);
   });}}>
-   <label>Retired content type<select value={kind} onChange={e=>{setKind(e.target.value);setAlternative(null);}}>
+   <label>Retired content type<select aria-label="Retired content type" value={kind} onChange={e=>{setKind(e.target.value);setAlternative(null);}}>
     <option value="course">Course</option><option value="item">Standalone item</option></select></label>
    <label>Retired content ID<input required maxLength={64} value={id} onChange={e=>{setId(e.target.value);setAlternative(null);}}/></label>
    <button disabled={p.busy}>Find reviewed alternative</button>
