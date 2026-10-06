@@ -1,3 +1,4 @@
+import {QuestionProgression} from "./question-progression.ts";
 import {DigestSubscriptionService} from "./digest-subscriptions.ts";
 import {ProviderCatalogService,type ProviderAdapter} from "./provider-catalog.ts";
 import {PortalService} from "./portal.ts";
@@ -271,11 +272,14 @@ export class LearningService {
         "human_complete_lesson",
         "learning_start_attempt",
         "human_save_answer",
+        "human_check_question",
         "human_submit_attempt",
       ].includes(c.toolName) &&
       scopedEnrollment.assignment_state !== "active"
     )
       reject("FORBIDDEN", "Assignment obligation is no longer active");
+    if(c.toolName==="human_save_answer"){const {a:at,e}=this.attempt(p,a.attemptId);new QuestionProgression(this.db).authorizeSave(at,this.version(e.course_id,e.version),a.questionId);}
+    if(c.toolName==="human_check_question"){const {a:at,e}=this.attempt(p,a.attemptId);new QuestionProgression(this.db).authorize(at,this.version(e.course_id,e.version),a);}
     if (c.toolName === "learning_assign") this.recipient(p, a.learnerId);
     if (a.courseId && c.toolName !== "learning_create_course") {
       const row=this.course(p,a.courseId);
@@ -448,6 +452,7 @@ export class LearningService {
                   }
                 : [
                       "human_save_answer",
+                      "human_check_question",
                       "human_assess_answer",
                       "human_assess_submission",
                       "human_mark_attendance",
@@ -726,8 +731,9 @@ export class LearningService {
           passed: at.passed === null ? null : !!at.passed,
           gradingState: at.grading_state,
           resultMessage: source === "human" && at.submitted && at.grading_state === "graded" ? (at.passed ? v.quiz.passMessage ?? null : v.quiz.failMessage ?? null) : null,
-          questions: visibleQuestions(v, at),
-          answers: source === "human" ? decode(at.answers) : {},
+          questions: visibleQuestions(v, at).filter((q:any)=>new QuestionProgression(this.db).eligible(at,v).includes(q.id)),
+          answers: source === "human" ? Object.fromEntries(Object.entries(decode(at.answers)).filter(([id])=>new QuestionProgression(this.db).eligible(at,v).includes(id))) : {},
+          ...(source==="human"?new QuestionProgression(this.db).human(at,v):{}),
           responsesWithheld: source === "bridge",
           questionResults:source === "human"&&!!at.feedback_released?this.assessments.results(at,v):[],
           feedback:
@@ -743,7 +749,7 @@ export class LearningService {
                     correctAnswers: q.correctAnswers,
                     options: q.options,
                   }))
-              : [],
+              : source==="human"?new QuestionProgression(this.db).feedback(at,v):[],
         };
       }
       case "learning_get_drafts":
@@ -973,6 +979,7 @@ export class LearningService {
     }
     new QuestionBankService(this.db).resolve(p,c,courseId);
     for (const q of c.quiz.questions) validateQuestion(q);
+    if(c.quiz.requireCorrectToContinue&&c.quiz.questions.some(q=>q.kind==="long_answer"))reject("INVALID_ARGUMENT","Correct-before-continuing requires objective questions; essays need human final assessment");
     if (Buffer.byteLength(JSON.stringify(c.quiz)) > 16 * 1024)
       reject("INVALID_ARGUMENT", "Assessment content exceeds 16 KiB budget");
     if (
@@ -1204,6 +1211,7 @@ export class LearningService {
           .run(id, e.id, n, JSON.stringify(presentation(v)));
         return { attemptId: id, number: n };
       }
+      case "human_check_question": {const {a:at,e}=this.attempt(p,a.attemptId);return new QuestionProgression(this.db).check(at,this.version(e.course_id,e.version),a);}
       case "human_save_answer": {
         const { a: at, e } = this.attempt(p, a.attemptId),
           v = this.version(e.course_id, e.version),
@@ -1212,6 +1220,7 @@ export class LearningService {
           reject("FORBIDDEN", "Submitted answers are immutable");
         if (!q) reject("INVALID_ARGUMENT", "Invalid question");
         validateAnswer(q!, a.answer);
+        new QuestionProgression(this.db).save(at,v,q.id,a.answer);
         const answers = decode(at.answers);
         answers[q.id] = a.answer;
         if (Buffer.byteLength(JSON.stringify(answers)) > 32 * 1024)
@@ -1229,6 +1238,7 @@ export class LearningService {
             "FORBIDDEN",
             "Attempt already submitted; reconcile the original key",
           );
+        if(!new QuestionProgression(this.db).canSubmit(at,v))reject("FORBIDDEN","Check every current response as correct before submitting");
         const answers = decode(at.answers);
         if (v.quiz.questions.some((q) => !Object.hasOwn(answers, q.id)))
           reject("INVALID_ARGUMENT", "Answer every question before submitting");

@@ -149,3 +149,6 @@ Future sessions support scoped explicit cancellation/rescheduling through human 
 ## G06 original question forms extension
 
 #109 adds multiple-answer exact/explicit-partial MCQ, gated option feedback, shuffled dropdown/free-text blank forms and separate manual correctness thresholds. Four domain/actual HTTP and one EN/VI mobile author/learner browser regression authored; exact-head CI pending. The partial formula and optional weighted mode are declared Pear policies pending exact reference fixtures. Keys/feedback remain absent from learner model context. Per-question progression/release, incorrect-only retry, preview/migration and full rich formatting/title support remain OPEN. See ADR-050.
+
+## Human question progression (PR #110)
+Optional original objective correct-before-continuing and after-question key release, ordered immutable presentation, saved-response version fingerprints, atomic audited human checks and persistence. A check never submits or completes learning. Essays require final human assessment and cannot use the objective gate. Learner bridge gets no responses, correctness/check states, fingerprints or keys. Five domain/HTTP/reopen and one EN/VI mobile fixture authored; exact-head CI pending. Incorrect-only retries/previous-response preferences, author preview and latest-quiz migration remain OPEN.

@@ -123,9 +123,10 @@ export interface Course {
     passMessage?: string;
     failMessage?: string;
     questions: Question[];
+    requireCorrectToContinue?: boolean;
     shuffleQuestions?: boolean;
     shuffleOptions?: boolean;
-    answerRelease?: "never" | "after_pass" | "after_exhausted" | "after_submission";
+    answerRelease?: "never" | "after_pass" | "after_exhausted" | "after_submission" | "after_question";
   };
 }
 export interface Bridge {

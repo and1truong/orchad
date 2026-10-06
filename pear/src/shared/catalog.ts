@@ -136,9 +136,10 @@ const courseProperties = {
       passMessage: {type:"string",maxLength:600},
       failMessage: {type:"string",maxLength:600},
       questions: array(questionSchema, 50, 1),
+      requireCorrectToContinue:{type:"boolean"},
       shuffleQuestions: { type: "boolean" },
       shuffleOptions: { type: "boolean" },
-      answerRelease: enumeration("never", "after_pass", "after_exhausted", "after_submission"),
+      answerRelease: enumeration("never", "after_pass", "after_exhausted", "after_submission", "after_question"),
     },
     ["passScore", "maxAttempts", "questions"],
   ),
@@ -412,6 +413,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  tool("human_check_question","write",{attemptId:string(64),questionId:string(64),fingerprint:{type:"string",pattern:"^[a-f0-9]{64}$"}},"Human checks a saved objective response. Does not submit, grade or complete learning."),
   ...digestHumanTools,
   ...providerHumanTools,
   ...portalHumanTools,

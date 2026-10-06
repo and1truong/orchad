@@ -637,6 +637,8 @@ export function CourseEditor({
                 })
               }
             />{translateUI("Shuffle choices per attempt")}</label>
+          <label><input type="checkbox" checked={!!course.quiz.requireCorrectToContinue} onChange={e=>update(c=>{c.quiz.requireCorrectToContinue=e.target.checked;})}/>{translateUI("Require correct objective response before continuing")}</label>
+          <p>{translateUI("Question checks do not submit, grade or complete learning. Essays need final human assessment.")}</p>
           <label>{translateUI("Answer release")}<select
               aria-label={translateUI("Answer release")}
               value={course.quiz.answerRelease ?? "never"}
@@ -647,6 +649,7 @@ export function CourseEditor({
               }
             >
               <option value="never">{translateUI("Never release answer keys")}</option>
+              <option value="after_question">{translateUI("After checking each objective question · human player only")}</option>
               <option value="after_submission">{translateUI("After grading submission · human player only")}</option>
               <option value="after_pass">{translateUI("After passing · human player only")}</option>
               <option value="after_exhausted">{translateUI("After all allowed attempts · human player only")}</option>

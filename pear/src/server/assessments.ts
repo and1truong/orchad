@@ -283,7 +283,7 @@ export class AssessmentService {
         passed === null ? null : passed ? 1 : 0,
         pending ? "pending_manual" : "graded",
         !pending &&
-          ((v.quiz.answerRelease === "after_submission") ||
+          ((v.quiz.answerRelease === "after_submission" || v.quiz.answerRelease === "after_question") ||
           (v.quiz.answerRelease === "after_pass" && passed) ||
             (v.quiz.answerRelease === "after_exhausted" && !v.quiz.unlimitedAttempts &&
               at.number >= v.quiz.maxAttempts + this.extra(at.enrollment_id)))

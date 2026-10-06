@@ -1060,7 +1060,7 @@ function App() {
                   <div>
                     <h3>{translateUI("Assessment · Attempt")}{" "}{attempt.number}</h3>
                     {attempt.questions.map((q: any) => (
-                      <AssessmentQuestion
+                      <React.Fragment key={attempt.id+q.id}><AssessmentQuestion
                         key={attempt.id + q.id}
                         q={q}
                         answer={attempt.answers[q.id]}
@@ -1082,6 +1082,7 @@ function App() {
                                 questionId: q.id,
                                 answer,
                               });
+                              setAttempt(await op("learning_get_attempt",{attemptId:attempt.id}));
                             } catch (e) {
                               setAttempt(previous);
                               throw e;
@@ -1089,6 +1090,11 @@ function App() {
                           });
                         }}
                       />
+                      {attempt.questionChecks?.find((entry:any)=>entry.questionId===q.id)?.checkable&&<div>
+                       <p>{translateUI("Question checks do not submit, grade or complete learning. Essays need final human assessment.")}</p>
+                       <button disabled={busy||active.assignment_state!=="active"||!completeResponse(q,attempt.answers[q.id])||!attempt.questionChecks.find((entry:any)=>entry.questionId===q.id)?.fingerprint} onClick={()=>void run(async()=>{const state=attempt.questionChecks.find((entry:any)=>entry.questionId===q.id);await mutate("human_check_question",{attemptId:attempt.id,questionId:q.id,fingerprint:state.fingerprint});setAttempt(await op("learning_get_attempt",{attemptId:attempt.id}));})}>{translateUI("Check saved response")}</button>
+                       {attempt.questionChecks.find((entry:any)=>entry.questionId===q.id)?.checked&&<p role="status">{translateUI(attempt.questionChecks.find((entry:any)=>entry.questionId===q.id).correct?"Checked correct":"Try another response")}</p>}
+                      </div>}</React.Fragment>
                     ))}
                     {attempt.questionResults?.length>0&&<ul aria-label={translateUI("Released question results")}>{attempt.questionResults.map((result:any)=><li key={result.questionId}>{result.questionId} · {result.scorePercent}% · {translateUI(result.correct?"Correct":"Incorrect")}</li>)}</ul>}
                     {attempt.feedback?.length > 0 && (
@@ -1127,6 +1133,7 @@ function App() {
                         disabled={
                           busy ||
                           active.assignment_state !== "active" ||
+                          attempt.canSubmit===false ||
                           attempt.questions.some(
                             (q: any) =>
                               !completeResponse(q, attempt.answers[q.id]),

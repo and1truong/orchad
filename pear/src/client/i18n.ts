@@ -1,5 +1,11 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Require correct objective response before continuing":"Yêu cầu câu trả lời khách quan đúng trước khi tiếp tục",
+"Question checks do not submit, grade or complete learning. Essays need final human assessment.":"Kiểm tra câu trả lời không nộp bài, chấm điểm chính thức hay hoàn thành việc học. Bài viết cần người đánh giá chấm cuối cùng.",
+"After checking each objective question · human player only":"Sau khi kiểm tra từng câu khách quan · chỉ trong giao diện người học",
+"Check saved response":"Kiểm tra câu trả lời đã lưu",
+"Checked correct":"Đã kiểm tra đúng",
+"Try another response":"Thử câu trả lời khác",
 "Choose an answer":"Chọn một đáp án",
 "Essay score required to mark correct":"Điểm bài viết cần đạt để đánh dấu đúng",
 "Use dropdown blank":"Dùng ô trống dạng lựa chọn",
