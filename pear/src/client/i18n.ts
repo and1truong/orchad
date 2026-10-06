@@ -1,5 +1,27 @@
 export type UILocale="en"|"vi";
 export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
+"Previous delivery records":"Hồ sơ gửi trước",
+"Next delivery records":"Hồ sơ gửi tiếp",
+
+"Allow organization event reads":"Cho phép đọc sự kiện tổ chức",
+"Reviewed webhook delivery":"Gửi webhook đã duyệt",
+"Organization event delivery":"Gửi sự kiện tổ chức",
+"Only reviewed server endpoints can receive events. Delivery is ordered and may repeat; receivers must deduplicate event IDs.":"Chỉ điểm nhận trên máy chủ đã duyệt được nhận sự kiện. Sự kiện được gửi theo thứ tự và có thể lặp; bên nhận phải khử trùng ID sự kiện.",
+"No authorized delivery endpoint is configured.":"Chưa cấu hình điểm nhận được cấp quyền.",
+"Reviewed endpoint":"Điểm nhận đã duyệt",
+"Choose endpoint":"Chọn điểm nhận",
+"Webhook review reason":"Lý do duyệt webhook",
+"Subscribe reviewed endpoint":"Đăng ký điểm nhận đã duyệt",
+"Paused":"Tạm dừng",
+"Event cursor":"Mốc sự kiện",
+"Inspect delivery status":"Xem trạng thái gửi",
+"Disable event delivery":"Tắt gửi sự kiện",
+"Event delivery attempts":"Lần thử gửi sự kiện",
+"Retry reviewed failed event":"Thử lại sự kiện lỗi đã duyệt",
+"Additional delivery records are available through the authorized paged API.":"Có thể đọc thêm hồ sơ gửi qua API phân trang được cấp quyền.",
+"Previous webhook subscriptions":"Đăng ký webhook trước",
+"Next webhook subscriptions":"Đăng ký webhook tiếp",
+
 "Provisioning credentials":"Thông tin xác thực cấp tài khoản",
 "Reviewed provisioning clients":"Ứng dụng cấp tài khoản đã duyệt",
 "Credentials are restricted to client-owned users and static groups. They cannot grant roles, link SSO identities or change learning records.":"Thông tin xác thực chỉ quản lý người dùng và nhóm tĩnh của ứng dụng. Chúng không cấp vai trò, liên kết SSO hay thay đổi lịch sử học.",

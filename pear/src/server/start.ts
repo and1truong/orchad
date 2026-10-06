@@ -18,12 +18,13 @@ const db = openDatabase(
   developmentAuth,
 );
 const oidc:OIDCConfig|undefined=process.env.PEAR_OIDC_CONFIG?JSON.parse(process.env.PEAR_OIDC_CONFIG):undefined;
-const { app, service } = await createApp({
+const { app, service, outbox } = await createApp({
   db,
   origin,
   dev,
   developmentAuth,
   oidc,
+  webhookEndpoints: process.env.PEAR_WEBHOOK_ENDPOINTS?JSON.parse(process.env.PEAR_WEBHOOK_ENDPOINTS):undefined,
   scimEnabled: process.env.PEAR_SCIM_ENABLED === "true",
   secureCookies: process.env.COOKIE_SECURE === "true",
 });
@@ -38,12 +39,18 @@ const assignmentTimer = setInterval(() => {
   }
 }, 30000);
 assignmentTimer.unref();
+let delivering=false,delivery:Promise<any>|null=null;
+const outboxTimer=setInterval(()=>{if(delivering)return;delivering=true;delivery=outbox.run().catch(()=>console.error("Outbox delivery failed; durable state retained")).finally(()=>{delivering=false;});},1000);
+outboxTimer.unref();
 console.log(
   `Pear: ${origin}${developmentAuth ? " · SYNTHETIC DEVELOPMENT ACCOUNTS" : ""}`,
 );
 for (const signal of ["SIGINT", "SIGTERM"])
   process.once(signal, async () => {
     clearInterval(assignmentTimer);
+    clearInterval(outboxTimer);
+    outbox.stop();
+    await delivery;
     await app.close();
     db.close();
     process.exit(0);

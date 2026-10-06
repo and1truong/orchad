@@ -1,3 +1,5 @@
+import {OutboxService,type WebhookEndpoint} from "./outbox.ts";
+import {registerOutbox} from "./outbox-routes.ts";
 import {registerSCIM} from "./scim-routes.ts";
 import {IdentityService,type OIDCConfig} from "./identity.ts";
 import { TelemetryService } from "./telemetry.ts";
@@ -30,6 +32,7 @@ export async function createApp(opts: {
   oidc?: OIDCConfig;
   identityFixture?: boolean;
   scimEnabled?: boolean;
+  webhookEndpoints?: WebhookEndpoint[];
 }) {
   const parsed = new URL(opts.origin);
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
@@ -39,6 +42,8 @@ export async function createApp(opts: {
   if(opts.oidc&&!opts.identityFixture&&!opts.secureCookies)throw Error("OIDC requires secure session cookies");
   if(opts.identityFixture&&!["127.0.0.1","localhost","[::1]"].includes(parsed.hostname))throw Error("Identity fixtures require loopback");
   if(opts.scimEnabled&&!opts.identityFixture&&!opts.secureCookies)throw Error("SCIM requires HTTPS and secure session cookies");
+  if(opts.webhookEndpoints?.length&&!opts.identityFixture&&!opts.secureCookies)throw Error("Webhook configuration requires HTTPS and secure session cookies");
+  const outbox=new OutboxService(opts.db,opts.webhookEndpoints,!!opts.identityFixture);
   const identity=new IdentityService(opts.db,opts.oidc,opts.origin,!!opts.identityFixture);
   const app = Fastify({
     bodyLimit: Bounds.message,
@@ -84,7 +89,7 @@ export async function createApp(opts: {
           (opts.dev ? " ws:" : "") +
           "; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
-    if (req.url.startsWith("/api/")||req.url.startsWith("/scim/")) reply.header("Cache-Control", "no-store");
+    if (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))) reply.header("Cache-Control", "no-store");
   });
   app.addHook("preHandler", async (req, reply) => {
     if (!req.url.startsWith("/api/")) return;
@@ -530,6 +535,7 @@ export async function createApp(opts: {
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  registerOutbox(app,outbox,opts.origin,req=>service.principal(req.session.principal));
   registerSCIM(app,opts.db,opts.origin,!!opts.scimEnabled,req=>service.principal(req.session.principal));
   app.get("/health", async () => ({ ok: true }));
   app.setErrorHandler((e:any,req,reply)=>{
@@ -543,7 +549,7 @@ export async function createApp(opts: {
       appType: "spa",
     });
     app.setNotFoundHandler((req, reply) => {
-      if ((req.url.startsWith("/api/")||req.url.startsWith("/scim/")))
+      if ((req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))))
         return reply.code(404).send(failure("NOT_FOUND", "Endpoint not found"));
       reply.hijack();
       vite.middlewares(req.raw, reply.raw);
@@ -556,11 +562,11 @@ export async function createApp(opts: {
     if (existsSync(root)) {
       await app.register(serveStatic, { root });
       app.setNotFoundHandler((req, reply) =>
-        (req.url.startsWith("/api/")||req.url.startsWith("/scim/"))
+        (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/")))
           ? reply.code(404).send(failure("NOT_FOUND", "Endpoint not found"))
           : reply.sendFile("index.html"),
       );
     }
   }
-  return { app, service };
+  return { app, service, outbox };
 }
