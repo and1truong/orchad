@@ -41,7 +41,7 @@ export class QuestionBankService{
   this.live(p);
   if(name==="learning_get_question_banks"){
    const rows=(this.db.prepare("SELECT * FROM question_banks WHERE tenant=? ORDER BY id").all(p.tenant) as any[]).flatMap(row=>{
-    const latest=this.version(row,row.latest_version);if(p.role!=="admin"&&row.owner!==p.id&&latest.access==="author")return [];
+    const latest=this.version(row,row.latest_version);if(!this.visible(p,row,latest))return [];
     return [{id:row.id,owner:row.owner,state:row.state,version:row.latest_version,title:latest.title,access:latest.access,aiProcessingAllowed:latest.aiProcessingAllowed,questionCount:latest.questions.length,questionIds:latest.questions.map(q=>q.id)}];
    });return boundedPage(rows,a.offset??0,a.limit??20);
   }
