@@ -178,7 +178,20 @@ export function orchardTool(
         result = internal("Host result exceeds size limit");
         serialized = JSON.stringify(result);
       }
-      await settle(api, convId, op, result, result.ok ? "completed" : "failed", context);
+      // A failed result is not always a failed dispatch: an 'outcome unknown'
+      // INTERNAL/TIMEOUT means the backend may have applied it — that is the
+      // ambiguous case the journal exists for, never a silent retry and never
+      // a plain 'failed' that lets the model immediately re-issue the call.
+      // Other retryable errors keep the op interrupted for reconciliation.
+      const opStatus: OpRecord["status"] = result.ok
+        ? "completed"
+        : /outcome.{0,16}unknown|no replay/i.test(result.error?.message ?? "") &&
+            (result.error?.code === "INTERNAL" || result.error?.code === "TIMEOUT")
+          ? "ambiguous"
+          : result.error?.retryable
+            ? "interrupted"
+            : "failed";
+      await settle(api, convId, op, result, opStatus, context);
       return {
         content: [{ type: "text" as const, text: serialized }],
         details: { opId: op.opId, attempts: op.attempts },

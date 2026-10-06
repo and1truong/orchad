@@ -1,10 +1,103 @@
 {
-  "ok": false,
-  "revision": null,
-  "data": null,
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Endpoint not found",
-    "retryable": false
-  }
+  "entries": [
+    {
+      "id": 9,
+      "timestamp": "2026-10-06T02:08:37.339Z",
+      "principal": "investigator",
+      "request_id": "mock-call-2",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_apply_patch: add_node",
+      "before_revision": 3,
+      "after_revision": 4,
+      "result": "OK"
+    },
+    {
+      "id": 8,
+      "timestamp": "2026-10-06T02:08:35.475Z",
+      "principal": "investigator",
+      "request_id": "3c84d473-d7c3-4c80-bf1e-a19c2cbc765b",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_get_graph",
+      "before_revision": 3,
+      "after_revision": 3,
+      "result": "OK"
+    },
+    {
+      "id": 7,
+      "timestamp": "2026-10-06T02:08:35.224Z",
+      "principal": "investigator",
+      "request_id": "mock-call-1",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_apply_patch: add_node",
+      "before_revision": 2,
+      "after_revision": 3,
+      "result": "OK"
+    },
+    {
+      "id": 6,
+      "timestamp": "2026-10-06T01:57:50.521Z",
+      "principal": "investigator",
+      "request_id": "mock-call-2",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_apply_patch: add_node",
+      "before_revision": 2,
+      "after_revision": 2,
+      "result": "INVALID_ARGUMENT"
+    },
+    {
+      "id": 5,
+      "timestamp": "2026-10-06T01:57:48.754Z",
+      "principal": "investigator",
+      "request_id": "1ad7be12-e466-4084-803c-05e511b01eb8",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_get_graph",
+      "before_revision": 2,
+      "after_revision": 2,
+      "result": "OK"
+    },
+    {
+      "id": 4,
+      "timestamp": "2026-10-06T01:57:48.503Z",
+      "principal": "investigator",
+      "request_id": "mock-call-1",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_apply_patch: add_node",
+      "before_revision": 2,
+      "after_revision": 2,
+      "result": "INVALID_ARGUMENT"
+    },
+    {
+      "id": 3,
+      "timestamp": "2026-10-06T01:20:56.652Z",
+      "principal": "investigator",
+      "request_id": "mock-call-2",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_apply_patch: add_node",
+      "before_revision": 1,
+      "after_revision": 2,
+      "result": "OK"
+    },
+    {
+      "id": 2,
+      "timestamp": "2026-10-06T01:20:54.891Z",
+      "principal": "investigator",
+      "request_id": "968c6b6c-444b-4e6e-8042-fe03177a9b4e",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_get_graph",
+      "before_revision": 1,
+      "after_revision": 1,
+      "result": "OK"
+    },
+    {
+      "id": 1,
+      "timestamp": "2026-10-06T01:20:54.641Z",
+      "principal": "investigator",
+      "request_id": "mock-call-1",
+      "document_id": "rca-consumer-lag",
+      "summary": "canvas_apply_patch: add_node",
+      "before_revision": 0,
+      "after_revision": 1,
+      "result": "OK"
+    }
+  ]
 }

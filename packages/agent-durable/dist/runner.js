@@ -82,7 +82,7 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
         getGatewayBaseUrl: () => gateway.current?.baseUrl ?? "",
         fetcher: options.fetcher,
         modelIds: () => [gateway.current?.model ?? "orchard-model"],
-        tools: () => uniqueTools(() => true).flatMap((b) => b.tools),
+        tools: () => uniqueTools().flatMap((b) => b.tools),
         maxSteps: options.maxSteps ?? 8,
         maxToolCalls: options.maxToolCalls ?? 16,
     });
@@ -91,21 +91,25 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
     const registry = createRegistry();
     // Several bindings may expose the same tool (re-pin after a panel reopen
     // creates a fresh targetId for the same document). First binding wins per
-    // tool name — the model has no way to disambiguate two anyway.
-    const uniqueTools = (pick) => {
+    // tool name — the model has no way to disambiguate two anyway — and live
+    // bindings are visited first so a minted op targets a dispatchable host.
+    const orderedBindings = () => [
+        ...[...boundTargets.values()].map((x) => x.binding),
+        ...knownTargets.values(),
+    ];
+    const uniqueTools = () => {
         const seen = new Set();
         const out = [];
-        for (const b of knownTargets.values())
-            if (pick(b)) {
-                const fresh = b.tools.filter((t) => !seen.has(t.name));
-                for (const t of fresh)
-                    seen.add(t.name);
-                if (fresh.length)
-                    out.push({ ...b, tools: fresh });
-            }
+        for (const b of orderedBindings()) {
+            const fresh = b.tools.filter((t) => !seen.has(t.name));
+            for (const t of fresh)
+                seen.add(t.name);
+            if (fresh.length)
+                out.push({ ...b, tools: fresh });
+        }
         return out;
     };
-    const buildTools = () => uniqueTools(() => true).flatMap((binding) => binding.tools.map((descriptor) => orchardTool(descriptor, {
+    const buildTools = () => uniqueTools().flatMap((binding) => binding.tools.map((descriptor) => orchardTool(descriptor, {
         targetId: binding.targetId,
         idempotent: binding.idempotentTools?.includes(descriptor.name) ?? false,
         getRevision: () => revisionByTarget.get(binding.targetId) ?? null,
@@ -169,11 +173,12 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
         },
     });
     const statusOf = async () => {
-        const [inspection, opsDoc, ctrl, view] = await Promise.all([
+        const [inspection, opsDoc, ctrl, view, subsPage] = await Promise.all([
             harness.inspect(context),
             harness.snapshot(OpsDoc, root.id, context),
             harness.snapshot(ControlDoc, root.id, context),
             root.context(context),
+            owned.storage.scanSubmissions({ conversationId: root.id }, 64, undefined, context),
         ]);
         const ops = Object.values(opsDoc?.ops ?? {}).map((o) => ({
             opId: o.opId,
@@ -182,9 +187,11 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
             attempts: o.attempts,
             error: o.error,
         }));
-        const submissions = inspection.submissions
-            .filter((s) => s.type === "input")
-            .map((s) => ({
+        // Inspection hides settled submissions, but the settlement is the only
+        // record of a terminally failed run — the context view drops a trailing
+        // error assistant, so an unanswered input is read back from storage.
+        const inputSubs = subsPage.items.filter((s) => s.type === "input");
+        const submissions = inputSubs.map((s) => ({
             requestId: s.requestId,
             status: s.status,
             reason: s.reason,
@@ -210,6 +217,14 @@ export async function openRunner(options, context = BACKGROUND_CONTEXT) {
                 break;
             }
         }
+        const lastUnanswered = [...inputSubs]
+            .reverse()
+            .find((s) => s.status === "unanswered");
+        if (lastUnanswered)
+            lastError ??=
+                typeof lastUnanswered.detail === "string"
+                    ? lastUnanswered.detail
+                    : (lastUnanswered.reason ?? "model_error");
         const { phase, reason } = phaseOf({
             tasks,
             submissions,

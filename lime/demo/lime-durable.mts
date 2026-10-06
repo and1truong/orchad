@@ -24,15 +24,18 @@ const TOKEN = "lime-fixture-token";
 const EVIDENCE = path.join(import.meta.dirname, "evidence");
 mkdirSync(EVIDENCE, { recursive: true });
 
+// Node ids are stamped per demo run: guava persists across restarts, so a
+// deterministic id would collide with a previous run's leftover node.
+const RUN_STAMP = Date.now().toString(36);
 const PATCH = (n: number) =>
   JSON.stringify({
     operations: [
       {
         op: "add_node",
         node: {
-          id: `durable-demo-${n}`,
+          id: `durable-demo-${RUN_STAMP}-${n}`,
           type: "note",
-          label: `Durable demo node ${n}`,
+          label: `Durable demo node ${RUN_STAMP}-${n}`,
           body: "Written by the companion-owned durable run",
           position: { x: 640, y: 40 * n },
           evidenceIds: [],
@@ -214,11 +217,15 @@ async function runOnce(p: Page, tag: string) {
   }
   await p.screenshot({ path: path.join(EVIDENCE, `${tag}-approval.png`) });
   await p.getByRole("button", { name: "Approve", exact: true }).click();
+  // Phase alone is not proof: the model can answer 'Done.' after a failed
+  // tool call. The op itself must settle 'completed'.
   for (let i = 0; i < 120; i++) {
-    if ((await dStatus(p)).includes("phase: completed")) return;
+    const s = await dStatus(p);
+    if (s.includes("canvas_apply_patch=completed") && s.includes("phase: completed")) return;
+    if (s.match(/canvas_apply_patch=(failed|ambiguous)/)) break;
     await sleep(250);
   }
-  throw new Error("run did not complete: " + (await dStatus(p)));
+  throw new Error("op did not settle completed: " + (await dStatus(p)));
 }
 
 // —— phase 1: approved mutation ——————————————————————————————
@@ -272,7 +279,7 @@ for (let i = 0; i < 160; i++) {
 }
 await panel.screenshot({ path: path.join(EVIDENCE, "p2-resumed.png") });
 const audit = await guavaPage.evaluate(
-  async () => (await fetch("/api/audit")).json(),
+  async () => (await fetch("/api/documents/rca-consumer-lag/audit")).json(),
 ).catch(() => null);
 evidence("p2-guava-audit.json", audit ?? "n/a");
 const p2Status = await dStatus(panel);
@@ -288,7 +295,7 @@ await panel.getByRole("button", { name: "Approve", exact: true }).waitFor();
 await panel.close();
 await sleep(1500);
 const auditBeforeReopen = await guavaPage.evaluate(
-  async () => (await fetch("/api/audit")).json().catch(() => null),
+  async () => (await fetch("/api/documents/rca-consumer-lag/audit")).json().catch(() => null),
 ).catch(() => null);
 evidence("p3-panel-closed-audit.json", auditBeforeReopen ?? "n/a");
 
@@ -297,8 +304,18 @@ await panel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 await panel.setViewportSize({ width: 520, height: 1200 });
 await bindPanel(panel);
 await panel.getByRole("button", { name: "Refresh" }).click();
-evidence("p3-reopen-status.json", await dStatus(panel));
+const p3Status = await dStatus(panel);
+evidence("p3-reopen-status.json", p3Status);
 await panel.screenshot({ path: path.join(EVIDENCE, "p3-reopened.png") });
+// The panel-closed dispatch was refused with 'outcome unknown — no replay':
+// the op must sit in reconciliation, never silently retried. Guava's audit
+// log is the ground truth that zero effect landed; resolve it honestly.
+if (!/canvas_apply_patch=(ambiguous|interrupted)/.test(p3Status))
+  console.warn("expected p3 op in reconciliation:", p3Status);
+await panel.getByRole("button", { name: "Reconcile", exact: true }).click().catch(() => {});
+await panel.getByRole("button", { name: "Not applied", exact: true }).click().catch(() => {});
+await sleep(800);
+evidence("p3-resolved-status.json", await dStatus(panel));
 
 // Persisted transcript as evidence
 await panel.getByRole("button", { name: "Transcript" }).click();
