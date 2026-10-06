@@ -126,3 +126,9 @@ Calendar PR #73 head b0ac1160431ce32672479cd7fe7870d3440315e3 passed all eight a
 ## Optional study telemetry — stacked on PR #73
 
 Migration 013 stores private timer totals and one session-bound lease per learner. Human readers explicitly start/pause; visible-browser pulses accumulate bounded server-clock intervals without accepting client duration. Long gaps, hidden tabs, revoked access and overlapping leases cannot inflate the same interval. Timers never change official learning or CAS revisions. Course/item transcript/report/export rows add separate intended duration and observed seconds; awards remain null. Five domain/HTTP fixtures and a production/development browser journey cover persistence, authority, rollback and no official progress. Local runner remains offline; exact-head CI is required before claiming Node/SQLite/browser PASS.
+
+Telemetry PR #74 head 66e06288b414fe7914eef702fecc0b508808c7ae passed all eight acceptance jobs in run 37477517138, with 92 domain/HTTP tests, 15 development and 15 production journeys, and 2 shared-Pi journeys.
+
+## Content promotion and retirement alternatives — stacked on PR #74
+
+Migration 014 stores explicit organization curation metadata. Aggregate impact includes pinned enrollments, reusable course/playlist/nested-award references and future assignment plans. Exact source/replacement impact is rechecked in the retirement transaction; no learning or references silently migrate. Learners explicitly preview a currently available alternative while original tracked reading remains pinned. Five domain/HTTP fixtures and one human browser journey cover metadata/privacy, role scope, stale impact, retry, rollback/restart, nested references and retained reading. Exact-head CI remains required; local runner is offline. External provider lifecycle feeds are unverified.

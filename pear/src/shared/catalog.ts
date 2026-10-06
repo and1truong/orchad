@@ -1,3 +1,4 @@
+import { curationTools, curationLibraryWrites } from "./curation.ts";
 import {
   blendedTools,
   blendedHumanTools,
@@ -126,6 +127,7 @@ export const courseSchema = object(
 );
 // Shared aggregate mapping for UI/test helpers and authoritative server validation.
 export const libraryWrites = new Set([
+  ...curationLibraryWrites,
   ...blendedLibraryWrites,
   ...assessmentLibraryWrites,
   ...programLibraryWrites,
@@ -322,6 +324,7 @@ const report = tool(
 export function allCatalog(role: Role): Tool[] {
   return [
     ...learnerTools,
+    ...curationTools(role),
     ...feedbackTools,
     ...standaloneTools,
     ...blendedTools(role),
@@ -347,9 +350,10 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
     group === "operations"
       ? blendedTools(role)
       : group === "learning"
-        ? [...learnerTools, ...feedbackTools, ...standaloneTools]
+        ? [...learnerTools, ...curationTools("learner"), ...feedbackTools, ...standaloneTools]
         : group === "content"
           ? [
+              ...curationTools(role),
               ...standaloneTools,
               ...learnerTools.filter(
                 (t) => t.name.includes("item") || t.name === "learning_search",

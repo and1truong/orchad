@@ -1,3 +1,4 @@
+import { CurationPanel, CuratedContent } from "./curation.tsx";
 import { StudyTimer } from "./study-timer.tsx";
 import { StandaloneLearning } from "./standalone-learning.tsx";
 import { Certificate } from "./certificate.tsx";
@@ -502,6 +503,12 @@ function App() {
         {notice && <p role="status">{notice}</p>}
         {view === "catalog" && (
           <>
+            <CuratedContent key={"curated:"+session.sessionEpoch} tick={tick} busy={busy} op={op} mutate={mutate} run={run}
+              isCurrent={()=>sessionRef.current===session && docRef.current===doc}
+              onChoose={(kind,id)=>void run(async()=>{
+                if(kind==="course") setPreview(await op("learning_get_item",{courseId:id}));
+                else {clearLearning();setReadingItem(await op("learning_get_content_item",{itemId:id}));}
+              })} />
             <form
               className="filters"
               onSubmit={(e) => {
@@ -1149,6 +1156,10 @@ function App() {
               />
             )}
           </>
+        )}
+        {view === "admin" && canEdit && (
+          <CurationPanel key={"curation:"+session.sessionEpoch} tick={tick} busy={busy} op={op} mutate={mutate} run={run}
+            isCurrent={()=>sessionRef.current===session && docRef.current===doc} />
         )}
         {view === "admin" && role === "admin" && (
           <FeedbackReview

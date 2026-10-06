@@ -1,3 +1,4 @@
+import { CurationService } from "./curation.ts";
 import { BlendedService, releaseInactiveBookings } from "./blended.ts";
 import { FeedbackService } from "./feedback.ts";
 import { StandaloneService } from "./standalone.ts";
@@ -60,6 +61,7 @@ import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
 const decode = (r: any) => JSON.parse(r);
 export class LearningService {
+  readonly curation: CurationService;
   readonly standalone: StandaloneService;
   readonly feedback: FeedbackService;
   readonly blended: BlendedService;
@@ -70,6 +72,7 @@ export class LearningService {
   readonly reports: ReportService;
   readonly assessments: AssessmentService;
   constructor(readonly db: DatabaseSync) {
+    this.curation = new CurationService(db);
     this.standalone = new StandaloneService(db);
     this.feedback = new FeedbackService(db);
     this.blended = new BlendedService(db);
@@ -209,6 +212,7 @@ export class LearningService {
   }
   private resourceAccess(p: Principal, c: Call) {
     const a = c.arguments as any;
+    this.curation.authorize(p, c.toolName, a);
     this.standalone.authorize(p, c.toolName, a);
     this.feedback.authorize(p, c.toolName, a);
     this.blended.authorize(p, c.toolName, a);
@@ -480,6 +484,7 @@ export class LearningService {
     source: string,
   ): any {
     const a = args as any;
+    if (["learning_get_curated_content","learning_get_retirement_alternative","learning_get_curation","learning_preview_retirement"].includes(name)) return this.curation.read(p,name,a);
     if (
       ["learning_get_my_items", "learning_get_item_enrollment"].includes(name)
     )
@@ -976,6 +981,7 @@ export class LearningService {
     args: Record<string, unknown>,
   ): any {
     const a = args as any;
+    if (["learning_save_curation","learning_retire_with_replacement"].includes(name)) return this.curation.write(p,name,a);
     if (["learning_enroll_item", "human_complete_item"].includes(name))
       return this.standalone.write(p, name, a);
     if (name === "human_save_course_feedback") return this.feedback.write(p, a);
