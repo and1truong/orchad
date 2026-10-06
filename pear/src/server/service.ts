@@ -439,6 +439,8 @@ export class LearningService {
           ? {offerId:data.offerId,collectionId:c.arguments.collectionId??c.arguments.destinationCollectionId,sourceVersion:c.arguments.sourceVersion,referenceCount:Array.isArray(c.arguments.references)?c.arguments.references.length:0,state:data.state}
           : c.toolName === "human_open_provider_content"
           ? {providerId:c.arguments.providerId,sourceId:c.arguments.sourceId,sourceVersion:c.arguments.version,launchId:data.launchId,confirmed:true}
+          : c.toolName==="human_retake_completed_item"
+          ? {itemEnrollmentId:c.arguments.itemEnrollmentId,newItemEnrollmentId:data.itemEnrollmentId,version:c.arguments.version,confirmed:true}
           : ["human_retake_completed_course","human_restart_latest_quiz","human_restart_latest_course"].includes(c.toolName)
           ? {enrollmentId:c.arguments.enrollmentId,newEnrollmentId:data.enrollmentId,mode:c.arguments.mode,targetVersion:c.arguments.targetVersion}
           : c.toolName === "learning_save_question_bank"
@@ -1089,7 +1091,7 @@ export class LearningService {
       return {courseId:a.courseId,bankId:a.source.bankId,bankVersion:a.source.version,questionIds:a.source.questionIds,draftUpdated:true,officialLearningChanged:false};
     }
     if (["learning_save_curation","learning_retire_with_replacement"].includes(name)) return this.curation.write(p,name,a);
-    if (["learning_enroll_item", "human_complete_item"].includes(name))
+    if (["learning_enroll_item", "human_complete_item","human_retake_completed_item"].includes(name))
       return this.standalone.write(p, name, a);
     if (name === "human_save_course_feedback") return this.feedback.write(p, a);
     switch (name) {

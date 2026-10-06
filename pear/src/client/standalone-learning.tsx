@@ -1,8 +1,16 @@
 import {translateUI} from "./i18n.ts";
 import React, { useEffect, useState } from "react";
+function FreshReading({row,p}:{row:any;p:{busy:boolean;mutate:(name:string,args:Record<string,unknown>)=>Promise<any>;op:(name:string,args?:Record<string,unknown>)=>Promise<any>;run:(fn:()=>Promise<void>)=>Promise<boolean>;onRead:(value:any)=>void}}){
+ const [confirmed,setConfirmed]=useState(false);
+ return <form aria-label={translateUI("Fresh standalone reading")} onSubmit={event=>{event.preventDefault();if(!confirmed)return;void p.run(async()=>{const next=await p.mutate("human_retake_completed_item",{itemEnrollmentId:row.id,version:row.version,confirmed:true}),value=await p.op("learning_get_item_enrollment",{itemEnrollmentId:next.itemEnrollmentId});p.onRead({...value.item,itemEnrollmentId:next.itemEnrollmentId,status:value.status});});}}>
+ <p>{translateUI("Start a new reading record for this exact version. Prior confirmed reading remains in history; no completion, study time or award proof is copied.")}</p>
+ <label><input type="checkbox" disabled={p.busy} checked={confirmed} onChange={event=>setConfirmed(event.target.checked)}/>{translateUI("I choose to study this same standalone version again in a fresh record.")}</label>
+ <button disabled={p.busy||!confirmed}>{translateUI("Start fresh standalone reading")}</button></form>;
+}
 export function StandaloneLearning(p: {
   tick: number;
   busy: boolean;
+  mutate:(name:string,args:Record<string,unknown>)=>Promise<any>;
   op: (name: string, args?: Record<string, unknown>) => Promise<any>;
   run: (fn: () => Promise<void>) => Promise<boolean>;
   onRead: (value: any) => void;
@@ -59,6 +67,7 @@ export function StandaloneLearning(p: {
               })
             }
           >{translateUI("Open tracked item")}</button>
+          {row.retakeAvailable&&<FreshReading key={row.id} row={row} p={p}/>}
         </section>
       ))}
       <button

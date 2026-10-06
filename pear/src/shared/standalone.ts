@@ -22,6 +22,7 @@ export const standaloneTools = [
   ),
 ];
 export const standaloneHumanTools = [
+  tool("human_retake_completed_item","write",{itemEnrollmentId:string(128),version:integer(100000,1),confirmed:{type:"boolean",enum:[true]}},"Human explicitly starts a fresh reading record for this exact completed pinned version. No copied completion, timer or automatic award proof; original history remains.",["itemEnrollmentId","version","confirmed"]),
   tool(
     "human_complete_item",
     "write",

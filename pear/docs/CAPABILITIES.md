@@ -233,3 +233,6 @@ ADR-069/Migration 040 provides separately confirmed objective/full-course versio
 
 ## #129 pinned original standalone item award proof candidate
 ADR-070 adds exact versioned item alternatives and derives only real human-confirmed reading under current rights. Required/elective/ongoing/one-item/nested rules and cycle freshness remain enforced, with no assessment grade inferred. CI PENDING. Fresh same-version standalone retakes for recurring awards, exact reference/item assessment/reset/recertification and external-learning availability remain OPEN/NOT VERIFIED.
+
+## #130 fresh original same-version standalone reading candidate
+ADR-071/Migration 041 adds a separately confirmed new reading record with no copied completion/time/proof, preserving original IDs/history/FKs. Ordinary tracking resumes the current successor; current rights and exact-source receipts remain enforced. Real new confirmation can satisfy a later award cycle's chronological freshness policy. CI PENDING. Exact reference item assessment/accreditation/reset/recertification semantics remain OPEN/NOT VERIFIED.

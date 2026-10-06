@@ -619,7 +619,7 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
     assert.equal(
       (db.prepare("SELECT MAX(version) AS n FROM schema_version").get() as any)
         .n,
-      40,
+      41,
     );
     const r = service.invoke("learner-a", {
       requestId: "persist",

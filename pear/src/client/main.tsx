@@ -840,6 +840,7 @@ function App() {
               </div>
             </div>
             <StandaloneLearning
+              mutate={mutate}
               key={"items:" + session.sessionEpoch}
               tick={tick}
               busy={busy}
