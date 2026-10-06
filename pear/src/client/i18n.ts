@@ -6,6 +6,8 @@ export const vietnamese:Readonly<Record<string,string>>=Object.freeze({
 "Primary assessor account ID":"Mã tài khoản người đánh giá chính",
 "Primary assignment reason":"Lý do phân công đánh giá chính",
 "Save primary assignment":"Lưu phân công đánh giá chính",
+"Download award PDF":"Tải PDF chứng chỉ chương trình",
+"Download certificate PDF":"Tải PDF chứng chỉ",
 "Latest objective quiz review":"Xem xét bài kiểm tra khách quan mới nhất",
 "Review latest objective quiz":"Xem xét bài kiểm tra khách quan mới nhất",
 "Review quiz version change":"Xem xét đổi phiên bản bài kiểm tra",

@@ -1,3 +1,5 @@
+import {readFileSync} from "node:fs";
+import {CertificateFont,certificatePDF,certificatePDFSupported} from "./certificate-pdf.ts";
 import {ProviderCatalogService,type ProviderAdapter} from "./provider-catalog.ts";
 import {registerProviderCatalog} from "./provider-catalog-routes.ts";
 import {registerSCORM} from "./scorm-routes.ts";
@@ -41,7 +43,11 @@ export async function createApp(opts: {
   xapiEnabled?: boolean;
   catalogAdapters?: ProviderAdapter[];
   catalogFixture?: boolean;
+  certificateFont?:Buffer;
 }) {
+  let certificateFontBytes=opts.certificateFont;
+  if(!certificateFontBytes&&opts.developmentAuth){try{certificateFontBytes=readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");}catch{}}
+  const certificateFont=certificateFontBytes?new CertificateFont(certificateFontBytes):undefined;
   const parsed = new URL(opts.origin);
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
     throw new Error("APP_ORIGIN must be an exact origin");
@@ -525,10 +531,7 @@ export async function createApp(opts: {
   });
   app.get("/api/certificates/:id", async (req, reply) => {
     try {
-      return service.certificate(
-        (req as any).session.principal,
-        (req.params as any).id,
-      );
+      const value=service.certificate((req as any).session.principal,(req.params as any).id);return {...value,pdfAvailable:certificatePDFSupported(value,false,certificateFont)};
     } catch {
       return reply
         .code(403)
@@ -537,16 +540,24 @@ export async function createApp(opts: {
   });
   app.get("/api/award-certificates/:id", async (req, reply) => {
     try {
-      return service.programs.certificate(
-        service.principal((req as any).session.principal),
-        (req.params as any).id,
-      );
+      const value=service.programs.certificate(service.principal((req as any).session.principal),(req.params as any).id);return {...value,pdfAvailable:certificatePDFSupported(value,true,certificateFont)};
     } catch {
       return reply
         .code(403)
         .send(failure("FORBIDDEN", "Award certificate access denied"));
     }
   });
+  
+  for(const award of [false,true])app.get(award?"/api/award-certificates/:id/pdf":"/api/certificates/:id/pdf",async(req,reply)=>{
+   try{
+    const id=(req.params as any).id,principal=(req as any).session.principal;
+    const certificate=award?service.programs.certificate(service.principal(principal),id):service.certificate(principal,id);
+    if(!certificateFont)throw new DomainError("FORBIDDEN","Server PDF font is not configured; original text and browser print remain available");
+    const bytes=certificatePDF(certificate,award,certificateFont);
+    return reply.header("Cache-Control","private, no-store").header("X-Content-Type-Options","nosniff").header("Content-Disposition",'attachment; filename="pear-'+(award?"award":"certificate")+'-'+certificate.id+'.pdf"').type("application/pdf").send(bytes);
+   }catch(e){return mediaFailure(e,reply);}
+  });
+
   app.get("/api/provider-launch/:id",async(req,reply)=>{
     try{return reply.header("Cache-Control","no-store").header("Referrer-Policy","no-referrer").redirect(service.providerCatalog.launch(service.principal((req as any).session.principal),(req.params as any).id));}catch(e){return mediaFailure(e,reply);}
   });

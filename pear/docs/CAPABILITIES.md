@@ -176,3 +176,7 @@ Optional identical-unit child-only quantity mode accumulates actual partial acce
 
 ## Explicit latest objective quiz upgrade (PR #117)
 Optional human-reviewed quiz-only successor for unfinished self-directed objective courses with identical nonquiz content. New answers reset, identical lessons retained, old immutable responses/results preserved and withdrawn from new official writes. Five domain/CAS/reopen and one EN/VI browser fixture authored; exact-head CI pending. Assigned/essay/event/submission/nonquiz migrations remain OPEN. No automatic upgrade or official progress manufacture.
+
+
+## Server certificate PDF (PR #118)
+Authenticated read-only original course/award PDF from authoritative own completed records, actual embedded-font Vietnamese text extraction and literal markup; private no-store attachment, no active PDF content. Explicit production font configuration and bounded Latin/Vietnamese profile; unsupported scripts/missing fonts retain text/browser exports. Five font/PDF reader/HTTP/config tests and one actual EN/VI browser download fixture authored; exact-head CI pending. Accreditation, PDF/A/tagged-PDF and manual accessibility/provider/production deployment audits remain NOT VERIFIED.

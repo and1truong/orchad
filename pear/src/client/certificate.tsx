@@ -30,6 +30,7 @@ export function Certificate({
       <p>{c.issuer}</p>
       <p>{translateUI("Self-authored development content. This certificate is not accredited.")}</p>
       <div className="print-controls">
+        {c.pdfAvailable&&<a href={(award?"/api/award-certificates/":"/api/certificates/")+encodeURIComponent(c.id)+"/pdf"} download>{translateUI(award?"Download award PDF":"Download certificate PDF")}</a>}
         <a
           download={`pear-${award ? "award" : "certificate"}-${c.id}.txt`}
           href={"data:text/plain;charset=utf-8," + encodeURIComponent(text)}

@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import type {OIDCConfig} from "./identity.ts";
 import { openDatabase } from "./database.ts";
 import { createApp } from "./app.ts";
@@ -23,6 +24,7 @@ const { app, service, outbox } = await createApp({
   origin,
   dev,
   developmentAuth,
+  certificateFont:process.env.PEAR_CERTIFICATE_FONT?readFileSync(process.env.PEAR_CERTIFICATE_FONT):undefined,
   oidc,
   catalogAdapters: process.env.PEAR_CATALOG_ADAPTERS?JSON.parse(process.env.PEAR_CATALOG_ADAPTERS):undefined,
   webhookEndpoints: process.env.PEAR_WEBHOOK_ENDPOINTS?JSON.parse(process.env.PEAR_WEBHOOK_ENDPOINTS):undefined,
