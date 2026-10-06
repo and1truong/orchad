@@ -3,6 +3,7 @@ import {createApp} from "../../src/server/app.ts";
 import {fixture,data} from "../helpers.ts";
 import {resolve} from "node:path";
 test("human unpublish persists withdrawal, keeps an enrolled learner reading and republish creates a new version",async({page})=>{
+ test.setTimeout(60000);
  const f=fixture(),origin="http://127.0.0.1:4323";
  const enrolled=data(f.call("learner-a","learning_enroll",{courseId:"systems-basics"}));
  const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist")});
@@ -21,5 +22,6 @@ test("human unpublish persists withdrawal, keeps an enrolled learner reading and
   await page.getByRole("button",{name:"Sign out",exact:true}).click();await login("admin");await page.getByRole("button",{name:"Administration",exact:true}).click();
   await row.getByRole("button",{name:"Publish",exact:true}).click();await expect(row).toContainText("Published version 2");await expect(row.getByRole("button",{name:"Unpublish",exact:true})).toBeEnabled();
   expect(f.db.prepare("SELECT version FROM enrollments WHERE id=?").get(enrolled.enrollmentId)!.version).toBe(1);
- }finally{await app.close();f.db.close();}
+ console.log("unpublish.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();}
 });

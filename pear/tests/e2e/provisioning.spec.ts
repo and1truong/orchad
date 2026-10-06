@@ -34,5 +34,6 @@ test("human reviews a one-time scoped credential and a real SCIM client creates,
   await expect(reloaded.getByRole("button",{name:"Revoke provisioning credential",exact:true})).toBeDisabled();
   expect((await request.get(origin+"/scim/v2/Users",{headers:{authorization:"Bearer "+token}})).status()).toBe(401);
   await page.screenshot({path:"artifacts/scim-reviewed-revocation.png",fullPage:true});
- }finally{await app.close();db.close();}
+ console.log("provisioning.spec.ts assertions: complete");
+ }finally{await page.close();app.server.closeAllConnections();await app.close();db.close();}
 });
