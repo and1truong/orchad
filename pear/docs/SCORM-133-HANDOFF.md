@@ -13,3 +13,8 @@ Next: S5 edition-specific 2004 runtime and CMI/error/SPM adapters, followed by S
 Build and use `PEAR_SCORM_CONTENT_ORIGIN=http://localhost:4315 npm run dev` with Pear on `http://127.0.0.1:4314`. Both servers share SQLite and bind loopback. `npm run test:scorm:browser` owns its app ports; do not stop shared development servers. The native/production strict-egress gate stays closed until proven on the actual platform. Missing commercial engine credentials must not block local development or become a reason to silently reduce the epic scope.
 
 The user already authorized implementation, tests, commits, remote branch updates and stacked PRs. After each reviewable slice passes, push and open its PR on the previous SCORM head, update epic evidence and start the next slice without waiting for human approval. Preserve expected-head checks, CI/review gates and product mutation consent. This does not authorize merging #49, bypassing protection, buying licenses or enabling production execution. Do not close #133 until the integrated delivery and its remaining gates meet the epic's definition of done.
+
+
+## S5 continuation (this session)
+
+The next owned slice implements the real SCORM 2004 API for 2nd/3rd/4th editions on S4. Read ADR-079 for the explicit single-SCO profile, edition limits, completion policy, primary sources and remaining interoperability findings. S6 must provide trusted activity-tree sequencing, objective/rollup navigation and durable snapshots before multi-SCO 2004 is enabled. Continue independent S6–S8 work without per-PR approval; do not merge or modify the separate #49 session's branches. Production execution remains disabled until the documented platform gates have real evidence.

@@ -17,7 +17,7 @@ export function contentHostOrigins(pearOrigin: string, contentOrigin: string) {
 export function createSCORMContentHost(options: {pearOrigin: string; contentOrigin: string; player?: SCORMPlayerService; runtimeBundle?: Buffer}) {
   const origins = contentHostOrigins(options.pearOrigin, options.contentOrigin);
   if (options.player && (!options.runtimeBundle?.length || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(origins.contentOrigin).hostname) || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(origins.pearOrigin).hostname))) throw Error('Executable SCORM content requires a built runtime and loopback fixture hosts');
-  const app = Fastify({logger: false, bodyLimit: 160 * 1024, trustProxy: false});
+  const app = Fastify({logger: false, bodyLimit: 544 * 1024, trustProxy: false});
   app.addHook('onRequest', async (req, reply) => {
     reply.header('Cache-Control', 'no-store').header('Referrer-Policy', 'no-referrer')
       .header('X-Content-Type-Options', 'nosniff').header('Cross-Origin-Resource-Policy', 'same-origin')

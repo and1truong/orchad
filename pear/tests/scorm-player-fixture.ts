@@ -1,7 +1,8 @@
 import {zip} from './scorm-fixture.ts';
+import type {SCORMStandard} from '../src/shared/scorm-engine.ts';
 import {multiFileManifest} from './scorm-package-fixture.ts';
-export function singleSCOManifest() {
-  return multiFileManifest().replace(/<p:item identifier="practice"[\s\S]*?<\/p:item>/, '').replace(/<p:resource identifier="sco2"[\s\S]*?<\/p:resource>/, '');
+export function singleSCOManifest(standard: SCORMStandard = '1.2') {
+  return multiFileManifest(standard).replace(/<p:item identifier="practice"[\s\S]*?<\/p:item>/, '').replace(/<p:resource identifier="sco2"[\s\S]*?<\/p:resource>/, '');
 }
 export function singleSCOPackage(xml = singleSCOManifest()) {
   return zip([

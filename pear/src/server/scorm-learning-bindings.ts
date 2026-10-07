@@ -3,7 +3,7 @@ import type {Principal, SCORMReference} from '../shared/model.ts';
 import type {SCORMManifest} from '../shared/scorm-engine.ts';
 import {SCORM_ENGINE} from '../shared/scorm-engine.ts';
 import type {LearningService} from './service.ts';
-import {scorm12Activities} from './scorm-activities.ts';
+import {playbackActivities} from './scorm-activities.ts';
 import {reject} from './errors.ts';
 
 export interface SCORMLearningContext {
@@ -38,12 +38,15 @@ export class SCORMLearningBindings {
     if (!c || registration.mode !== 'normal') return false;
     if (this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=? AND attempt_id=?').get(registration.id, attemptId)) return false;
     const rows = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=? AND sco_attempt_number=1').all(attemptId, p.tenant) as any[];
-    const evidence = scorm12Activities(manifest).map(({activity}) => {
-      const row = rows.find(r => r.sco_id === activity.id), state = row ? JSON.parse(row.runtime_state) : {}, raw = state.core?.score?.raw, min = state.core?.score?.min, max = state.core?.score?.max;
-      const score = raw !== undefined && raw !== '' && Number.isFinite(Number(raw)) ? min !== undefined && min !== '' && max !== undefined && max !== '' && Number(max) > Number(min) ? (Number(raw) - Number(min)) / (Number(max) - Number(min)) * 100 : Number(raw) : null;
-      return {scoId: activity.id, finished: row?.finished === 1, status: state.core?.lesson_status ?? 'not attempted', score, seconds: row?.reported_seconds ?? 0, revision: row?.revision ?? 0};
+    const evidence = playbackActivities(manifest).map(({activity}) => {
+      const row = rows.find(r => r.sco_id === activity.id), state = row ? JSON.parse(row.runtime_state) : {}, scores = manifest.standard === '1.2' ? state.core?.score : state.score;
+      let score: number | null = null;
+      if (manifest.standard === '1.2' && scores?.raw !== undefined && scores.raw !== '' && Number.isFinite(Number(scores.raw))) score = Number(scores.raw);
+      else if (scores?.scaled !== undefined && scores.scaled !== '' && Number.isFinite(Number(scores.scaled))) score = Number(scores.scaled) * 100;
+      else if (scores?.raw !== undefined && scores.raw !== '' && scores.min !== undefined && scores.min !== '' && scores.max !== undefined && scores.max !== '' && Number(scores.max) > Number(scores.min)) score = (Number(scores.raw) - Number(scores.min)) / (Number(scores.max) - Number(scores.min)) * 100;
+      return {scoId: activity.id, finished: row?.finished === 1, status: manifest.standard === '1.2' ? state.core?.lesson_status ?? 'not attempted' : state.completion_status ?? 'unknown', success: manifest.standard === '1.2' ? state.core?.lesson_status ?? 'not attempted' : state.success_status ?? 'unknown', score, seconds: row?.reported_seconds ?? 0, revision: row?.revision ?? 0};
     });
-    if (evidence.some(e => !e.finished || !(c.reference.completion === 'passed' ? e.status === 'passed' : ['completed', 'passed'].includes(e.status)) || c.reference.minimumScore !== undefined && (e.score === null || e.score < c.reference.minimumScore || e.score > 100))) return false;
+    if (evidence.some(e => !e.finished || (manifest.standard === '1.2' ? !['completed', 'passed'].includes(e.status) : e.status !== 'completed') || c.reference.completion === 'passed' && e.success !== 'passed' || c.reference.minimumScore !== undefined && (e.score === null || e.score < c.reference.minimumScore || e.score > 100))) return false;
     const now = new Date().toISOString(), proof = {packageId: registration.package_id, version: registration.version, sha256: registration.sha256, engine: SCORM_ENGINE, reference: c.reference, context: c.context, scos: evidence};
     this.db.prepare('INSERT INTO scorm_completion_proofs VALUES(?,?,?,?,?)').run(registration.id, attemptId, p.tenant, JSON.stringify(proof), now);
     if (c.courseEnrollmentId) {

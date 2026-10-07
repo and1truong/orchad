@@ -104,7 +104,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   while (stack.length) {
     const {node, depth} = stack.pop()!;
     if (++count > 12000 || depth > 32) invalid('manifest node/depth quota');
-    if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore'].includes(node.localName ?? '')) {
+    if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore', 'dataFromLMS', 'timeLimitAction', 'completionThreshold', 'data'].includes(node.localName ?? '')) {
       const parent = node.parentNode as Element;
       if (parent?.localName !== 'item' || parent.namespaceURI !== ns) invalid('misplaced runtime extension');
       features.add(node.localName!);
@@ -153,6 +153,25 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
         if (nodes.length) extensions[key] = tag === 'datafromlms' ? nodes[0].textContent ?? '' : nodes[0].textContent?.trim() ?? '';
       }
       if (extensions.launchData !== undefined && extensions.launchData.length > 4096 || extensions.masteryScore !== undefined && (!/^\d{1,3}(?:\.\d+)?$/.test(extensions.masteryScore) || Number(extensions.masteryScore) > 100) || extensions.maxTimeAllowed !== undefined && !/^\d{2,4}:[0-5]\d:[0-5]\d(?:\.\d{1,2})?$/.test(extensions.maxTimeAllowed) || extensions.timeLimitAction !== undefined && !['exit,message', 'exit,no message', 'continue,message', 'continue,no message'].includes(extensions.timeLimitAction)) invalid('invalid runtime launch data, mastery or time policy');
+    }
+    if (standard !== '1.2') {
+      for (const [tag, key] of [['dataFromLMS', 'launchData'], ['timeLimitAction', 'timeLimitAction']] as const) {
+        const nodes = elements(el, tag, cp); if (nodes.length > 1) invalid('duplicate runtime extension');
+        if (nodes.length) extensions[key] = tag === 'dataFromLMS' ? nodes[0].textContent ?? '' : nodes[0].textContent?.trim() ?? '';
+      }
+      if (extensions.launchData !== undefined && extensions.launchData.length > 4000 || extensions.timeLimitAction !== undefined && !['exit,message', 'exit,no message', 'continue,message', 'continue,no message'].includes(extensions.timeLimitAction)) invalid('invalid SCORM 2004 launch data or time policy');
+      const thresholds = elements(el, 'completionThreshold', cp); if (thresholds.length > 1) invalid('duplicate completion threshold');
+      if (thresholds.length) {
+        const n = thresholds[0], text = n.textContent?.trim() ?? '', attrs = Array.from({length: n.attributes.length}, (_, i) => n.attributes.item(i)!);
+        const numeric = (value: string) => /^(?:0(?:\.\d+)?|1(?:\.0+)?|\.\d+)$/.test(value);
+        if (attrs.length) {
+          if (standard !== '2004-4' || text || attrs.some(a => a.namespaceURI || !['completedByMeasure', 'minProgressMeasure', 'progressWeight'].includes(a.name))) invalid('completion threshold attributes require 4th edition');
+          const enabled = n.getAttribute('completedByMeasure') ?? 'false', minimum = n.getAttribute('minProgressMeasure') ?? '1', weight = n.getAttribute('progressWeight') ?? '1';
+          if (!['true', 'false', '1', '0'].includes(enabled) || !numeric(minimum) || !numeric(weight)) invalid('invalid completion threshold attributes');
+          if (['true', '1'].includes(enabled)) extensions.completionThreshold = minimum;
+          if (weight !== '1' && Number(weight) !== 1) features.add('weightedCompletion');
+        } else if (text) {if (!numeric(text)) invalid('invalid completion threshold'); extensions.completionThreshold = text;}
+      }
     }
     return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, children: elements(el, 'item', ns!).map(activity)};
   };

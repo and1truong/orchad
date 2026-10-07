@@ -28,7 +28,7 @@ export function activityStates(manifest: SCORMManifest, rows: {sco_id: string; r
     else {
       const row = byId.get(a.id);
       // Prerequisite completion uses accepted SCO communication completion, not an in-flight write.
-      status = row?.finished ? JSON.parse(row.runtime_state).core?.lesson_status ?? 'not attempted' : 'not attempted';
+      status = row?.finished ? (manifest.standard === '1.2' ? JSON.parse(row.runtime_state).core?.lesson_status : JSON.parse(row.runtime_state).completion_status) ?? 'not attempted' : 'not attempted';
     }
     states.set(a.id, status); return status;
   }
@@ -81,4 +81,13 @@ export function prerequisite(source: string, states: Map<string, string>) {
 
 export function activityAvailable(profile: ReturnType<typeof scorm12Activities>[number], states: Map<string, string>) {
   return [...profile.ancestors, profile.activity].every(a => !a.prerequisites || prerequisite(a.prerequisites, states));
+}
+
+/** S5's explicit profile; complex 2004 manifests require the sequencing slice. */
+export function playbackActivities(manifest: SCORMManifest) {
+  if (manifest.standard === '1.2') return scorm12Activities(manifest);
+  if (manifest.runtimeFeatures?.some(f => !['dataFromLMS', 'timeLimitAction', 'completionThreshold'].includes(f)) || manifest.activities.length !== 1 || manifest.activities[0].children.length) reject('INVALID_ARGUMENT', 'SCORM 2004 multi-activity or sequencing profile not yet supported');
+  const activity = manifest.activities[0], resource = manifest.resources.find(r => r.id === activity.resourceId);
+  if (!resource || resource.kind !== 'sco') reject('INVALID_ARGUMENT', 'SCORM 2004 requires an exact SCO leaf');
+  return [{activity, resource, ancestors: [] as SCORMActivity[]}];
 }

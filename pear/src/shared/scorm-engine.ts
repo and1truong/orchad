@@ -16,6 +16,7 @@ export interface SCORMActivity {
   prerequisites?: string;
   launchData?: string;
   masteryScore?: string;
+  completionThreshold?: string;
   maxTimeAllowed?: string;
   timeLimitAction?: string;
   children: SCORMActivity[];
