@@ -267,3 +267,6 @@ SCORM calendar delivery successor (ADR-088) enforces bounded explicit-timezone b
 The fourth-edition local shared-data successor (ADR-089) adds mapped read/write stores, durable transactional deltas/receipts, retake preservation and current-SCO backing-state redaction. System-global shared data and objectives remain open, alongside other #133 code/conformance/deployment gaps.
 
 System shared-data successor (ADR-090) admits fourth-edition default/global shared-data maps with persistent tenant/learner working stores and current-SCO permissions. Schema-49 migration, concurrency/receipt, capacity, revocation, reopen/backup and unofficial-isolation evidence supplement G05/G10/G14/G18. System-global objectives, remaining semantics and full interoperability/production gates remain open.
+
+
+SCORM #133 / ADR-091 supplements G05/G10/G14/G18 with tenant/learner system objective persistence, cross-package prerequisites and local/system/unofficial scope separation. Inherited objective state does not create course/award completion proof; these capability supplements do not close external reference/platform/conformance/production gates.

@@ -458,7 +458,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
   } finally {f.db.close();}
 });
 test('unsupported sequencing rules, misplaced elements, collection references and system-global mappings fail closed', async () => {
-  for (const xml of [sequencingManifest().replace('action="disabled"', 'action="retry"'), sequencingManifest().replace('objectivesGlobalToSystem="false"', 'objectivesGlobalToSystem="true"'), sequencingManifest().replace('<s:controlMode ', '<s:controlMode bogus="true" '), sequencingManifest().replace('referencedObjective="required-intro"', 'referencedObjective="unknown"')]) {
+  for (const xml of [sequencingManifest().replace('action="disabled"', 'action="retry"'), sequencingManifest().replace('<s:controlMode ', '<s:controlMode bogus="true" '), sequencingManifest().replace('referencedObjective="required-intro"', 'referencedObjective="unknown"')]) {
     try {const pkg = await inspectSCORMPackage(multiFilePackage('2004-4', xml)); assert.throws(() => sequencingTree(pkg.manifest));} catch(e) {assert.match(String(e), /Unsupported|unknown|System-global/);}
   }
 });

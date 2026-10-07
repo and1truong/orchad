@@ -4,7 +4,7 @@ import { readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomBytes, scryptSync } from "node:crypto";
 import { courses } from "./seed.ts";
-export const CURRENT_SCHEMA_VERSION = 49;
+export const CURRENT_SCHEMA_VERSION = 50;
 export function openDatabase(path: string, seed = false) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
@@ -338,6 +338,11 @@ export function openDatabase(path: string, seed = false) {
   if (!db.prepare("SELECT 1 FROM schema_version WHERE version=49").get()) {
     db.exec("BEGIN IMMEDIATE");
     try {db.exec(readFileSync(new URL("../../migrations/049.sql",import.meta.url),"utf8"));db.exec("COMMIT");}
+    catch(e){db.exec("ROLLBACK");db.close();throw e;}
+  }
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=50").get()) {
+    db.exec("BEGIN IMMEDIATE");
+    try {db.exec(readFileSync(new URL("../../migrations/050.sql",import.meta.url),"utf8"));db.exec("COMMIT");}
     catch(e){db.exec("ROLLBACK");db.close();throw e;}
   }
   if (seed) {

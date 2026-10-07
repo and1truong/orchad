@@ -34,7 +34,7 @@ test('populated schema 47 upgrades resource guards without changing pinned state
     f.db.exec('DROP TRIGGER scorm_engine_resource_no_delete; DROP TRIGGER scorm_engine_resource_finalized_insert; DELETE FROM schema_version WHERE version=48'); f.db.close();
     const db = openDatabase(path, false);
     try {
-      assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, 49);
+      assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, 50);
       assert.deepEqual(db.prepare('SELECT * FROM scorm_engine_resources ORDER BY path').all(), resources); assert.deepEqual(db.prepare('SELECT * FROM scorm_sco_attempts').all(), states);
       assert.throws(() => db.exec('DELETE FROM scorm_engine_resources'), /immutable/); assert.equal(db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
     } finally {db.close();}
@@ -79,9 +79,9 @@ test('root xml:base normalizes inside the package while concrete/escaping resour
 });
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
-  test(edition + ': ADL namespace objective scope accepts registration-local maps and refuses system-global/malformed definitions', async () => {
+  test(edition + ': ADL namespace objective scope accepts local/system scopes and refuses malformed definitions', async () => {
     for (const local of ['false', '0']) {const parsed = await inspectSCORMPackage(multiFilePackage(edition, sequencingManifest(edition).replace('a:objectivesGlobalToSystem="false"', 'a:objectivesGlobalToSystem="' + local + '"'))); assert.equal(parsed.manifest.objectivesGlobalToSystem, false); assert.ok(sequencingTree(parsed.manifest));}
-    const global = await inspectSCORMPackage(multiFilePackage(edition, sequencingManifest(edition).replace('a:objectivesGlobalToSystem="false"', 'a:objectivesGlobalToSystem="true"'))); assert.throws(() => sequencingTree(global.manifest), /System-global/);
+    const global = await inspectSCORMPackage(multiFilePackage(edition, sequencingManifest(edition).replace('a:objectivesGlobalToSystem="false"', 'a:objectivesGlobalToSystem="true"'))); assert.equal(global.manifest.objectivesGlobalToSystem, true); assert.ok(sequencingTree(global.manifest));
     await assert.rejects(() => inspectSCORMPackage(multiFilePackage(edition, sequencingManifest(edition).replace('a:objectivesGlobalToSystem="false"', 'a:objectivesGlobalToSystem="invalid"'))), /objective scope/);
     await assert.rejects(() => inspectSCORMPackage(multiFilePackage(edition, sequencingManifest(edition).replace('a:objectivesGlobalToSystem="false"', 'a:objectivesGlobalToSystem="false" objectivesGlobalToSystem="true"'))), /conflicting/);
   });

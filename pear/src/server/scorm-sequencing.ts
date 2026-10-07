@@ -16,8 +16,6 @@ export function sequencingTree(manifest: SCORMManifest) {
     // windows from the executable tree while retaining the original manifest.
     if (n.deliveryControls?.tracked === false) {delete n.beginTimeLimit; delete n.endTimeLimit;}
     const objectives = [...(n.objectives ?? []), ...(n.primaryObjective ? [n.primaryObjective] : [])];
-    // Global-to-system objective persistence must not silently become registration-local.
-    if (manifest.objectivesGlobalToSystem && objectives.some(o => o.mapInfo?.length)) reject('INVALID_ARGUMENT', 'System-global objective maps require a separately authorized persistence policy');
     const ids = new Set(objectives.map(o => o.objectiveID));
     for (const rules of Object.values(n.sequencingRules ?? {}) as any[][]) for (const rule of rules) for (const c of rule.conditions) if (c.referencedObjective && !ids.has(c.referencedObjective)) reject('INVALID_ARGUMENT', 'Sequencing rule references an unknown local objective');
     (n.children ?? []).forEach(inspect);
