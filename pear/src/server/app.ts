@@ -1,3 +1,5 @@
+import {SCORMPackageService} from "./scorm-package-service.ts";
+import {registerSCORMEngine} from "./scorm-engine-routes.ts";
 import {reportPDF} from "./report-pdf.ts";
 import {reportSchema} from "../shared/reports.ts";
 import {transcriptPDF} from "./transcript-pdf.ts";
@@ -584,6 +586,7 @@ export async function createApp(opts: {
     try{return reply.header("Cache-Control","no-store").header("Referrer-Policy","no-referrer").redirect(service.providerCatalog.launch(service.principal((req as any).session.principal),(req.params as any).id));}catch(e){return mediaFailure(e,reply);}
   });
   await registerProviderCatalog(app,providerCatalog,opts.origin,!!opts.catalogAdapters?.length);
+  await registerSCORMEngine(app,new SCORMPackageService(opts.db),!!opts.developmentAuth&&["127.0.0.1","localhost","[::1]"].includes(parsed.hostname)||!!opts.identityFixture,req=>service.principal(req.session.principal));
   await registerSCORM(app,service.scorm,opts.origin,!!opts.developmentAuth||!!opts.identityFixture,req=>service.principal(req.session.principal));
   await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
   registerTranslations(app,service.translations,req=>service.principal(req.session.principal));

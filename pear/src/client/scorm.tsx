@@ -1,3 +1,4 @@
+import {EnginePackages} from "./scorm-engine.tsx";
 import React,{useEffect,useRef,useState} from "react";
 import {request,type Session} from "./api.ts";
 import {translateUI as t} from "./i18n.ts";
@@ -41,7 +42,7 @@ export function PackageLearning(p:{session:Session;busy:boolean;run:(fn:()=>Prom
   if(!response.ok)throw Error(t("Package export was denied."));const blob=await response.blob();
   if(!alive.current||!p.isCurrent())return;const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=row.filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
  });}
- return <section className="panel" aria-label={t(p.author?"Imported package administration":"Imported package learning")}><h2>{t(p.author?"Reviewed SCORM package imports":"Imported learning packages")}</h2>
+ return <><EnginePackages {...p}/><section className="panel" aria-label={t(p.author?"Imported package administration":"Imported package learning")}><h2>{t(p.author?"Reviewed SCORM package imports":"Imported learning packages")}</h2>
  <p>{t("Restricted SCORM 1.2 inline profile. Package status, score and time are reported separately; they never create Pear certificates or official quiz credit.")}</p>
  {error&&<p role="alert">{error}</p>}{status&&<p role="status">{status}</p>}
  {data&&!data.runtimeEnabled&&<p>{t("Production scanning, storage and runtime adapter are not configured.")}</p>}
@@ -65,5 +66,5 @@ export function PackageLearning(p:{session:Session;busy:boolean;run:(fn:()=>Prom
  {launch&&<><iframe style={{width:"100%",height:"28rem",border:"1px solid #ddd"}} ref={frame} key={launch.launchId} title={t("Isolated SCORM package")} sandbox="allow-scripts" src={launch.url}/><button disabled={p.busy||pending.current} onClick={()=>{currentLaunch.current=null;setLaunch(null);setStatus("");}}>{t("Close package")}</button></>}
  <button disabled={p.busy||offset===0} onClick={()=>setOffset(Math.max(0,offset-20))}>{t("Previous packages")}</button><button disabled={p.busy||data?.nextOffset==null} onClick={()=>setOffset(data.nextOffset)}>{t("Next packages")}</button>
  {!p.author&&<><button disabled={p.busy||recordOffset===0} onClick={()=>setRecordOffset(Math.max(0,recordOffset-20))}>{t("Previous package records")}</button><button disabled={p.busy||records?.nextOffset==null} onClick={()=>setRecordOffset(records.nextOffset)}>{t("Next package records")}</button></>}
- </section>;
+ </section></>;
 }
