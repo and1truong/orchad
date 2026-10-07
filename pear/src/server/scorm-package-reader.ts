@@ -3,7 +3,7 @@ import yauzl from 'yauzl';
 import {DOMParser, type Element} from '@xmldom/xmldom';
 import type {SCORMActivity, SCORMManifest, SCORMResource, SCORMStandard} from '../shared/scorm-engine.ts';
 import {crc32} from './scorm-archive.ts';
-import {parseSequencing, parseSequencingCollections, parsePresentation} from './scorm-sequencing-parser.ts';
+import {parseSequencing, parseSequencingCollections, parsePresentation, parseSharedData} from './scorm-sequencing-parser.ts';
 import {reject} from './errors.ts';
 
 export const packageLimits = {archive: 32 * 1024 * 1024, expanded: 64 * 1024 * 1024, file: 16 * 1024 * 1024, files: 2048, manifest: 1024 * 1024};
@@ -105,10 +105,16 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   while (stack.length) {
     const {node, depth} = stack.pop()!;
     if (++count > 12000 || depth > 32) invalid('manifest node/depth quota');
+    if (node.namespaceURI === CP12 && ['data', 'map'].includes(node.localName ?? '')) invalid('shared data requires fourth-edition ADL namespace');
+    if (node.getAttributeNS(CP2004, 'sharedDataGlobalToSystem') !== null && (node.localName !== 'organization' || node.namespaceURI !== ns)) invalid('misplaced shared data scope');
     if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore', 'dataFromLMS', 'timeLimitAction', 'completionThreshold', 'data'].includes(node.localName ?? '')) {
       const parent = node.parentNode as Element;
       if (parent?.localName !== 'item' || parent.namespaceURI !== ns) invalid('misplaced runtime extension');
       features.add(node.localName!);
+    }
+    if (node.namespaceURI === CP2004 && node.localName === 'map') {
+      const parent = node.parentNode as Element;
+      if (parent.namespaceURI !== CP2004 || parent.localName !== 'data') invalid('misplaced shared data mapping');
     }
     if (node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && ['sequencing', 'sequencingCollection'].includes(node.localName!)) {
       const parent = node.parentNode as Element;
@@ -164,6 +170,9 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   // or unsupported ADL semantics behind the selected profile's feature flags.
   for (const el of [...Array.from(root!.getElementsByTagNameNS(ns!, 'organization')), ...Array.from(root!.getElementsByTagNameNS(ns!, 'item'))]) {
     if (el.localName === 'organization') objectiveScope(el);
+    const scope = el.getAttributeNS(CP2004, 'sharedDataGlobalToSystem');
+    if (scope !== null && (standard !== '2004-4' || el.localName !== 'organization' || !['true', 'false', '1', '0'].includes(scope))) invalid('invalid shared data scope');
+    if (parseSharedData(el, standard) && (!resourceIds.has(el.getAttribute('identifierref') ?? '') || resources.find(r => r.id === el.getAttribute('identifierref'))?.kind !== 'sco')) invalid('shared data requires a SCO activity');
     parseSequencing(el, standard, collections);
     if (parsePresentation(el, standard) && !resourceIds.has(el.getAttribute('identifierref') ?? '')) invalid('presentation requires a resource activity');
   }
@@ -182,6 +191,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     const prerequisites = pre[0]?.textContent?.trim();
     const extensions: Partial<SCORMActivity> = {};
     const presentation = parsePresentation(el, standard);
+    const sharedData = parseSharedData(el, standard); if (sharedData) extensions.sharedDataMaps = sharedData;
     if (presentation) {if (!resourceId) invalid('presentation requires a resource activity'); extensions.hideLmsUi = presentation;}
     if (standard === '1.2') {
       for (const [tag, key] of [['datafromlms', 'launchData'], ['masteryscore', 'masteryScore'], ['maxtimeallowed', 'maxTimeAllowed'], ['timelimitaction', 'timeLimitAction']] as const) {
@@ -217,7 +227,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   // XML ID uniqueness spans the document, including unselected organizations.
   const documentIds = new Set([root!, ...Array.from(root!.getElementsByTagNameNS(ns!, '*'))].map(n => n.getAttribute('identifier')).filter(Boolean));
   if ([...collections.keys()].some(id => documentIds.has(id))) invalid('duplicate sequencing identifier');
-  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global)} : {}), runtimeFeatures: [...features].sort()};
+  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global), ...(standard === '2004-4' ? {sharedDataGlobalToSystem: !['false', '0'].includes(org.getAttributeNS(CP2004, 'sharedDataGlobalToSystem') ?? 'true')} : {})} : {}), runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {

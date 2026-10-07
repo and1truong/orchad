@@ -1,6 +1,7 @@
 import Scorm2004API from 'scorm-again/scorm2004';
 import {scorm2004CheckpointBytes, scorm2004FieldError, scorm2004EngineValue, scorm2004ExitRequests, type SCORM2004Edition} from '../shared/scorm2004-runtime.ts';
 import {validNavigation} from '../shared/scorm-sequencing-runtime.ts';
+import {applySharedDataWrites} from './scorm-shared-data.ts';
 import {reject} from './errors.ts';
 
 const writable = /^(?:cmi\.(?:completion_status|success_status|exit|location|progress_measure|session_time|suspend_data)|cmi\.score\.(?:scaled|raw|min|max)|cmi\.learner_preference\.(?:audio_level|language|delivery_speed|audio_captioning)|cmi\.comments_from_learner\.\d{1,3}\.(?:comment|location|timestamp)|cmi\.objectives\.\d{1,3}\.(?:id|description|completion_status|success_status|progress_measure|score\.(?:scaled|raw|min|max))|cmi\.interactions\.\d{1,3}\.(?:id|type|timestamp|weighting|learner_response|result|latency|description|objectives\.\d{1,3}\.id|correct_responses\.\d{1,3}\.pattern))$/;
@@ -18,7 +19,7 @@ function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}
   return out;
 }
 /** Replay writable strings through the engine; compare LMS-owned fields to trusted seed. */
-export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string, any>, edition: SCORM2004Edition, finished: boolean, navigation = '_none_', trustedRuntime?: Scorm2004API): Record<string, any> {
+export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string, any>, edition: SCORM2004Edition, finished: boolean, navigation = '_none_', trustedRuntime?: Scorm2004API, sharedData?: unknown): Record<string, any> {
   if (Buffer.byteLength(JSON.stringify(input) ?? '') > scorm2004CheckpointBytes || !trustedRuntime && !scorm2004ExitRequests.includes(navigation)) reject('INVALID_ARGUMENT', 'SCORM 2004 checkpoint or navigation quota/profile rejected');
   const incoming = leaves(input), runtime = trustedRuntime ?? new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   runtime.loadFromJSON(seed);
@@ -27,6 +28,7 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
   // Initialize seeds local objectives from the trusted manifest/snapshot. Their
   // default unknown values are not content writes that may override top-level CMI.
   const baseline = leaves(runtime.renderCMIToJSONObject().cmi);
+  if (sharedData !== undefined) {if (edition !== '2004-4' || !trustedRuntime) reject('INVALID_ARGUMENT', 'Trusted fourth-edition shared data required'); applySharedDataWrites(runtime, sharedData);}
   const priority = (key: string) => key.endsWith('.id') ? 0 : key.endsWith('.type') ? 1 : 2;
   for (const [key, value] of Object.entries(incoming).sort(([a], [b]) => priority(a) - priority(b) || a.localeCompare(b, 'en', {numeric: true}))) {
     if (readonly.test(key)) {if (value !== protectedValues[key]) reject('FORBIDDEN', 'Server-owned CMI value changed'); continue;}

@@ -6,9 +6,10 @@ import {reject} from './errors.ts';
 
 export function sequencingTree(manifest: SCORMManifest) {
   playbackActivities(manifest);
+  if (manifest.sharedDataGlobalToSystem && playbackActivities(manifest).some(p => p.activity.sharedDataMaps?.length)) reject('INVALID_ARGUMENT', 'System-global shared data requires a persistent system-scoped store');
   // IMS CP isvisible affects menu rendering only. Do not forward it as the
   // engine's isVisible, which also denies otherwise valid choice navigation.
-  const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, ...(a.hideLmsUi?.length ? {hideLmsUi: a.hideLmsUi} : {}), children: a.children.map(node), ...(a.completionMeasure ? {completionThreshold: a.completionMeasure} : a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
+  const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, ...(a.sharedDataMaps ? {sharedDataMaps: a.sharedDataMaps} : {}), ...(a.hideLmsUi?.length ? {hideLmsUi: a.hideLmsUi} : {}), children: a.children.map(node), ...(a.completionMeasure ? {completionThreshold: a.completionMeasure} : a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
   const tree = {id: manifest.organizationId, title: manifest.title, ...manifest.sequencing, children: manifest.activities.map(node)};
   const inspect = (n: Record<string, any>) => {
     // IMS SS UP.1: untracked activities cannot violate limit conditions.
@@ -53,6 +54,6 @@ export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifes
   return current;
 }
 export function usesSequencing(manifest: SCORMManifest) {
-  const configured = (a: SCORMActivity) => a.sequencing || a.hideLmsUi?.length || a.completionMeasure && a.completionMeasure.progressWeight !== 1;
+  const configured = (a: SCORMActivity) => a.sequencing || a.sharedDataMaps?.length || a.hideLmsUi?.length || a.completionMeasure && a.completionMeasure.progressWeight !== 1;
   return manifest.standard !== '1.2' && (!!manifest.sequencing || playbackActivities(manifest).length > 1 || playbackActivities(manifest).some(p => configured(p.activity) || p.ancestors.some(configured)));
 }

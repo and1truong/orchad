@@ -44,6 +44,20 @@ export function parsePresentation(item: Element, edition: SCORMStandard): string
   }))];
 }
 
+export function parseSharedData(item: Element, edition: SCORMStandard) {
+  const cp = 'http://www.adlnet.org/xsd/adlcp_v1p3';
+  const nodes = children(item).filter(n => n.namespaceURI === cp && n.localName === 'data');
+  if (!nodes.length) return undefined; if (nodes.length !== 1 || edition !== '2004-4') fail();
+  attrs(nodes[0], []); const maps = children(nodes[0]), ids = new Set<string>();
+  if (!maps.length || maps.length > 64) fail();
+  return maps.map(n => {
+    if (n.namespaceURI !== cp || n.localName !== 'map' || children(n).length) fail(); attrs(n, ['targetID', 'readSharedData', 'writeSharedData']);
+    const targetID = n.getAttribute('targetID');
+    if (!targetID || targetID.length > 4000 || /\s|[\u0000-\u001f\u007f]/.test(targetID) || ids.has(targetID)) fail(); ids.add(targetID!);
+    return {targetID: targetID!, readSharedData: bool(n, 'readSharedData') ?? true, writeSharedData: bool(n, 'writeSharedData') ?? false};
+  });
+}
+
 function adlObjectives(el: Element, edition: SCORMStandard) {
   if (edition !== '2004-4') fail(); attrs(el, []); const list = children(el), ids = new Set<string>();
   if (!list.length || list.length > 1024) fail();

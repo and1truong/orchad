@@ -18,11 +18,12 @@ Version: epic #133 / ADR-075–087. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | Weighted completion / progress rollup | — | — | — | Tested profile | Fourth-edition progressWeight and threshold policy; durable trusted measure, zero-weight obligations and official proof (ADR-086) |
 | ADL presentation / rollup / constrained choice | — | Tested profile | Tested profile | Tested profile | Namespace/default/collection validation; hideLMSUI is presentation, content navigation remains allowed; ADL score/progress/completion maps are fourth-edition-only (ADR-087) |
 | pipwerks licensed wrapper save/resume/finish | Tested | Tested | Tested | Tested | Pinned original wrapper and original course assets; not a commercial authoring export |
+| Registration-local shared data | — | — | — | Tested profile | Explicit sharedDataGlobalToSystem=false; mapped read/write stores, durable delta receipts, technical retake preservation and hidden backing-state redaction (ADR-089) |
 | Calendar delivery windows | — | Tested profile | Tested profile | Tested profile | Host-clock begin/end checks, explicit timezone, Gregorian validation, inclusive endpoints; bounded precision/profile (ADR-088) |
 | ADL developer-guide licensed wrapper | — | Unverified | Tested | Unverified | Exact byte-preserved file, CC BY-SA 3.0 notices retained; full Roses/Flash course not bundled |
 | Enrollment/standalone/nested award version/cycle projection | Tested | Tested | Tested | Tested | All required SCO evidence; live authorization, immutable proof/audit/receipt; quiz remains required for course certificate |
 
-Explicitly refused playback profiles: asset activity leaves, absolute/experienced duration limits, selection/randomization, system-global objective maps, fourth-edition shared data. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
+Explicitly refused playback profiles: asset activity leaves, absolute/experienced duration limits, selection/randomization, system-global objective maps, fourth-edition system-global shared data. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
 
 | Lane | Observed result | Remaining gate |
 |---|---|---|

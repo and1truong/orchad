@@ -263,3 +263,5 @@ G05 now includes immutable multi-file ZIP import/review/publish and isolated rev
 OPEN: missing semantics in #133 checklist B; exhaustive standards/reference/commercial interoperability; actual additional OS/mobile and native Side Panel; production credentialless isolation, strict egress, scanning/storage/privacy/archival/retention and load/recovery acceptance. Full SCORM/LRS/cmi5, provider/partner, issuer/accreditation and unrelated #49 parity gates remain open.
 
 SCORM calendar delivery successor (ADR-088) enforces bounded explicit-timezone begin/end windows using the trusted host clock, including stale client navigation rollback and snapshot reconstruction across 2004 editions 2–4. It does not close duration, selection/global/shared-data, production or full conformance gaps.
+
+The fourth-edition local shared-data successor (ADR-089) adds mapped read/write stores, durable transactional deltas/receipts, retake preservation and current-SCO backing-state redaction. System-global shared data and objectives remain open, alongside other #133 code/conformance/deployment gaps.

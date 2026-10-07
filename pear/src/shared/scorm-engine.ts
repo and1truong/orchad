@@ -20,6 +20,7 @@ export interface SCORMActivity {
   completionThreshold?: string;
   completionMeasure?: {completedByMeasure: boolean; minProgressMeasure: number; progressWeight: number};
   hideLmsUi?: string[];
+  sharedDataMaps?: {targetID: string; readSharedData: boolean; writeSharedData: boolean}[];
   sequencing?: Record<string, any>;
   maxTimeAllowed?: string;
   timeLimitAction?: string;
@@ -35,6 +36,7 @@ export interface SCORMManifest {
   runtimeFeatures?: string[];
   sequencing?: Record<string, any>;
   objectivesGlobalToSystem?: boolean;
+  sharedDataGlobalToSystem?: boolean;
 }
 export function scormStandard(value: unknown): SCORMStandard {
   if (!SCORM_STANDARDS.includes(value as SCORMStandard)) throw new Error('Unsupported SCORM edition');

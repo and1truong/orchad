@@ -5,7 +5,84 @@ import {multiFileManifest, multiFilePackage} from './scorm-package-fixture.ts';
 import {createSCORM2004API, type SCORM2004Edition} from '../src/shared/scorm2004-runtime.ts';
 import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
-import {sequencingManifest, collectionManifest, retryManifest, weightedManifest, adlManifest, calendarManifest} from './scorm-sequencing-fixture.ts';
+import {sequencingManifest, collectionManifest, retryManifest, weightedManifest, adlManifest, calendarManifest, sharedDataManifest} from './scorm-sequencing-fixture.ts';
+
+test('fourth-edition local shared data persists across SCO delivery, preserves read/write permissions and hides unrelated stores', async () => {
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', sharedDataManifest()));
+  try {
+    const binding = f.enroll(), first = f.launch(binding), b = f.player.bootstrap(first.token);
+    const api = createSCORM2004API({edition: '2004-4', state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot});
+    assert.equal(api.Initialize(''), 'true'); assert.equal(api.GetValue('adl.data._count'), '2'); assert.equal(api.GetValue('adl.data.0.id'), 'urn:pear:shared-notes');
+    assert.equal(api.GetValue('adl.data.0.store'), ''); assert.equal(api.GetLastError(), '405'); assert.equal(api.SetValue('adl.data.0.id', 'forged'), 'false'); assert.equal(api.GetLastError(), '404');
+    const request = sequenceCheckpoint(f, first, {'adl.data.0.store': 'Shared learner notes 🦉', 'adl.data.1.store': 'private-writer-secret', 'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'});
+    const result = f.player.checkpoint(first.token, request); assert.equal(result.officialLearningChanged, false); assert.deepEqual(f.player.checkpoint(first.token, request), result);
+    const next = f.launch(binding), second = f.player.bootstrap(next.token);
+    assert.ok(second.sequencingSnapshot!.includes('Shared learner notes')); assert.ok(!second.sequencingSnapshot!.includes('private-writer-secret'));
+    const reader = createSCORM2004API({edition: '2004-4', state: second.state, sequencingTree: second.sequencingTree, sequencingSnapshot: second.sequencingSnapshot});
+    assert.equal(reader.Initialize(''), 'true'); assert.equal(reader.GetValue('adl.data._count'), '1'); assert.equal(reader.GetValue('adl.data.0.store'), 'Shared learner notes 🦉');
+    assert.equal(reader.SetValue('adl.data.0.store', 'forged'), 'false'); assert.equal(reader.GetLastError(), '404');
+    const end = sequenceCheckpoint(f, next, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'});
+    assert.throws(() => f.player.checkpoint(next.token, {...end, sharedData: {'urn:pear:shared-notes': 'forged'}}), /cannot write/);
+    assert.equal(f.player.checkpoint(next.token, end).officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
+test('shared data writes survive an overall technical retake within a registration while CMI and authority reset', async () => {
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', sharedDataManifest()));
+  try {
+    const binding = f.enroll(), first = f.launch(binding);
+    const request = sequenceCheckpoint(f, first, {'adl.data.0.store': 'persistent-local-notes', 'cmi.location': 'old-attempt-location', 'cmi.session_time': 'PT20S'}, false);
+    f.player.checkpoint(first.token, request);
+    const result = f.player.retake(f.service.principal('learner-a'), {registrationId: first.registrationId, attemptId: first.attemptId, confirmed: true, revision: f.service.context('learner-a', 'learning:demo:learner-a').revision, key: 'local-shared-retake'});
+    assert.notEqual(result.attemptId, first.attemptId); assert.throws(() => f.player.bootstrap(first.token), /closed|capability/);
+    const again = f.launch(binding), bootstrap = f.player.bootstrap(again.token); assert.equal(bootstrap.state.location ?? '', ''); assert.equal(bootstrap.state.total_time, 'PT0S'); assert.ok(!bootstrap.sequencingSnapshot!.includes('persistent-local-notes'));
+    f.player.checkpoint(again.token, sequenceCheckpoint(f, again, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'}));
+    const next = f.launch(binding), b = f.player.bootstrap(next.token), api = createSCORM2004API({edition: '2004-4', state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot});
+    assert.equal(api.Initialize(''), 'true'); assert.equal(api.GetValue('adl.data.0.store'), 'persistent-local-notes');
+    const other = f.launch(undefined, undefined, 'normal', 'learner-b'); assert.ok(!f.player.bootstrap(other.token).sequencingSnapshot!.includes('persistent-local-notes'));
+    const preview = f.launch(undefined, undefined, 'preview', 'admin'); assert.ok(!f.player.bootstrap(preview.token).sequencingSnapshot!.includes('persistent-local-notes'));
+    assert.equal(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts WHERE attempt_id=?').get(first.attemptId)!.runtime_state, JSON.stringify(request.state));
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+  } finally {f.db.close();}
+});
+
+test('shared data queue rejection preserves the write delta; a successful queue acceptance clears it', async () => {
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', sharedDataManifest()));
+  try {
+    const first = f.launch(f.enroll()), b = f.player.bootstrap(first.token); let available = false; const attempts: unknown[] = [];
+    const api = createSCORM2004API({edition: '2004-4', state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot, checkpoint(_s, _f, _n, writes) {attempts.push(writes); return available;}});
+    api.Initialize(''); assert.equal(api.SetValue('adl.data.0.store', 'x'.repeat(64001)), 'false');
+    assert.equal(api.SetValue('adl.data.0.store', 'queued-notes'), 'true'); assert.equal(api.Commit(''), 'false'); assert.equal(api.GetLastError(), '391');
+    available = true; assert.equal(api.Commit(''), 'true'); assert.equal(api.Commit(''), 'true');
+    assert.deepEqual(attempts, [{'urn:pear:shared-notes': 'queued-notes'}, {'urn:pear:shared-notes': 'queued-notes'}, {}]);
+    const request = sequenceCheckpoint(f, first, {}, false);
+    for (const writes of [null, [], {'unknown': 'forged'}, {'urn:pear:shared-notes': 5}, {'urn:pear:shared-notes': 'x'.repeat(64001)}]) assert.throws(() => f.player.checkpoint(first.token, {...request, sharedData: writes}), /shared data|Shared data|store value/);
+    assert.equal(f.player.bootstrap(first.token).revision, b.revision);
+  } finally {f.db.close();}
+});
+
+test('accepted shared data and its receipt survive a real database/server reopen', async () => {
+  const {mkdtempSync, rmSync} = await import('node:fs'), {tmpdir} = await import('node:os'), {join} = await import('node:path');
+  const {fixture} = await import('./helpers.ts'), {SCORMPlayerService} = await import('../src/server/scorm-player-service.ts'), {SCORMLearningBindings} = await import('../src/server/scorm-learning-bindings.ts');
+  const directory = mkdtempSync(join(tmpdir(), 'pear-shared-data-')), path = join(directory, 'db.sqlite');
+  const f = await scormLearningFixture(path, multiFilePackage('2004-4', sharedDataManifest())), binding = f.enroll(), first = f.launch(binding);
+  const request = sequenceCheckpoint(f, first, {'adl.data.0.store': 'reopened-shared-notes', 'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'}), receipt = f.player.checkpoint(first.token, request);
+  f.db.close(); const opened = fixture(path), player = new SCORMPlayerService(opened.db, new SCORMLearningBindings(opened.db, opened.service));
+  try {
+    assert.deepEqual(player.checkpoint(first.token, request), receipt);
+    const next = player.launch(opened.service.principal('learner-a'), 'session-learner-a', {packageId: f.pkg.id, version: 1, binding, mode: 'normal', confirmed: true, revision: opened.service.context('learner-a', 'learning:demo:learner-a').revision, key: crypto.randomUUID()});
+    const b = player.bootstrap(next.token), api = createSCORM2004API({edition: '2004-4', state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot});
+    assert.equal(api.Initialize(''), 'true'); assert.equal(api.GetValue('adl.data.0.store'), 'reopened-shared-notes');
+  } finally {opened.db.close(); rmSync(directory, {recursive: true, force: true});}
+});
+
+test('shared data import rejects earlier editions, invalid maps/scopes and unselected definitions', async () => {
+  const xml = sharedDataManifest();
+  for (const bad of [xml.replace('writeSharedData="true"', 'writeSharedData="maybe"'), xml.replace('targetID="urn:pear:shared-notes"', 'targetID=""'), xml.replace('<runtime:map targetID=', '<runtime:map bogus="true" targetID='), xml.replace('</runtime:data>', '<runtime:map targetID="urn:pear:shared-notes"/></runtime:data>'), xml.replace('sharedDataGlobalToSystem="false"', 'sharedDataGlobalToSystem="maybe"'), xml.replaceAll('<runtime:data>', '<wrong:data xmlns:wrong="http://www.adlnet.org/xsd/adlcp_rootv1p2">').replaceAll('</runtime:data>', '</wrong:data>'), xml.replace('</p:organizations>', '<p:organization identifier="unused" runtime:sharedDataGlobalToSystem="maybe"><p:title>Unused</p:title></p:organization></p:organizations>')]) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', bad)), /Unsupported|shared data scope|shared data requires|misplaced shared/);
+  for (const edition of ['2004-2', '2004-3'] as const) await assert.rejects(inspectSCORMPackage(multiFilePackage(edition, xml.replace('2004 4th Edition', edition === '2004-2' ? '2004 2nd Edition' : '2004 3rd Edition'))), /shared data scope|Unsupported/);
+  const global = (await inspectSCORMPackage(multiFilePackage('2004-4', xml.replace('runtime:sharedDataGlobalToSystem="false"', '')))).manifest;
+  assert.throws(() => sequencingTree(global), /System-global shared data/);
+});
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': calendar limits use the host clock and survive trusted reconstruction', async t => {
   const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
@@ -355,12 +432,12 @@ test('an empty inline limitConditions replaces a collected attempt limit with th
   assert.equal(engine.getSequencingState()!.currentActivity.attemptCount, 2);
 });
 export function sequenceCheckpoint(f: Awaited<ReturnType<typeof scormLearningFixture>>, launch: ReturnType<typeof f.launch>, values: Record<string, string>, finished = true) {
-  const b = f.player.bootstrap(launch.token); let state: any, navigation = '_none_';
-  const api = createSCORM2004API({edition: b.standard as SCORM2004Edition, state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot, checkpoint(s, _finished, nav) {state = s; navigation = nav;}});
+  const b = f.player.bootstrap(launch.token); let state: any, navigation = '_none_', sharedData: Record<string, string> | undefined;
+  const api = createSCORM2004API({edition: b.standard as SCORM2004Edition, state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot, checkpoint(s, _finished, nav, writes) {state = s; navigation = nav; sharedData = writes;}});
   assert.equal(api.Initialize(''), 'true');
   for (const [key, value] of Object.entries(values)) assert.equal(api.SetValue(key, value), 'true', key + ': ' + api.GetDiagnostic(''));
   assert.equal(finished ? api.Terminate('') : api.Commit(''), 'true', api.GetDiagnostic(''));
-  return {state, navigation, finished, sequence: b.sequence + 1, revision: b.revision};
+  return {state, navigation, finished, sequence: b.sequence + 1, revision: b.revision, ...(sharedData && Object.keys(sharedData).length ? {sharedData} : {})};
 }
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': objective maps gate direct choices; Terminate drives durable flow/rollup and preserves SCO isolation', async () => {
   const f = await scormLearningFixture(undefined, multiFilePackage(edition, sequencingManifest(edition)));

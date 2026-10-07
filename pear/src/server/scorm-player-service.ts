@@ -13,6 +13,7 @@ import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
 import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
+import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
 import {SCORM_RUNTIME_LIMITS} from '../shared/scorm-operations.ts';
 
@@ -135,7 +136,7 @@ export class SCORMPlayerService {
     if (c.launch.finished) reject('FORBIDDEN', 'Finished communication session must be relaunched');
     const latest = this.db.prepare('SELECT result FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, c.launch.sequence) as any;
     const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
-    return {...(engine ? {sequencingTree: sequencingTree(manifest), sequencingSnapshot: engine.serializeSequencingState()} : {}), standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
+    return {...(engine ? {sequencingTree: sequencingTree(manifest), sequencingSnapshot: sharedDataClientSnapshot(engine)} : {}), standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
   }
   context(p: Principal, a: {packageId?: string; version?: string; enrollmentId?: string; lessonId?: string; itemEnrollmentId?: string; mode?: string}) {
     const {mode = 'normal', ...args} = a;
@@ -182,6 +183,13 @@ export class SCORMPlayerService {
       const id = randomUUID(), now = new Date().toISOString();
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE registration_id=?').run(registration.id);
       this.db.prepare('INSERT INTO scorm_engine_attempts(id,tenant,registration_id,attempt_number,created_at) VALUES(?,?,?,?,?)').run(id, p.tenant, registration.id, previous.attempt_number + 1, now);
+      const manifest = this.manifest(registration.package_id, registration.version, p.tenant);
+      if (manifest.standard === '2004-4' && playbackActivities(manifest).some(p => p.activity.sharedDataMaps?.length)) {
+        const prior = trustedSequencing(manifest, previous.sequencing_state, {attemptId: previous.id, sha256: registration.sha256});
+        const next = trustedSequencing(manifest, '{}', {attemptId: id, sha256: registration.sha256});
+        next.restoreSharedDataSnapshot(prior.captureSharedDataSnapshot());
+        this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(next, manifest, {attemptId: id, sha256: registration.sha256}), id, p.tenant);
+      }
       const result = {registrationId: registration.id, attemptId: id, attemptNumber: previous.attempt_number + 1, officialLearningChanged: false};
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run(doc);
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, doc, 'human_scorm_engine_retake', JSON.stringify({registrationId: registration.id, previousAttemptId: previous.id, attemptId: id}), now);
@@ -200,15 +208,17 @@ export class SCORMPlayerService {
     return this.transaction(() => {
       const c = this.capability(token);
       const manifest = this.manifest(c.registration.package_id, c.registration.version, c.p.tenant);
-      const keys = manifest.standard === '1.2' ? ['sequence', 'revision', 'state', 'finished'] : ['sequence', 'revision', 'state', 'finished', 'navigation'];
+      const keys = manifest.standard === '1.2' ? ['sequence', 'revision', 'state', 'finished'] : ['sequence', 'revision', 'state', 'finished', 'navigation', 'sharedData'];
       if (!a || Object.keys(a).some(k => !keys.includes(k)) || !Number.isSafeInteger(a.sequence) || a.sequence < 1 || !Number.isSafeInteger(a.revision) || a.revision < 0 || typeof a.finished !== 'boolean') reject('INVALID_ARGUMENT', 'Exact checkpoint sequence and revision required');
       const payloadHash = tokenHash(JSON.stringify(a)), old = this.db.prepare('SELECT * FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, a.sequence) as any;
       if (old) {if (old.payload_hash !== payloadHash) reject('IDEMPOTENCY_CONFLICT', 'Checkpoint sequence payload changed'); return JSON.parse(old.result);}
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
       if (manifest.standard !== '1.2' && a.navigation !== undefined && typeof a.navigation !== 'string') reject('INVALID_ARGUMENT', 'Exact navigation request required');
+      if (a.sharedData !== undefined && manifest.standard !== '2004-4') reject('INVALID_ARGUMENT', 'Shared data requires fourth edition');
+      if (a.sharedData !== undefined && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData})) > 512 * 1024) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
       const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
       if (engine && deliveredSCO(engine, manifest)?.activity.id !== c.launch.sco_id) reject('STALE_CONTEXT', 'Sequencing has delivered a different SCO');
-      const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation, engine);
+      const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation, engine, a.sharedData);
       const seconds = manifest.standard === '1.2' ? scormSeconds(state.core.session_time) : scorm2004Seconds(state.session_time);
       if (seconds < c.launch.session_seconds) reject('INVALID_ARGUMENT', 'Session time cannot decrease within a launch');
       const revision = c.sco.revision + 1, now = new Date().toISOString();
