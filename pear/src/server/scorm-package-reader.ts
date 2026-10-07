@@ -179,7 +179,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
           const enabled = n.getAttribute('completedByMeasure') ?? 'false', minimum = n.getAttribute('minProgressMeasure') ?? '1', weight = n.getAttribute('progressWeight') ?? '1';
           if (!['true', 'false', '1', '0'].includes(enabled) || !numeric(minimum) || !numeric(weight)) invalid('invalid completion threshold attributes');
           if (['true', '1'].includes(enabled)) extensions.completionThreshold = minimum;
-          if (weight !== '1' && Number(weight) !== 1) features.add('weightedCompletion');
+          extensions.completionMeasure = {completedByMeasure: ['true', '1'].includes(enabled), minProgressMeasure: Number(minimum), progressWeight: Number(weight)};
         } else if (text) {if (!numeric(text)) invalid('invalid completion threshold'); extensions.completionThreshold = text;}
       }
     }

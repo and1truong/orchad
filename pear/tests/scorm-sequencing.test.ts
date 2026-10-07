@@ -5,7 +5,58 @@ import {multiFileManifest, multiFilePackage} from './scorm-package-fixture.ts';
 import {createSCORM2004API, type SCORM2004Edition} from '../src/shared/scorm2004-runtime.ts';
 import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
-import {sequencingManifest, collectionManifest, retryManifest} from './scorm-sequencing-fixture.ts';
+import {sequencingManifest, collectionManifest, retryManifest, weightedManifest} from './scorm-sequencing-fixture.ts';
+
+test('fourth-edition weighted completion survives engine reconstruction and appears in immutable official rollup evidence', async () => {
+  const xml = weightedManifest();
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding);
+    assert.equal(f.player.bootstrap(first.token).state.completion_threshold, '0.5');
+    const request = sequenceCheckpoint(f, first, {'cmi.progress_measure': '0.5', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'});
+    assert.equal(f.player.checkpoint(first.token, request).officialLearningChanged, false);
+    const envelope = JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state));
+    const states = JSON.parse(envelope.snapshot).sequencing.activityStates;
+    const tree = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', xml))).manifest);
+    assert.equal(tree.children[0].completionThreshold.progressWeight, 0.75); assert.equal(tree.children[1].completionThreshold.progressWeight, 0.25);
+    assert.equal(states.org.attemptCompletionAmount, 0.375); assert.equal(states.org.attemptCompletionAmountStatus, true);
+    const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+    const engine = sequencingRuntime(tree, envelope.snapshot);
+    assert.equal(engine.getSequencingState()!.rootActivity.children[0].progressWeight, 0.75);
+    assert.equal(engine.getSequencingState()!.rootActivity.attemptCompletionAmount, 0.375);
+    const next = f.launch(binding); assert.equal(next.scoId, 'practice');
+    assert.equal(f.player.checkpoint(next.token, sequenceCheckpoint(f, next, {'cmi.progress_measure': '1', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+    const proof = JSON.parse(String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence));
+    assert.equal(proof.rollup.completionMeasure, 0.625);
+  } finally {f.db.close();}
+});
+
+test('fourth-edition weight is independent of completedByMeasure and rejects invalid or earlier-edition attributes', async () => {
+  const xml = weightedManifest().replaceAll('completedByMeasure="true"', 'completedByMeasure="false"');
+  const parsed = await inspectSCORMPackage(multiFilePackage('2004-4', xml));
+  assert.deepEqual(parsed.manifest.activities[0].completionMeasure, {completedByMeasure: false, minProgressMeasure: 0.5, progressWeight: 0.75});
+  assert.equal(parsed.manifest.activities[0].completionThreshold, undefined);
+  const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+  const engine = sequencingRuntime(sequencingTree(parsed.manifest)); engine.processNavigationRequest('start'); engine.Initialize('');
+  assert.equal(engine.GetValue('cmi.completion_threshold'), '');
+  assert.equal(engine.getSequencingState()!.currentActivity.progressWeight, 0.75);
+  for (const weight of ['-0.1', '1.01', 'NaN', 'Infinity', '']) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', xml.replace('progressWeight="0.75"', `progressWeight="${weight}"`))), /threshold/);
+  for (const [marker, edition] of [['2004 2nd Edition', '2004-2'], ['2004 3rd Edition', '2004-3']] as const) await assert.rejects(inspectSCORMPackage(multiFilePackage(edition, xml.replace('2004 4th Edition', marker))), /4th edition/);
+});
+
+test('zero completion weight does not remove a SCO from the published per-SCO completion policy', async () => {
+  const xml = sequencingManifest().replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:completionThreshold completedByMeasure="true" minProgressMeasure="0.8" progressWeight="0"/>').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:completionThreshold completedByMeasure="true" minProgressMeasure="0.8" progressWeight="1"/>');
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding);
+    f.player.checkpoint(first.token, sequenceCheckpoint(f, first, {'cmi.progress_measure': '0.2', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'}));
+    const next = f.launch(binding);
+    assert.equal(f.player.checkpoint(next.token, sequenceCheckpoint(f, next, {'cmi.progress_measure': '1', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, false);
+    const states = JSON.parse(JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state)).snapshot).sequencing.activityStates;
+    assert.equal(states.org.attemptCompletionAmount, 1); assert.equal(states.intro.completionStatus, 'incomplete');
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+  } finally {f.db.close();}
+});
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': hidden SCOs retain flow, current delivery, choice validity and completion obligations', async () => {
   const xml = sequencingManifest(edition).replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"');

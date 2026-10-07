@@ -16,8 +16,8 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
     {name: 'assets/player.js', data: Buffer.from(`const api=parent.API_1484_11;api.Initialize('');
       document.getElementById('entry').textContent='Sequencing entry: '+api.GetValue('cmi.entry')+'; bookmark: '+api.GetValue('cmi.location');
       const update=()=>{api.SetValue('cmi.location','sequencing-page');api.SetValue('cmi.exit','suspend');api.SetValue('cmi.session_time','PT20S');};
-      document.getElementById('save').onclick=()=>{update();api.SetValue('cmi.completion_status','incomplete');document.getElementById('result').textContent='Sequencing Commit: '+api.Commit('');};
-      const finish=(nav)=>{update();api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','passed');api.SetValue('cmi.score.scaled','0.9');api.SetValue('adl.nav.request',nav);document.getElementById('result').textContent='Sequencing Terminate: '+api.Terminate('');};
+      document.getElementById('save').onclick=()=>{update();api.SetValue('cmi.progress_measure','0.2');api.SetValue('cmi.completion_status','incomplete');document.getElementById('result').textContent='Sequencing Commit: '+api.Commit('');};
+      const finish=(nav)=>{update();api.SetValue('cmi.progress_measure',location.pathname.endsWith('intro.html')?'0.5':'1');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','passed');api.SetValue('cmi.score.scaled','0.9');api.SetValue('adl.nav.request',nav);document.getElementById('result').textContent='Sequencing Terminate: '+api.Terminate('');};
       document.getElementById('fail').onclick=()=>{update();api.SetValue('cmi.exit','normal');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','failed');api.SetValue('cmi.score.scaled','0.4');api.SetValue('adl.nav.request','exit');document.getElementById('result').textContent='Failed attempt Terminate: '+api.Terminate('');};
       document.getElementById('continue').onclick=()=>finish('continue');document.getElementById('end').onclick=()=>finish('exitAll');`), method: 8},
     {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
@@ -36,4 +36,8 @@ export function collectionManifest(edition: SCORM2004Edition = '2004-4') {
 export function retryManifest(edition: SCORM2004Edition = '2004-4', action: 'retry' | 'retryAll' = 'retry') {
   const rule = `<s:sequencingRules><s:postConditionRule><s:ruleConditions><s:ruleCondition condition="satisfied" operator="not"/></s:ruleConditions><s:ruleAction action="${action}"/></s:postConditionRule></s:sequencingRules>`;
   return sequencingManifest(edition).replace('<s:objectives><s:primaryObjective', rule + '<s:limitConditions attemptLimit="3"/><s:objectives><s:primaryObjective');
+}
+
+export function weightedManifest() {
+  return sequencingManifest().replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:completionThreshold completedByMeasure="true" minProgressMeasure="0.5" progressWeight="0.75"/>').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:completionThreshold completedByMeasure="true" minProgressMeasure="0.5" progressWeight="0.25"/>');
 }

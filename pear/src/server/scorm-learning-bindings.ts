@@ -47,7 +47,7 @@ export class SCORMLearningBindings {
       const overall = this.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(attemptId, p.tenant) as any;
       const envelope = JSON.parse(overall.sequencing_state), root = JSON.parse(envelope.snapshot).sequencing?.activityStates?.[manifest.organizationId];
       if (!root || root.completionStatus !== 'completed' || c.reference.completion === 'passed' && root.successStatus !== 'passed') return false;
-      rollup = {activityId: manifest.organizationId, completion: root.completionStatus, success: root.successStatus, normalizedMeasure: root.objectiveMeasureStatus ? root.objectiveNormalizedMeasure : null};
+      rollup = {activityId: manifest.organizationId, completion: root.completionStatus, success: root.successStatus, normalizedMeasure: root.objectiveMeasureStatus ? root.objectiveNormalizedMeasure : null, completionMeasure: root.attemptCompletionAmountStatus ? root.attemptCompletionAmount : null};
     }
     const now = new Date().toISOString(), proof = {packageId: registration.package_id, version: registration.version, sha256: registration.sha256, engine: SCORM_ENGINE, reference: c.reference, context: c.context, scos: evidence, ...(rollup ? {rollup} : {})};
     this.db.prepare('INSERT INTO scorm_completion_proofs VALUES(?,?,?,?,?)').run(registration.id, attemptId, p.tenant, JSON.stringify(proof), now);
