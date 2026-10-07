@@ -5,6 +5,7 @@ import {packageLimits} from './scorm-package-reader.ts';
 import {DomainError, reject} from './errors.ts';
 import {failure} from '@orchard/bridge-contract';
 import type {SCORMPlayerService} from './scorm-player-service.ts';
+import {scormLaunchDiagnostics, scormTenantDiagnostics} from './scorm-diagnostics.ts';
 
 export async function registerSCORMEngine(app: FastifyInstance, packages: SCORMPackageService, enabled: boolean, principal: (req: any) => Principal, runtime?: {player: SCORMPlayerService; contentOrigin: string}) {
   const error = (e: any, reply: any) => {
@@ -12,6 +13,16 @@ export async function registerSCORMEngine(app: FastifyInstance, packages: SCORMP
     return reply.code(code === 'UNAUTHORIZED' ? 401 : code === 'FORBIDDEN' ? 403 : code === 'STALE_CONTEXT' || code === 'IDEMPOTENCY_CONFLICT' ? 409 : code === 'INTERNAL' ? 500 : 400).send(failure(code, code === 'INTERNAL' ? 'Internal package error' : e.message));
   };
   const guard = async (_req: any, reply: any) => {if (!enabled) return reply.code(403).send(failure('FORBIDDEN', 'SCORM engine is limited to reviewed loopback development fixtures'));};
+  const download = (reply: any, packet: object) => reply.type('application/json; charset=utf-8').header('Cache-Control', 'no-store').header('Content-Disposition', 'attachment; filename="pear-scorm-support.json"').send(packet);
+  app.get('/api/scorm-engine/diagnostics', async (req, reply) => {
+    try {return download(reply, scormTenantDiagnostics(packages.db, principal(req), !!runtime));} catch (e) {return error(e, reply);}
+  });
+  app.get('/api/scorm-engine/launches/:id/diagnostics', async (req, reply) => {
+    try {
+      if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured');
+      return download(reply, scormLaunchDiagnostics(runtime!.player, principal(req), (req.params as any).id, (req as any).session.token_hash));
+    } catch (e) {return error(e, reply);}
+  });
   app.get('/api/scorm-engine/packages', async (req, reply) => {
     try {
       const q = req.query as any, offset = Number(q.offset ?? 0);

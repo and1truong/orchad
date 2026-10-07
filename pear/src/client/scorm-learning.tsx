@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {request, type Session} from './api.ts';
+import {downloadSCORMSupport} from './scorm-support.ts';
 import type {SCORMReference} from '../shared/model.ts';
 
 export function SCORMReferenceEditor(p: {session: Session; value?: SCORMReference; onChange: (value: SCORMReference) => void}) {
@@ -27,6 +28,7 @@ export function SCORMReferenceEditor(p: {session: Session; value?: SCORMReferenc
 export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId: string; lessonId: string} | {itemEnrollmentId: string}; busy: boolean; run: (fn: () => Promise<void>) => Promise<boolean>; onSaved: () => Promise<void>}) {
   const [context, setContext] = useState<any>(null), [launch, setLaunch] = useState<any>(null), [consent, setConsent] = useState(false), [status, setStatus] = useState(''), [error, setError] = useState('');
   const [retakeConfirmed, setRetakeConfirmed] = useState(false);
+  const sessionRef = useRef(p.session); sessionRef.current = p.session;
   const frame = useRef<HTMLIFrameElement>(null), activeLaunch = useRef<any>(null), binding = JSON.stringify(p.binding);
   async function refresh() {const value = await request<any>('/api/scorm-engine/player-context?' + new URLSearchParams(p.binding), p.session); setContext(value);}
   useEffect(() => {let active = true; request<any>('/api/scorm-engine/player-context?' + new URLSearchParams(p.binding), p.session).then(value => {if (active) setContext(value);}).catch(e => {if (active) setError(e.message);}); return () => {active = false; activeLaunch.current = null;};}, [p.session, binding]);
@@ -88,7 +90,7 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
         await request('/api/scorm-engine/retake', p.session, {registrationId: context.registrationId, attemptId: context.attemptId, confirmed: retakeConfirmed, revision: current.revision, key: crypto.randomUUID()});
         await refresh(); setRetakeConfirmed(false);
       });}}>Start fresh SCORM attempt</button></fieldset>}
-    {launch && <><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{status}</p>
+    {launch && <><button disabled={p.busy} onClick={() => {void p.run(() => downloadSCORMSupport(p.session, launch.launchId, () => sessionRef.current === p.session && activeLaunch.current === launch));}}>Download SCORM support details</button><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{status}</p>
       <button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button>
       <button disabled={p.busy} onClick={() => {void close();}}>Close SCO and choose another</button></>}
   </section>;

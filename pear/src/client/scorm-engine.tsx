@@ -1,5 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {request, type Session} from './api.ts';
+import {downloadSCORMSupport} from './scorm-support.ts';
 
 export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: () => Promise<void>) => Promise<boolean>; isCurrent: () => boolean; tick: number; author?: boolean}) {
   const [data, setData] = useState<any>(null), [job, setJob] = useState<any>(null), [file, setFile] = useState<File | null>(null);
@@ -106,7 +107,7 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
     {!data?.importsEnabled && <p>Package imports require reviewed loopback development fixtures.</p>}
     {error && <p role="alert">{error}</p>}
     {job && <div role="status">Import: {job.status}{job.error && <p role="alert">{job.error}</p>}{job.warnings?.map((w: string) => <p key={w}>{w}</p>)}</div>}
-    {p.author && <><form onSubmit={e => {void importPackage(e);}}><fieldset disabled={p.busy || !data?.importsEnabled}>
+    {p.author && <><button disabled={p.busy} onClick={() => {void p.run(() => downloadSCORMSupport(p.session, undefined, p.isCurrent));}}>Download tenant SCORM support summary</button><form onSubmit={e => {void importPackage(e);}}><fieldset disabled={p.busy || !data?.importsEnabled}>
       <label>SCORM engine ZIP<input aria-label="SCORM engine ZIP" type="file" accept=".zip,application/zip" required onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
       <label>Content rights and provenance<input aria-label="Content rights and provenance" required maxLength={500} value={provenance} onChange={e => setProvenance(e.target.value)} /></label>
       <label><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />I confirm the rights and will review the exact executable package.</label>
@@ -120,7 +121,7 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
       {data?.runtimeEnabled && row.state === 'published' && <>{!row.playbackSupported && <p>This package requires SCORM features outside the current playback support.</p>}<button disabled={p.busy || !consent || !!launch || !row.playbackSupported} onClick={() => {void play(row);}}>{p.author ? 'Preview engine package' : 'Play or resume engine package'}</button></>}
     </article>)}
     {selectedPackage && <nav aria-label="Practice SCORM activities">{activities.map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available} onClick={() => {void play(selectedPackage, a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>}
-    {launch && <><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{playStatus}</p><button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button><button disabled={p.busy} onClick={() => {void close();}}>Close engine package</button></>}
+    {launch && <><button disabled={p.busy} onClick={() => {void p.run(() => downloadSCORMSupport(p.session, launch.launchId, p.isCurrent));}}>Download SCORM support details</button><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{playStatus}</p><button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button><button disabled={p.busy} onClick={() => {void close();}}>Close engine package</button></>}
     <button disabled={p.busy || offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Previous engine packages</button>
     <button disabled={p.busy || data?.nextOffset == null} onClick={() => setOffset(data.nextOffset)}>Next engine packages</button>
   </section>;

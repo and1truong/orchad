@@ -146,6 +146,9 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   if (!org) invalid('default organization unavailable');
   const organizationId = id(org), title = label(org, ns!);
   const activity = (el: Element): SCORMActivity => {
+    const visibility = el.getAttribute('isvisible');
+    if (visibility !== null && !['true', 'false', '1', '0'].includes(visibility)) invalid('invalid activity visibility');
+    if (visibility === 'false' || visibility === '0') features.add('unsupportedActivityVisibility');
     const aid = id(el), resourceId = el.getAttribute('identifierref') || undefined, parameters = el.getAttribute('parameters') || undefined;
     if (resourceId && !resourceIds.has(resourceId)) invalid('activity references unknown resource');
     if (parameters && (parameters.length > 2048 || /[\u0000-\u001f]/.test(parameters))) invalid('activity parameters quota');

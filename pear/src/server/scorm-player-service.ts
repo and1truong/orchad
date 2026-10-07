@@ -12,6 +12,8 @@ import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
 import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
+import {scormRuntimeStorageBytes} from './scorm-storage.ts';
+import {SCORM_RUNTIME_LIMITS} from '../shared/scorm-operations.ts';
 
 export function scorm12LaunchProfile(manifest: SCORMManifest, scoId?: string) {
   const profiles = scorm12Activities(manifest), profile = scoId ? profiles.find(p => p.activity.id === scoId) : profiles[0];
@@ -26,7 +28,10 @@ function launchProfile(manifest: SCORMManifest, scoId?: string) {
 
 export class SCORMPlayerService {
   readonly store: SCORMEngineStore;
-  constructor(readonly db: DatabaseSync, readonly bindings?: SCORMLearningBindings) {this.store = new SCORMEngineStore(db, bindings ? (p, r) => bindings.guard(p, r) : undefined);}
+  constructor(readonly db: DatabaseSync, readonly bindings?: SCORMLearningBindings, readonly limits: {maxCheckpointReceiptsPerLaunch: number; maxRuntimeStorageBytesPerTenant: number} = SCORM_RUNTIME_LIMITS) {
+    if (Object.values(limits).some(n => !Number.isSafeInteger(n) || n < 1)) throw Error('Positive runtime limits required');
+    this.store = new SCORMEngineStore(db, bindings ? (p, r) => bindings.guard(p, r) : undefined);
+  }
   private transaction<T>(fn: () => T) {this.db.exec('BEGIN IMMEDIATE'); try {const result = fn(); this.db.exec('COMMIT'); return result;} catch(e) {this.db.exec('ROLLBACK'); throw e;}}
   private scos(attemptId: string, tenant: string) {
     return this.db.prepare('SELECT s.* FROM scorm_sco_attempts s WHERE s.attempt_id=? AND s.tenant=? AND s.sco_attempt_number=(SELECT max(n.sco_attempt_number) FROM scorm_sco_attempts n WHERE n.attempt_id=s.attempt_id AND n.sco_id=s.sco_id)').all(attemptId, tenant) as any[];
@@ -54,8 +59,8 @@ export class SCORMPlayerService {
     if (scoId && !reviewed.activities.some(a => a.id === scoId && a.available) || !reviewed.activities.some(a => a.available)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
     const session = this.db.prepare('SELECT * FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(sessionHash, p.id, p.auth_version, Date.now()) as any;
     if (!session) reject('UNAUTHORIZED', 'Current application session required');
-    const registered = this.store.register(p, args, context ? {key: context.bindingKey, attach: id => this.bindings!.attach(p, id, context)} : undefined);
     return this.transaction(() => {
+      const registered = this.store.register(p, args, context ? {key: context.bindingKey, attach: id => this.bindings!.attach(p, id, context)} : undefined);
       const registration = this.store.registration(p, registered.registrationId);
       const rows = this.scos(registered.attemptId, p.tenant), states = activityStates(manifest, rows);
       const overall = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(registered.attemptId, p.tenant) as any;
@@ -88,6 +93,7 @@ export class SCORMPlayerService {
       }
       this.db.prepare('INSERT INTO scorm_engine_launches(id,token_hash,tenant,registration_id,attempt_id,sco_id,session_hash,auth_version,expires,initial_state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id, tokenHash(token), p.tenant, registered.registrationId, registered.attemptId, profile.activity.id, sessionHash, p.auth_version, Math.min(session.expires, now + 60 * 60 * 1000), JSON.stringify(initialState), new Date(now).toISOString());
       this.db.prepare('UPDATE scorm_engine_launches SET sco_attempt_number=? WHERE id=?').run(scoAttempt, id);
+      if (scormRuntimeStorageBytes(this.db, p.tenant) > this.limits.maxRuntimeStorageBytesPerTenant) reject('INVALID_ARGUMENT', 'SCORM runtime storage quota reached; contact a content administrator');
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, 'learning:' + p.tenant + ':' + p.id, 'human_scorm_engine_launch', JSON.stringify({launchId: id, registrationId: registered.registrationId, attemptId: registered.attemptId, scoId: profile.activity.id, mode: args.mode}), new Date(now).toISOString());
       return {...registered, launchId: id, token, title: profile.activity.title, scoId: profile.activity.id, standard: manifest.standard};
     });
@@ -209,6 +215,7 @@ export class SCORMPlayerService {
       const nextScoId = engine && a.finished ? deliveredSCO(engine, manifest)?.activity.id ?? null : null;
       const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine ? {nextScoId: nextScoId !== c.launch.sco_id ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
       this.db.prepare('INSERT INTO scorm_engine_checkpoints VALUES(?,?,?,?)').run(c.launch.id, a.sequence, payloadHash, JSON.stringify(result));
+      if (a.sequence > this.limits.maxCheckpointReceiptsPerLaunch || scormRuntimeStorageBytes(this.db, c.p.tenant) > this.limits.maxRuntimeStorageBytesPerTenant) reject('INVALID_ARGUMENT', 'SCORM runtime storage quota reached; contact a content administrator');
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(c.p.tenant, c.p.id, 'learning:' + c.p.tenant + ':' + c.p.id, 'runtime_scorm_engine_checkpoint', JSON.stringify({launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished}), now);
       return result;
     });

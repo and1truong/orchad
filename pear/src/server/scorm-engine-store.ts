@@ -27,7 +27,8 @@ export class SCORMEngineStore {
   }
 
   register(p: Principal, a: {packageId: string; version: number; mode: 'normal' | 'preview'; confirmed: boolean; revision: number; key: string}, binding?: {key: string; attach: (id: string) => void}) {
-    this.db.exec('BEGIN IMMEDIATE');
+    const nested = this.db.isTransaction;
+    this.db.exec(nested ? 'SAVEPOINT scorm_register' : 'BEGIN IMMEDIATE');
     try {
       this.live(p, a?.mode === 'preview');
       if (!a || Object.keys(a).some(k => !['packageId', 'version', 'mode', 'confirmed', 'revision', 'key'].includes(k)) ||
@@ -42,7 +43,7 @@ export class SCORMEngineStore {
         if (old.payload !== payload) reject('IDEMPOTENCY_CONFLICT', 'SCORM registration request changed');
         const result = JSON.parse(old.result);
         this.registration(p, result.registrationId);
-        this.db.exec('COMMIT');
+        this.db.exec(nested ? 'RELEASE scorm_register' : 'COMMIT');
         return result;
       }
       const pkg = this.db.prepare('SELECT * FROM scorm_engine_versions WHERE package_id=? AND version=? AND tenant=?').get(a.packageId, a.version, p.tenant) as any;
@@ -61,8 +62,8 @@ export class SCORMEngineStore {
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run(doc);
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, doc, 'human_scorm_register', JSON.stringify({packageId: a.packageId, version: a.version, mode: a.mode}), now);
       this.db.prepare('INSERT INTO idempotency VALUES(?,?,?,?,?)').run(p.id, doc, a.key, payload, JSON.stringify(result));
-      this.db.exec('COMMIT');
+      this.db.exec(nested ? 'RELEASE scorm_register' : 'COMMIT');
       return result;
-    } catch (e) { this.db.exec('ROLLBACK'); throw e; }
+    } catch (e) { this.db.exec(nested ? 'ROLLBACK TO scorm_register; RELEASE scorm_register' : 'ROLLBACK'); throw e; }
   }
 }
