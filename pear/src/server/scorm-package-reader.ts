@@ -152,10 +152,18 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   }
   const resourceIds = new Set(resources.map(r => r.id));
   if (!resources.some(r => r.kind === 'sco') || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('SCO or resource dependency missing');
+  const objectiveScope = (organization: Element) => {
+    const qualified = organization.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacy = organization.getAttribute('objectivesGlobalToSystem');
+    if (qualified !== null && legacy !== null && qualified !== legacy) invalid('conflicting objective scope');
+    const value = qualified ?? legacy ?? 'true';
+    if (!['true', 'false', '1', '0'].includes(value)) invalid('invalid objective scope');
+    return value;
+  };
   // Validate extension syntax/references in every organization, not just the
   // selected execution tree. A hidden/unselected branch cannot hide malformed
   // or unsupported ADL semantics behind the selected profile's feature flags.
   for (const el of [...Array.from(root!.getElementsByTagNameNS(ns!, 'organization')), ...Array.from(root!.getElementsByTagNameNS(ns!, 'item'))]) {
+    if (el.localName === 'organization') objectiveScope(el);
     parseSequencing(el, standard, collections);
     if (parsePresentation(el, standard) && !resourceIds.has(el.getAttribute('identifierref') ?? '')) invalid('presentation requires a resource activity');
   }
@@ -205,10 +213,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');
-  const qualifiedGlobal = org.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacyGlobal = org.getAttribute('objectivesGlobalToSystem');
-  if (qualifiedGlobal && legacyGlobal && qualifiedGlobal !== legacyGlobal) invalid('conflicting objective scope');
-  const global = qualifiedGlobal || legacyGlobal || 'true';
-  if (!['true', 'false', '1', '0'].includes(global)) invalid('invalid objective scope');
+  const global = objectiveScope(org);
   // XML ID uniqueness spans the document, including unselected organizations.
   const documentIds = new Set([root!, ...Array.from(root!.getElementsByTagNameNS(ns!, '*'))].map(n => n.getAttribute('identifier')).filter(Boolean));
   if ([...collections.keys()].some(id => documentIds.has(id))) invalid('duplicate sequencing identifier');

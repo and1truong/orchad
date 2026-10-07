@@ -59,6 +59,20 @@ test('ADL extensions reject misplaced, malformed, unknown, duplicate and wrong-e
   await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-3', xml.replace('2004 4th Edition', '2004 3rd Edition').replace('</s:sequencingRules><a:rollupConsiderations', '</s:sequencingRules><a:objectives><a:objective objectiveID="required-intro"><a:mapInfo targetObjectiveID="scores"/></a:objective></a:objectives><a:rollupConsiderations'))), /Unsupported/);
 });
 
+test('objective scope validates every organization, including empty attributes and conflicting namespace values', async () => {
+  for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
+    const xml = adlManifest(edition);
+    for (const attrs of ['a:objectivesGlobalToSystem="maybe"', 'a:objectivesGlobalToSystem=""', 'objectivesGlobalToSystem="maybe"', 'a:objectivesGlobalToSystem="true" objectivesGlobalToSystem="false"']) {
+      const bad = xml.replace('</p:organizations>', `<p:organization identifier="unused" ${attrs}><p:title>Unused</p:title></p:organization></p:organizations>`);
+      await assert.rejects(inspectSCORMPackage(multiFilePackage(edition, bad)), /Invalid SCORM package: (invalid|conflicting) objective scope/);
+    }
+    for (const value of ['true', 'false', '1', '0']) {
+      const valid = xml.replace('</p:organizations>', `<p:organization identifier="unused" a:objectivesGlobalToSystem="${value}"><p:title>Unused</p:title></p:organization></p:organizations>`);
+      assert.equal((await inspectSCORMPackage(multiFilePackage(edition, valid))).manifest.objectivesGlobalToSystem, false);
+    }
+  }
+});
+
 test('ADL collection groups override independently and objective extensions can bind to inline IMS objectives', async () => {
   const xml = collectionManifest().replace('<s:sequencing ID="shared-0">', '<s:sequencing ID="shared-0"><a:rollupConsiderations requiredForCompleted="ifNotSuspended"/>').replace('<s:sequencing IDRef="shared-0"/>', '<s:sequencing IDRef="shared-0"><a:rollupConsiderations requiredForSatisfied="ifAttempted"/></s:sequencing>');
   const tree: Record<string, any> = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', xml))).manifest);
