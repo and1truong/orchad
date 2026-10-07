@@ -1,6 +1,6 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–082. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked logging-only adaptation `pear-no-direct-sequencing-logs-v1` to the exact ESM entry (ADR-082). A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–083. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked logging-only adaptation `pear-no-direct-sequencing-logs-v1` to the exact ESM entry (ADR-082). A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
@@ -12,11 +12,12 @@ Version: epic #133 / ADR-075–082. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | Multi-SCO folders, durable per-SCO resume/history | Tested | Tested profile | Tested profile | Tested profile | Current technical attempt differs from overall attempt and domain retake |
 | Prerequisites / objective gates | AICC expression profile | Sequencing profile | Sequencing profile | Sequencing profile | Direct requests checked server-side; unknown objective state is not silently treated as false |
 | Flow/choice, rules, local objective maps, rollup, attempt limits | AICC profile | Tested profile | Tested profile | Tested profile | Flow-only initial start and ADL-namespaced local maps tested; Commit does not navigate; Terminate/delivery/root rollup remain authoritative (ADR-080/082) |
+| Manifest-local sequencing collections / IDRef | — | Tested profile | Tested profile | Tested profile | Whole XML group replacement, control defaults, objective gates and durable official rollup (ADR-083) |
 | pipwerks licensed wrapper save/resume/finish | Tested | Tested | Tested | Tested | Pinned original wrapper and original course assets; not a commercial authoring export |
 | ADL developer-guide licensed wrapper | — | Unverified | Tested | Unverified | Exact byte-preserved file, CC BY-SA 3.0 notices retained; full Roses/Flash course not bundled |
 | Enrollment/standalone/nested award version/cycle projection | Tested | Tested | Tested | Tested | All required SCO evidence; live authorization, immutable proof/audit/receipt; quiz remains required for course certificate |
 
-Explicitly refused playback profiles: asset activity leaves, nondefault `isvisible`, sequencing collections/references, retry/retryAll rules, duration limits, selection/randomization, ADL presentation/rollup extensions, system-global objective maps, weighted completion and fourth-edition shared data. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
+Explicitly refused playback profiles: asset activity leaves, nondefault `isvisible`, retry/retryAll rules, duration limits, selection/randomization, ADL presentation/rollup extensions, system-global objective maps, weighted completion and fourth-edition shared data. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
 
 | Lane | Observed result | Remaining gate |
 |---|---|---|
@@ -26,6 +27,6 @@ Explicitly refused playback profiles: asset activity leaves, nondefault `isvisib
 | Coconut Tauri / Linux WebKit | PASS: real SCORM Tauri/WebKit, 9/9 checks in run 37594546875 at 41b4fbe14597aa79e976bfc12e645730f26ec946 | Licensed wrapper save/resume/finish, isolation and real external MCP; other OS engines remain open |
 | Coconut Windows/macOS | Unverified | Actual WebView2/WKWebView playback, authority and egress counterexamples |
 | Production / strict all-egress | Disabled | Reviewed credentialless content origin, deployment isolation, native/browser channel policy and negative evidence |
-| Main integration | Pending | Separate #49 owner must land the selected predecessor; preserve dependency/review gates |
+| Main integration S1–S8 | PASS: main `f7d30b45f968dbaf52199cb35021d7aee6cc5600`, tree `159d24bd1178633d82f15cc7ee34bcf89538bf7e`; run 37675973833, 8/8 | Successor semantics require their own integrated acceptance; production/conformance gates remain open |
 
 External gates stay OPEN/BLOCKED: commercial Storyline/Captivate/Rise exports with redistribution rights; authorized Rustici/SCORM Cloud differential account; complete ADL/reference suite and license resolution for legacy ADL Sample RTE. That RTE's root Apache notice conflicts with a legacy CC BY-NC-SA notice and its Windows/Java/Tomcat platform differs from CI. Offline wrapper tests provide explicit equivalent coverage only for API discovery/save/resume/finish, not the whole conformance suite. Never upload learner data or licensed packages to an external engine without independent authorization.
