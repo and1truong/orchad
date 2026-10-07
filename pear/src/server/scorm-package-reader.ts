@@ -192,7 +192,9 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   if (qualifiedGlobal && legacyGlobal && qualifiedGlobal !== legacyGlobal) invalid('conflicting objective scope');
   const global = qualifiedGlobal || legacyGlobal || 'true';
   if (!['true', 'false', '1', '0'].includes(global)) invalid('invalid objective scope');
-  if ([...collections.keys()].some(id => ids.has(id))) invalid('duplicate sequencing identifier');
+  // XML ID uniqueness spans the document, including unselected organizations.
+  const documentIds = new Set([root!, ...Array.from(root!.getElementsByTagNameNS(ns!, '*'))].map(n => n.getAttribute('identifier')).filter(Boolean));
+  if ([...collections.keys()].some(id => documentIds.has(id))) invalid('duplicate sequencing identifier');
   return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global)} : {}), runtimeFeatures: [...features].sort()};
 }
 

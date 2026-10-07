@@ -45,6 +45,8 @@ test('collections reject dangling, chained, duplicate, misplaced and malformed d
     original.replace('IDRef="shared-0"', 'IDRef="missing"'), original.replace('IDRef="shared-0"', 'IDRef=""'),
     original.replace('ID="shared-0"', 'ID="shared-0" IDRef="shared-1"'),
     original.replace('ID="shared-1"', 'ID="shared-0"'), original.replace('ID="shared-0"', 'ID="org"'),
+    original.replace('</p:organizations>', '<p:organization identifier="shared-0"><p:title>Unselected</p:title></p:organization></p:organizations>'),
+    original.replace('</p:organizations>', '<p:organization identifier="unselected"><p:title>Unselected</p:title><p:item identifier="shared-1"><p:title>Collision</p:title></p:item></p:organization></p:organizations>'),
     original.replace('ID="shared-0"', 'ID="bad identifier"'), original.replace('ID="shared-0"', ''),
     original.replace('IDRef="shared-0"', 'ID="inline-id"'),
     original.replace('<s:sequencingCollection>', '<s:sequencingCollection bogus="true">'),
@@ -55,6 +57,19 @@ test('collections reject dangling, chained, duplicate, misplaced and malformed d
   for (const xml of cases) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', xml)), /Unsupported|misplaced|duplicate/);
   const unicode = original.replaceAll('shared-0', 'tập-hợp');
   assert.ok((sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', unicode))).manifest) as Record<string, any>).sequencingControls.flow);
+});
+
+test('an empty inline limitConditions replaces a collected attempt limit with the no-limit default', async () => {
+  const xml = collectionManifest().replace('<s:sequencing ID="shared-1">', '<s:sequencing ID="shared-1"><s:limitConditions attemptLimit="1"/>').replace('<s:sequencing IDRef="shared-1"/>', '<s:sequencing IDRef="shared-1"><s:limitConditions/></s:sequencing>');
+  const tree = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', xml))).manifest);
+  assert.equal(tree.children[0].attemptLimit, undefined);
+  const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+  const engine = sequencingRuntime(tree);
+  assert.equal(engine.getSequencingState()!.rootActivity.children[0].attemptLimit, null);
+  assert.equal(engine.processNavigationRequest('start'), true);
+  engine.Initialize(''); assert.equal(engine.SetValue('adl.nav.request', 'exit'), 'true'); engine.Terminate('');
+  assert.equal(engine.processNavigationRequest('choice', 'intro'), true);
+  assert.equal(engine.getSequencingState()!.currentActivity.attemptCount, 2);
 });
 export function sequenceCheckpoint(f: Awaited<ReturnType<typeof scormLearningFixture>>, launch: ReturnType<typeof f.launch>, values: Record<string, string>, finished = true) {
   const b = f.player.bootstrap(launch.token); let state: any, navigation = '_none_';

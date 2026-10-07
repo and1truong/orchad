@@ -114,7 +114,7 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard) {
       case 'constrainedChoiceConsiderations': out.sequencingControls = {...out.sequencingControls, ...flags(n, ['constrainChoice', 'preventActivation'])}; break;
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
       case 'limitConditions': {
-        attrs(n, ['attemptLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit === undefined || !Number.isInteger(limit)) fail(); out.attemptLimit = limit; break;
+        attrs(n, ['attemptLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;} break;
       }
       case 'sequencingRules': {
         attrs(n, []); out.sequencingRules = {};
