@@ -11,7 +11,7 @@ Version: epic #133 / ADR-075–082. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | Separate completion / success | Combined lesson status | Tested | Tested | Tested | Passed policy requires completed and passed for 2004; preview/practice remains unofficial |
 | Multi-SCO folders, durable per-SCO resume/history | Tested | Tested profile | Tested profile | Tested profile | Current technical attempt differs from overall attempt and domain retake |
 | Prerequisites / objective gates | AICC expression profile | Sequencing profile | Sequencing profile | Sequencing profile | Direct requests checked server-side; unknown objective state is not silently treated as false |
-| Flow/choice, rules, local objective maps, rollup, attempt limits | AICC profile | Tested profile | Tested profile | Tested profile | Commit does not navigate; Terminate/delivery and root rollup are authoritative (ADR-080) |
+| Flow/choice, rules, local objective maps, rollup, attempt limits | AICC profile | Tested profile | Tested profile | Tested profile | Flow-only initial start and ADL-namespaced local maps tested; Commit does not navigate; Terminate/delivery/root rollup remain authoritative (ADR-080/082) |
 | pipwerks licensed wrapper save/resume/finish | Tested | Tested | Tested | Tested | Pinned original wrapper and original course assets; not a commercial authoring export |
 | ADL developer-guide licensed wrapper | — | Unverified | Tested | Unverified | Exact byte-preserved file, CC BY-SA 3.0 notices retained; full Roses/Flash course not bundled |
 | Enrollment/standalone/nested award version/cycle projection | Tested | Tested | Tested | Tested | All required SCO evidence; live authorization, immutable proof/audit/receipt; quiz remains required for course certificate |

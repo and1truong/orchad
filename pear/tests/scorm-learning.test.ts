@@ -193,7 +193,7 @@ test('populated v45 upgrade preserves accepted practice CMI and registration, wi
   const dir = mkdtempSync(join(tmpdir(), 'pear-scorm-v45-')), path = join(dir, 'pear.sqlite'), f = await scormLearningFixture(path);
   const launch = f.launch(undefined, 'intro'); f.checkpoint(launch, 'passed', '90', false);
   const state = f.db.prepare('SELECT runtime_state,revision,reported_seconds FROM scorm_sco_attempts').get(), registrations = f.db.prepare('SELECT * FROM scorm_registrations').all();
-  f.db.exec('DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; ALTER TABLE scorm_sco_attempts DROP COLUMN finished; ALTER TABLE scorm_engine_launches DROP COLUMN sco_attempt_number; DELETE FROM schema_version WHERE version>=46'); f.db.close();
+  f.db.exec('DROP TRIGGER scorm_engine_resource_no_delete; DROP TRIGGER scorm_engine_resource_finalized_insert; DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; ALTER TABLE scorm_sco_attempts DROP COLUMN finished; ALTER TABLE scorm_engine_launches DROP COLUMN sco_attempt_number; DELETE FROM schema_version WHERE version>=46'); f.db.close();
   const reopened = fixture(path);
   try {
     assert.deepEqual(reopened.db.prepare('SELECT runtime_state,revision,reported_seconds FROM scorm_sco_attempts').get(), state);

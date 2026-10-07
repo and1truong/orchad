@@ -44,12 +44,17 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       if (finished) return bad('104');
       if (initialized) return bad('103');
       if (argument !== '') return bad('201');
-      error = null; const result = runtime.Initialize(argument); if (result === 'true') initialized = true; return result;
+      error = null; const result = runtime.Initialize(argument);
+      if (result === 'true') {initialized = true; if (navigation !== '_none_' && runtime.SetValue('adl.nav.request', navigation) !== 'true') return bad('101');}
+      return result;
     },
     GetValue(key: string) {
       const code = inactive('122', '123'); if (code) {bad(code); return '';}
       if (typeof key !== 'string') {bad('201'); return '';}
       if (key.startsWith('adl.data.') || options.edition !== '2004-4' && key.startsWith('adl.nav.request_valid.jump')) {bad('401'); return '';}
+      // ADL navigation is read/write (REQ_47.1); this engine treats the request
+      // as write-only. Expose the validated local request without processing it.
+      if (key === 'adl.nav.request') {error = null; runtime.lastErrorCode = '0'; return navigation;}
       error = null; return runtime.GetValue(key);
     },
     SetValue(key: string, value: string) {

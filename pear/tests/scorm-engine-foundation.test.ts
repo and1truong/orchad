@@ -17,6 +17,9 @@ function engineFixture(path?: string) {
   f.db.prepare('INSERT INTO scorm_engine_packages VALUES(?,?,?,?,?)').run('pkg', 'demo', 'admin', 'Engine fixture', '2026-10-07T00:00:00Z');
   for (const version of [1, 2]) f.db.prepare(`INSERT INTO scorm_engine_versions(package_id,tenant,version,standard,sha256,archive,manifest,state,created_at)
     VALUES('pkg','demo',?,'1.2',?,?,?,'published',?)`).run(version, String(version).repeat(64), Buffer.from('fixture'), JSON.stringify({standard: '1.2'}), '2026-10-07T00:00:00Z');
+  f.db.exec("UPDATE scorm_engine_versions SET state='quarantined' WHERE package_id='pkg'");
+  f.db.prepare('INSERT INTO scorm_engine_resources VALUES(?,?,?,?,?,?)').run('pkg', 1, 'demo', 'sco/index.html', Buffer.from('hello'), 'text/html');
+  f.db.exec("UPDATE scorm_engine_versions SET state='published' WHERE package_id='pkg'");
   const register = (user = 'learner-a', extra: any = {}) => store.register(f.service.principal(user), {
     packageId: 'pkg', version: 1, mode: 'normal', confirmed: true, key: crypto.randomUUID(),
     revision: f.service.context(user, 'learning:demo:' + user).revision, ...extra,
@@ -66,7 +69,7 @@ test('tenant foreign keys and immutable package snapshots reject cross-tenant re
   try {
     assert.throws(() => f.db.prepare('INSERT INTO scorm_registrations(id,tenant,learner,package_id,version,mode,created_at) VALUES(?,?,?,?,?,?,?)').run('bad', 'other', 'outsider', 'pkg', 1, 'normal', 'now'), /FOREIGN KEY/);
     assert.throws(() => f.db.exec("UPDATE scorm_engine_versions SET sha256='x' WHERE package_id='pkg'"), /immutable/);
-    f.db.prepare('INSERT INTO scorm_engine_resources VALUES(?,?,?,?,?,?)').run('pkg', 1, 'demo', 'sco/index.html', Buffer.from('hello'), 'text/html');
+    assert.throws(() => f.db.prepare('INSERT INTO scorm_engine_resources VALUES(?,?,?,?,?,?)').run('pkg', 1, 'demo', 'extra.html', Buffer.from('changed'), 'text/html'), /immutable/);
     assert.throws(() => f.db.exec("UPDATE scorm_engine_resources SET bytes=X'00'"), /immutable/);
     const a = f.register();
     f.db.exec("UPDATE scorm_engine_versions SET state='retired' WHERE package_id='pkg' AND version=1");

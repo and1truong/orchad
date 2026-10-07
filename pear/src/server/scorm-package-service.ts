@@ -113,7 +113,7 @@ export class SCORMPackageService {
 
   list(p: Principal, author = false, offset = 0) {
     this.store.live(p, author);
-    return boundedPage(this.db.prepare(`SELECT p.id,p.title,v.version,v.standard,v.sha256,v.state,v.filename,v.provenance,v.review_reason
+    return boundedPage(this.db.prepare(`SELECT p.id,p.title,v.version,v.standard,v.sha256,v.state,v.filename${author ? ',v.provenance,v.review_reason' : ''}
       FROM scorm_engine_packages p JOIN scorm_engine_versions v ON v.package_id=p.id AND v.tenant=p.tenant
       WHERE p.tenant=? AND (?=1 OR v.state='published') ORDER BY p.created_at DESC,p.id,v.version DESC`).all(p.tenant, author ? 1 : 0), offset, 20);
   }

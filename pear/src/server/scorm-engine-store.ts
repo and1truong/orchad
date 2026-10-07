@@ -43,6 +43,8 @@ export class SCORMEngineStore {
         if (old.payload !== payload) reject('IDEMPOTENCY_CONFLICT', 'SCORM registration request changed');
         const result = JSON.parse(old.result);
         this.registration(p, result.registrationId);
+        const latest = this.db.prepare('SELECT id FROM scorm_engine_attempts WHERE registration_id=? ORDER BY attempt_number DESC LIMIT 1').get(result.registrationId) as any;
+        if (latest?.id !== result.attemptId) reject('STALE_CONTEXT', 'SCORM launch receipt refers to a superseded attempt');
         this.db.exec(nested ? 'RELEASE scorm_register' : 'COMMIT');
         return result;
       }

@@ -74,7 +74,7 @@ function one(parent: Element, name: string, ns: string) {
 function label(parent: Element, ns: string) {const value = one(parent, 'title', ns).textContent?.trim() ?? ''; if (!value || value.length > 500) invalid('bounded title required'); return value;}
 
 /** Resolve local manifest URIs while refusing root escape, scheme and encoded traversal. */
-export function packageURI(base: string, relative: string) {
+export function packageURI(base: string, relative: string, allowRoot = false) {
   if (!relative || /[\\\u0000-\u001f]/.test(relative) || /^[a-z][a-z0-9+.-]*:/i.test(relative) || relative.startsWith('/')) invalid('remote or absolute launch URI unsupported');
   const directory = base.endsWith('/') ? base : base.slice(0, base.lastIndexOf('/') + 1);
   const pathAndSuffix = relative.match(/^([^?#]*)([?#].*)?$/)!;
@@ -87,7 +87,7 @@ export function packageURI(base: string, relative: string) {
     if (part === '..') {if (!parts.length) invalid('resource URI escapes package'); parts.pop();}
     else parts.push(part);
   }
-  const path = packagePath(parts.join('/'));
+  const path = allowRoot && !parts.length ? '' : packagePath(parts.join('/'));
   return {path, suffix: pathAndSuffix[2] ?? ''};
 }
 
@@ -127,7 +127,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   const ids = new Set<string>();
   const id = (el: Element) => {const value = el.getAttribute('identifier') ?? ''; if (!value || value.length > 256 || ids.has(value)) invalid('missing/duplicate/oversized identifier'); ids.add(value); return value;};
   const identifier = id(root!);
-  const localBase = (el: Element, parent: string) => {const value = el.getAttributeNS(XML, 'base'); if (!value) return parent; const uri = packageURI(parent, value); if (uri.suffix) invalid('xml:base cannot contain query or fragment'); return uri.path + (value.endsWith('/') ? '/' : '');};
+  const localBase = (el: Element, parent: string) => {const value = el.getAttributeNS(XML, 'base'); if (!value) return parent; const uri = packageURI(parent, value, true); if (uri.suffix) invalid('xml:base cannot contain query or fragment'); return uri.path + (uri.path && value.endsWith('/') ? '/' : '');};
   const rootBase = localBase(root!, '');
   const resourceRoot = one(root!, 'resources', ns!), resourcesBase = localBase(resourceRoot, rootBase), resources: SCORMResource[] = [];
   for (const el of elements(resourceRoot, 'resource', ns!)) {
@@ -186,7 +186,11 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');
-  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard), objectivesGlobalToSystem: org.getAttribute('objectivesGlobalToSystem') !== 'false'} : {}), runtimeFeatures: [...features].sort()};
+  const qualifiedGlobal = org.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacyGlobal = org.getAttribute('objectivesGlobalToSystem');
+  if (qualifiedGlobal && legacyGlobal && qualifiedGlobal !== legacyGlobal) invalid('conflicting objective scope');
+  const global = qualifiedGlobal || legacyGlobal || 'true';
+  if (!['true', 'false', '1', '0'].includes(global)) invalid('invalid objective scope');
+  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard), objectivesGlobalToSystem: !['false', '0'].includes(global)} : {}), runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {
