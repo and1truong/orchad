@@ -227,6 +227,17 @@ export class LearningService {
     new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
     return e;
   }
+  scormCourseContext(p: Principal, enrollmentId: string, lessonId: string) {
+    this.resourceAccess(p, {requestId: 'scorm', documentId: this.personal(p), toolName: 'human_complete_lesson', arguments: {enrollmentId, lessonId}, expectedRevision: null, idempotencyKey: null});
+    const e = this.enrollment(p, enrollmentId), v = this.version(e.course_id, e.version), l = v.lessons.find(l => l.id === lessonId);
+    new ContentAccess(this.db).current(p, 'course', e.course_id);
+    if (l?.contentRef) new ContentAccess(this.db).current(p, 'item', l.contentRef.itemId);
+    if (!l || l.kind !== 'scorm' || !l.scorm) reject('FORBIDDEN', 'Exact enrolled SCORM lesson required');
+    if (requiredLessonIds(v, l).some(id => !JSON.parse(e.completed_lessons).includes(id))) reject('FORBIDDEN', 'Complete prerequisite lessons first');
+    const award = e.award_binding_id ? this.db.prepare('SELECT award_enrollment_id,criterion_path FROM award_course_bindings WHERE id=?').get(e.award_binding_id) as any : null;
+    return {bindingKey: 'course:' + e.id + ':' + l.id, reference: l.scorm, courseEnrollmentId: e.id, lessonId: l.id,
+      context: {enrollmentId: e.id, courseId: e.course_id, version: e.version, assignmentCycleId: e.assignment_cycle_id ?? null, awardBindingId: e.award_binding_id ?? null, awardEnrollmentId: award?.award_enrollment_id ?? null, criterionPath: award?.criterion_path ?? null, reference: l.scorm}};
+  }
   private attempt(p: Principal, id: string) {
     const a = this.db
       .prepare("SELECT * FROM attempts WHERE id=?")
@@ -552,6 +563,7 @@ export class LearningService {
       ...e,
       completed_lessons: decode(e.completed_lessons),
       certificateId: row?.id ?? null,
+      scormCompletions: this.db.prepare('SELECT b.lesson_id AS lessonId,r.package_id AS packageId,r.version,v.sha256,p.projected_at AS completedAt FROM scorm_completion_proofs p JOIN scorm_learning_bindings b ON b.registration_id=p.registration_id AND b.tenant=p.tenant JOIN scorm_registrations r ON r.id=p.registration_id AND r.tenant=p.tenant JOIN scorm_engine_versions v ON v.package_id=r.package_id AND v.version=r.version AND v.tenant=r.tenant WHERE b.course_enrollment_id=? AND p.tenant=? AND r.learner=?').all(e.id,e.tenant,e.learner),
       overdue:
         e.status !== "completed" &&
         !!e.due_date &&
@@ -729,6 +741,7 @@ export class LearningService {
           id: l.id,courseId:e.course_id,version:e.version,enrollmentId:e.id,
           title: l.title,
           kind: l.kind,
+          ...(source === 'human' && l.scorm ? {scorm: l.scorm} : {}),
           text: l.text,
           submission: source === "human" ? (l.submission ?? null) : null,
           sessions: source === "human" ? (l.sessions?.map(s=>this.blended.learnerSession(e,s)) ?? null) : null,
@@ -877,8 +890,14 @@ export class LearningService {
   }
   private validateMedia(
     p: Principal,
-    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId" | "captions">,
+    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId" | "captions" | "scorm">,
   ) {
+    if (l.kind === 'scorm') {
+      const ref = l.scorm;
+      if (!ref || l.assetId || l.url || l.captions || !this.db.prepare("SELECT 1 FROM scorm_engine_versions WHERE package_id=? AND version=? AND tenant=? AND sha256=? AND state='published'").get(ref.packageId,ref.version,p.tenant,ref.sha256)) reject('INVALID_ARGUMENT','Published exact SCORM package reference required');
+      return;
+    }
+    if (l.scorm) reject('INVALID_ARGUMENT','SCORM reference requires SCORM content');
     if(l.captions){
       if(!["audio","video"].includes(l.kind)||!l.assetId)reject("INVALID_ARGUMENT","Captions require uploaded audio/video");
       if(new Set(l.captions.map(t=>t.language)).size!==l.captions.length)reject("INVALID_ARGUMENT","Use distinct caption languages");
@@ -938,11 +957,6 @@ export class LearningService {
     const c = structuredClone(value) as Course;
     new ContentAccess(this.db).validate(p,c);
     this.validateDiscovery(c.discovery);
-    c.completionPolicy = c.lessons.some((l) =>
-      ["submission", "event"].includes(l.kind),
-    )
-      ? "human_attestation_review_and_quiz"
-      : "human_attestation_and_quiz";
     // Server snapshots the explicitly pinned item version. Caller-supplied text,
     // URL or license flags cannot override the authoritative source item.
     for (const l of c.lessons) {
@@ -956,6 +970,8 @@ export class LearningService {
       l.title = item.title;
       l.text = item.text;
       l.kind = item.kind;
+      delete l.scorm;
+      if (item.scorm) l.scorm = structuredClone(item.scorm);
       delete l.assetId;
       if (item.assetId) l.assetId = item.assetId;
       delete l.captions;
@@ -966,6 +982,11 @@ export class LearningService {
       if (item.transcript) l.transcript = item.transcript;
       c.aiProcessingAllowed = c.aiProcessingAllowed && item.aiProcessingAllowed;
     }
+    c.completionPolicy = c.lessons.some(l => l.kind === 'scorm') ? 'scorm_evidence_and_quiz' : c.lessons.some((l) =>
+      ["submission", "event"].includes(l.kind),
+    )
+      ? "human_attestation_review_and_quiz"
+      : "human_attestation_and_quiz";
     if (
       new Set(c.lessons.map((l) => l.id)).size !== c.lessons.length ||
       new Set(c.quiz.questions.map((q) => q.id)).size !==
@@ -1194,10 +1215,10 @@ export class LearningService {
           v = this.version(e.course_id, e.version),
           l = v.lessons.find((l) => l.id === a.lessonId);
         if (!l) reject("NOT_FOUND", "Lesson unavailable");
-        if (["submission", "event"].includes(l.kind))
+        if (["submission", "event", "scorm"].includes(l.kind))
           reject(
             "FORBIDDEN",
-            "Submission or attendance requires an authorized human review",
+            "Completion requires authorized review or accepted SCORM evidence",
           );
         const completed = decode(e.completed_lessons);
         if (requiredLessonIds(v, l).some((id) => !completed.includes(id)))

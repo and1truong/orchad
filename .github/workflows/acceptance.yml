@@ -112,6 +112,7 @@ jobs:
           BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
           test -n "$BIN"
           xvfb-run -a node scripts/native-pear-acceptance.mjs "$BIN"
+          xvfb-run -a node scripts/native-scorm-acceptance.mjs "$BIN"
   guava:
     runs-on: ubuntu-latest
     steps:
@@ -184,9 +185,11 @@ jobs:
           npm run test:host
           PEAR_E2E_PRODUCTION=1 npm run test:browser-host
           npm run test:lime
+          npm run test:scorm:lime
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          retention-days: 7
           name: pear-browser-evidence
           path: |
             pear/artifacts/

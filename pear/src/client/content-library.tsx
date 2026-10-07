@@ -1,3 +1,4 @@
+import {SCORMReferenceEditor, SCORMLearningPlayer} from './scorm-learning.tsx';
 import {translateUI} from "./i18n.ts";
 import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { StudyTimer } from "./study-timer.tsx";
@@ -158,6 +159,7 @@ export function ContentLibrary({
                   setItem({
                     ...item,
                     kind: e.target.value as ContentItem["kind"],
+                    scorm: undefined,
                     captions: undefined,
                     assetId: undefined,
                     url: undefined,
@@ -170,9 +172,11 @@ export function ContentLibrary({
                 <option value="link">{translateUI("HTTPS link")}</option>
                 <option value="audio">{translateUI("Uploaded audio")}</option>
                 <option value="document">{translateUI("Uploaded PDF")}</option>
+                <option value="scorm">SCORM package</option>
                 <option value="interactive">{translateUI("Interactive HTML")}</option>
               </select>
             </label>
+            {item.kind === 'scorm' && <SCORMReferenceEditor session={session} value={item.scorm} onChange={scorm => setItem({...item, scorm})} />}
             <label>{translateUI("Item text")}<textarea
                 required
                 maxLength={2500}
@@ -254,7 +258,11 @@ export function StandaloneReader({
   onTrack,
   onComplete,
   busy = false,
+  scormRun,
+  onSCORMSaved,
 }: {
+  scormRun?: (fn: () => Promise<void>) => Promise<boolean>;
+  onSCORMSaved?: () => Promise<void>;
   session: Session;
   item: any;
   onClose: () => void;
@@ -279,7 +287,7 @@ export function StandaloneReader({
           {translateUI(item.status === "completed" ? "Reading confirmed" : "Tracked · In progress")}
         </p>
       )}
-      {item.itemEnrollmentId && item.status !== "completed" && onComplete && (
+      {item.kind !== "scorm" && item.itemEnrollmentId && item.status !== "completed" && onComplete && (
         <fieldset disabled={busy}>
           <legend>{translateUI("Confirm reading")}</legend>
           <label className="choice">
@@ -291,6 +299,7 @@ export function StandaloneReader({
           <button disabled={!confirmed} onClick={onComplete}>{translateUI("Confirm standalone reading")}</button>
         </fieldset>
       )}
+      {item.kind === 'scorm' && item.itemEnrollmentId && scormRun && onSCORMSaved && <SCORMLearningPlayer key={item.itemEnrollmentId} session={session} binding={{itemEnrollmentId: item.itemEnrollmentId}} busy={busy} run={scormRun} onSaved={onSCORMSaved} />}
       <UploadedMedia
         session={session}
         content={item}

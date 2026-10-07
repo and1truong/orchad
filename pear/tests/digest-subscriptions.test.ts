@@ -1,3 +1,4 @@
+import {CURRENT_SCHEMA_VERSION} from "../src/server/database.ts";
 import {mkdtempSync,rmSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -128,6 +129,6 @@ test("actual SQLite close/reopen retains reviewed schedule, original approval re
   assert.deepEqual(f.db.prepare("SELECT * FROM digest_notifications").all(),notifications);
   assert.deepEqual(f.db.prepare("SELECT * FROM audit WHERE tool='digest_in_app_delivery'").all(),audit);
   assert.equal(f.service.context("learner-a").revision,revision);
-  assert.equal(f.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,42);
+  assert.equal(f.db.prepare("SELECT MAX(version) AS n FROM schema_version").get()!.n,CURRENT_SCHEMA_VERSION);
  }finally{f.db.close();rmSync(dir,{recursive:true,force:true});}
 });

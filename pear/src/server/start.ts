@@ -19,7 +19,8 @@ const db = openDatabase(
   developmentAuth,
 );
 const oidc:OIDCConfig|undefined=process.env.PEAR_OIDC_CONFIG?JSON.parse(process.env.PEAR_OIDC_CONFIG):undefined;
-const { app, service, outbox } = await createApp({
+const scormOrigin = process.env.PEAR_SCORM_CONTENT_ORIGIN;
+const { app, service, outbox, scormContentApp } = await createApp({
   db,
   origin,
   dev,
@@ -31,7 +32,13 @@ const { app, service, outbox } = await createApp({
   xapiEnabled: process.env.PEAR_XAPI_ENABLED === "true",
   scimEnabled: process.env.PEAR_SCIM_ENABLED === "true",
   secureCookies: process.env.COOKIE_SECURE === "true",
+  scormContent: scormOrigin ? {origin: scormOrigin, runtimeBundle: readFileSync(new URL('../../dist/scorm/runtime.js', import.meta.url))} : undefined,
 });
+if (scormContentApp && scormOrigin) {
+  if (!["127.0.0.1", "localhost", "::1"].includes(host)) throw Error('SCORM fixture player must bind loopback');
+  const contentURL = new URL(scormOrigin);
+  await scormContentApp.listen({port: Number(contentURL.port || 80), host});
+}
 await app.listen({ port, host });
 const assignmentTimer = setInterval(() => {
   try {

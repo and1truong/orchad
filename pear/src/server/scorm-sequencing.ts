@@ -1,0 +1,51 @@
+import type {SCORMActivity, SCORMManifest} from '../shared/scorm-engine.ts';
+import {playbackActivities} from './scorm-activities.ts';
+import {sequencingRuntime, navigationTarget} from '../shared/scorm-sequencing-runtime.ts';
+import {SCORM_ENGINE} from '../shared/scorm-engine.ts';
+import {reject} from './errors.ts';
+
+export function sequencingTree(manifest: SCORMManifest) {
+  playbackActivities(manifest);
+  const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, children: a.children.map(node), ...(a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
+  const tree = {id: manifest.organizationId, title: manifest.title, ...manifest.sequencing, children: manifest.activities.map(node)};
+  const inspect = (n: Record<string, any>) => {
+    const objectives = [...(n.objectives ?? []), ...(n.primaryObjective ? [n.primaryObjective] : [])];
+    // Global-to-system objective persistence must not silently become registration-local.
+    if (manifest.objectivesGlobalToSystem && objectives.some(o => o.mapInfo?.length)) reject('INVALID_ARGUMENT', 'System-global objective maps require a separately authorized persistence policy');
+    const ids = new Set(objectives.map(o => o.objectiveID));
+    for (const rules of Object.values(n.sequencingRules ?? {}) as any[][]) for (const rule of rules) for (const c of rule.conditions) if (c.referencedObjective && !ids.has(c.referencedObjective)) reject('INVALID_ARGUMENT', 'Sequencing rule references an unknown local objective');
+    (n.children ?? []).forEach(inspect);
+  }; inspect(tree); return tree;
+}
+export function trustedSequencing(manifest: SCORMManifest, persisted: string, scope: {attemptId: string; sha256: string}) {
+  const tree = sequencingTree(manifest), envelope = JSON.parse(persisted);
+  if (Object.keys(envelope).length && (envelope.attemptId !== scope.attemptId || envelope.sha256 !== scope.sha256 || envelope.standard !== manifest.standard || envelope.engine?.version !== SCORM_ENGINE.version || typeof envelope.snapshot !== 'string')) reject('FORBIDDEN', 'SCORM sequencing snapshot identity changed');
+  return sequencingRuntime(tree, envelope.snapshot);
+}
+export function saveSequencing(runtime: ReturnType<typeof sequencingRuntime>, manifest: SCORMManifest, scope: {attemptId: string; sha256: string}) {
+  const snapshot = runtime.serializeSequencingState(); if (Buffer.byteLength(snapshot) > 1024 * 1024) reject('INVALID_ARGUMENT', 'Sequencing snapshot quota exceeded');
+  return JSON.stringify({...scope, standard: manifest.standard, engine: SCORM_ENGINE, snapshot});
+}
+export function deliveredSCO(runtime: ReturnType<typeof sequencingRuntime>, manifest: SCORMManifest) {
+  const id = runtime.getSequencingState()?.currentActivity?.id;
+  return playbackActivities(manifest).find(p => p.activity.id === id);
+}
+export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifest: SCORMManifest, scoId?: string) {
+  if (scoId && !playbackActivities(manifest).some(p => p.activity.id === scoId)) reject('FORBIDDEN', 'Exact sequencing SCO required');
+  let current = deliveredSCO(runtime, manifest);
+  const activity = runtime.getSequencingState()?.currentActivity;
+  if (!current || !activity?.isActive) {
+    const suspended = JSON.parse(runtime.serializeSequencingState()).sequencing?.suspendedActivity;
+    if (suspended && scoId && suspended !== scoId) reject('FORBIDDEN', 'Resume the suspended SCO before selecting another');
+    let ok = runtime.processNavigationRequest(suspended ? 'resumeAll' : !current ? 'start' : 'choice', scoId ?? playbackActivities(manifest)[0].activity.id);
+    if (ok && !suspended && !current && scoId && deliveredSCO(runtime, manifest)?.activity.id !== scoId) ok = runtime.processNavigationRequest('choice', scoId);
+    if (!ok) reject('FORBIDDEN', 'Sequencing denies activity delivery'); current = deliveredSCO(runtime, manifest);
+  } else if (scoId && scoId !== current.activity.id) {
+    if (!runtime.processNavigationRequest('choice', scoId)) reject('FORBIDDEN', 'Sequencing denies choice'); current = deliveredSCO(runtime, manifest);
+  }
+  if (!current || scoId && current.activity.id !== scoId) reject('FORBIDDEN', 'Sequencing did not deliver the requested SCO');
+  return current;
+}
+export function usesSequencing(manifest: SCORMManifest) {
+  return manifest.standard !== '1.2' && (!!manifest.sequencing || playbackActivities(manifest).length > 1 || playbackActivities(manifest).some(p => p.activity.sequencing || p.ancestors.some(a => a.sequencing)));
+}

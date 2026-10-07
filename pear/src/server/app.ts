@@ -1,3 +1,8 @@
+import {SCORMPackageService} from "./scorm-package-service.ts";
+import {registerSCORMEngine} from "./scorm-engine-routes.ts";
+import {SCORMLearningBindings} from './scorm-learning-bindings.ts';
+import {SCORMPlayerService} from "./scorm-player-service.ts";
+import {createSCORMContentHost, contentHostOrigins} from "./scorm-content-host.ts";
 import {reportPDF} from "./report-pdf.ts";
 import {reportSchema} from "../shared/reports.ts";
 import {transcriptPDF} from "./transcript-pdf.ts";
@@ -47,11 +52,18 @@ export async function createApp(opts: {
   catalogAdapters?: ProviderAdapter[];
   catalogFixture?: boolean;
   certificateFont?:Buffer;
+  scormContent?: {origin: string; runtimeBundle: Buffer};
 }) {
   let certificateFontBytes=opts.certificateFont;
   if(!certificateFontBytes&&opts.developmentAuth){try{certificateFontBytes=readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");}catch{}}
   const certificateFont=certificateFontBytes?new CertificateFont(certificateFontBytes):undefined;
   const parsed = new URL(opts.origin);
+  const scormEnabled = !!opts.identityFixture || !!opts.developmentAuth && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+  if (opts.scormContent && !scormEnabled) throw Error("SCORM player requires reviewed loopback development fixtures");
+  const scormOrigins = opts.scormContent ? contentHostOrigins(opts.origin, opts.scormContent.origin) : undefined;
+  const learningService = new LearningService(opts.db,opts.origin,opts.catalogAdapters);
+  const scormPlayer = opts.scormContent ? new SCORMPlayerService(opts.db, new SCORMLearningBindings(opts.db, learningService)) : undefined;
+  const scormContentApp = scormOrigins && scormPlayer ? createSCORMContentHost({pearOrigin: opts.origin, contentOrigin: scormOrigins.contentOrigin, player: scormPlayer, runtimeBundle: opts.scormContent!.runtimeBundle}) : undefined;
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
     throw new Error("APP_ORIGIN must be an exact origin");
   if (opts.secureCookies && parsed.protocol !== "https:")
@@ -78,7 +90,7 @@ export async function createApp(opts: {
     },
   });
   await app.register(cookie);
-  const service = new LearningService(opts.db,opts.origin,opts.catalogAdapters),
+  const service = learningService,
     name = opts.secureCookies ? "__Host-pear-session" : "pear-session";
   const launchSecret = randomBytes(32);
   const loginBudget = new Map<
@@ -108,7 +120,7 @@ export async function createApp(opts: {
         "Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https: blob:; connect-src 'self'" +
           (opts.dev ? " ws:" : "") +
-          "; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          "; frame-src 'self'" + (scormOrigins ? " " + scormOrigins.contentOrigin : "") + "; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
     if (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))) reply.header("Cache-Control", reply.getHeader("Cache-Control")==="private, no-store"?"private, no-store":"no-store");
   });
@@ -584,6 +596,8 @@ export async function createApp(opts: {
     try{return reply.header("Cache-Control","no-store").header("Referrer-Policy","no-referrer").redirect(service.providerCatalog.launch(service.principal((req as any).session.principal),(req.params as any).id));}catch(e){return mediaFailure(e,reply);}
   });
   await registerProviderCatalog(app,providerCatalog,opts.origin,!!opts.catalogAdapters?.length);
+  await registerSCORMEngine(app,new SCORMPackageService(opts.db),scormEnabled,req=>service.principal(req.session.principal),scormOrigins && scormPlayer ? {player: scormPlayer, contentOrigin: scormOrigins.contentOrigin} : undefined);
+  if (scormContentApp) app.addHook('onClose', async () => {await scormContentApp.close();});
   await registerSCORM(app,service.scorm,opts.origin,!!opts.developmentAuth||!!opts.identityFixture,req=>service.principal(req.session.principal));
   await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
   registerTranslations(app,service.translations,req=>service.principal(req.session.principal));
@@ -620,5 +634,5 @@ export async function createApp(opts: {
       );
     }
   }
-  return { app, service, outbox, providerCatalog };
+  return { app, service, outbox, providerCatalog, scormContentApp };
 }

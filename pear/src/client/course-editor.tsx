@@ -1,3 +1,4 @@
+import type {Session} from './api.ts';
 import {QuizPreview} from "./quiz-preview.tsx";
 import {translateUI} from "./i18n.ts";
 import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
@@ -58,12 +59,14 @@ export function newCourse(): Course {
 const freshId = (prefix: string) =>
   prefix + "-" + crypto.randomUUID().slice(0, 8);
 export function CourseEditor({
+  session,
   selection,
   reusableItems,
   busy,
   onSave,
   onNew,
 }: {
+  session: Session;
   selection: DraftSelection;
   reusableItems: ReusableItem[];
   busy: boolean;
@@ -303,6 +306,7 @@ export function CourseEditor({
                           delete next.url;
                           delete next.assetId;
                           if (content.assetId) next.assetId = content.assetId;
+                          delete next.scorm;
                           delete next.captions;
                           if(content.captions)next.captions=structuredClone(content.captions);
                           delete next.transcript;
@@ -366,6 +370,7 @@ export function CourseEditor({
                       onChange={(e) =>
                         updateLesson(l.id, (next) => {
                           next.kind = e.target.value as Lesson["kind"];
+                          delete next.scorm;
                           delete next.captions;
                           delete next.assetId;
                           delete next.url;
@@ -387,6 +392,7 @@ export function CourseEditor({
                       <option value="video">{translateUI("HTTPS video")}</option>
                       <option value="link">{translateUI("HTTPS link")}</option>
                       <option value="submission">{translateUI("Assignment submission")}</option>
+                      <option value="scorm">SCORM package</option>
                       <option value="event">{translateUI("Instructor-led event")}</option>
                       {["audio", "document", "interactive"].includes(
                         l.kind,
@@ -396,6 +402,7 @@ export function CourseEditor({
                     </select>
                   </label>
                   <LessonSettings
+                    session={session}
                     lesson={l}
                     onChange={(patch) =>
                       updateLesson(l.id, (next) => Object.assign(next, patch))

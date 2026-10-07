@@ -33,7 +33,9 @@ export interface Principal {
   auth_version: number;
 }
 export interface CaptionTrack { assetId:string; language:"en"|"vi"; label:string; }
+export interface SCORMReference {packageId: string; version: number; sha256: string; completion: 'completed_or_passed' | 'passed'; minimumScore?: number;}
 export interface Lesson {
+  scorm?: SCORMReference;
   captions?: CaptionTrack[];
   id: string;
   title: string;
@@ -45,6 +47,7 @@ export interface Lesson {
     | "audio"
     | "document"
     | "interactive"
+    | "scorm"
     | "submission"
     | "event";
   assetId?: string;
@@ -56,6 +59,7 @@ export interface Lesson {
   contentRef?: { itemId: string; version: number };
 }
 export interface ContentItem {
+  scorm?: SCORMReference;
   access?: "tenant" | "author" | "groups";
   groupIds?: string[];
   captions?: CaptionTrack[];
@@ -114,7 +118,8 @@ export interface Course {
   license: "self-authored";
   completionPolicy:
     | "human_attestation_and_quiz"
-    | "human_attestation_review_and_quiz";
+    | "human_attestation_review_and_quiz"
+    | "scorm_evidence_and_quiz";
   lessons: Lesson[];
   modules?: CourseModule[];
   quiz: {
