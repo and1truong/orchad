@@ -236,7 +236,7 @@ export async function openRunner(
               };
             const result = await live.dispatch(envelope, attempt, ctx);
             if (result.ok && typeof result.revision === "number")
-              revisionByTarget.set(envelope.targetId, result.revision);
+              revisionByTarget.set(envelope.targetId, Math.max(revisionByTarget.get(envelope.targetId) ?? -1, result.revision));
             return result;
           },
         }),
@@ -427,6 +427,9 @@ export async function openRunner(
     async submit({ prompt, requestId }) {
       const rid = requestId ?? crypto.randomUUID();
       await harness.commit(async (tx) => {
+        const ops = await tx.doc(OpsDoc, root.id);
+        if(Object.values(ops.ops).some(op=>op.envelope.idempotencyKey!==null&&(op.status==="ambiguous"||op.status==="interrupted")))
+          throw new Error("[NEEDS_RECONCILIATION] Resolve the original mutation outcome before submitting another durable request");
         const c = await tx.doc(ControlDoc, root.id);
         c.cancelledAt = null;
         return undefined;

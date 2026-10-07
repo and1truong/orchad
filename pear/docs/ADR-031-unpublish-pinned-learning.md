@@ -1,0 +1,9 @@
+# ADR-031: Withdraw publication without rewriting learning
+Status: implemented; exact-head CI pending.
+Courses, standalone items, playlists and awards have explicit destructive unpublish operations for existing content-author roles. Unpublish accepts only currently published resources and changes state to draft without deleting versions, licenses, publications, learner records, grades or certificates. New discovery, enrollment, assignment and published references use existing availability gates; already enrolled learners retain immutable versions and may continue.
+Republish creates the next immutable version. Retire remains distinct. No automatic cancellation of obligations or revocation of earned completion is implied.
+Existing live role/tenant/collection-owner checks run before idempotency, then CAS, domain mutation, workspace revision, audit and keyed result commit atomically. An exact retry returns its historical result without withdrawing a subsequent publication; consumers refresh current state before another decision.
+Migration 023 records minimal unpublish lifecycle facts for the transactional outbox. Author-only collection facts remain suppressed. Existing subscribers do not opt into new topics automatically.
+Human authoring surfaces expose unpublish controls in course, reusable item and program rows. The learner and agent channels cannot confirm official assessment answers.
+Evidence: dedicated domain tests cover discovery, enrollment/reference/assignment denial, pinned reading/award completion, republish/version preservation, roles/tenant guesses, CAS, exact retry after republish, live revocation and audit rollback; actual browser course withdrawal covers human controls and persisted pinned learner access.
+This closes internal unpublish semantics, not commercial entitlement revocation, complete course/item access-scope parity or third-party provider lifecycle reconciliation.

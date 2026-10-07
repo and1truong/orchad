@@ -1,0 +1,13 @@
+# ADR 038: scoped immutable question banks
+
+G06 gains reusable self-authored question banks with bounded immutable versions. A bank contains up to 40 validated objective/long-answer questions within 32 KiB. A course explicitly selects one version and 1–8 distinct question IDs; the existing 16 KiB quiz and 44 KiB resolved-course budgets remain unchanged. There is no unreviewed random sampling or raised Bridge cap.
+
+Only content administrators/administrators receive bank tools. Original owner or administrator may publish/retire a bank; tenant banks are readable/applicable by other authorized authors. Author banks require the same owned author-only course audience. Both current audience and selected immutable bank-version audience are checked before replay; private questions cannot be applied to a wider course through a bank reference. Administrative human review is explicit. Model-prohibited bank bodies are withheld from Bridge reads and their policy propagates into the applied course. Source-course capture checks authoritative questions, audience and processing policy server-side.
+
+Application changes only an authorized course draft. Exact bank/version/question IDs are stored with the copied question snapshot. Publication validates provenance equality; the human editor disables manual edits until explicit detachment. Pass score, retry and shuffle/release settings remain course-owned. Updating/retiring a bank never changes published course snapshots, active attempts, grading, progress or certificates. Retired banks deny new draft applications/publications until detached or an available version is chosen.
+
+Live author scope precedes idempotency replay. CAS, bank versions, course draft, audit/key/revision commit with the existing domain transaction. Authored answer keys/bodies are omitted from bank audit metadata. Atomic failures preserve the old bank/draft. Bank/source/version metadata is bounded; learners, managers and scoped assessors have no question-bank solution endpoint.
+
+Validation authored: four domain/actual HTTP regressions cover pinned actual grading across bank updates/retirement, privacy/processing policy, explicit detachment, source-course capture, owner/channel/tenant scope, live key replay revocation, semantic invalid questions/selections, CAS/conflicts and audit rollback. One browser journey covers actual bank capture, audience selection, selected questions, draft review/publication, retained learner pins, retirement, manual detachment and Vietnamese labels. Exact-head CI pending.
+
+Full completed-learning retake/reset and exact reference migration semantics remain open. This is a bounded Pear question-bank profile, not a claim of all reference assessment-bank behavior.

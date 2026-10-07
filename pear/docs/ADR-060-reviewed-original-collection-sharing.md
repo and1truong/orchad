@@ -1,0 +1,7 @@
+# Reviewed original collection configuration sharing
+
+Source tenant administrator explicitly offers one immutable published original collection configuration to an active named administrator in another tenant. Addressed receiving administrator reviews its literal rules and independently maps every content reference to an authorized local published version. Acceptance creates only an author-private draft. No provider media, content license, learner/assessment history, audience group, assessor delegation or publication is copied.
+
+Current source administrator/collection authority, addressed receiver role and every destination reference/version are checked before receipts and inside atomic transaction. Own incoming/outgoing pages withhold definition/reference metadata after cancellation, expiry, source revocation or acceptance; accepted local drafts remain independently governed. Twenty-four-hour offers, 500-offer quota per source administrator, 64 distinct reference mappings, existing canonical caps and version CAS bound operations. Counterpart library revisions and redacted audit share the transaction.
+
+Original bounded two-admin configuration workflow. Provider catalogue/resource sharing, live partner portal compatibility, automatic crossportal user synchronization, invitations/messages, retention administration and deployment remain open. No actual production tenant data sent during development.

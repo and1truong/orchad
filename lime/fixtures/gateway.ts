@@ -15,7 +15,8 @@ export async function startMockGateway(
     arguments: '{"amount":1}',
   },
 ) {
-  let calls = 0;
+  let calls = 0,requestCount=0;
+  const requests:any[]=[];
   const server = createServer(async (req, res) => {
     if (req.url === "/health") {
       res.setHeader("Content-Type", "application/json");
@@ -36,6 +37,7 @@ export async function startMockGateway(
         let raw = "";
         for await (const part of req) raw += part;
         const body = JSON.parse(raw || "{}");
+        requestCount++;requests.push(structuredClone(body));if(requests.length>32)requests.shift();
         const last = (body.messages ?? []).at(-1);
         res.writeHead(200, { "Content-Type": "text/event-stream" });
         if (last?.role === "tool") {
@@ -67,6 +69,8 @@ export async function startMockGateway(
   );
   return {
     port: (server.address() as { port: number }).port,
+    requests,
+    get requestCount(){return requestCount;},
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }

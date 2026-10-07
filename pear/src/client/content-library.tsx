@@ -1,0 +1,318 @@
+import {translateUI} from "./i18n.ts";
+import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
+import { StudyTimer } from "./study-timer.tsx";
+import { UploadField, UploadedMedia } from "./media.tsx";
+import type { Session } from "./api.ts";
+import {CaptionEditor} from "./caption-editor.tsx";
+import React, { useState } from "react";
+import type { ContentItem } from "../shared/model.ts";
+export interface ContentDraft {
+  id: string;
+  state: string;
+  latest_version: number;
+  draft: ContentItem;
+  published: ContentItem | null;
+}
+const emptyItem = (): ContentItem => ({
+  title: "",
+  summary: "",
+  language: "en",
+  provider: "Pear Originals",
+  license: "self-authored",
+  aiProcessingAllowed: true,
+  kind: "text",
+  text: "",
+});
+export function ContentLibrary({
+  session,
+  items,
+  busy,
+  onSave,
+  onAction,
+  offset,
+  nextOffset,
+  onPage,
+}: {
+  session: Session;
+  items: ContentDraft[];
+  busy: boolean;
+  onSave: (id: string, item: ContentItem, exists: boolean) => Promise<boolean>;
+  onAction: (name: string, id: string) => void;
+  offset: number;
+  nextOffset: number | null;
+  onPage: (offset: number) => void;
+}) {
+  const [editing, setEditing] = useState(false),
+    [id, setId] = useState("");
+  const [item, setItem] = useState<ContentItem>(emptyItem);
+  return (
+    <section className="panel" aria-label={translateUI("Reusable content library")}>
+      <h2>{translateUI("Standalone content library")}</h2>
+      <p className="muted">
+        Self-authored text, video, audio, document, interactive HTML or link.
+        Publish exact reusable versions; source edits never rewrite enrolled
+        courses. Standalone reading has no completion or certificate.
+      </p>
+      {items.map((row) => (
+        <section className="learning-row" key={row.id}>
+          <div>
+            <h3>{row.draft.title}</h3>
+            <p>
+              {row.id} · {row.state} · Published version {row.latest_version}
+            </p>
+          </div>
+          <div className="actions">
+            <button
+              className="ghost"
+              disabled={busy}
+              onClick={() => {
+                setEditing(true);
+                setId(row.id);
+                setItem(structuredClone(row.draft));
+              }}
+            >{translateUI("Edit item draft")}</button>
+            <button
+              disabled={busy}
+              onClick={() => onAction("learning_publish_content_item", row.id)}
+            >{translateUI("Publish item")}</button>
+            <button className="ghost" disabled={busy || row.state !== "published"} onClick={() => onAction("learning_unpublish_content_item", row.id)}>{translateUI("Unpublish item")}</button>
+            <button
+              className="ghost"
+              disabled={busy || row.state === "retired"}
+              onClick={() => onAction("learning_retire_content_item", row.id)}
+            >{translateUI("Retire item")}</button>
+          </div>
+        </section>
+      ))}
+      <div className="actions">
+        <button
+          className="ghost"
+          disabled={offset === 0 || busy}
+          onClick={() => onPage(Math.max(0, offset - 20))}
+        >{translateUI("Previous items")}</button>
+        <button
+          className="ghost"
+          disabled={nextOffset === null || busy}
+          onClick={() => onPage(nextOffset!)}
+        >{translateUI("Next items")}</button>
+      </div>
+      <h3>{editing ? "Edit standalone draft" : "Create standalone item"}</h3>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void onSave(id, item, editing).then((saved) => {
+            if (saved) setEditing(true);
+          });
+        }}
+      >
+        <fieldset disabled={busy}>
+          <legend>{translateUI("Item content and permissions")}</legend>
+          <div className="editor">
+            <label>{translateUI("Item ID")}<input
+                required
+                maxLength={64}
+                disabled={editing}
+                value={id}
+                onChange={(e) => setId(e.target.value)}
+              />
+            </label>
+            <label>{translateUI("Item title")}<input
+                required
+                maxLength={160}
+                value={item.title}
+                onChange={(e) => setItem({ ...item, title: e.target.value })}
+              />
+            </label>
+            <label>{translateUI("Item summary")}<textarea
+                required
+                maxLength={600}
+                value={item.summary}
+                onChange={(e) => setItem({ ...item, summary: e.target.value })}
+              />
+            </label>
+            <DiscoveryMetadataEditor value={item.discovery} onChange={value=>setItem(current=>{if(value)return {...current,discovery:value};const {discovery,...rest}=current;return rest;})} />
+            <label>{translateUI("Item language")}<select
+                value={item.language}
+                onChange={(e) =>
+                  setItem({
+                    ...item,
+                    language: e.target.value as ContentItem["language"],
+                  })
+                }
+              >
+                <option value="en">{translateUI("English")}</option>
+                <option value="vi">{translateUI("Tiếng Việt")}</option>
+              </select>
+            </label>
+            <label>{translateUI("Item provider")}<input
+                required
+                maxLength={100}
+                value={item.provider}
+                onChange={(e) => setItem({ ...item, provider: e.target.value })}
+              />
+            </label>
+            <label>{translateUI("Item format")}<select
+                aria-label={translateUI("Item format")}
+                value={item.kind}
+                onChange={(e) =>
+                  setItem({
+                    ...item,
+                    kind: e.target.value as ContentItem["kind"],
+                    captions: undefined,
+                    assetId: undefined,
+                    url: undefined,
+                    transcript: undefined,
+                  })
+                }
+              >
+                <option value="text">{translateUI("Text")}</option>
+                <option value="video">{translateUI("HTTPS video")}</option>
+                <option value="link">{translateUI("HTTPS link")}</option>
+                <option value="audio">{translateUI("Uploaded audio")}</option>
+                <option value="document">{translateUI("Uploaded PDF")}</option>
+                <option value="interactive">{translateUI("Interactive HTML")}</option>
+              </select>
+            </label>
+            <label>{translateUI("Item text")}<textarea
+                required
+                maxLength={2500}
+                value={item.text}
+                onChange={(e) => setItem({ ...item, text: e.target.value })}
+              />
+            </label>
+            {["audio", "video", "document", "interactive"].includes(
+              item.kind,
+            ) && (
+              <>
+                <UploadField
+                  key={item.kind}
+                  session={session}
+                  kind={item.kind}
+                  onUploaded={(assetId) =>
+                    setItem((current) => ({ ...current, assetId }))
+                  }
+                />
+                {item.assetId && <p>{translateUI("Stored asset:")}{" "}{item.assetId}</p>}
+              </>
+            )}
+            {["audio","video"].includes(item.kind)&&item.assetId&&<CaptionEditor session={session} tracks={item.captions} onChange={captions=>setItem(current=>{
+              const next={...current};if(captions)next.captions=captions;else delete next.captions;return next;
+            })}/>}
+            {["video", "link"].includes(item.kind) && !item.assetId && (
+              <label>{translateUI("Item HTTPS URL")}<input
+                  required
+                  type="url"
+                  maxLength={2048}
+                  value={item.url ?? ""}
+                  onChange={(e) => setItem({ ...item, url: e.target.value })}
+                />
+              </label>
+            )}
+            {["video", "audio", "interactive"].includes(item.kind) && (
+              <label>{translateUI("Item transcript")}<textarea
+                  required
+                  maxLength={2500}
+                  value={item.transcript ?? ""}
+                  onChange={(e) =>
+                    setItem({ ...item, transcript: e.target.value })
+                  }
+                />
+              </label>
+            )}
+            <label>{translateUI("Content audience")}<select aria-label={translateUI("Content audience")} value={item.access??"tenant"} onChange={e=>{const access=e.target.value as "tenant"|"author"|"groups",next={...item,access};if(access==="groups")next.groupIds=next.groupIds??[];else delete next.groupIds;setItem(next);}}><option value="tenant">{translateUI("Organization")}</option><option value="author">{translateUI("Author only")}</option><option value="groups">{translateUI("Selected groups")}</option></select></label>
+            {item.access==="groups"&&<label>{translateUI("Audience group IDs")}<input aria-label={translateUI("Audience group IDs")} maxLength={520} value={(item.groupIds??[]).join(",")} onChange={e=>setItem({...item,groupIds:e.target.value.split(",").map(id=>id.trim()).filter(Boolean)})}/><span>{translateUI("Use one to eight existing group IDs. Current members of any selected group can access the content; membership changes revoke access without deleting history.")}</span></label>}
+            <label className="choice">
+              <input
+                type="checkbox"
+                checked={item.aiProcessingAllowed}
+                onChange={(e) =>
+                  setItem({ ...item, aiProcessingAllowed: e.target.checked })
+                }
+              />{translateUI("Allow model processing of this self-authored item")}</label>
+          </div>
+        </fieldset>
+        <div className="actions">
+          <button disabled={busy}>{translateUI("Save item draft")}</button>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              setId("");
+              setEditing(false);
+              setItem(emptyItem());
+            }}
+          >{translateUI("New item")}</button>
+        </div>
+      </form>
+    </section>
+  );
+}
+export function StandaloneReader({
+  session,
+  item,
+  onClose,
+  onTrack,
+  onComplete,
+  busy = false,
+}: {
+  session: Session;
+  item: any;
+  onClose: () => void;
+  onTrack?: () => void;
+  onComplete?: () => void;
+  busy?: boolean;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <section className="panel" aria-label={translateUI("Standalone item reader")}>
+      <h2>{item.title}</h2>
+      <p>{translateUI("Standalone item · Version")}{" "}{item.version} · No course progress or
+        certificate
+      </p>
+      <p className="lesson-text">{item.text}</p>
+      {item.itemEnrollmentId && <StudyTimer key={session.sessionEpoch+item.itemEnrollmentId} session={session} kind="item" targetId={item.itemEnrollmentId} busy={busy} />}
+      {!item.itemEnrollmentId && onTrack && (
+        <button disabled={busy} onClick={onTrack}>{translateUI("Track this standalone version")}</button>
+      )}
+      {item.itemEnrollmentId && (
+        <p>
+          {translateUI(item.status === "completed" ? "Reading confirmed" : "Tracked · In progress")}
+        </p>
+      )}
+      {item.itemEnrollmentId && item.status !== "completed" && onComplete && (
+        <fieldset disabled={busy}>
+          <legend>{translateUI("Confirm reading")}</legend>
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />{translateUI("I confirm I have studied this standalone version.")}</label>
+          <button disabled={!confirmed} onClick={onComplete}>{translateUI("Confirm standalone reading")}</button>
+        </fieldset>
+      )}
+      <UploadedMedia
+        session={session}
+        content={item}
+        context={
+          item.itemEnrollmentId
+            ? { itemEnrollmentId: item.itemEnrollmentId }
+            : { itemId: item.id, version: item.version }
+        }
+      />
+      {item.kind === "video" && !item.assetId && (
+        <video controls preload="none" src={item.url} aria-label={item.title} />
+      )}
+      {item.kind === "link" && (
+        <a href={item.url} target="_blank" rel="noopener noreferrer">{translateUI("Open content link")}</a>
+      )}
+      {item.transcript && (
+        <details>
+          <summary>{translateUI("Transcript")}</summary>
+          <p className="lesson-text">{item.transcript}</p>
+        </details>
+      )}
+      <button className="ghost" disabled={busy} onClick={onClose}>{translateUI("Close item")}</button>
+    </section>
+  );
+}

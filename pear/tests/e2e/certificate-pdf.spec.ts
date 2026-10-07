@@ -1,0 +1,17 @@
+import {test,expect} from "@playwright/test";
+import {readFileSync} from "node:fs";
+import {execFileSync} from "node:child_process";
+import {fixture,data} from "../helpers.ts";
+import {courses} from "../../src/server/seed.ts";
+import {createApp} from "../../src/server/app.ts";
+import {resolve} from "node:path";
+test("own actual PDF download preserves original Vietnamese title and certificate ledger, EN/VI control and binary cookie authorization",async({page})=>{
+ test.setTimeout(90000);const f=fixture(),origin="http://127.0.0.1:4371",course={...structuredClone(courses["learning-vi"]),title:"Chứng nhận học tập gốc"},font=readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");
+ f.db.prepare("UPDATE accounts SET name='Nguyễn Trường' WHERE id='learner-a'").run();data(f.call("editor","learning_create_course",{courseId:"ui-pdf-course",course}));data(f.call("editor","learning_publish_course",{courseId:"ui-pdf-course"}));const e=data(f.call("learner-a","learning_enroll",{courseId:"ui-pdf-course"}));for(const l of course.lessons)data(f.call("learner-a","human_complete_lesson",{enrollmentId:e.enrollmentId,lessonId:l.id},"human"));const at=data(f.call("learner-a","learning_start_attempt",{enrollmentId:e.enrollmentId}));for(const q of course.quiz.questions)data(f.call("learner-a","human_save_answer",{attemptId:at.attemptId,questionId:q.id,answer:q.correct},"human"));data(f.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human"));const before=f.db.prepare("SELECT * FROM certificates").all(),attempts=f.db.prepare("SELECT * FROM attempts").all();
+ const {app}=await createApp({db:f.db,origin,developmentAuth:true,certificateFont:font,staticRoot:resolve("dist")});
+ try{
+  await app.listen({port:4371,host:"127.0.0.1"});await page.goto(origin);await page.getByLabel("Account",{exact:true}).fill("learner-a");await page.getByLabel("Password",{exact:true}).fill("learner-a-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();await expect(page.getByRole("button",{name:"Sign out",exact:true})).toBeVisible();await page.getByRole("button",{name:"My learning",exact:true}).click();await page.getByRole("button",{name:"Certificate",exact:true}).click();
+  const certificate=page.getByRole("region",{name:"Completion certificate",exact:true});await expect(certificate).toContainText("Nguyễn Trường");const download=page.waitForEvent("download");await certificate.getByRole("button",{name:"Download certificate PDF",exact:true}).click();const file=await download;expect(file.suggestedFilename()).toMatch(/\.pdf$/);const path=await file.path();expect(path).toBeTruthy();const bytes=readFileSync(path!),text=execFileSync("pdftotext",["-","-"],{input:bytes,encoding:"utf8"});expect(text).toContain("Nguyễn Trường");expect(text).toContain(course.title);expect(text).toContain("Not accredited");expect(f.db.prepare("SELECT * FROM certificates").all()).toEqual(before);expect(f.db.prepare("SELECT * FROM attempts").all()).toEqual(attempts);
+  await page.getByLabel("Interface language",{exact:true}).selectOption("vi");await expect(certificate.getByRole("button",{name:"Tải PDF chứng chỉ",exact:true})).toBeVisible();await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:"artifacts/server-original-certificate-pdf.png",fullPage:true});
+ }finally{await page.close();app.server.closeAllConnections();await app.close();f.db.close();}
+});

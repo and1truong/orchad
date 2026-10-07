@@ -1,0 +1,85 @@
+import {test} from "node:test";
+import assert from "node:assert/strict";
+import {mkdtempSync,rmSync,readFileSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
+import {courseRestartFixture} from "./course-restart-fixture.ts";
+import {fixture,data} from "./helpers.ts";
+const setup=(mode="objective",options:any={})=>courseRestartFixture(mode,":memory:","cycle",options);
+const offer=(f:ReturnType<typeof setup>)=>data(f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:f.e.enrollmentId,targetVersion:2,mode:"fresh_course",previousReviewId:null,confirmed:true},"human"));
+const accept=(f:ReturnType<typeof setup>,id:string)=>f.call("learner-a","human_accept_assigned_quiz_restart",{reviewId:id,targetVersion:2,mode:"fresh_course",confirmed:true},"human");
+function pending(f:ReturnType<typeof setup>,id:string){return {requestId:"cycle-original",documentId:f.service.personal(f.service.principal("learner-a")),toolName:"human_accept_assigned_quiz_restart",arguments:{reviewId:id,targetVersion:2,mode:"fresh_course",confirmed:true},expectedRevision:f.service.context("learner-a").revision,idempotencyKey:"cycle-original-key"};}
+test("real scheduler course cycle review changes only this learner delivery, preserves due/assigner/failed history and keeps future cycles on original version",()=>{
+ const f=setup("objective",{repeatDays:1});try{
+  const cycles=JSON.stringify(f.db.prepare("SELECT * FROM assignment_cycles").all()),plan=f.db.prepare("SELECT * FROM assignment_plans").get(),old=f.db.prepare("SELECT * FROM enrollments WHERE id=?").get(f.e.enrollmentId)!,prior=f.db.prepare("SELECT * FROM attempts WHERE id=?").get(f.at.attemptId),review=offer(f);
+  const shown=data(f.call("learner-a","human_get_assigned_quiz_review",{sourceEnrollmentId:f.e.enrollmentId},"human"));assert.equal(shown.cycle.originalTargetVersion,1);assert.equal(shown.mode,"fresh_course");
+  const call=pending(f,review.reviewId),result=f.service.invoke("learner-a",call,"human"),next=data(result),row=f.db.prepare("SELECT * FROM enrollments WHERE id=?").get(next.enrollmentId)!;
+  assert.deepEqual(f.service.invoke("learner-a",call,"human"),result);assert.equal(accept(f,review.reviewId).ok,false);assert.equal(row.assignment_cycle_id,old.assignment_cycle_id);assert.equal(row.due_date,old.due_date);assert.equal(row.assigned_by,old.assigned_by);assert.equal(row.completed_lessons,"[]");assert.equal(row.version,2);assert.equal(row.status,"in_progress");
+  const d=f.db.prepare("SELECT * FROM assignment_deliveries WHERE cycle_id=? AND learner='learner-a'").get(row.assignment_cycle_id)!;assert.equal(d.enrollment_id,row.id);assert.equal(d.review_id,review.reviewId);assert.equal(d.original_enrollment_id,old.id);assert.equal(d.state,"active");assert.equal(JSON.stringify(f.db.prepare("SELECT * FROM assignment_cycles").all()),cycles);assert.deepEqual(f.db.prepare("SELECT * FROM assignment_plans").get(),plan);assert.deepEqual(f.db.prepare("SELECT * FROM attempts WHERE id=?").get(f.at.attemptId),prior);
+  f.service.assignments.runBackground("2026-10-02T10:00:00.000Z");const future=f.db.prepare("SELECT e.* FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id JOIN enrollments e ON e.id=d.enrollment_id WHERE c.run_at='2026-10-02T10:00:00.000Z'").get()!;assert.equal(future.version,1);assert.equal(future.completed_lessons,"[]");assert.equal(future.retake_of,null);assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(old.id)!.assignment_state,"withdrawn");assert.deepEqual(f.db.prepare("PRAGMA foreign_key_check").all(),[]);
+ }finally{f.db.close();}
+});
+test("live dynamic membership gates review before scheduler; leave/rejoin touches only current delivery, cancellation keeps archived ancestor withdrawn and blocks original receipt",()=>{
+ const f=setup();try{
+  const group=(members:string[])=>({name:"Original dynamic cycle",kind:"static",memberIds:members,mode:"ALL",rules:[]});data(f.call("admin","learning_save_group",{groupId:"cycle-group",group:group(["learner-a"])}));
+  const plan=JSON.parse(String(f.db.prepare("SELECT definition FROM assignment_plans").get()!.definition));data(f.call("manager","learning_save_assignment_plan",{planId:"fresh-plan",plan:{...plan,audienceKind:"group",learnerIds:[],groupId:"cycle-group",membership:"dynamic"},reason:"Reviewed dynamic future policy"}));
+  // The existing cycle retains its frozen policy; create a distinct dynamic occurrence through actual scheduler.
+  const dynamic={...plan,audienceKind:"group",learnerIds:[],groupId:"cycle-group",membership:"dynamic",startsAt:"2026-10-02T10:00:00.000Z"};data(f.call("manager","learning_save_assignment_plan",{planId:"dynamic-plan",plan:dynamic,reason:"Original dynamic root cycle"}));f.service.assignments.runBackground(dynamic.startsAt);
+  const src=f.db.prepare("SELECT e.id FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id JOIN enrollments e ON e.id=d.enrollment_id WHERE c.plan_id='dynamic-plan'").get()!; // This occurrence is already latest v2; publish an original v3.
+  const newer={...f.next,title:"Original cycle v3"};data(f.call("editor","learning_update_course",{courseId:"fresh-course",course:newer}));data(f.call("editor","learning_publish_course",{courseId:"fresh-course"}));
+  const review=data(f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:src.id,targetVersion:3,mode:"fresh_course",confirmed:true},"human")),call={...pending(f,review.reviewId),arguments:{reviewId:review.reviewId,targetVersion:3,mode:"fresh_course",confirmed:true}},result=f.service.invoke("learner-a",call,"human"),next=data(result);
+  data(f.call("admin","learning_save_group",{groupId:"cycle-group",group:group([])}));assert.equal(f.service.invoke("learner-a",call,"human").ok,false);f.service.assignments.runBackground("2026-10-03T10:00:00.000Z");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"withdrawn");
+  data(f.call("admin","learning_save_group",{groupId:"cycle-group",group:group(["learner-a"])}));f.service.assignments.runBackground("2026-10-03T10:00:00.000Z");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"active");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(src.id)!.assignment_state,"withdrawn");
+  data(f.call("manager","learning_set_assignment_plan_state",{planId:"dynamic-plan",state:"cancelled",reason:"Original cancellation"}));assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"cancelled");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(src.id)!.assignment_state,"withdrawn");assert.equal(f.service.invoke("learner-a",call,"human").ok,false);
+ }finally{f.db.close();}
+});
+test("closed plan retains current obligation; completing reviewed successor emits one completion notification for that cycle without reviving its ancestor",()=>{
+ const f=setup();try{
+  const review=offer(f);data(f.call("manager","learning_set_assignment_plan_state",{planId:"fresh-plan",state:"closed",reason:"Stop future occurrences"}));const next=data(accept(f,review.reviewId));for(const l of f.next.lessons)data(f.call("learner-a","human_complete_lesson",{enrollmentId:next.enrollmentId,lessonId:l.id},"human"));
+  const at=data(f.call("learner-a","learning_start_attempt",{enrollmentId:next.enrollmentId}));for(const q of f.next.quiz.questions)data(f.call("learner-a","human_save_answer",{attemptId:at.attemptId,questionId:q.id,answer:q.correct},"human"));data(f.call("learner-a","human_submit_attempt",{attemptId:at.attemptId,confirmed:true},"human"));
+  f.service.assignments.refreshCompletionNotifications("demo","learner-a");f.service.assignments.refreshCompletionNotifications("demo","learner-a");const old=f.db.prepare("SELECT * FROM enrollments WHERE id=?").get(f.e.enrollmentId)!;assert.equal(old.assignment_state,"withdrawn");assert.equal(old.completed_at,null);assert.equal(f.db.prepare("SELECT state FROM assignment_deliveries WHERE enrollment_id=?").get(next.enrollmentId)!.state,"completed");assert.equal(f.db.prepare("SELECT count(*) n FROM learning_notifications WHERE cycle_id=? AND kind='completed'").get(old.assignment_cycle_id)!.n,1);
+ }finally{f.db.close();}
+});
+test("pending essay, live coordinator loss, blocked/cancelled plans and wrong mode fail before any new successor or replay",()=>{
+ const f=setup("essay");try{
+  assert.equal(f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:f.e.enrollmentId,targetVersion:2,mode:"fresh_course",confirmed:true},"human").ok,false);data(f.call("assessor","human_assess_answer",{attemptId:f.at.attemptId,questionId:"essay",points:0,reason:"Resolved original cycle reasoning"},"human"));const review=offer(f);
+  assert.equal(f.call("learner-a","human_accept_assigned_quiz_restart",{reviewId:review.reviewId,targetVersion:2,confirmed:true},"human").ok,false);
+  f.db.prepare("UPDATE accounts SET manager_id=NULL WHERE id='learner-a'").run();assert.equal(accept(f,review.reviewId).ok,false);f.db.prepare("UPDATE accounts SET manager_id='manager' WHERE id='learner-a'").run();
+  f.db.prepare("UPDATE assignment_plans SET state='blocked' WHERE id='fresh-plan'").run();assert.equal(accept(f,review.reviewId).ok,false);assert.equal(f.db.prepare("SELECT count(*) n FROM enrollments WHERE retake_of=?").get(f.e.enrollmentId)!.n,0);f.db.prepare("UPDATE assignment_plans SET state='active' WHERE id='fresh-plan'").run();assert.equal(accept(f,review.reviewId).ok,true);
+ }finally{f.db.close();}
+});
+test("cycle delivery pointer, review, source, both revisions and receipt roll back together on audit failure",()=>{
+ const f=setup();try{
+  const review=offer(f),before=JSON.stringify({d:f.db.prepare("SELECT * FROM assignment_deliveries").all(),e:f.db.prepare("SELECT * FROM enrollments").all(),r:f.db.prepare("SELECT * FROM workspaces").all(),keys:f.db.prepare("SELECT * FROM idempotency").all()});f.db.exec("CREATE TRIGGER reject_cycle_restart BEFORE INSERT ON audit WHEN NEW.tool='human_accept_assigned_quiz_restart' BEGIN SELECT RAISE(ABORT,'cycle restart fixture'); END;");
+  assert.equal(accept(f,review.reviewId).ok,false);assert.equal(JSON.stringify({d:f.db.prepare("SELECT * FROM assignment_deliveries").all(),e:f.db.prepare("SELECT * FROM enrollments").all(),r:f.db.prepare("SELECT * FROM workspaces").all(),keys:f.db.prepare("SELECT * FROM idempotency").all()}),before);assert.equal(f.db.prepare("SELECT state FROM assigned_quiz_reviews WHERE id=?").get(review.reviewId)!.state,"pending");
+ }finally{f.db.close();}
+});
+test("actual 039 to 040 migration preserves nonempty cycle delivery, pinned progress and foreign keys across reopen",()=>{
+ const dir=mkdtempSync(join(tmpdir(),"pear-cycle-review-")),path=join(dir,"db.sqlite"),f=courseRestartFixture("objective",path,"cycle");let reopened:ReturnType<typeof fixture>|null=null;try{
+  const delivery=f.db.prepare("SELECT cycle_id,learner,enrollment_id,award_enrollment_id,state,delivered_at FROM assignment_deliveries").get()!,old=f.db.prepare("SELECT * FROM enrollments").all();
+  f.db.exec("ALTER TABLE assignment_deliveries DROP COLUMN review_id; ALTER TABLE assignment_deliveries DROP COLUMN original_enrollment_id; DROP INDEX enrollment_cycle; CREATE UNIQUE INDEX enrollment_cycle ON enrollments(learner,assignment_cycle_id,course_id) WHERE assignment_cycle_id IS NOT NULL; DELETE FROM schema_version WHERE version=40");f.db.close();reopened=fixture(path);
+  assert.deepEqual(reopened.db.prepare("SELECT cycle_id,learner,enrollment_id,award_enrollment_id,state,delivered_at FROM assignment_deliveries").get(),delivery);assert.deepEqual(reopened.db.prepare("SELECT * FROM enrollments").all(),old);assert.equal(reopened.db.prepare("SELECT review_id,original_enrollment_id FROM assignment_deliveries").get()!.review_id,null);assert.deepEqual(reopened.db.prepare("PRAGMA foreign_key_check").all(),[]);
+ }finally{if(reopened)reopened.db.close();else f.db.close();rmSync(dir,{recursive:true,force:true});}
+});
+
+test("objective-only cycle option keeps identical lessons and rejects agent writes; award-cycle child is excluded from root review",()=>{
+ const f=setup();try{
+  const compatible={...f.value,quiz:{...f.value.quiz,passScore:0}};data(f.call("editor","learning_update_course",{courseId:"fresh-course",course:compatible}));data(f.call("editor","learning_publish_course",{courseId:"fresh-course"}));
+  const args={sourceEnrollmentId:f.e.enrollmentId,targetVersion:3,confirmed:true};assert.equal(f.call("manager","human_offer_assigned_quiz_restart",args).ok,false);const review=data(f.call("manager","human_offer_assigned_quiz_restart",args,"human")),next=data(f.call("learner-a","human_accept_assigned_quiz_restart",{reviewId:review.reviewId,targetVersion:3,confirmed:true},"human"));assert.equal(f.db.prepare("SELECT completed_lessons FROM enrollments WHERE id=?").get(next.enrollmentId)!.completed_lessons,JSON.stringify(f.value.lessons.map((l:any)=>l.id)));
+  const award={title:"Original cycle award",summary:"Original own rules",access:"tenant",unit:"credits",target:1,ongoing:false,moderatedExternal:false,requirements:[{id:"course",title:"Original course",required:true,credits:1,alternatives:[{kind:"course",id:"fresh-course"}]}]};data(f.call("editor","learning_save_award",{collectionId:"cycle-award",award}));data(f.call("editor","learning_publish_collection",{collectionId:"cycle-award"}));
+  const plan={title:"Original award cycle",targetKind:"award",targetId:"cycle-award",audienceKind:"individuals",learnerIds:["learner-a"],groupId:"",membership:"fixed",startsAt:"2026-10-03T10:00:00.000Z",repeatDays:0,endAt:null,dueKind:"none",fixedDueAt:null,rollingDays:0};data(f.call("manager","learning_save_assignment_plan",{planId:"award-plan",plan,reason:"Original award review"}));f.service.assignments.runBackground(plan.startsAt);
+  const root=f.db.prepare("SELECT award_enrollment_id FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id WHERE c.plan_id='award-plan'").get()!,child=data(f.call("learner-a","learning_enroll_award_course",{awardEnrollmentId:root.award_enrollment_id,courseId:"fresh-course"}));assert.equal(f.call("manager","human_get_assigned_quiz_review",{sourceEnrollmentId:child.enrollmentId},"human").ok,false);const learning=data(f.call("learner-a","learning_get_my_learning"));assert.equal(learning.enrollments.find((e:any)=>e.id===child.enrollmentId).cycleCourseReviewable,false);
+ }finally{f.db.close();}
+});
+
+test("reconciliation checks the reviewed delivery pinned audience even when original cycle and latest published version are tenant-visible",()=>{
+ const f=setup();try{
+  const group=(ids:string[])=>({name:"Original reviewed-version access",kind:"static",memberIds:ids,mode:"ALL",rules:[]});data(f.call("admin","learning_save_group",{groupId:"reviewed-access",group:group(["manager","learner-a"])}));
+  const restricted={...f.next,title:"Original reviewed restricted v3",access:"groups",groupIds:["reviewed-access"]};data(f.call("editor","learning_update_course",{courseId:"fresh-course",course:restricted}));data(f.call("editor","learning_publish_course",{courseId:"fresh-course"}));
+  const review=data(f.call("manager","human_offer_assigned_quiz_restart",{sourceEnrollmentId:f.e.enrollmentId,targetVersion:3,mode:"fresh_course",confirmed:true},"human")),next=data(f.call("learner-a","human_accept_assigned_quiz_restart",{reviewId:review.reviewId,targetVersion:3,mode:"fresh_course",confirmed:true},"human"));
+  data(f.call("editor","learning_update_course",{courseId:"fresh-course",course:{...f.next,title:"Original tenant-visible v4"}}));data(f.call("editor","learning_publish_course",{courseId:"fresh-course"}));
+  data(f.call("admin","learning_save_group",{groupId:"reviewed-access",group:group(["manager"])}));f.service.assignments.runBackground("2026-10-02T10:00:00.000Z");
+  assert.equal(f.db.prepare("SELECT state FROM assignment_deliveries WHERE enrollment_id=?").get(next.enrollmentId)!.state,"withdrawn");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"withdrawn");assert.equal(f.call("learner-a","learning_get_lesson",{enrollmentId:next.enrollmentId,lessonId:f.value.lessons[0].id}).ok,false);assert.equal(f.db.prepare("SELECT target_version FROM assignment_cycles").get()!.target_version,1);
+  data(f.call("admin","learning_save_group",{groupId:"reviewed-access",group:group(["manager","learner-a"])}));f.service.assignments.runBackground("2026-10-02T10:00:00.000Z");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(next.enrollmentId)!.assignment_state,"active");assert.equal(f.db.prepare("SELECT assignment_state FROM enrollments WHERE id=?").get(f.e.enrollmentId)!.assignment_state,"withdrawn");
+ }finally{f.db.close();}
+});

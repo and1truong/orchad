@@ -1,0 +1,9 @@
+# ADR-020: Explicit EN/VI interface text and preserved source identity
+
+Interface locale is independent from declared content language and profile preferences. The human locale selector rerenders existing React components and updates document language without remounting the workspace or clearing unsaved forms. A browser-local preference persists across reload; unavailable storage falls back safely. Server principals, Bridge document/epoch/CAS, tool names, enum values, IDs and authored titles/bodies/comments are never translated.
+
+UI strings use explicit translateUI calls and an English-keyed Vietnamese dictionary. No DOM rewriting, automatic replacement of arbitrary data or machine translation is used. Static labels/accessible names across learner, authoring, programs, people, assignment, feedback, media and report surfaces are included, with explicit handling for discovery helpers, report headers and role option labels. Options retain original backend values. Recommendation reasons translate known UI prefixes while preserving declared interests.
+
+Report date formatting uses the selected interface locale while retaining its existing UTC boundary; CSV and backend timestamps remain canonical. Unknown UI/diagnostic/provider text falls back to the original rather than inventing a translation. This layer does not claim provider content language coverage, translated course variants, exhaustive server-diagnostic localization or professional linguistic/accessibility certification. Those remain explicit G16 gaps.
+
+Validation: unit fixtures cover locale fallback, source declaration preservation and UTC formatting. A real browser journey switches EN/VI and back with an unsaved draft, checks unchanged bridge identity/revision, reload persistence and unmodified original course titles. Full existing English browser and native acceptance remains required.

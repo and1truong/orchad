@@ -1,3 +1,4 @@
+import {learningInstructions,learningWorkflows,workflowLabels,type LearningWorkflow} from "../host/learning-workflows.js";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./sidepanel.css";
@@ -34,6 +35,18 @@ import {
   type DurableStatus,
   type Paired,
 } from "./companion-transport.js";
+const durableGuidance:Record<string,string>={
+ running:"Work is in progress. Wait or cancel; sending the same mutation again can create another operation.",
+ queued:"Your request is queued. Do not submit a duplicate request while it waits.",
+ waiting_for_host:"Reconnect the same app, account and workspace. Pin the current target and renew consent before resuming.",
+ waiting_for_consent:"Review the live target and exact mutation arguments. Approval authorizes only that operation; restored conversation history does not restore consent.",
+ needs_reconciliation:"A mutation outcome is unknown. Reconnect and reconcile the original operation. Read the app's authoritative records before deciding whether it applied; do not create a replacement operation key.",
+ blocked_incompatible:"This saved conversation cannot run with this runtime. Keep its data and use a reviewed compatible recovery; do not reset it to guess the outcome.",
+ completed:"The assistant turn finished. Confirm learning, scores, attendance and certificates from the app's records.",
+ failed:"The assistant stopped with an error. A dispatched mutation may still have committed; reconcile its original outcome before retrying.",
+ cancelled:"Assistant work was cancelled. Previously committed app changes remain; cancellation does not undo them.",
+ idle:"No request is running. Review the current app records before choosing the next step."
+};
 function App() {
   const [status, setStatus] = useState("disconnected"),
     [bridgeStatus, setBridgeStatus] = useState("disconnected"),
@@ -47,6 +60,7 @@ function App() {
     [token, setToken] = useState(""),
     [models, setModels] = useState<string[]>([]),
     [model, setModel] = useState(""),
+    [learningWorkflow,setLearningWorkflow]=useState<LearningWorkflow>("general"),
     [prompt, setPrompt] = useState('/tool demo_increment {"amount":1}'),
     [text, setText] = useState(""),
     [activity, setActivity] = useState<string[]>([]),
@@ -75,6 +89,7 @@ function App() {
     // model and tools — every approved app turn fails before the gateway).
     runTurnRef = useRef(runTurn),
     history = useRef<Message[]>([]),
+    workflowGeneration=useRef(0),
     externalPolicies = useRef(new Map<string, HostPolicy>()),
     transport = useRef<CompanionTransport | null>(null);
   runTurnRef.current = runTurn;
@@ -98,6 +113,7 @@ function App() {
       return yes;
     });
   const clearConsent = () => {
+    workflowGeneration.current++;
     history.current = [];
     session.current.abort();
     run.current?.abort();
@@ -372,7 +388,7 @@ function App() {
   ): Promise<{ ok: boolean; text?: string; error?: string }> {
     if (!policy.current || !adapter.current || runningRef.current)
       return { ok: false, error: "unavailable or busy" };
-    const p = policy.current;
+    const p = policy.current,capturedGeneration=workflowGeneration.current;
     runningRef.current = true;
     setRunning(true);
     setStatus("connecting");
@@ -384,12 +400,15 @@ function App() {
     try {
       const context = await p.context(signal);
       if (!context.ok) throw context;
+      if(capturedGeneration!==workflowGeneration.current||signal.aborted)return {ok:false,error:"workflow cancelled"};
       // CAS discipline: stamp the revision the agent was actually shown, and
       // advance it only from tool results — never silently re-read, or a
       // concurrent edit gets a mutation formed against unseen state.
       let revision = (context.data as { revision: number }).revision;
       // Re-supply bounded context every turn: revision/summary/selection can
       // change between messages (selection changes do not bump revision).
+      const guide=learningInstructions(p.consent.target.appId,learningWorkflow,tools);
+      if(guide&&!history.current.some(m=>m.role==="system"))history.current.unshift({role:"system",content:guide});
       history.current.push({
         role: "user",
         content:
@@ -429,11 +448,13 @@ function App() {
           return result as unknown as ClientResult;
         },
         onEvent: (e) => {
+          if(capturedGeneration!==workflowGeneration.current)return;
           if (e.type === "text_delta")
             setText((x) => x + String(e.payload.text));
           else log(e.type + " " + JSON.stringify(e.payload));
         },
       });
+      if(capturedGeneration!==workflowGeneration.current)return {ok:false,error:"workflow cancelled"};
       history.current = result.messages;
       setStatus(
         result.finishReason === "cancelled"
@@ -670,6 +691,7 @@ function App() {
           </p>
           {dStatus && (
             <div className="pin">
+              <p role="status" aria-label="Durable recovery guidance">{durableGuidance[dStatus.phase]??"Refresh the current run status before continuing."}</p>
               phase: <b>{dStatus.phase}</b>
               {dStatus.reason ? ` · ${dStatus.reason}` : ""}
               <br />
@@ -700,7 +722,7 @@ function App() {
             rows={2}
           />
           <button
-            disabled={!dPrompt}
+            disabled={!dPrompt||dStatus?.ops.some(o=>o.status==="ambiguous"||o.status==="interrupted")}
             onClick={() =>
               void durableOp("submit", {
                 prompt: dPrompt,
@@ -753,6 +775,7 @@ function App() {
                 <p>
                   Resolve {o.toolName} ({o.status})
                 </p>
+                <p>Choose a verdict only after checking the authoritative app outcome. This decision does not apply, undo or grade learning.</p>
                 <button
                   onClick={() =>
                     void durableOp("resolve", {
@@ -796,6 +819,12 @@ function App() {
       )}
       <section>
         <h2>Chat</h2>
+        {target?.appId==="orchard-pear"&&<fieldset>
+          <legend>Learning assistance</legend>
+          <label>Learning workflow<select disabled={running} aria-label="Learning workflow" value={learningWorkflow} onChange={e=>{workflowGeneration.current++;history.current=[];setText("");setLearningWorkflow(e.target.value as LearningWorkflow);}}>
+          {learningWorkflows.map(mode=><option key={mode} value={mode}>{workflowLabels[mode]}</option>)}</select></label>
+          {learningWorkflow==="practice"&&<><p>Optional AI practice · unofficial. Questions use only permitted lesson text. Skip at any time; official learning stays unchanged.</p><button className="secondary" onClick={()=>{workflowGeneration.current++;run.current?.abort();history.current=[];setText("");setLearningWorkflow("general");setStatus("practice skipped");}}>Skip practice</button></>}
+        </fieldset>}
         <div className="transcript">{text || "No messages yet."}</div>
         <textarea
           aria-label="Message"

@@ -1,0 +1,10 @@
+# ADR-049: Reviewed quiz capacity, attempts and results
+Epic #49 G06/G12/G16. Source review 2026-10-06: https://help.go1.com/en/articles/16936766-create-and-edit-quizzes
+
+The current guide establishes configurable attempts, result messages and wider quizzes. Pear now accepts 1–50 original questions, a 0–100 pass threshold, finite limits up to 1000 or an explicit unlimited configuration, and optional literal pass/fail messages. Banks and explicit pinned selections also support 50 questions. Existing versions/attempts remain immutable.
+
+The configured unlimited flag removes the quiz business limit, not storage safeguards: a separate visible operational quota is 2500 attempts per enrollment. Pending manual review still prevents another attempt and unlimited mode never releases an “all attempts exhausted” answer key. The optional after_submission policy releases objective keys only after final grading and only in the human player; pending manual submissions remain withheld. Result messages follow final grading, use text rendering and stay outside learner bridge context. Zero threshold never bypasses prerequisites, required answers, human submission or manual assessment.
+
+The 16 KiB quiz, 32 KiB combined response/bank, 44 KiB course and canonical 64 KiB envelope budgets remain unchanged. Fifty large questions can fail the existing byte budget; failure is explicit and atomic. Whole source/question IDs and provenance are preserved; no truncation or placeholder scoring. Existing weighting is a Pear policy, not an assertion of identical reference weighting.
+
+Four domain/actual HTTP regressions and one EN/VI mobile human author/learner/browser regression authored; exact-head CI pending. Includes bank selection of 50, zero threshold, finite versus unlimited, operational quota, manual pending, key/message egress, rollback and literal HTML-looking text. Guide settings not yet equivalent include multiple-correct MCQ/option feedback, per-question correct-before-continuing, incorrect-only retries, dropdown blanks, interactive author preview and explicit latest-quiz migration decisions. These remain OPEN; no full G06 or epic closure follows.

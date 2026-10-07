@@ -18,6 +18,7 @@ import {connect} from 'node:net';
 import {readFile,access} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {smokeLines} from './smoke-lines.mjs';
 
 const coconutRoot=fileURLToPath(new URL('..',import.meta.url));
 const TRUSTED='http://127.0.0.1:4310';        // must match trusted-origin.txt
@@ -36,7 +37,8 @@ const bin=process.argv[2]??`${coconutRoot}/src-tauri/target/debug/coconut`;
 await access(bin);
 const child=spawn(bin,[],{env:{...process.env,COCONUT_SMOKE:'1',COCONUT_MCP_PORT:String(MCP_PORT),WEBKIT_DISABLE_DMABUF_RENDERER:'1',WEBKIT_DISABLE_COMPOSITING_MODE:'1',LIBGL_ALWAYS_SOFTWARE:'1',GALLIUM_DRIVER:'llvmpipe'},stdio:['ignore','ignore','pipe']});
 let stderr='';const markers=[];let exitCode=null;
-child.stderr.on('data',d=>{stderr+=d;for(const l of String(d).split('\n'))if(l.startsWith('COCONUT_SMOKE:'))markers.push(l.trim());});
+const consumeMarkers=smokeLines(line=>markers.push(line));
+child.stderr.on('data',d=>{stderr+=d;consumeMarkers(d);});
 child.on('exit',c=>exitCode=c);
 const waitMarker=(re,ms)=>new Promise((res,rej)=>{const t=Date.now()+ms;const tick=()=>{const hit=markers.find(m=>re.test(m));if(hit)return res(hit);if(exitCode!==null)return rej(new Error(`binary exited (${exitCode}) waiting for ${re}\n${stderr.slice(-2000)}`));if(Date.now()>t)return rej(new Error(`timeout waiting for ${re}\n${stderr.slice(-2000)}`));setTimeout(tick,100);};tick();});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -93,6 +95,10 @@ try{
   const denied=await deniedP;
   check('consent: unconsented read needs trusted approval (denied path)',denied.ok===false&&denied.error?.code==='APPROVAL_DENIED',JSON.stringify(denied.error));
 
+  // The sidebar revokes old grants when it first observes the binding.
+  // Wait for that real UI effect before granting through the smoke surface.
+  // Otherwise a late first heartbeat can revoke this test's new grant.
+  await waitMarker(/^COCONUT_SMOKE:ui-response:consent$/,15000);
   // explicit consent -> consented read.
   await request({action:'consent',targetId,readTools:['demo_read']});
   const read=await tool('host_call_tool',{targetId,pageInstanceId,call:{toolName:'demo_read',arguments:{},documentId,expectedRevision:null,idempotencyKey:null,requestId:randomUUID()}});

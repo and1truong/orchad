@@ -1,0 +1,10 @@
+# ADR-053: Previous-response hints and incorrect-only objective retries
+Epic #49 G06/G12/G16. Base PR #111.
+
+Optional original quiz settings let the human player show the immediately prior graded attempt's immutable response or redo only objective questions that did not earn full credit. Incorrect-only cannot combine with correct-before-continuing, as the public guide specifies. Long-answer incorrect-only composition remains explicitly unsupported pending an exact manual-score reference fixture; ordinary full retries can show previous written responses.
+
+Migration 034 pins the previous attempt and records retained successful question IDs. New option permutations remap canonical prior selections into the fresh attempt. Retained responses are immutable and included only when the learner explicitly submits the complete new attempt; start does not produce a score, official progress or certificate. Incorrect questions have no automatic prefill. Each subsequent retry pins the latest graded attempt, so previously corrected questions join the retained set.
+
+Reads/writes retain current owner/tenant/pinned group rights and active-assignment policy before receipt lookup and inside the existing atomic transaction. Start's attempt, presentation, previous pin, retained answers, carries, revision, receipt and audit roll back together. Replay does not duplicate them. Learner bridge withholds question content for retained retries to avoid disclosing which earlier answers were correct; prior human response hints are never model context. Human hints reveal original choices/responses, not answer keys beyond existing release policy.
+
+Five domain/golden/HTTP/rollback/SQLite reopen tests and one author/learner EN/VI mobile fixture are authored; exact-head CI pending. Existing attempt limits, byte budgets, pending manual blocks and immutable prior scores/certificates remain unchanged. Practice preview intentionally has no real attempt history. Rich question authoring and explicit latest-quiz migration remain OPEN; essay incorrect-only/reference fixtures and production/a11y audits remain NOT VERIFIED.

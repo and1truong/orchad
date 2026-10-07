@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node", "chrome"],
+    "typeRoots": ["./node_modules/@types", "../lime/node_modules/@types"]
+  },
+  "include": [
+    "tests/host.test.ts",
+    "tests/e2e/host.spec.ts",
+    "scripts/lime-browser.ts"
+  ],
+  "exclude": []
+}
