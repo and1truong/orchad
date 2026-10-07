@@ -5,7 +5,71 @@ import {multiFileManifest, multiFilePackage} from './scorm-package-fixture.ts';
 import {createSCORM2004API, type SCORM2004Edition} from '../src/shared/scorm2004-runtime.ts';
 import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
-import {sequencingManifest, collectionManifest, retryManifest, weightedManifest, adlManifest} from './scorm-sequencing-fixture.ts';
+import {sequencingManifest, collectionManifest, retryManifest, weightedManifest, adlManifest, calendarManifest} from './scorm-sequencing-fixture.ts';
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': calendar limits use the host clock and survive trusted reconstruction', async t => {
+  const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+  const xml = sequencingManifest(edition).replace('<s:controlMode flow="true" choice="true" forwardOnly="true"/>', '<s:controlMode flow="true" choice="true" forwardOnly="true"/><s:limitConditions beginTimeLimit="2024-02-29T24:00:00+02:00" endTimeLimit="2024-03-01T00:00:01+02:00"/>');
+  const tree: Record<string, any> = sequencingTree((await inspectSCORMPackage(multiFilePackage(edition, xml))).manifest);
+  assert.equal(tree.beginTimeLimit, '2024-02-29T22:00:00.000Z'); assert.equal(tree.endTimeLimit, '2024-02-29T22:00:01.000Z');
+  t.mock.timers.enable({apis: ['Date'], now: Date.parse('2024-02-29T21:59:59.999Z')});
+  const early = sequencingRuntime(tree); assert.equal(early.processNavigationRequest('start'), false);
+  t.mock.timers.setTime(Date.parse(tree.beginTimeLimit));
+  const atBegin = sequencingRuntime(tree); assert.equal(atBegin.processNavigationRequest('start'), true);
+  const resumed = sequencingRuntime(tree, atBegin.serializeSequencingState());
+  assert.equal(resumed.getSequencingState()!.rootActivity.beginTimeLimit, tree.beginTimeLimit);
+  assert.equal(resumed.processNavigationRequest('exitAll'), true);
+  t.mock.timers.setTime(Date.parse(tree.endTimeLimit));
+  const atEnd = sequencingRuntime(tree); assert.equal(atEnd.processNavigationRequest('start'), true);
+  t.mock.timers.setTime(Date.parse(tree.endTimeLimit) + 1);
+  const late = sequencingRuntime(tree); assert.equal(late.processNavigationRequest('start'), false);
+});
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': server rechecks calendar delivery and rolls back a client-valid request after expiration', async t => {
+  t.mock.timers.enable({apis: ['Date'], now: Date.parse('2024-03-01T00:00:00Z')});
+  const xml = calendarManifest(edition, '2024-03-01T00:00:01Z', '2024-03-01T00:00:02Z');
+  const f = await scormLearningFixture(undefined, multiFilePackage(edition, xml));
+  try {
+    const binding = f.enroll();
+    assert.throws(() => f.launch(binding), /Sequencing denies|prerequisites/);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_launches').get()!.n, 0);
+    t.mock.timers.setTime(Date.parse('2024-03-01T00:00:01Z'));
+    const first = f.launch(binding), before = f.player.bootstrap(first.token);
+    const request = sequenceCheckpoint(f, first, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'cmi.session_time': 'PT20S', 'adl.nav.request': 'continue'});
+    t.mock.timers.setTime(Date.parse('2024-03-01T00:00:02.001Z'));
+    assert.throws(() => f.player.checkpoint(first.token, request), /Sequencing denied|navigation/);
+    const after = f.player.bootstrap(first.token); assert.equal(after.revision, before.revision); assert.equal(after.sequence, before.sequence); assert.equal(after.state.total_time, before.state.total_time);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+    t.mock.timers.setTime(Date.parse('2024-03-01T00:00:02Z'));
+    assert.equal(f.player.checkpoint(first.token, request).officialLearningChanged, false);
+    const next = f.launch(binding); assert.equal(next.scoId, 'practice');
+    const end = sequenceCheckpoint(f, next, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'});
+    assert.equal(f.player.checkpoint(next.token, end).officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': untracked activities cannot violate a calendar delivery limit', async () => {
+  const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+  for (const [begin, end] of [['2000-01-01T00:00:00Z', '2000-01-02T00:00:00Z'], ['2099-01-01T00:00:00Z', '2099-01-02T00:00:00Z']]) {
+    const xml = calendarManifest(edition, begin, end).replace('<s:limitConditions ', '<s:deliveryControls tracked="false"/><s:limitConditions ');
+    const manifest = (await inspectSCORMPackage(multiFilePackage(edition, xml))).manifest;
+    assert.equal(manifest.sequencing!.beginTimeLimit, begin.replace('Z', '.000Z'));
+    const tree: Record<string, any> = sequencingTree(manifest); assert.equal(tree.beginTimeLimit, undefined); assert.equal(tree.endTimeLimit, undefined);
+    assert.equal(sequencingRuntime(tree).processNavigationRequest('start'), true);
+  }
+});
+
+test('calendar limit profile rejects malformed/ambiguous dates and impossible intervals in collected or unselected trees', async () => {
+  for (const value of ['2023-02-29T00:00:00Z', '1900-02-29T00:00:00Z', '0000-01-01T00:00:00Z', '2024-04-31T00:00:00Z', '2024-13-01T00:00:00Z', '2024-01-01T24:00:01Z', '2024-01-01T00:00:60Z', '2024-01-01T00:00:00+14:01', '2024-01-01T00:00:00+15:00', '2024-01-01T00:00:00', '2024-01-01', '']) {
+    const bad = sequencingManifest().replace('<s:controlMode flow="true" choice="true" forwardOnly="true"/>', `<s:controlMode flow="true" choice="true" forwardOnly="true"/><s:limitConditions beginTimeLimit="${value}"/>`);
+    await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', bad)), /Unsupported/);
+  }
+  const reversed = '<s:limitConditions beginTimeLimit="2024-01-02T00:00:00Z" endTimeLimit="2024-01-01T00:00:00Z"/>';
+  for (const xml of [collectionManifest().replace('<s:sequencing ID="shared-0">', '<s:sequencing ID="shared-0">' + reversed), sequencingManifest().replace('</p:organizations>', '<p:organization identifier="unused"><p:title>Unused</p:title><s:sequencing>' + reversed + '</s:sequencing></p:organization></p:organizations>')]) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', xml)), /Unsupported/);
+  const inherited = collectionManifest().replace('<s:sequencing ID="shared-0">', '<s:sequencing ID="shared-0"><s:limitConditions beginTimeLimit="2024-01-01T00:00:00Z"/>').replace('<s:sequencing IDRef="shared-0"/>', '<s:sequencing IDRef="shared-0"><s:limitConditions endTimeLimit="2099-01-01T00:00:00Z"/></s:sequencing>');
+  const merged: Record<string, any> = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', inherited))).manifest);
+  assert.equal(merged.beginTimeLimit, undefined); assert.equal(merged.endTimeLimit, '2099-01-01T00:00:00.000Z');
+});
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': ADL presentation and rollup settings retain content-requested navigation and required SCO evidence', async () => {
   const xml = adlManifest(edition), f = await scormLearningFixture(undefined, multiFilePackage(edition, xml));

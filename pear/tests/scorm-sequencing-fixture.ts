@@ -48,3 +48,7 @@ export function adlManifest(edition: SCORM2004Edition = '2004-4') {
     .replace('</s:sequencingRules></s:sequencing>', '</s:sequencingRules><a:rollupConsiderations requiredForCompleted="ifAttempted" requiredForSatisfied="ifNotSkipped" measureSatisfactionIfActive="false"/></s:sequencing>')
     .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><n:presentation><n:navigationInterface><n:hideLMSUI>continue</n:hideLMSUI><n:hideLMSUI>exit</n:hideLMSUI></n:navigationInterface></n:presentation>');
 }
+
+export function calendarManifest(edition: SCORM2004Edition = '2004-4', begin = '2000-01-01T00:00:00Z', end = '2099-01-01T00:00:00Z') {
+  return sequencingManifest(edition).replace('<s:controlMode flow="true" choice="true" forwardOnly="true"/>', `<s:controlMode flow="true" choice="true" forwardOnly="true"/><s:limitConditions beginTimeLimit="${begin}" endTimeLimit="${end}"/>`);
+}

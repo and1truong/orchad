@@ -11,6 +11,10 @@ export function sequencingTree(manifest: SCORMManifest) {
   const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, ...(a.hideLmsUi?.length ? {hideLmsUi: a.hideLmsUi} : {}), children: a.children.map(node), ...(a.completionMeasure ? {completionThreshold: a.completionMeasure} : a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
   const tree = {id: manifest.organizationId, title: manifest.title, ...manifest.sequencing, children: manifest.activities.map(node)};
   const inspect = (n: Record<string, any>) => {
+    // IMS SS UP.1: untracked activities cannot violate limit conditions.
+    // Upstream calendar checks do not inspect tracked, so omit these static
+    // windows from the executable tree while retaining the original manifest.
+    if (n.deliveryControls?.tracked === false) {delete n.beginTimeLimit; delete n.endTimeLimit;}
     const objectives = [...(n.objectives ?? []), ...(n.primaryObjective ? [n.primaryObjective] : [])];
     // Global-to-system objective persistence must not silently become registration-local.
     if (manifest.objectivesGlobalToSystem && objectives.some(o => o.mapInfo?.length)) reject('INVALID_ARGUMENT', 'System-global objective maps require a separately authorized persistence policy');

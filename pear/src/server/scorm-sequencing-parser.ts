@@ -11,6 +11,23 @@ function attrs(el: Element, names: string[]) {
 }
 function bool(el: Element, name: string) {const v = el.getAttribute(name); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
 function number(el: Element, name: string, min: number, max: number) {const v = el.getAttribute(name); if (v === null) return undefined; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v) || Number(v) < min || Number(v) > max) fail(); return Number(v);}
+// Delivery windows require an explicit timezone so every host enforces the
+// same instant. Validate Gregorian dates before Date can normalize them.
+function calendarLimit(el: Element, name: string) {
+  const value = el.getAttribute(name); if (value === null) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!m) fail();
+  const [year, month, day, hour, minute, second] = m!.slice(1, 7).map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (!year || month < 1 || month > 12 || day < 1 || day > days[month - 1] || hour > 24 || minute > 59 || second > 59 || hour === 24 && (minute || second || Number(m![7] ?? 0))) fail();
+  const zoneHours = Number(m![10] ?? 0), zoneMinutes = Number(m![11] ?? 0);
+  if (zoneHours > 14 || zoneMinutes > 59 || zoneHours === 14 && zoneMinutes) fail();
+  const date = new Date(0); date.setUTCFullYear(year, month - 1, day); date.setUTCHours(hour, minute, second, Number((m![7] ?? '').padEnd(3, '0')));
+  const offset = (zoneHours * 60 + zoneMinutes) * (m![9] === '-' ? -1 : 1);
+  date.setTime(date.getTime() - offset * 60000);
+  return date.toISOString();
+}
 function flags(el: Element, names: string[]) {attrs(el, names); return Object.fromEntries(names.filter(n => el.hasAttribute(n)).map(n => [n, bool(el, n)]));}
 
 export function parsePresentation(item: Element, edition: SCORMStandard): string[] | undefined {
@@ -159,7 +176,11 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
       case 'controlMode': out.sequencingControls = {...out.sequencingControls, choice: true, choiceExit: true, flow: false, forwardOnly: false, useCurrentAttemptObjectiveInfo: true, useCurrentAttemptProgressInfo: true, ...flags(n, ['choice', 'choiceExit', 'flow', 'forwardOnly', 'useCurrentAttemptObjectiveInfo', 'useCurrentAttemptProgressInfo'])}; break;
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
       case 'limitConditions': {
-        attrs(n, ['attemptLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;} break;
+        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
+        const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');
+        if (begin !== undefined) out.beginTimeLimit = begin; if (end !== undefined) out.endTimeLimit = end;
+        if (begin !== undefined && end !== undefined && Date.parse(begin) > Date.parse(end)) fail();
+        break;
       }
       case 'sequencingRules': {
         attrs(n, []); out.sequencingRules = {};
