@@ -1,3 +1,4 @@
+import {scormCharacters} from '../shared/scorm-characterstring.ts';
 import type {DatabaseSync} from 'node:sqlite';
 import type Scorm2004API from 'scorm-again/scorm2004';
 import type {SCORMManifest} from '../shared/scorm-engine.ts';
@@ -21,7 +22,7 @@ export function saveSystemData(db: DatabaseSync, registration: Registration, man
   const maps = playbackActivities(manifest).find(p => p.activity.id === scoId)?.activity.sharedDataMaps ?? [];
   const update = db.prepare('INSERT INTO scorm_system_data VALUES(?,?,?,?,1,?,?) ON CONFLICT(tenant,learner,target_id) DO UPDATE SET store=excluded.store,revision=scorm_system_data.revision+1,source_registration_id=excluded.source_registration_id,updated_at=excluded.updated_at');
   for (const [id, store] of Object.entries(writes as Record<string, unknown>)) {
-    if (typeof store !== 'string' || store.length > 64000 || !maps.some(m => m.targetID === id && m.writeSharedData)) reject('FORBIDDEN', 'Mapped system shared data write required');
+    if (typeof store !== 'string' || scormCharacters(store) > 64000 || !maps.some(m => m.targetID === id && m.writeSharedData)) reject('FORBIDDEN', 'Mapped system shared data write required');
     update.run(registration.tenant, registration.learner, id, store, registration.id, new Date().toISOString());
   }
   if (Number(db.prepare('SELECT count(*) n FROM scorm_system_data WHERE tenant=? AND learner=?').get(registration.tenant, registration.learner)!.n) > 4096) reject('INVALID_ARGUMENT', 'System shared data store quota reached');

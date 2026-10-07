@@ -7,13 +7,18 @@ export function sequencingManifest(edition: SCORM2004Edition = '2004-4') {
   return multiFileManifest(edition).replace('<p:manifest ', '<p:manifest xmlns:a="http://www.adlnet.org/xsd/adlseq_v1p3" xmlns:s="http://www.imsglobal.org/xsd/imsss" ').replace('<p:organization identifier="org">', '<p:organization identifier="org" a:objectivesGlobalToSystem="false">').replace('<p:title>Original multi &amp; file package</p:title>', '<p:title>Original multi &amp; file package</p:title><s:sequencing><s:controlMode flow="true" choice="true" forwardOnly="true"/>' + rollup + '</s:sequencing>').replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing>' + objective + '</s:sequencing>').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><s:sequencing>' + gate + '</s:sequencing>');
 }
 import {zip} from './scorm-fixture.ts';
-export function sequencingPackage(edition: SCORM2004Edition, manifest = sequencingManifest(edition)) {
+export function sequencingPackage(edition: SCORM2004Edition, manifest = sequencingManifest(edition), unicode = false) {
   const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save sequencing progress</button><button id="fail">Fail sequencing attempt</button><button id="continue">Continue sequencing SCO</button><button id="end">End sequencing session</button><script src="../assets/player.js"></script></body></html>';
   const sharedScript = manifest.includes('<runtime:data>') ? `
     const sharedStatus=document.createElement('p');document.body.append(sharedStatus);
     const sharedValue=api.GetValue('adl.data.0.store');sharedStatus.textContent='Shared notes: '+(api.GetLastError()==='0'?sharedValue:'unreadable');
     const remember=()=>{if(location.pathname.endsWith('intro.html'))api.SetValue('adl.data.0.store','authored-shared-notes');};
     for(const id of ['save','continue','end'])document.getElementById(id).addEventListener('click',remember,true);
+  ` : '';
+  const unicodeScript = unicode ? `
+    const status=document.createElement('p');document.body.append(status);status.textContent='Unicode suspend characters: '+Array.from(api.GetValue('cmi.suspend_data')).length;
+    const rememberUnicode=()=>{const value='🙂'.repeat(${edition === '2004-2' ? 4000 : 64000});const rejected=api.SetValue('cmi.suspend_data',value+'x')==='false';status.textContent='Unicode SetValue: '+(rejected && api.SetValue('cmi.suspend_data',value)==='true'?'accepted':'failed');};
+    for(const id of ['save','continue','end'])document.getElementById(id).addEventListener('click',rememberUnicode,true);
   ` : '';
   return zip([
     {name: 'imsmanifest.xml', data: Buffer.from(manifest), method: 8},
@@ -25,7 +30,7 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
       document.getElementById('save').onclick=()=>{update();api.SetValue('cmi.progress_measure','0.2');api.SetValue('cmi.completion_status','incomplete');document.getElementById('result').textContent='Sequencing Commit: '+api.Commit('');};
       const finish=(nav)=>{update();api.SetValue('cmi.progress_measure',location.pathname.endsWith('intro.html')?'0.5':'1');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','passed');api.SetValue('cmi.score.scaled','0.9');api.SetValue('adl.nav.request',nav);document.getElementById('result').textContent='Sequencing Terminate: '+api.Terminate('');};
       document.getElementById('fail').onclick=()=>{update();api.SetValue('cmi.exit','normal');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','failed');api.SetValue('cmi.score.scaled','0.4');api.SetValue('adl.nav.request','exit');document.getElementById('result').textContent='Failed attempt Terminate: '+api.Terminate('');};
-      document.getElementById('continue').onclick=()=>finish('continue');document.getElementById('end').onclick=()=>finish('exitAll');` + sharedScript), method: 8},
+      document.getElementById('continue').onclick=()=>finish('continue');document.getElementById('end').onclick=()=>finish('exitAll');` + sharedScript + unicodeScript), method: 8},
     {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
   ]);
 }

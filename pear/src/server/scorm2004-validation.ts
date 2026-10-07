@@ -1,10 +1,10 @@
+import {scormCharacters, scorm2004Writable as writable} from '../shared/scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
 import {scorm2004CheckpointBytes, scorm2004FieldError, scorm2004EngineValue, scorm2004ExitRequests, type SCORM2004Edition} from '../shared/scorm2004-runtime.ts';
 import {validNavigation} from '../shared/scorm-sequencing-runtime.ts';
 import {applySharedDataWrites} from './scorm-shared-data.ts';
 import {reject} from './errors.ts';
 
-const writable = /^(?:cmi\.(?:completion_status|success_status|exit|location|progress_measure|session_time|suspend_data)|cmi\.score\.(?:scaled|raw|min|max)|cmi\.learner_preference\.(?:audio_level|language|delivery_speed|audio_captioning)|cmi\.comments_from_learner\.\d{1,3}\.(?:comment|location|timestamp)|cmi\.objectives\.\d{1,3}\.(?:id|description|completion_status|success_status|progress_measure|score\.(?:scaled|raw|min|max))|cmi\.interactions\.\d{1,3}\.(?:id|type|timestamp|weighting|learner_response|result|latency|description|objectives\.\d{1,3}\.id|correct_responses\.\d{1,3}\.pattern))$/;
 const readonly = /^(?:cmi\.(?:learner_id|learner_name|credit|mode|entry|total_time|launch_data|scaled_passing_score|completion_threshold|max_time_allowed|time_limit_action)|cmi\.comments_from_lms\.\d{1,3}\.(?:comment|location|timestamp))$/;
 const container = /^(?:cmi|cmi\.(?:score|learner_preference|comments_from_learner|comments_from_lms|objectives|interactions)|cmi\.(?:comments_from_learner|comments_from_lms|objectives|interactions)\.\d{1,3}|cmi\.objectives\.\d{1,3}\.score|cmi\.interactions\.\d{1,3}\.(?:objectives|correct_responses)|cmi\.interactions\.\d{1,3}\.(?:objectives|correct_responses)\.\d{1,3})$/;
 function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}) {
@@ -12,7 +12,7 @@ function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}
   for (const [key, value] of Object.entries(input)) {
     const path = prefix + '.' + key;
     if (typeof value === 'string') {
-      if (Object.keys(out).length >= 2048 || value.length > (path === 'cmi.suspend_data' ? 64000 : 4096)) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
+      if (Object.keys(out).length >= 2048 || scormCharacters(value) > (path === 'cmi.suspend_data' ? 64000 : 4096)) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
       out[path] = value;
     } else leaves(value, path, out);
   }

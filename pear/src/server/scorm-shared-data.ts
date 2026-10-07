@@ -1,3 +1,4 @@
+import {scormCharacters} from '../shared/scorm-characterstring.ts';
 import type Scorm2004API from 'scorm-again/scorm2004';
 import type {SCORMActivity} from '../shared/scorm-engine.ts';
 import {reject} from './errors.ts';
@@ -11,7 +12,7 @@ export function applySharedDataWrites(runtime: Scorm2004API, writes: unknown) {
   for (const [id, store] of entries) {
     const index = maps.findIndex(m => m.targetID === id && m.writeSharedData);
     if (index < 0) reject('FORBIDDEN', 'Current SCO cannot write this shared data store');
-    if (typeof store !== 'string' || store.length > 64000 || runtime.SetValue(`adl.data.${index}.store`, store) !== 'true') reject('INVALID_ARGUMENT', 'Shared data store value rejected');
+    if (typeof store !== 'string' || scormCharacters(store) > 64000 || runtime.SetValue(`adl.data.${index}.store`, store) !== 'true') reject('INVALID_ARGUMENT', 'Shared data store value rejected');
   }
 }
 

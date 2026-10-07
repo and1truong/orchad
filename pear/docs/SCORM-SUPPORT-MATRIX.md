@@ -1,12 +1,12 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–094. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-limits-v3` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094. A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–095. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-unicode-v4` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094 and plain Unicode characterstring correction in ADR-095. A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
 | ZIP/XML, immutable original, nested paths and auxiliary assets | Tested | Tested | Tested | Tested | Strict quotas, UTF-8 XML, no DTD/XXE/traversal/special files; auxiliary assets differ from asset activity leaves |
 | API discovery, synchronous string results, CMI/lifecycle errors | Tested profile | Tested profile | Tested profile | Tested profile | Real engine, server replay/read-only baseline; no complete error-code suite claim |
-| Suspend data | 4096 engine limit | 4000 engine limit | 64000 engine limit | 64000 engine limit | Upstream UTF-16 code-unit counting; supplementary-Unicode SPM conformance is OPEN |
+| Suspend data | 4096 scalar characters | 4000 scalar characters | 64000 scalar characters | 64000 scalar characters | Tested exact supplementary boundaries, durable resume/refusal (ADR-095); broader encoding/SPM conformance remains OPEN |
 | Comments, objectives, interactions, score and reported duration | Tested profile | Tested profile | Tested profile | Tested profile | Time intervals bounded to centiseconds; 2004 calendar conversion uses 365-day years / 30-day months |
 | Separate completion / success | Combined lesson status | Tested | Tested | Tested | Passed policy requires completed and passed for 2004; preview/practice remains unofficial |
 | Multi-SCO folders, durable per-SCO resume/history | Tested | Tested profile | Tested profile | Tested profile | Current technical attempt differs from overall attempt and domain retake |
@@ -41,3 +41,5 @@ Explicitly refused duration bindings: negative, calendar year/month, week or fin
 | Main integration S1–S8 | PASS: main `f7d30b45f968dbaf52199cb35021d7aee6cc5600`, tree `159d24bd1178633d82f15cc7ee34bcf89538bf7e`; run 37675973833, 8/8 | Successor semantics require their own integrated acceptance; production/conformance gates remain open |
 
 External gates stay OPEN/BLOCKED: commercial Storyline/Captivate/Rise exports with redistribution rights; authorized Rustici/SCORM Cloud differential account; complete ADL/reference suite and license resolution for legacy ADL Sample RTE. That RTE's root Apache notice conflicts with a legacy CC BY-NC-SA notice and its Windows/Java/Tomcat platform differs from CI. Offline wrapper tests provide explicit equivalent coverage only for API discovery/save/resume/finish, not the whole conformance suite. Never upload learner data or licensed packages to an external engine without independent authorization.
+
+Unicode/SPM evidence (ADR-095): exact supplementary suspend-data bounds in all four editions, plain location/comment-location and mapped shared-store scalar counting, malformed-surrogate refusal and durable receipt/resume. Byte quotas remain separate. Localized strings, identifiers and interaction response grammars retain explicit exhaustive-conformance gaps; this does not close the full encoding/SPM requirement.

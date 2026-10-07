@@ -1,3 +1,4 @@
+import {scormCharacters, scorm12Writable} from './scorm-characterstring.ts';
 import Scorm12API from 'scorm-again/scorm12';
 
 /** Only the standard synchronous API is exposed to content, never engine helpers. */
@@ -29,6 +30,7 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
     LMSSetValue(key: string, value: string) {
       if (!active()) return bad('301');
       if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
+      if (scorm12Writable.test(key) && !Number.isFinite(scormCharacters(value)) || key === 'cmi.suspend_data' && scormCharacters(value) > 4096) return bad('405');
       if (key === 'cmi.core.lesson_status' && value === 'not attempted') return bad('405');
       localError = null; return runtime.LMSSetValue(key, value);
     },

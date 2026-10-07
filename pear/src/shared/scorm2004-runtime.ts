@@ -1,3 +1,4 @@
+import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
 import type {SCORMStandard} from './scorm-engine.ts';
@@ -23,8 +24,9 @@ export function scorm2004EngineValue(key: string, value: string) {
   return value;
 }
 export function scorm2004FieldError(edition: SCORM2004Edition, key: string, value: string): string | null {
+  if ((scorm2004Writable.test(key) || /^adl\.data\.\d+\.store$/.test(key)) && !Number.isFinite(scormCharacters(value))) return '406';
   if (edition !== '2004-4' && (key.startsWith('adl.data.') || key.startsWith('adl.nav.request_valid.jump') || key === 'adl.nav.request' && value.endsWith('jump'))) return '401';
-  if (key === 'cmi.suspend_data' && value.length > (edition === '2004-2' ? 4000 : 64000)) return '406';
+  if (key === 'cmi.suspend_data' && scormCharacters(value) > (edition === '2004-2' ? 4000 : 64000)) return '406';
   if (key === 'cmi.session_time' || /^cmi.interactions.\d+.latency$/.test(key)) {
     try {scorm2004Seconds(value);} catch {return '406';}
   }
@@ -61,12 +63,15 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
     SetValue(key: string, value: string) {
       const code = inactive('132', '133'); if (code) return bad(code);
       if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
-      const fieldError = scorm2004FieldError(options.edition, key, value); if (fieldError) return bad(fieldError);
+      const fieldError = scorm2004FieldError(options.edition, key, value);
+      if (fieldError === '401') return bad(fieldError);
       // Navigation involving another activity is enabled only with trusted sequencing.
       if (key === 'adl.nav.request' && !options.sequencingTree && !scorm2004ExitRequests.includes(value)) return bad('406');
       const shared = /^adl\.data\.(\d+)\.(id|store)$/.exec(key);
       if (shared?.[2] === 'id') return bad('404');
       if (shared && (!Number.isSafeInteger(Number(shared[1])) || Number(shared[1]) >= Number(runtime.GetValue('adl.data._count')))) return bad('351');
+      if (shared?.[2] === 'store' && runtime.getSequencingState()?.currentActivity?.sharedDataMaps[Number(shared[1])]?.writeSharedData === false) return bad('404');
+      if (fieldError) return bad(fieldError);
       error = null; const result = runtime.SetValue(key, scorm2004EngineValue(key, value));
       if (result === 'true' && key === 'adl.nav.request') navigation = value;
       if (result === 'true' && shared?.[2] === 'store') sharedWrites[runtime.GetValue(`adl.data.${Number(shared[1])}.id`)] = value;
