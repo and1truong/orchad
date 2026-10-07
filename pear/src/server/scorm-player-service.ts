@@ -13,6 +13,7 @@ import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
 import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
+import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
 import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
 import {SCORM_RUNTIME_LIMITS} from '../shared/scorm-operations.ts';
@@ -67,6 +68,7 @@ export class SCORMPlayerService {
       const rows = this.scos(registered.attemptId, p.tenant), states = activityStates(manifest, rows);
       const overall = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(registered.attemptId, p.tenant) as any;
       const sequenceScope = {attemptId: registered.attemptId, sha256: registration.sha256}, engine = usesSequencing(manifest) ? trustedSequencing(manifest, overall.sequencing_state, sequenceScope) : undefined;
+      if (engine) loadSystemData(this.db, registration, manifest, engine);
       const currentId = engine?.getSequencingState()?.currentActivity?.id, current = rows.find(r => r.sco_id === currentId);
       if (engine && current && !current.finished) {engine.loadFromJSON(JSON.parse(current.runtime_state)); engine.Initialize('');}
       const candidates = playbackActivities(manifest).filter(p => activityAvailable(p, states));
@@ -136,6 +138,7 @@ export class SCORMPlayerService {
     if (c.launch.finished) reject('FORBIDDEN', 'Finished communication session must be relaunched');
     const latest = this.db.prepare('SELECT result FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, c.launch.sequence) as any;
     const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
+    if (engine) loadSystemData(this.db, c.registration, manifest, engine);
     return {...(engine ? {sequencingTree: sequencingTree(manifest), sequencingSnapshot: sharedDataClientSnapshot(engine)} : {}), standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
   }
   context(p: Principal, a: {packageId?: string; version?: string; enrollmentId?: string; lessonId?: string; itemEnrollmentId?: string; mode?: string}) {
@@ -218,7 +221,9 @@ export class SCORMPlayerService {
       if (a.sharedData !== undefined && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData})) > 512 * 1024) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
       const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
       if (engine && deliveredSCO(engine, manifest)?.activity.id !== c.launch.sco_id) reject('STALE_CONTEXT', 'Sequencing has delivered a different SCO');
+      if (engine) loadSystemData(this.db, c.registration, manifest, engine);
       const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation, engine, a.sharedData);
+      saveSystemData(this.db, c.registration, manifest, c.launch.sco_id, a.sharedData);
       const seconds = manifest.standard === '1.2' ? scormSeconds(state.core.session_time) : scorm2004Seconds(state.session_time);
       if (seconds < c.launch.session_seconds) reject('INVALID_ARGUMENT', 'Session time cannot decrease within a launch');
       const revision = c.sco.revision + 1, now = new Date().toISOString();

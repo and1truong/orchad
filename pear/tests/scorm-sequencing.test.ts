@@ -1,3 +1,4 @@
+import {sequenceCheckpoint} from './scorm-checkpoint-fixture.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {scormLearningFixture} from './scorm-learning-fixture.ts';
@@ -81,7 +82,7 @@ test('shared data import rejects earlier editions, invalid maps/scopes and unsel
   for (const bad of [xml.replace('writeSharedData="true"', 'writeSharedData="maybe"'), xml.replace('targetID="urn:pear:shared-notes"', 'targetID=""'), xml.replace('<runtime:map targetID=', '<runtime:map bogus="true" targetID='), xml.replace('</runtime:data>', '<runtime:map targetID="urn:pear:shared-notes"/></runtime:data>'), xml.replace('sharedDataGlobalToSystem="false"', 'sharedDataGlobalToSystem="maybe"'), xml.replaceAll('<runtime:data>', '<wrong:data xmlns:wrong="http://www.adlnet.org/xsd/adlcp_rootv1p2">').replaceAll('</runtime:data>', '</wrong:data>'), xml.replace('</p:organizations>', '<p:organization identifier="unused" runtime:sharedDataGlobalToSystem="maybe"><p:title>Unused</p:title></p:organization></p:organizations>')]) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', bad)), /Unsupported|shared data scope|shared data requires|misplaced shared/);
   for (const edition of ['2004-2', '2004-3'] as const) await assert.rejects(inspectSCORMPackage(multiFilePackage(edition, xml.replace('2004 4th Edition', edition === '2004-2' ? '2004 2nd Edition' : '2004 3rd Edition'))), /shared data scope|Unsupported/);
   const global = (await inspectSCORMPackage(multiFilePackage('2004-4', xml.replace('runtime:sharedDataGlobalToSystem="false"', '')))).manifest;
-  assert.throws(() => sequencingTree(global), /System-global shared data/);
+  assert.ok(sequencingTree(global).children[0].sharedDataMaps.length);
 });
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': calendar limits use the host clock and survive trusted reconstruction', async t => {
@@ -431,14 +432,7 @@ test('an empty inline limitConditions replaces a collected attempt limit with th
   assert.equal(engine.processNavigationRequest('choice', 'intro'), true);
   assert.equal(engine.getSequencingState()!.currentActivity.attemptCount, 2);
 });
-export function sequenceCheckpoint(f: Awaited<ReturnType<typeof scormLearningFixture>>, launch: ReturnType<typeof f.launch>, values: Record<string, string>, finished = true) {
-  const b = f.player.bootstrap(launch.token); let state: any, navigation = '_none_', sharedData: Record<string, string> | undefined;
-  const api = createSCORM2004API({edition: b.standard as SCORM2004Edition, state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot, checkpoint(s, _finished, nav, writes) {state = s; navigation = nav; sharedData = writes;}});
-  assert.equal(api.Initialize(''), 'true');
-  for (const [key, value] of Object.entries(values)) assert.equal(api.SetValue(key, value), 'true', key + ': ' + api.GetDiagnostic(''));
-  assert.equal(finished ? api.Terminate('') : api.Commit(''), 'true', api.GetDiagnostic(''));
-  return {state, navigation, finished, sequence: b.sequence + 1, revision: b.revision, ...(sharedData && Object.keys(sharedData).length ? {sharedData} : {})};
-}
+
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': objective maps gate direct choices; Terminate drives durable flow/rollup and preserves SCO isolation', async () => {
   const f = await scormLearningFixture(undefined, multiFilePackage(edition, sequencingManifest(edition)));
   try {

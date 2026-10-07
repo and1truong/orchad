@@ -64,3 +64,5 @@ export function sharedDataManifest() {
     .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:data><runtime:map targetID="urn:pear:shared-notes" readSharedData="false" writeSharedData="true"/><runtime:map targetID="urn:pear:private-writer" readSharedData="false" writeSharedData="true"/></runtime:data>')
     .replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:data><runtime:map targetID="urn:pear:shared-notes"/></runtime:data>');
 }
+
+export function systemSharedDataManifest() {return sharedDataManifest().replace('runtime:sharedDataGlobalToSystem="false"', '');}

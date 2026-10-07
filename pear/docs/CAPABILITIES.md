@@ -265,3 +265,5 @@ OPEN: missing semantics in #133 checklist B; exhaustive standards/reference/comm
 SCORM calendar delivery successor (ADR-088) enforces bounded explicit-timezone begin/end windows using the trusted host clock, including stale client navigation rollback and snapshot reconstruction across 2004 editions 2–4. It does not close duration, selection/global/shared-data, production or full conformance gaps.
 
 The fourth-edition local shared-data successor (ADR-089) adds mapped read/write stores, durable transactional deltas/receipts, retake preservation and current-SCO backing-state redaction. System-global shared data and objectives remain open, alongside other #133 code/conformance/deployment gaps.
+
+System shared-data successor (ADR-090) admits fourth-edition default/global shared-data maps with persistent tenant/learner working stores and current-SCO permissions. Schema-49 migration, concurrency/receipt, capacity, revocation, reopen/backup and unofficial-isolation evidence supplement G05/G10/G14/G18. System-global objectives, remaining semantics and full interoperability/production gates remain open.
