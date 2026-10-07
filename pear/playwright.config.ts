@@ -3,7 +3,7 @@ const production = process.env.PEAR_E2E_PRODUCTION === "1";
 export default defineConfig({
   testDir: "tests/e2e",
   testIgnore:
-    process.env.PEAR_HOST_LANE === "1" ? undefined : "**/host.spec.ts",
+    process.env.PEAR_HOST_LANE === "1" ? "**/*.host.spec.ts" : ["**/host.spec.ts", "**/*.host.spec.ts"],
   workers: 1,
   timeout: 30_000,
   use: {

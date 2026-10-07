@@ -33,3 +33,19 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     const proof = JSON.parse(String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence)); expect(proof.rollup.completion).toBe('completed'); expect(proof.rollup.success).toBe('passed');
   } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
 });
+
+test('unbound practice follows authenticated next-SCO delivery without granting official learning', async ({page}) => {
+  const f = await scormLearningFixture(undefined, sequencingPackage('2004-4'));
+  const origin = 'http://127.0.0.1:4344', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4345', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
+  try {
+    await content!.listen({port: 4345, host: '127.0.0.1'}); await app.listen({port: 4344, host: '127.0.0.1'}); await page.goto(origin);
+    await page.getByLabel('Account', {exact: true}).fill('learner-a'); await page.getByLabel('Password', {exact: true}).fill('learner-a-dev'); await page.getByRole('button', {name: 'Sign in', exact: true}).click();
+    await page.getByRole('button', {name: 'Imported packages', exact: true}).click();
+    const player = page.getByRole('region', {name: 'SCORM engine packages', exact: true}), sco = page.frameLocator('iframe[title="Isolated SCORM engine player"]').frameLocator('iframe[title="SCORM SCO"]');
+    await player.getByLabel("I consent to this engine package's separate reported tracking.", {exact: true}).check(); await player.getByRole('button', {name: 'Play or resume engine package', exact: true}).click();
+    await sco.getByRole('button', {name: 'Continue sequencing SCO', exact: true}).click(); await expect(sco.getByRole('heading', {name: 'Original sequencing practice', exact: true})).toBeVisible();
+    await sco.getByRole('button', {name: 'End sequencing session', exact: true}).click(); await expect(player.getByRole('status')).toContainText('finished and saved by the server');
+    expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0); expect(f.db.prepare('SELECT count(*) n FROM enrollments').get()!.n).toBe(0);
+    expect(f.db.prepare('SELECT count(*) n FROM scorm_sco_attempts WHERE finished=1').get()!.n).toBe(2);
+  } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
+});

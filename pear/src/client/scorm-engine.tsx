@@ -15,8 +15,16 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
       if (!current || event.source !== frame.current?.contentWindow || event.origin !== current.contentOrigin || value?.kind !== 'pear-scorm-engine-status' || value.launchId !== current.launchId || !Number.isSafeInteger(value.sequence)) return;
       // Messages only request reconciliation. Durable acknowledgement comes from Pear's authenticated read.
       if (!value.acknowledged) {setPlayStatus('Package progress is pending server acknowledgement.'); return;}
-      void request<any>('/api/scorm-engine/launches/' + current.launchId, p.session).then(result => {
-        if (active && p.isCurrent() && currentLaunch.current === current && result.sequence >= value.sequence) setPlayStatus(result.finished ? 'Package finished and saved by the server; official learning is unchanged.' : 'Package progress saved by the server; official learning is unchanged.');
+      void request<any>('/api/scorm-engine/launches/' + current.launchId, p.session).then(async result => {
+        if (!active || !p.isCurrent() || currentLaunch.current !== current || result.sequence < value.sequence) return;
+        setPlayStatus(result.finished ? 'Package finished and saved by the server; official learning is unchanged.' : 'Package progress saved by the server; official learning is unchanged.');
+        if (result.finished && result.nextScoId && !current.navigating) {
+          current.navigating = true;
+          await request('/api/scorm-engine/launches/' + current.launchId + '/close', p.session, {});
+          if (!active || !p.isCurrent() || currentLaunch.current !== current) return;
+          currentLaunch.current = null; setLaunch(null);
+          await play(current.package, result.nextScoId, current.consented);
+        }
       }).catch(e => {if (active && p.isCurrent()) setPlayStatus(e.message);});
     };
     window.addEventListener('message', message);
@@ -68,11 +76,11 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
     const value = await request<any>('/api/scorm-engine/player-context?' + new URLSearchParams({packageId: row.id, version: String(row.version), mode: p.author ? 'preview' : 'normal'}), p.session);
     if (p.isCurrent()) setActivities(value.activities);
   }
-  async function play(row: any, scoId?: string) {
+  async function play(row: any, scoId?: string, consented = consent) {
     await p.run(async () => {
       const context = await request<any>('/api/context?documentId=' + encodeURIComponent('learning:' + p.session.principal.tenant + ':' + p.session.principal.id), p.session);
-      const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: row.id, version: row.version, mode: p.author ? 'preview' : 'normal', ...(scoId ? {scoId} : {}), confirmed: consent, revision: context.revision, key: crypto.randomUUID()});
-      if (p.isCurrent()) {currentLaunch.current = value; setLaunch(value); setPlayStatus('Package progress has not been saved yet.'); setSelectedPackage(row); await readActivities(row);}
+      const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: row.id, version: row.version, mode: p.author ? 'preview' : 'normal', ...(scoId ? {scoId} : {}), confirmed: consented, revision: context.revision, key: crypto.randomUUID()});
+      if (p.isCurrent()) {const current = {...value, package: row, consented}; currentLaunch.current = current; setLaunch(current); setPlayStatus('Package progress has not been saved yet.'); setSelectedPackage(row); await readActivities(row);}
     });
   }
   async function close() {

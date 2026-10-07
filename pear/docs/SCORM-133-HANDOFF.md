@@ -23,3 +23,7 @@ The next owned slice implements the real SCORM 2004 API for 2nd/3rd/4th editions
 ## S6 continuation (this session)
 
 S6 installs the trusted multi-SCO 2004 sequencing profile described in ADR-080, including transactional snapshots, server-verified choice/flow/objective maps/rollup, technical attempt limits and authenticated automatic delivery after Terminate ACK. The strict unsupported-profile list remains visible; do not advertise complete sequencing conformance. Continue S7 licensed wrapper/reference fixtures and host isolation, then S8 operational diagnostics and integrated acceptance. The separate #49 owner and production/main gates remain untouched.
+
+## S7 continuation
+
+S7 adds pinned pipwerks/ADL wrapper fixtures and an adversarial built Chromium lane (ADR-081). Practice now follows authenticated next-SCO delivery. Run `test:scorm:lime` after building Lime with a full extension-capable Chromium; this workspace headless shell cannot run it. Continue S8 diagnostics, backup/restore and integrated support matrix; native SCORM and licensed commercial/reference differential acceptance remain open. S6 remote head `96cfcc4507524a18e19cb9b877dc7f6c8c212b80` passed all eight acceptance jobs. Do not edit the other session's #49 branches.

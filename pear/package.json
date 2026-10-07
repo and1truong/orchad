@@ -25,7 +25,8 @@
     "typecheck:host": "tsc --noEmit -p tsconfig.host.json",
     "test:browser-host": "PEAR_HOST_LANE=1 playwright test tests/e2e/host.spec.ts",
     "dev:scorm-content": "node --import tsx src/server/scorm-content-start.ts",
-    "test:scorm:browser": "playwright test -c playwright.scorm.config.ts"
+    "test:scorm:browser": "playwright test -c playwright.scorm.config.ts",
+    "test:scorm:lime": "PEAR_SCORM_HOST_LANE=1 playwright test -c playwright.scorm.config.ts scorm-lime.host.spec.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
