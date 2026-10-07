@@ -43,7 +43,7 @@ export class SCORMLearningBindings {
     const rows = this.db.prepare('SELECT s.* FROM scorm_sco_attempts s WHERE s.attempt_id=? AND s.tenant=? AND s.sco_attempt_number=(SELECT max(n.sco_attempt_number) FROM scorm_sco_attempts n WHERE n.attempt_id=s.attempt_id AND n.sco_id=s.sco_id)').all(attemptId, p.tenant) as any[];
     const overall = usesSequencing(manifest) ? this.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(attemptId, p.tenant) as any : null;
     const selection = overall ? selectionEvidence(manifest, JSON.parse(overall.sequencing_state).snapshot) : {scos: playbackActivities(manifest), clusters: []};
-    const evidence = selection.scos.map(({activity}) => scoEvidence(manifest.standard, activity.id, rows.find(r => r.sco_id === activity.id)));
+    const evidence = selection.scos.filter(p => p.resource.kind === 'sco').map(({activity}) => scoEvidence(manifest.standard, activity.id, rows.find(r => r.sco_id === activity.id)));
     if (!evidence.length) return false;
     if (evidence.some(e => !meetsSCORMPolicy(manifest.standard, e, c.reference))) return false;
     let rollup: Record<string, any> | undefined;

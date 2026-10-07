@@ -1,6 +1,6 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–092. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-selection-v2` to the exact ESM entry: ADR-082 direct-log removal plus the selection corrections in ADR-092. A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–093. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-selection-v2` to the exact ESM entry: ADR-082 direct-log removal plus the selection corrections in ADR-092. A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
@@ -18,6 +18,7 @@ Version: epic #133 / ADR-075–092. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | Weighted completion / progress rollup | — | — | — | Tested profile | Fourth-edition progressWeight and threshold policy; durable trusted measure, zero-weight obligations and official proof (ADR-086) |
 | ADL presentation / rollup / constrained choice | — | Tested profile | Tested profile | Tested profile | Namespace/default/collection validation; hideLMSUI is presentation, content navigation remains allowed; ADL score/progress/completion maps are fourth-edition-only (ADR-087) |
 | pipwerks licensed wrapper save/resume/finish | Tested | Tested | Tested | Tested | Pinned original wrapper and original course assets; not a commercial authoring export |
+| Noncommunicating asset leaves | Tested profile | Tested profile | Tested profile | Tested profile | No API/CMI; LMS-owned durable navigation; SCO-only proof plus trusted root rollup; asset-only packages cannot generate official proof (ADR-093) |
 | Selection/randomization | — | Tested profile | Tested profile | Tested profile | Original cluster controls, count 0–2048, once/each timing, trusted stable pool/order, retry/resume and selected-only proof (ADR-092) |
 | System-global objectives | — | Tested profile | Tested profile | Tested profile | Tenant/learner mapped tracking values, original access flags, cross-package prerequisite delivery, field deltas, unofficial separation and schema 50 (ADR-091) |
 | System-global shared data | — | — | — | Tested profile | Tenant/learner working stores, current mapped permissions, explicit-delta concurrency/receipts, unofficial isolation, schema 49 and backup/quota/revocation evidence (ADR-090) |
@@ -26,7 +27,7 @@ Version: epic #133 / ADR-075–092. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | ADL developer-guide licensed wrapper | — | Unverified | Tested | Unverified | Exact byte-preserved file, CC BY-SA 3.0 notices retained; full Roses/Flash course not bundled |
 | Enrollment/standalone/nested award version/cycle projection | Tested | Tested | Tested | Tested | All required SCO evidence; live authorization, immutable proof/audit/receipt; quiz remains required for course certificate |
 
-Explicitly refused playback profiles: asset activity leaves, absolute/experienced duration limits. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
+Explicitly refused playback profiles: absolute/experienced duration limits. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
 
 | Lane | Observed result | Remaining gate |
 |---|---|---|

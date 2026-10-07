@@ -15,7 +15,7 @@ import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequen
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
 import {hasSelection, beforeSelection, selectionNeedsStart} from './scorm-selection.ts';
-import {sequencingRuntime} from '../shared/scorm-sequencing-runtime.ts';
+import {sequencingRuntime, validNavigation} from '../shared/scorm-sequencing-runtime.ts';
 import {loadSystemObjectives, saveSystemObjectives, objectiveSnapshot, objectiveClientSnapshot} from './scorm-system-objectives.ts';
 import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
@@ -81,7 +81,7 @@ export class SCORMPlayerService {
       const candidates = playbackActivities(manifest).filter(p => activityAvailable(p, states));
       // Default 2004 launch follows the trusted current delivery/start flow;
       // menu visibility must not turn it into a choice of a different SCO.
-      const needsEvidence = (id: string) => !meetsSCORMPolicy(manifest.standard, scoEvidence(manifest.standard, id, rows.find(r => r.sco_id === id)), context?.reference ?? {completion: 'completed_or_passed'});
+      const needsEvidence = (id: string) => manifest.resources.find(r => r.id === candidates.find(p => p.activity.id === id)?.activity.resourceId)?.kind === 'asset' ? !rows.find(r => r.sco_id === id)?.finished : !meetsSCORMPolicy(manifest.standard, scoEvidence(manifest.standard, id, rows.find(r => r.sco_id === id)), context?.reference ?? {completion: 'completed_or_passed'});
       const suspended = engine ? JSON.parse(engine.serializeSequencingState()).sequencing?.suspendedActivity : undefined;
       const replayTarget = engine && rows.length && !engine.getSequencingState()?.currentActivity?.isActive && !suspended ? candidates.find(p => needsEvidence(p.activity.id) && reviewed.activities.some(a => a.id === p.activity.id && a.available))?.activity.id : undefined;
       const profile = engine ? selectSCO(engine, manifest, scoId ?? replayTarget) : scoId ? launchProfile(manifest, scoId) : candidates.find(p => needsEvidence(p.activity.id)) ?? candidates[0];
@@ -146,7 +146,9 @@ export class SCORMPlayerService {
     const latest = this.db.prepare('SELECT result FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, c.launch.sequence) as any;
     const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
     if (engine) {loadSystemData(this.db, c.registration, manifest, engine); loadSystemObjectives(this.db, c.registration, manifest, engine);}
-    return {...(engine ? {sequencingTree: sequencingTree(manifest), sequencingSnapshot: objectiveClientSnapshot(sharedDataClientSnapshot(engine), engine)} : {}), standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
+    const hidden = engine?.getSequencingService()?.getOverallSequencingProcess()?.getEffectiveHideLmsUi(engine.getSequencingState()?.currentActivity ?? null) ?? [];
+    const assetNavigation = profile.resource.kind === 'asset' ? ['continue', 'exitAll'].filter(nav => !hidden.includes(nav as any) && (!engine || validNavigation(engine, nav))) : [];
+    return {...(engine && profile.resource.kind === 'sco' ? {sequencingTree: sequencingTree(manifest), sequencingSnapshot: objectiveClientSnapshot(sharedDataClientSnapshot(engine), engine)} : {}), kind: profile.resource.kind, ...(profile.resource.kind === 'asset' ? {assetNavigation} : {}), standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: profile.resource.kind === 'asset' ? {} : this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
   }
   context(p: Principal, a: {packageId?: string; version?: string; enrollmentId?: string; lessonId?: string; itemEnrollmentId?: string; mode?: string}) {
     const {mode = 'normal', ...args} = a;
@@ -216,14 +218,23 @@ export class SCORMPlayerService {
     if (!row) reject('FORBIDDEN', 'Package resource unavailable');
     return {bytes: Buffer.from(row.bytes), mime: row.mime};
   }
-  checkpoint(token: string, a: any) {
+  checkpoint(token: string, a: any) {return this.writeCheckpoint(token, a, false);}
+  advanceAsset(token: string, a: any) {return this.writeCheckpoint(token, a, true);}
+  private writeCheckpoint(token: string, a: any, asset: boolean) {
     return this.transaction(() => {
       const c = this.capability(token);
       const manifest = this.manifest(c.registration.package_id, c.registration.version, c.p.tenant);
-      const keys = manifest.standard === '1.2' ? ['sequence', 'revision', 'state', 'finished'] : ['sequence', 'revision', 'state', 'finished', 'navigation', 'sharedData'];
-      if (!a || Object.keys(a).some(k => !keys.includes(k)) || !Number.isSafeInteger(a.sequence) || a.sequence < 1 || !Number.isSafeInteger(a.revision) || a.revision < 0 || typeof a.finished !== 'boolean') reject('INVALID_ARGUMENT', 'Exact checkpoint sequence and revision required');
+      const profile = launchProfile(manifest, c.launch.sco_id);
+      if ((profile.resource.kind === 'asset') !== asset) reject('FORBIDDEN', 'Exact communicating SCO or noncommunicating asset action required');
+      const keys = asset ? ['sequence', 'revision', 'navigation'] : manifest.standard === '1.2' ? ['sequence', 'revision', 'state', 'finished'] : ['sequence', 'revision', 'state', 'finished', 'navigation', 'sharedData'];
+      if (!a || Object.keys(a).some(k => !keys.includes(k)) || !Number.isSafeInteger(a.sequence) || a.sequence < 1 || !Number.isSafeInteger(a.revision) || a.revision < 0 || !asset && typeof a.finished !== 'boolean') reject('INVALID_ARGUMENT', 'Exact checkpoint sequence and revision required');
       const payloadHash = tokenHash(JSON.stringify(a)), old = this.db.prepare('SELECT * FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, a.sequence) as any;
       if (old) {if (old.payload_hash !== payloadHash) reject('IDEMPOTENCY_CONFLICT', 'Checkpoint sequence payload changed'); return JSON.parse(old.result);}
+      if (asset) {
+        if (!['continue', 'exitAll'].includes(a.navigation)) reject('INVALID_ARGUMENT', 'Exact asset navigation required');
+        const state = this.seed(c); if (manifest.standard === '1.2') state.core.lesson_status = 'browsed';
+        a = {sequence: a.sequence, revision: a.revision, state, finished: true, ...(manifest.standard !== '1.2' ? {navigation: a.navigation} : {assetNavigation: a.navigation})};
+      }
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
       if (manifest.standard !== '1.2' && a.navigation !== undefined && typeof a.navigation !== 'string') reject('INVALID_ARGUMENT', 'Exact navigation request required');
       if (a.sharedData !== undefined && manifest.standard !== '2004-4') reject('INVALID_ARGUMENT', 'Shared data requires fourth edition');
@@ -244,13 +255,14 @@ export class SCORMPlayerService {
       this.db.prepare('UPDATE scorm_engine_attempts SET revision=revision+1 WHERE id=?').run(c.attempt.id);
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run('learning:' + c.p.tenant + ':' + c.p.id);
       const officialLearningChanged = a.finished && !!this.bindings?.project(c.p, c.registration, c.attempt.id, this.manifest(c.registration.package_id, c.registration.version, c.p.tenant));
-      const nextScoId = engine && a.finished ? deliveredSCO(engine, manifest)?.activity.id ?? null : null;
+      const profiles = playbackActivities(manifest), nextAsset = asset && !engine && a.assetNavigation === 'continue' ? profiles.slice(profiles.findIndex(p => p.activity.id === c.launch.sco_id) + 1).find(p => activityAvailable(p, activityStates(manifest, this.scos(c.attempt.id, c.p.tenant))))?.activity.id : undefined;
+      const nextScoId = engine && a.finished ? deliveredSCO(engine, manifest)?.activity.id ?? null : nextAsset ?? null;
       const delivered = engine?.getSequencingState()?.currentActivity;
       // A post-condition retry can deliver this same SCO as a fresh technical
       // attempt. The old communication session is finished; the shell must
       // close its capability and launch the newly delivered attempt as usual.
       const newSameSCOAttempt = delivered?.isActive && delivered.attemptCount > c.launch.sco_attempt_number;
-      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine ? {nextScoId: nextScoId !== c.launch.sco_id || newSameSCOAttempt ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
+      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine || asset ? {nextScoId: nextScoId !== c.launch.sco_id || newSameSCOAttempt ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
       this.db.prepare('INSERT INTO scorm_engine_checkpoints VALUES(?,?,?,?)').run(c.launch.id, a.sequence, payloadHash, JSON.stringify(result));
       if (a.sequence > this.limits.maxCheckpointReceiptsPerLaunch || scormRuntimeStorageBytes(this.db, c.p.tenant) > this.limits.maxRuntimeStorageBytesPerTenant) reject('INVALID_ARGUMENT', 'SCORM runtime storage quota reached; contact a content administrator');
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(c.p.tenant, c.p.id, 'learning:' + c.p.tenant + ':' + c.p.id, 'runtime_scorm_engine_checkpoint', JSON.stringify({launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished}), now);

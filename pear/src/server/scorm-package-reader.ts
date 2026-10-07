@@ -157,7 +157,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     resources.push({id: rid, kind: type as 'sco' | 'asset', href: entry ? entry.path + entry.suffix : '', files: declared, dependencies: elements(el, 'dependency', ns!).map(d => d.getAttribute('identifierref') ?? '')});
   }
   const resourceIds = new Set(resources.map(r => r.id));
-  if (!resources.some(r => r.kind === 'sco') || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('SCO or resource dependency missing');
+  if (!resources.some(r => r.href) || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('Launchable resource or resource dependency missing');
   const objectiveScope = (organization: Element) => {
     const qualified = organization.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacy = organization.getAttribute('objectivesGlobalToSystem');
     if (qualified !== null && legacy !== null && qualified !== legacy) invalid('conflicting objective scope');

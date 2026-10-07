@@ -42,6 +42,9 @@ export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifes
     const suspended = JSON.parse(runtime.serializeSequencingState()).sequencing?.suspendedActivity;
     if (suspended && scoId && suspended !== scoId) reject('FORBIDDEN', 'Resume the suspended SCO before selecting another');
     let ok = runtime.processNavigationRequest(suspended ? 'resumeAll' : !current ? 'start' : 'choice', scoId ?? current?.activity.id ?? playbackActivities(manifest)[0].activity.id);
+    // A choice-only organization cannot start through flow. Its authored
+    // choice request still has to pass the engine's delivery rules.
+    if (!ok && !suspended && !current) ok = runtime.processNavigationRequest('choice', scoId ?? playbackActivities(manifest)[0].activity.id);
     if (ok && !suspended && !current && scoId && deliveredSCO(runtime, manifest)?.activity.id !== scoId) ok = runtime.processNavigationRequest('choice', scoId);
     if (!ok) reject('FORBIDDEN', 'Sequencing denies activity delivery'); current = deliveredSCO(runtime, manifest);
   } else if (scoId && scoId !== current.activity.id) {
@@ -52,5 +55,5 @@ export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifes
 }
 export function usesSequencing(manifest: SCORMManifest) {
   const configured = (a: SCORMActivity) => a.sequencing || a.sharedDataMaps?.length || a.hideLmsUi?.length || a.completionMeasure && a.completionMeasure.progressWeight !== 1;
-  return manifest.standard !== '1.2' && (!!manifest.sequencing || playbackActivities(manifest).length > 1 || playbackActivities(manifest).some(p => configured(p.activity) || p.ancestors.some(configured)));
+  return manifest.standard !== '1.2' && (!!manifest.sequencing || playbackActivities(manifest).length > 1 || playbackActivities(manifest).some(p => p.resource.kind === 'asset' || configured(p.activity) || p.ancestors.some(configured)));
 }
