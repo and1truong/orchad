@@ -115,6 +115,7 @@ test('content host serves capability-scoped assets and refuses application crede
   try {
     const bootstrap = await content.inject({url: base, headers: {host}}); assert.equal(bootstrap.statusCode, 200);
     assert.match(bootstrap.headers['content-security-policy'] as string, /sandbox allow-scripts allow-same-origin/);
+    assert.match(bootstrap.headers['content-security-policy'] as string, /worker-src 'none'/);
     assert.equal(bootstrap.headers['access-control-allow-origin'], undefined);
     assert.equal((await content.inject({url: base, headers: {host, cookie: 'pear-session=private'}})).statusCode, 403);
     assert.equal((await content.inject({url: base, headers: {host: '127.0.0.1:4339'}})).statusCode, 403);

@@ -26,6 +26,11 @@ test('built single-SCO engine isolates Pear, durably retries outages/lost ACK an
     const runtime = page.frameLocator('iframe[title="Isolated SCORM engine player"]'), sco = runtime.frameLocator('iframe[title="SCORM SCO"]');
     await expect(sco.getByText('Engine entry: ab-initio', {exact: true})).toBeVisible();
     await expect(sco.getByText('Pear cookies and bridge are isolated', {exact: true})).toBeVisible();
+    const workerDenied = await sco.locator('body').evaluate(async () => {
+      try {await navigator.serviceWorker.register('../assets/player.js'); return false;} catch {return true;}
+    });
+    expect(workerDenied).toBe(true);
+    expect(await sco.locator('body').evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBe(0);
     await expect(sco.getByRole('heading', {name: 'Original engine SCO'})).toHaveCSS('color', 'rgb(17, 34, 51)');
     await sco.getByRole('button', {name: 'Save engine progress', exact: true}).click();
     await expect(panel.getByRole('status')).toContainText('saved by the server');
