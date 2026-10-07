@@ -23,7 +23,7 @@ export function sequencingTree(manifest: SCORMManifest) {
 }
 export function trustedSequencing(manifest: SCORMManifest, persisted: string, scope: {attemptId: string; sha256: string}) {
   const tree = sequencingTree(manifest), envelope = JSON.parse(persisted);
-  if (Object.keys(envelope).length && (envelope.attemptId !== scope.attemptId || envelope.sha256 !== scope.sha256 || envelope.standard !== manifest.standard || envelope.engine?.version !== SCORM_ENGINE.version || typeof envelope.snapshot !== 'string')) reject('FORBIDDEN', 'SCORM sequencing snapshot identity changed');
+  if (Object.keys(envelope).length && (envelope.attemptId !== scope.attemptId || envelope.sha256 !== scope.sha256 || envelope.standard !== manifest.standard || envelope.engine?.version !== SCORM_ENGINE.version || envelope.engine?.adaptation !== undefined && envelope.engine.adaptation !== SCORM_ENGINE.adaptation || typeof envelope.snapshot !== 'string')) reject('FORBIDDEN', 'SCORM sequencing snapshot identity changed');
   return sequencingRuntime(tree, envelope.snapshot);
 }
 export function saveSequencing(runtime: ReturnType<typeof sequencingRuntime>, manifest: SCORMManifest, scope: {attemptId: string; sha256: string}) {

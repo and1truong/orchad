@@ -66,3 +66,7 @@ export function sharedDataManifest() {
 }
 
 export function systemSharedDataManifest() {return sharedDataManifest().replace('runtime:sharedDataGlobalToSystem="false"', '');}
+
+export function selectionManifest(edition: SCORM2004Edition = '2004-4', selectionTiming = 'once', randomizationTiming = 'once', selectCount = 1, reorderChildren = true) {
+  return sequencingManifest(edition).replace(/(<s:controlMode[^>]*\/>)/, '$1' + `<s:randomizationControls selectionTiming="${selectionTiming}" randomizationTiming="${randomizationTiming}" selectCount="${selectCount}" reorderChildren="${reorderChildren}"/>`).replace(/(<p:title>Practice<\/p:title>)<s:sequencing>.*?<\/s:sequencing>/, '$1');
+}

@@ -8,7 +8,7 @@ import {CURRENT_SCHEMA_VERSION} from './database.ts';
 import type {SCORMPlayerService} from './scorm-player-service.ts';
 
 const finite = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : 0;
-const base = () => ({format: 'pear-scorm-support-v1', engine: SCORM_ENGINE, schemaVersion: CURRENT_SCHEMA_VERSION, generatedAt: new Date().toISOString(), productionEnabled: false, loggingAdaptation: 'pear-no-direct-sequencing-logs-v1'});
+const base = () => ({format: 'pear-scorm-support-v1', engine: SCORM_ENGINE, schemaVersion: CURRENT_SCHEMA_VERSION, generatedAt: new Date().toISOString(), productionEnabled: false, loggingAdaptation: 'pear-no-direct-sequencing-logs-v1', behaviorAdaptation: SCORM_ENGINE.adaptation});
 
 // Build an allowlisted support packet. Never spread a database/runtime row.
 export function scormLaunchDiagnostics(player: SCORMPlayerService, p: Principal, launchId: string, sessionHash: string) {

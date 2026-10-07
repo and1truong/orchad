@@ -189,6 +189,15 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
     switch (n.localName) {
       case 'controlMode': out.sequencingControls = {...out.sequencingControls, choice: true, choiceExit: true, flow: false, forwardOnly: false, useCurrentAttemptObjectiveInfo: true, useCurrentAttemptProgressInfo: true, ...flags(n, ['choice', 'choiceExit', 'flow', 'forwardOnly', 'useCurrentAttemptObjectiveInfo', 'useCurrentAttemptProgressInfo'])}; break;
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
+      case 'randomizationControls': {
+        attrs(n, ['randomizationTiming', 'selectCount', 'reorderChildren', 'selectionTiming']);
+        const selectionTiming = n.getAttribute('selectionTiming') ?? 'never', randomizationTiming = n.getAttribute('randomizationTiming') ?? 'never';
+        if (![selectionTiming, randomizationTiming].every(v => ['never', 'once', 'onEachNewAttempt'].includes(v))) fail();
+        if (n.hasAttribute('selectCount') && !/^[+-]?\d+$/.test(n.getAttribute('selectCount')!)) fail();
+        const selectCount = number(n, 'selectCount', 0, 2048); if (selectCount !== undefined && !Number.isInteger(selectCount)) fail();
+        out.sequencingControls = {...out.sequencingControls, selectionTiming, randomizationTiming, selectCount: selectCount ?? null, randomizeChildren: bool(n, 'reorderChildren') ?? false};
+        break;
+      }
       case 'limitConditions': {
         attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
         const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');

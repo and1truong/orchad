@@ -270,3 +270,5 @@ System shared-data successor (ADR-090) admits fourth-edition default/global shar
 
 
 SCORM #133 / ADR-091 supplements G05/G10/G14/G18 with tenant/learner system objective persistence, cross-package prerequisites and local/system/unofficial scope separation. Inherited objective state does not create course/award completion proof; these capability supplements do not close external reference/platform/conformance/production gates.
+
+SCORM #133 / ADR-092 supplements G05/G10/G14/G18 with host-owned selected pool/order, selected-subtree proof and explicit pinned behavior provenance. Presentation-hidden/zero-weight SCOs remain required when selected; disabled/uncompleted selected SCOs cannot produce proof. Static eligible menus do not spend a random choice; actual host delivery/authorization stays authoritative.

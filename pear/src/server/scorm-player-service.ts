@@ -14,6 +14,8 @@ import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
+import {hasSelection, beforeSelection} from './scorm-selection.ts';
+import {sequencingRuntime} from '../shared/scorm-sequencing-runtime.ts';
 import {loadSystemObjectives, saveSystemObjectives, objectiveSnapshot, objectiveClientSnapshot} from './scorm-system-objectives.ts';
 import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
@@ -167,7 +169,8 @@ export class SCORMPlayerService {
     }
     const available = (id: string) => {
       if (!engine) return true;
-      try {const copy = trustedSequencing(manifest, saveSequencing(engine, manifest, {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}), {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}); selectSCO(copy, manifest, id); return true;} catch {return false;}
+      try {const copy = !attempt && hasSelection(manifest) ? sequencingRuntime(beforeSelection(sequencingTree(manifest))) : trustedSequencing(manifest, saveSequencing(engine, manifest, {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}), {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256});
+        if (!attempt && hasSelection(manifest)) loadSystemObjectives(this.db, {id: 'context-preview', tenant: p.tenant, learner: p.id, mode, binding_key: context?.bindingKey ?? 'standalone'}, manifest, copy); selectSCO(copy, manifest, id); return true;} catch {return false;}
     };
     return {packageId, version, reference: context?.reference ?? null, officialLearning: !!context,
       registrationId: r?.id ?? null, attemptId: attempt?.id ?? null, retakeAvailable: rows.some(row => row.revision > 0),
