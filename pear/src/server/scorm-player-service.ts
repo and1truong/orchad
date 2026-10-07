@@ -216,7 +216,7 @@ export class SCORMPlayerService {
     packagePath(path);
     const row = this.db.prepare('SELECT bytes,mime FROM scorm_engine_resources WHERE package_id=? AND version=? AND tenant=? AND path=?').get(c.registration.package_id, c.registration.version, c.launch.tenant, path) as any;
     if (!row) reject('FORBIDDEN', 'Package resource unavailable');
-    return {bytes: Buffer.from(row.bytes), mime: row.mime};
+    return {bytes: Buffer.from(row.bytes), mime: row.mime, kind: launchProfile(this.manifest(c.registration.package_id, c.registration.version, c.p.tenant), c.launch.sco_id).resource.kind};
   }
   checkpoint(token: string, a: any) {return this.writeCheckpoint(token, a, false);}
   advanceAsset(token: string, a: any) {return this.writeCheckpoint(token, a, true);}
