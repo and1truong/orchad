@@ -5,7 +5,75 @@ import {multiFileManifest, multiFilePackage} from './scorm-package-fixture.ts';
 import {createSCORM2004API, type SCORM2004Edition} from '../src/shared/scorm2004-runtime.ts';
 import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
-import {sequencingManifest, collectionManifest} from './scorm-sequencing-fixture.ts';
+import {sequencingManifest, collectionManifest, retryManifest} from './scorm-sequencing-fixture.ts';
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const action of ['retry', 'retryAll'] as const) test(edition + ': ' + action + ' redelivers the same SCO in a new technical attempt without rewriting history or granting proof', async () => {
+  const f = await scormLearningFixture(undefined, multiFilePackage(edition, retryManifest(edition, action)));
+  try {
+    const binding = f.enroll(), first = f.launch(binding, 'intro');
+    const failed = sequenceCheckpoint(f, first, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.4', 'cmi.location': 'failed-page', 'cmi.suspend_data': 'old-private-data', 'cmi.session_time': 'PT12S', 'adl.nav.request': 'exit'});
+    const result = f.player.checkpoint(first.token, failed);
+    assert.equal(result.officialLearningChanged, false); assert.equal(result.nextScoId, 'intro');
+    assert.deepEqual(f.player.checkpoint(first.token, failed), result);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+    const saved = f.db.prepare('SELECT * FROM scorm_sco_attempts WHERE sco_id=?').get('intro') as any;
+    assert.equal(saved.sco_attempt_number, 1); assert.equal(saved.reported_seconds, 12); assert.equal(saved.finished, 1);
+    const second = f.launch(binding, 'intro'), b = f.player.bootstrap(second.token);
+    assert.equal(b.state.entry, 'ab-initio'); assert.equal(b.state.total_time, 'PT0S');
+    assert.ok(!b.state.location); assert.ok(!b.state.suspend_data);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_attempts').get()!.n, 1);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_sco_attempts').get()!.n, 2);
+    assert.deepEqual(f.db.prepare('SELECT * FROM scorm_sco_attempts WHERE sco_id=? AND sco_attempt_number=1').get('intro'), saved);
+    assert.throws(() => f.player.checkpoint(first.token, failed), /closed/);
+    f.player.checkpoint(second.token, sequenceCheckpoint(f, second, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'cmi.session_time': 'PT5S', 'adl.nav.request': 'continue'}));
+    const practice = f.launch(binding, 'practice');
+    assert.equal(f.player.checkpoint(practice.token, sequenceCheckpoint(f, practice, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+    const proof = JSON.parse(String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence));
+    assert.equal(proof.scos.find((s: any) => s.scoId === 'intro').seconds, 5);
+  } finally {f.db.close();}
+});
+
+test('retryAll from a later SCO restarts root flow and preserves both earlier SCO histories', async () => {
+  const rule = '<s:postConditionRule><s:ruleConditions><s:ruleCondition condition="completed" operator="not"/></s:ruleConditions><s:ruleAction action="retryAll"/></s:postConditionRule>';
+  const xml = sequencingManifest().replace('</s:preConditionRule></s:sequencingRules>', '</s:preConditionRule>' + rule + '</s:sequencingRules>');
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', xml));
+  try {
+    const binding = f.enroll(), intro = f.launch(binding, 'intro');
+    f.player.checkpoint(intro.token, sequenceCheckpoint(f, intro, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'cmi.location': 'earlier-intro', 'cmi.session_time': 'PT7S', 'adl.nav.request': 'continue'}));
+    const practice = f.launch(binding, 'practice');
+    const result = f.player.checkpoint(practice.token, sequenceCheckpoint(f, practice, {'cmi.completion_status': 'incomplete', 'cmi.location': 'failed-practice', 'cmi.session_time': 'PT9S', 'adl.nav.request': 'exit'}));
+    assert.equal(result.nextScoId, 'intro'); assert.equal(result.officialLearningChanged, false);
+    const restarted = f.launch(binding, 'intro'), state = f.player.bootstrap(restarted.token).state;
+    assert.ok(!state.location); assert.equal(state.total_time, 'PT0S'); assert.equal(state.entry, 'ab-initio');
+    const history = f.db.prepare('SELECT sco_id,sco_attempt_number,reported_seconds,runtime_state FROM scorm_sco_attempts ORDER BY sco_id,sco_attempt_number').all() as any[];
+    assert.equal(history.length, 3); assert.equal(JSON.parse(history[0].runtime_state).location, 'earlier-intro'); assert.equal(history[0].reported_seconds, 7);
+    assert.equal(JSON.parse(history[2].runtime_state).location, 'failed-practice'); assert.equal(history[2].reported_seconds, 9);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_attempts').get()!.n, 1);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+  } finally {f.db.close();}
+});
+
+test('post-condition retry obeys attempt limits and Commit never starts the retry', async () => {
+  const xml = retryManifest().replace('attemptLimit="3"', 'attemptLimit="2"');
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding, 'intro');
+    const values = {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.4', 'cmi.session_time': 'PT3S', 'adl.nav.request': 'exit'};
+    const commit = f.player.checkpoint(first.token, sequenceCheckpoint(f, first, values, false));
+    assert.equal(commit.finished, false); assert.equal(commit.nextScoId, null);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_sco_attempts').get()!.n, 1);
+    assert.equal(f.player.checkpoint(first.token, sequenceCheckpoint(f, first, values)).nextScoId, 'intro');
+    const second = f.launch(binding, 'intro');
+    const pending = sequenceCheckpoint(f, second, values, false);
+    assert.throws(() => f.player.checkpoint(second.token, {...pending, finished: true}), /denies/);
+    assert.equal(f.db.prepare('SELECT revision FROM scorm_sco_attempts WHERE sco_attempt_number=2').get()!.revision, 0);
+    const result = f.player.checkpoint(second.token, sequenceCheckpoint(f, second, {...values, 'adl.nav.request': 'exitAll'}));
+    assert.equal(result.officialLearningChanged, false);
+    assert.throws(() => f.launch(binding, 'intro'), /prerequisites|denies/);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_sco_attempts').get()!.n, 2);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+  } finally {f.db.close();}
+});
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': manifest-local collections retain objective gates, durable delivery and official rollup', async () => {
   const f = await scormLearningFixture(undefined, multiFilePackage(edition, collectionManifest(edition)));

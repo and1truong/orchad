@@ -17,8 +17,7 @@ function rule(el: Element, kind: string) {
   if (nodes.length !== 2 || !cs || !action || nodes.some(n => n.namespaceURI !== SN)) fail();
   attrs(cs!, ['conditionCombination']); attrs(action!, ['action']);
   const combination = cs!.getAttribute('conditionCombination') ?? 'all', value = action!.getAttribute('action');
-  const actions = kind === 'preConditionRule' ? preActions : kind === 'exitConditionRule' ? ['exit'] : ['exitParent', 'exitAll', 'continue', 'previous'];
-  // retry/retryAll require additional conformance coverage before accepting manifests.
+  const actions = kind === 'preConditionRule' ? preActions : kind === 'exitConditionRule' ? ['exit'] : ['exitParent', 'exitAll', 'continue', 'previous', 'retry', 'retryAll'];
   if (!['all', 'any'].includes(combination) || !actions.includes(value ?? '')) fail();
   const list = children(cs!); if (!list.length || list.length > 64) fail();
   return {action: value, conditionCombination: combination, conditions: list.map(n => {
