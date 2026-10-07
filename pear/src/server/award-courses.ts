@@ -10,7 +10,7 @@ import {reject} from './errors.ts';
 export class AwardCourses {
  constructor(readonly db:DatabaseSync){}
  private principal(id:string,tenant:string){const p=this.db.prepare('SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1').get(id,tenant) as unknown as Principal;if(!p)reject('FORBIDDEN','Active assignment participant required');return p;}
- private award(p:Principal,id:string,changing=false){
+ private award(p:Principal,id:string,changing=false,historical=false){
   const e=this.db.prepare('SELECT * FROM award_enrollments WHERE id=? AND tenant=?').get(id,p.tenant) as any;
   if(!e)reject('FORBIDDEN','Award binding unavailable');
   const learner=this.principal(e.learner,e.tenant),owner=this.owner(e);
@@ -20,10 +20,10 @@ export class AwardCourses {
   if(value.access==='groups'&&!value.groupIds.some((id:string)=>new PeopleService(this.db).isMember(e.tenant,id,learner.id)))reject('FORBIDDEN','Current award group membership required');
   const current=this.db.prepare('SELECT v.content FROM collections c JOIN collection_versions v ON v.collection_id=c.id AND v.version=c.latest_version WHERE c.id=? AND c.tenant=?').get(e.award_id,e.tenant) as any;
   const currentValue=current?JSON.parse(current.content):null;
-  if(changing&&(!currentValue||currentValue.access==='groups'&&!currentValue.groupIds.some((id:string)=>new PeopleService(this.db).isMember(e.tenant,id,learner.id))||currentValue.access==='author'&&this.db.prepare('SELECT owner FROM collections WHERE id=?').get(e.award_id)!.owner!==learner.id))reject('FORBIDDEN','Current award audience required');
-  if(e.assigned_by)this.principal(owner,e.tenant);
+  if((changing||historical)&&(!currentValue||currentValue.access==='groups'&&!currentValue.groupIds.some((id:string)=>new PeopleService(this.db).isMember(e.tenant,id,learner.id))||currentValue.access==='author'&&this.db.prepare('SELECT owner FROM collections WHERE id=?').get(e.award_id)!.owner!==learner.id))reject('FORBIDDEN','Current award audience required');
+  if(e.assigned_by&&!historical)this.principal(owner,e.tenant);
   if(changing&&(e.assignment_state!=='active'||e.completed_at))reject('FORBIDDEN','An active unfinished award is required for a binding change');
-  if(e.assignment_cycle_id){
+  if(e.assignment_cycle_id&&!historical){
    const d=this.db.prepare('SELECT d.*,p.state plan_state,p.owner,c.definition,c.target_kind,c.target_id FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id JOIN assignment_plans p ON p.id=c.plan_id WHERE d.cycle_id=? AND d.learner=? AND p.tenant=?').get(e.assignment_cycle_id,learner.id,e.tenant) as any;
    if(!d||d.award_enrollment_id!==e.id||d.target_kind!=='award'||d.target_id!==e.award_id||!['active','closed'].includes(d.plan_state)||(changing&&d.state!=='active'))reject('FORBIDDEN','Active award cycle delivery required');
    const coordinator=this.principal(d.owner,e.tenant);this.coordinator(coordinator,e);
@@ -55,14 +55,16 @@ export class AwardCourses {
   const x=this.context(p,this.address(p,a),true);
   if(x.source?.id!==result.enrollmentId)reject('STALE_CONTEXT','Award course binding changed; review again');
  }
- private context(p:Principal,a:any,changing=false){
-  const e=this.award(p,a.awardEnrollmentId,changing),ref=awardCourseReferences(this.db,e).find(r=>r.criterionPath===a.criterionPath&&r.courseId===a.courseId);
+ private context(p:Principal,a:any,changing=false,historical=false){
+  const e=this.award(p,a.awardEnrollmentId,changing,historical),ref=awardCourseReferences(this.db,e).find(r=>r.criterionPath===a.criterionPath&&r.courseId===a.courseId);
   if(!ref)reject('FORBIDDEN','Exact course criterion outside enrolled award');
   const b=this.db.prepare('SELECT * FROM award_course_bindings WHERE award_enrollment_id=? AND criterion_path=? AND course_id=?').get(e.id,ref.criterionPath,ref.courseId) as any;
   if(b&&b.pinned_version!==ref.version)reject('INTERNAL','Award binding pin mismatch');
   const source=b?.course_enrollment_id?this.db.prepare('SELECT * FROM enrollments WHERE id=?').get(b.course_enrollment_id) as any:this.db.prepare('SELECT * FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND assignment_cycle_id IS ? AND award_binding_id IS NULL AND retake_of IS NULL ORDER BY (version=?) DESC,rowid DESC LIMIT 1').get(e.learner,e.tenant,ref.courseId,e.assignment_cycle_id,ref.version) as any;
   if(source&&(source.learner!==e.learner||source.tenant!==e.tenant||source.course_id!==ref.courseId||source.assignment_cycle_id!==e.assignment_cycle_id))reject('FORBIDDEN','Bound course ledger scope mismatch');
   const data={...e,courseId:ref.courseId},learner=this.principal(e.learner,e.tenant);
+  for(const ancestor of ref.ancestors){const row=this.db.prepare('SELECT owner,latest_version FROM collections WHERE id=? AND tenant=?').get(ancestor.id,e.tenant) as any;if(!row)reject('FORBIDDEN','Nested award unavailable');for(const version of new Set([ancestor.version,row.latest_version])){const v=JSON.parse((this.db.prepare('SELECT content FROM collection_versions WHERE collection_id=? AND version=?').get(ancestor.id,version) as any).content);if(v.access==='author'&&row.owner!==learner.id||v.access==='groups'&&!v.groupIds.some((id:string)=>new PeopleService(this.db).isMember(e.tenant,id,learner.id)))reject('FORBIDDEN','Current nested award audience required');}}
+
   for(const who of p.id===learner.id?[learner]:[p,learner])for(const version of new Set([ref.version,b?.current_version??ref.version,...(source?[source.version]:[])]))this.content(who,data,version);
   return {e,ref,b,source,data,learner};
  }
@@ -144,7 +146,7 @@ export class AwardCourses {
   const b=this.db.prepare('SELECT * FROM award_course_bindings WHERE id=?').get(e.award_binding_id) as any;
   if(!b)reject('FORBIDDEN','Award binding unavailable');
   if(write&&b.course_enrollment_id!==e.id)reject('FORBIDDEN','Only the current bound course may change official learning');
-  const award=this.award(p,b.award_enrollment_id,write);
+  const {e:award}=this.context(p,{awardEnrollmentId:b.award_enrollment_id,criterionPath:b.criterion_path,courseId:b.course_id},write,!write);
   this.content(p,{...award,courseId:b.course_id},e.version);
  }
  open(p:Principal,a:any,authorizeOnly=false){

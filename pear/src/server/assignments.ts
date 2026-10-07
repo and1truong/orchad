@@ -290,7 +290,7 @@ export class AssignmentService {
         const children=this.db.prepare("SELECT e.*,b.pinned_version,b.current_version FROM award_course_bindings b JOIN enrollments e ON e.id=b.course_enrollment_id WHERE b.award_enrollment_id=? AND e.completed_at IS NULL").all(d.award_enrollment_id) as any[];
         for(const child of children){
           let allowed=!!recipient&&desired.has(d.learner)&&d.state!=="cancelled";
-          if(allowed){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"course",child.course_id,child.pinned_version);access.enrolled(recipient,"course",child.course_id,child.current_version);access.current(recipient,"course",child.course_id);}catch{allowed=false;}}
+          if(allowed){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"course",child.course_id,child.pinned_version);access.enrolled(recipient,"course",child.course_id,child.current_version);access.current(recipient,"course",child.course_id);new AwardCourses(this.db).requireCurrentCourse(recipient,child.id,false);}catch{allowed=false;}}
           const state=d.state==="cancelled"?"cancelled":allowed?"active":"withdrawn";
           if(child.assignment_state!==state){this.db.prepare("UPDATE enrollments SET assignment_state=? WHERE id=?").run(state,child.id);this.advance(p,d.learner);changed++;}
         }
