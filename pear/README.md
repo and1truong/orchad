@@ -1,5 +1,7 @@
 # Pear
 
+SCORM engine expansion is tracked in epic #133 and [ADR-075](docs/ADR-075-scorm-engine-foundation.md). The foundation uses pinned scorm-again 3.4.5 and migration 043 while preserving the legacy inline player. `npm run dev:scorm-content` starts a loopback-only, fail-closed content host at `http://localhost:4315`, separately from Pear at `http://127.0.0.1:4314`; it currently exposes health only. Package player enablement, full standards acceptance and production executable isolation remain explicit later gates.
+
 Independent deterministic learning app for [epic #49](https://github.com/and1truong/orchad/issues/49), built with React/TypeScript, same-origin Fastify and Node 24 SQLite. Full Go1 parity remains open; [capability register](docs/CAPABILITIES.md) separates implemented internal profiles, CI evidence, unfinished work and external dependencies.
 
 Pear owns catalog, immutable learning versions, roles, official grades/completion, reports and administration. Lime/shared Pi/Mango owns model execution. Pear contains no model, provider credentials or app-owned agent loop.

@@ -4,6 +4,7 @@ import { readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomBytes, scryptSync } from "node:crypto";
 import { courses } from "./seed.ts";
+export const CURRENT_SCHEMA_VERSION = 43;
 export function openDatabase(path: string, seed = false) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
@@ -302,6 +303,11 @@ export function openDatabase(path: string, seed = false) {
   if (!db.prepare("SELECT 1 FROM schema_version WHERE version=42").get()) {
     db.exec("BEGIN IMMEDIATE");
     try {db.exec(readFileSync(new URL("../../migrations/042.sql",import.meta.url),"utf8"));new ProgramService(db).snapshotLegacyCertificates();if(db.prepare("PRAGMA foreign_key_check").all().length)throw new Error("Award binding migration violates foreign keys");db.exec("COMMIT");}
+    catch(e){db.exec("ROLLBACK");db.close();throw e;}
+  }
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=43").get()) {
+    db.exec("BEGIN IMMEDIATE");
+    try {db.exec(readFileSync(new URL("../../migrations/043.sql",import.meta.url),"utf8"));if(db.prepare("PRAGMA foreign_key_check").all().length)throw new Error("SCORM engine migration violates foreign keys");db.exec("COMMIT");}
     catch(e){db.exec("ROLLBACK");db.close();throw e;}
   }
   if (seed) {

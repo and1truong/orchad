@@ -1,3 +1,4 @@
+import {CURRENT_SCHEMA_VERSION} from "../src/server/database.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -619,7 +620,7 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
     assert.equal(
       (db.prepare("SELECT MAX(version) AS n FROM schema_version").get() as any)
         .n,
-      42,
+      CURRENT_SCHEMA_VERSION,
     );
     const r = service.invoke("learner-a", {
       requestId: "persist",

@@ -1,0 +1,29 @@
+export const SCORM_STANDARDS = ['1.2', '2004-2', '2004-3', '2004-4'] as const;
+export type SCORMStandard = typeof SCORM_STANDARDS[number];
+export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5'} as const;
+export interface SCORMResource {
+  id: string;
+  kind: 'sco' | 'asset';
+  href: string;
+  files: string[];
+  dependencies: string[];
+}
+export interface SCORMActivity {
+  id: string;
+  title: string;
+  resourceId?: string;
+  parameters?: string;
+  children: SCORMActivity[];
+}
+export interface SCORMManifest {
+  standard: SCORMStandard;
+  identifier: string;
+  title: string;
+  organizationId: string;
+  activities: SCORMActivity[];
+  resources: SCORMResource[];
+}
+export function scormStandard(value: unknown): SCORMStandard {
+  if (!SCORM_STANDARDS.includes(value as SCORMStandard)) throw new Error('Unsupported SCORM edition');
+  return value as SCORMStandard;
+}
