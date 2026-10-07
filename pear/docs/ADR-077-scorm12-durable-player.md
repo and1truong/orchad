@@ -1,0 +1,23 @@
+# ADR 077 — Isolated SCORM 1.2 playback with durable acknowledgements
+
+S3 of epic #133, stacked on ADR 075/076. Enable reviewed single-SCO 1.2 content on explicitly configured loopback fixture hosts. Preserve the legacy inline player and its separate tracking.
+
+## Browser and credential boundary
+
+Pear remains the authenticated shell on one hostname. A minimal independently bundled runtime and SCO frames share the other hostname, allowing synchronous standard API discovery. The bundle imports only the pinned engine facade and contains its MIT notice. It has no Pear session client, agent bridge or native imports. The content host refuses Cookie/Authorization headers, mismatched Host, cross-origin checkpoints and unknown resource paths. No CORS or application session is exposed. HTTP sandbox/CSP restrict forms, popups, top navigation, scripts/assets/connections and frame ancestry. Resource paths remain relative to each immutable package version.
+
+Launch URLs carry a random 256-bit capability; only its hash is stored. Each capability binds one learner, application session, tenant, exact registration/version/mode/attempt/SCO, and one-hour-or-session expiry. Relaunch supersedes the prior communication session while retaining the same attempt. Every bootstrap, resource read and checkpoint rechecks live account/authorization version, original session, preview role, and package lifecycle. Logout, account change, closure, expiry and revocation deny further reads/writes. Retirement permits an already active launch. Capability holders can report their own SCORM results; this is not an anti-cheat claim.
+
+## Durable runtime contract
+
+Expose only the eight standard synchronous string-return 1.2 methods. A local successful Commit queues a bounded immutable snapshot, while Pear displays Saved only after reconciling the durable sequence through an authenticated server read. Explicit commits, Finish, periodic 15-second checkpoints and close-time flush feed one serialized queue. A failed or lost acknowledgement retains the original sequence/revision/payload for retry. Finish snapshots before closing the API; writes after Finish are rejected. Close waits for the queue to drain and verifies the last durable sequence before revoking the launch. Unload/crash is not a persistence guarantee; resume uses the last server acknowledgement.
+
+Migration 045 persists launches and checkpoint receipts. Server validation never preloads untrusted CMI JSON: bound and flatten it, enforce writable/readonly field families, preload only trusted stored state, then replay changed writable fields through the actual engine data model. Student identity, mode/credit/entry and LMS data stay server-owned. The initial launch seed keeps readonly fields stable across checkpoints. Atomic audit, SCO state/revision, overall attempt revision, personal context revision, launch sequence, Finish and receipt commit together. Retry is identical or rejected; old/reordered writers fail CAS. Session time is cumulative within a launch and only its delta is added, so repeated Commit/Finish cannot double count. Relaunch resets session time and supplies durable total time and suspend/resume state.
+
+## Evidence and remaining scope
+
+Domain tests exercise the real installed engine, interactions/objectives/score, restart and resume, exact retry, stale writer, forged identity, malformed data, audit rollback, preview isolation, session/account/package revocation and resource/origin guards. Built Chromium acceptance exercises real assets/CSS/API discovery, blocked access to Pear cookies/bridge, network failure before persistence, lost ACK after persistence, retry, Finish, close flush, page reload/resume and logout. Existing legacy browser acceptance still passes.
+
+Launch reparses retained immutable XML rather than trusting old derived metadata. This slice explicitly refuses 2004, multi-SCO trees, prerequisites, mastery/time/launch-data extensions and sequencing. Import recognition of four editions is not player support or conformance. S4 adds multi-SCO/course/award binding and retakes, S5 edition-specific 2004 CMI, S6 real sequencing, S7 native/production host security and external-package interoperability, and S8 final acceptance.
+
+Production execution is disabled. Browser CSP is not a proof that all content-driven navigation/network egress is prevented. The native host and production content infrastructure must demonstrate their executable and all-egress boundaries before enabling arbitrary packages there. Fixture playback can continue without a commercial engine account or human PR approval wait.

@@ -1,7 +1,7 @@
 import Scorm12API from 'scorm-again/scorm12';
 
 /** Only the standard synchronous API is exposed to content, never engine helpers. */
-export function createSCORM12API(options: {state?: Record<string, any>; checkpoint?: (state: Record<string, any>, finished: boolean) => void} = {}) {
+export function createSCORM12API(options: {state?: Record<string, any>; checkpoint?: (state: Record<string, any>, finished: boolean) => unknown} = {}) {
   const runtime = new Scorm12API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false});
   if (options.state) runtime.loadFromJSON(options.state);
   const snapshot = () => {
@@ -14,6 +14,7 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
   const active = () => initialized && !finished;
   return Object.freeze({
     LMSInitialize(argument: string) {
+      if (finished) return bad('301');
       if (argument !== '') return bad('201');
       localError = null;
       const value = runtime.LMSInitialize(argument);
@@ -35,7 +36,7 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       if (argument !== '') return bad('201');
       localError = null;
       const value = runtime.LMSCommit(argument);
-      if (value === 'true') options.checkpoint?.(snapshot(), false);
+      if (value === 'true' && options.checkpoint?.(snapshot(), false) === false) return bad('101');
       return value;
     },
     LMSFinish(argument: string) {
@@ -43,8 +44,9 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       if (argument !== '') return bad('201');
       localError = null;
       const state = snapshot();
+      if (options.checkpoint?.(state, true) === false) return bad('101');
       const value = runtime.LMSFinish(argument);
-      if (value === 'true') {finished = true; options.checkpoint?.(state, true);}
+      if (value === 'true') finished = true;
       return value;
     },
     LMSGetLastError() {return localError ?? runtime.LMSGetLastError();},

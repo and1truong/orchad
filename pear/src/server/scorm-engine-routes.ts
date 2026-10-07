@@ -4,8 +4,9 @@ import {SCORMPackageService} from './scorm-package-service.ts';
 import {packageLimits} from './scorm-package-reader.ts';
 import {DomainError, reject} from './errors.ts';
 import {failure} from '@orchard/bridge-contract';
+import type {SCORMPlayerService} from './scorm-player-service.ts';
 
-export async function registerSCORMEngine(app: FastifyInstance, packages: SCORMPackageService, enabled: boolean, principal: (req: any) => Principal) {
+export async function registerSCORMEngine(app: FastifyInstance, packages: SCORMPackageService, enabled: boolean, principal: (req: any) => Principal, runtime?: {player: SCORMPlayerService; contentOrigin: string}) {
   const error = (e: any, reply: any) => {
     const code = e instanceof DomainError ? e.code : 'INTERNAL';
     return reply.code(code === 'UNAUTHORIZED' ? 401 : code === 'FORBIDDEN' ? 403 : code === 'STALE_CONTEXT' || code === 'IDEMPOTENCY_CONFLICT' ? 409 : code === 'INTERNAL' ? 500 : 400).send(failure(code, code === 'INTERNAL' ? 'Internal package error' : e.message));
@@ -15,10 +16,24 @@ export async function registerSCORMEngine(app: FastifyInstance, packages: SCORMP
     try {
       const q = req.query as any, offset = Number(q.offset ?? 0);
       if (!Number.isSafeInteger(offset) || offset < 0) reject('INVALID_ARGUMENT', 'Invalid package page');
-      return {...packages.list(principal(req), q.author === 'true', offset), importsEnabled: enabled, runtimeEnabled: false};
+      const p = principal(req), data = packages.list(p, q.author === 'true', offset);
+      return {...data, items: data.items.map((row: any) => ({...row, playbackSupported: !!runtime && runtime.player.playbackSupported(row.id, row.version, p.tenant)})), importsEnabled: enabled, runtimeEnabled: !!runtime};
     } catch (e) {return error(e, reply);}
   });
   app.get('/api/scorm-engine/jobs/:id', async (req, reply) => {try {return packages.job(principal(req), (req.params as any).id);} catch (e) {return error(e, reply);}});
+  app.post('/api/scorm-engine/launch', {preHandler: guard}, async (req, reply) => {
+    try {
+      if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured');
+      const {token, ...result} = runtime!.player.launch(principal(req), (req as any).session.token_hash, req.body as any);
+      return {...result, contentOrigin: runtime!.contentOrigin, url: runtime!.contentOrigin + '/launch/' + token};
+    } catch(e) {return error(e, reply);}
+  });
+  app.get('/api/scorm-engine/launches/:id', async (req, reply) => {
+    try {if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured'); return runtime!.player.status(principal(req), (req.params as any).id, (req as any).session.token_hash);} catch(e) {return error(e, reply);}
+  });
+  app.post('/api/scorm-engine/launches/:id/close', {preHandler: guard}, async (req, reply) => {
+    try {if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured'); return runtime!.player.close(principal(req), (req.params as any).id, (req as any).session.token_hash);} catch(e) {return error(e, reply);}
+  });
   app.post('/api/scorm-engine/review', {preHandler: guard}, async (req, reply) => {try {return packages.review(principal(req), req.body);} catch (e) {return error(e, reply);}});
   app.get('/api/scorm-engine/packages/:id/:version/export', {preHandler: guard}, async (req, reply) => {
     try {

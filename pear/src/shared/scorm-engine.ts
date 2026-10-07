@@ -22,6 +22,7 @@ export interface SCORMManifest {
   organizationId: string;
   activities: SCORMActivity[];
   resources: SCORMResource[];
+  runtimeFeatures?: string[];
 }
 export function scormStandard(value: unknown): SCORMStandard {
   if (!SCORM_STANDARDS.includes(value as SCORMStandard)) throw new Error('Unsupported SCORM edition');

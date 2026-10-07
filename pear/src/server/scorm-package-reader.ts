@@ -100,8 +100,13 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   try {root = new DOMParser({onError: () => {throw Error('Malformed manifest XML');}}).parseFromString(xml!, 'application/xml').documentElement!;} catch {invalid('malformed manifest XML');}
   const ns = root!.namespaceURI;
   if (root!.localName !== 'manifest' || ![IMS12, IMS2004].includes(ns!)) invalid('SCORM packaging namespace unsupported');
-  let count = 0; const stack = [{node: root!, depth: 0}];
-  while (stack.length) {const {node, depth} = stack.pop()!; if (++count > 12000 || depth > 32) invalid('manifest node/depth quota'); for (const n of elements(node)) stack.push({node: n, depth: depth + 1});}
+  let count = 0; const features = new Set<string>(), stack = [{node: root!, depth: 0}];
+  while (stack.length) {
+    const {node, depth} = stack.pop()!;
+    if (++count > 12000 || depth > 32) invalid('manifest node/depth quota');
+    if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore'].includes(node.localName ?? '') || node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && node.localName === 'sequencing') features.add(node.localName!);
+    for (const n of elements(node)) stack.push({node: n, depth: depth + 1});
+  }
   const metadata = one(root!, 'metadata', ns!), schema = one(metadata, 'schema', ns!).textContent?.trim(), edition = one(metadata, 'schemaversion', ns!).textContent?.trim();
   if (schema !== 'ADL SCORM') invalid('SCORM schema marker required');
   const editions: Record<string, SCORMStandard> = {'1.2': '1.2', '2004 2nd Edition': '2004-2', '2004 3rd Edition': '2004-3', '2004 4th Edition': '2004-4'};
@@ -137,7 +142,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');
-  return {standard, identifier, title, organizationId, activities, resources};
+  return {standard, identifier, title, organizationId, activities, resources, runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {
