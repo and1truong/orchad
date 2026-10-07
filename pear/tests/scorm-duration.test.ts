@@ -70,8 +70,12 @@ test('duration state resets for technical retry while activity totals continue, 
       f.db.exec("CREATE TRIGGER duration_audit_failure BEFORE INSERT ON audit WHEN NEW.tool='runtime_scorm_engine_checkpoint' BEGIN SELECT RAISE(ABORT,'duration audit failure'); END");assert.throws(()=>f.player.checkpoint(first.token,request),/duration audit failure/); assert.equal(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state,before);assert.equal(f.db.prepare('SELECT sequence FROM scorm_engine_launches').get()!.sequence,0);f.db.exec('DROP TRIGGER duration_audit_failure');
       const receipt=f.player.checkpoint(first.token,request);assert.equal(receipt.nextScoId,'intro');assert.deepEqual(f.player.checkpoint(first.token,request),receipt);
       const retry=snapshot(f).pearDurationClock.rows.intro; assert.equal(retry.attempt,2);assert.equal(retry.absolute,0);assert.equal(retry.experienced,0);assert.equal(retry.activityAbsolute,4000);assert.equal(retry.activityExperienced,4000);
+      assert.equal(snapshot(f).pearDurationClock.paused,true);
+      // Simulate a lost finish response followed by delayed close/relaunch.
+      t.mock.timers.tick(2000);assert.deepEqual(f.player.checkpoint(first.token,request),receipt);
+      f.player.close(f.service.principal('learner-a'),first.launchId,'session-learner-a');t.mock.timers.tick(1000);
       const next=f.launch(binding);t.mock.timers.tick(6000);f.player.checkpoint(next.token,sequenceCheckpoint(f,next,{'cmi.completion_status':'incomplete'},false));
-      const state=snapshot(f).pearDurationClock.rows.intro;assert.equal(state.absolute,6000);assert.equal(state.experienced,6000);assert.equal(state.activityAbsolute,10000);assert.equal(state.activityExperienced,10000);
+      const state=snapshot(f).pearDurationClock.rows.intro;assert.equal(state.absolute,9000);assert.equal(state.experienced,6000);assert.equal(state.activityAbsolute,13000);assert.equal(state.activityExperienced,10000);
       assert.equal(f.player.context(f.service.principal('learner-a'),binding).activities.find(a=>a.id==='intro')!.available,key.startsWith('attempt'));
     } finally {f.db.close();t.mock.timers.reset();}
   }
@@ -90,6 +94,20 @@ test('trusted clocks and exact receipts survive real database/server reopen', as
     const next=player.launch(opened.service.principal('learner-a'),'session-learner-a',{packageId:f.pkg.id,version:1,binding,mode:'normal',confirmed:true,revision:opened.service.context('learner-a','learning:demo:learner-a').revision,key:crypto.randomUUID()});
     const clock=JSON.parse(player.bootstrap(next.token).sequencingSnapshot!).pearDurationClock.rows.intro;assert.equal(clock.attempt,1);assert.equal(clock.absolute,22000);assert.equal(clock.experienced,2000);assert.equal(opened.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n,0);
   } finally {opened.db.close();rmSync(directory,{recursive:true,force:true});t.mock.timers.reset();}
+});
+
+test('finished navigation does not charge an unexposed successor during lost response and delayed close', async t => {
+  const manifest=sequencingManifest().replaceAll('<s:sequencing>', '<s:sequencing><s:limitConditions attemptExperiencedDurationLimit="PT10S"/>');
+  const f=await scormLearningFixture(undefined,multiFilePackage('2004-4',manifest));t.mock.timers.enable({apis:['Date'],now:new Date('2026-10-07T00:00:00Z')});
+  try {
+    const binding=f.enroll(),first=f.launch(binding);t.mock.timers.tick(2000);
+    const request=sequenceCheckpoint(f,first,{'cmi.completion_status':'completed','cmi.success_status':'passed','cmi.score.scaled':'0.9','adl.nav.request':'continue'});
+    const receipt=f.player.checkpoint(first.token,request);assert.equal(receipt.nextScoId,'practice');assert.equal(snapshot(f).pearDurationClock.paused,true);
+    t.mock.timers.tick(20000);assert.deepEqual(f.player.checkpoint(first.token,request),receipt);
+    f.player.close(f.service.principal('learner-a'),first.launchId,'session-learner-a');t.mock.timers.tick(20000);
+    const next=f.launch(binding);assert.equal(next.scoId,'practice');assert.equal(snapshot(f).pearDurationClock.rows.practice.experienced,0);assert.equal(snapshot(f).pearDurationClock.rows.practice.absolute,40000);
+    t.mock.timers.tick(1000);f.player.checkpoint(next.token,sequenceCheckpoint(f,next,{'cmi.completion_status':'incomplete'},false));assert.equal(snapshot(f).pearDurationClock.rows.practice.experienced,1000);
+  } finally {f.db.close();t.mock.timers.reset();}
 });
 
 test('experienced exposure is capped by the live launch deadline while absolute wall time continues', async t => {
