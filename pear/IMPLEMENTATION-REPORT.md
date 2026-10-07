@@ -2,7 +2,9 @@
 
 ## Current delivery — 2026-10-07
 
-The existing #59–#132 stack is accepted at its integrated tip, with ADR-074 and migration 042 on #132's branch. The current [gap table and milestone dependencies](docs/DELIVERY-STATUS.md) and [exact-commit delivery evidence](docs/DELIVERY-EVIDENCE.md) are authoritative. Server certificate/transcript/report PDF delivery exists (#118/#123/#124); native Tauri Pear/external Coconut MCP and actual durable Pear recovery are existing CI lanes. The three award/course gaps from ADR-073 now have one exact criterion/version binding and separate human reviews. The HTTP collection-sharing regression exercises the actual bridge route and checks 403/FORBIDDEN/no destination state.
+Integrated runtime source `05d0bf4087e25250b0f9be19cfdc7c3be1b64907` passed all eight jobs in [acceptance 37566694622](https://github.com/and1truong/orchad/actions/runs/37566694622). Clean CI includes the actual Lime extension and native Tauri Pear/external Coconut MCP lanes; it is not model-quality, standards or production parity evidence.
+
+The #59–#132 implementation has integrated runtime acceptance, with ADR-074 and migration 042 on #132's branch. The current [gap table and milestone dependencies](docs/DELIVERY-STATUS.md) and [exact-commit delivery evidence](docs/DELIVERY-EVIDENCE.md) are authoritative. Server certificate/transcript/report PDF delivery exists (#118/#123/#124); native Tauri Pear/external Coconut MCP and actual durable Pear recovery are existing CI lanes. The three award/course gaps from ADR-073 now have one exact criterion/version binding and separate human reviews. The HTTP collection-sharing regression exercises the actual bridge route and checks 403/FORBIDDEN/no destination state.
 
 Full parity, professional accessibility/language/model evaluation, standards and named licensed/live/production dependencies remain OPEN/BLOCKED/NOT VERIFIED. Earlier section outcomes and “pending/not implemented” statements below are historical observations at those commits, not current capability status.
 
