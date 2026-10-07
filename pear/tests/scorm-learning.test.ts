@@ -27,6 +27,22 @@ test('1.2 default launch advances hidden required SCOs and resumes unfinished st
   } finally {f.db.close();}
 });
 
+test('1.2 default replay selects a later hidden terminal SCO whose score or success still fails the bound policy', async () => {
+  const xml = multiFileManifest().replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="false"');
+  const f = await scormLearningFixture(undefined, multiFilePackage('1.2', xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding); f.checkpoint(first);
+    const savedIntro = f.db.prepare("SELECT * FROM scorm_sco_attempts WHERE sco_id='intro'").get();
+    const second = f.launch(binding); assert.equal(second.scoId, 'practice');
+    assert.equal(f.checkpoint(second, 'passed', '70').result.officialLearningChanged, false);
+    const retry = f.launch(binding); assert.equal(retry.scoId, 'practice');
+    assert.equal(f.checkpoint(retry, 'completed', '90').result.officialLearningChanged, false);
+    const passed = f.launch(binding); assert.equal(passed.scoId, 'practice');
+    assert.equal(f.checkpoint(passed, 'passed', '90').result.officialLearningChanged, true);
+    assert.deepEqual(f.db.prepare("SELECT * FROM scorm_sco_attempts WHERE sco_id='intro'").get(), savedIntro);
+  } finally {f.db.close();}
+});
+
 test('AICC prerequisites parse bounded logical, status, set and threshold expressions without executing source', () => {
   const states = new Map([['a', 'passed'], ['b', 'failed'], ['block', 'completed']]);
   for (const expression of ['a & ~b', '(b | a) & block', 'a="passed" & b<>"passed"', '2*{a,b,block}', '{a,block}', 'a | b & block']) assert.equal(prerequisite(expression, states), true, expression);

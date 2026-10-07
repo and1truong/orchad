@@ -28,7 +28,7 @@ export function singleSCOPackage(xml = singleSCOManifest()) {
 export function multiSCOPlayerPackage(hidden = false) {
   let xml = multiFileManifest().replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:prerequisites type="aicc_script">intro</runtime:prerequisites>');
   if (hidden) xml = xml.replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"');
-  const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save SCO progress</button><button id="finish">Finish SCO</button><script src="../assets/player.js"></script></body></html>';
+  const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save SCO progress</button><button id="finish">Finish SCO</button><button id="low-score">Finish below minimum score</button><script src="../assets/player.js"></script></body></html>';
   return zip([
     {name: 'imsmanifest.xml', data: Buffer.from(xml), method: 8},
     {name: 'lessons/intro.html', data: Buffer.from(html('Original introduction SCO')), method: 8},
@@ -37,6 +37,7 @@ export function multiSCOPlayerPackage(hidden = false) {
       document.getElementById("entry").textContent="SCO entry: "+api.LMSGetValue("cmi.core.entry")+"; bookmark: "+api.LMSGetValue("cmi.core.lesson_location");
       const update=()=>{api.LMSSetValue("cmi.core.lesson_location",location.pathname.endsWith("intro.html")?"intro-page":"practice-page");api.LMSSetValue("cmi.core.exit","suspend");api.LMSSetValue("cmi.core.score.raw","90");api.LMSSetValue("cmi.core.score.min","0");api.LMSSetValue("cmi.core.score.max","100");api.LMSSetValue("cmi.core.session_time","00:00:20");};
       document.getElementById("save").onclick=()=>{update();api.LMSSetValue("cmi.core.lesson_status","incomplete");document.getElementById("result").textContent="Commit: "+api.LMSCommit("");};
+      document.getElementById("low-score").onclick=()=>{update();api.LMSSetValue("cmi.core.lesson_status","passed");api.LMSSetValue("cmi.core.score.raw","70");document.getElementById("result").textContent="Finish: "+api.LMSFinish("");};
       document.getElementById("finish").onclick=()=>{update();api.LMSSetValue("cmi.core.lesson_status","passed");document.getElementById("result").textContent="Finish: "+api.LMSFinish("");};`), method: 8},
     {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
   ]);

@@ -23,7 +23,9 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
     const next = f.launch(binding); assert.equal(next.scoId, 'practice');
     const reopened = f.launch(binding, 'practice'); assert.equal(reopened.scoId, 'practice');
-    assert.equal(f.player.checkpoint(reopened.token, sequenceCheckpoint(f, reopened, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+    assert.equal(f.player.checkpoint(reopened.token, sequenceCheckpoint(f, reopened, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.7', 'adl.nav.request': 'exitAll'})).officialLearningChanged, false);
+    const retry = f.launch(binding); assert.equal(retry.scoId, 'practice');
+    assert.equal(f.player.checkpoint(retry.token, sequenceCheckpoint(f, retry, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
   } finally {f.db.close();}
 });
 

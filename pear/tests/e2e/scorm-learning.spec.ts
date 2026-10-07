@@ -25,6 +25,13 @@ for (const hidden of [false, true]) test((hidden ? 'hidden ' : '') + 'built enro
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click();
     await player.getByRole('button', {name: hidden ? 'Play or resume enrolled SCORM package' : /Practice.*not attempted/}).click(); await expect(sco.getByRole('heading', {name: 'Original practice SCO'})).toBeVisible();
     await expect(sco.getByText('SCO entry: ab-initio; bookmark:', {exact: true})).toBeVisible();
+    if (hidden) {
+      await sco.getByRole('button', {name: 'Finish below minimum score', exact: true}).click(); await expect(player.getByRole('status')).toContainText('Other SCOs');
+      expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
+      await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click();
+      await player.getByRole('button', {name: 'Play or resume enrolled SCORM package', exact: true}).click();
+      await expect(sco.getByRole('heading', {name: 'Original practice SCO'})).toBeVisible();
+    }
     await sco.getByRole('button', {name: 'Finish SCO', exact: true}).click(); await expect(player.getByRole('status')).toContainText('completion accepted');
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(1);

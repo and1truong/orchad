@@ -39,7 +39,7 @@ export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifes
   if (!current || !activity?.isActive) {
     const suspended = JSON.parse(runtime.serializeSequencingState()).sequencing?.suspendedActivity;
     if (suspended && scoId && suspended !== scoId) reject('FORBIDDEN', 'Resume the suspended SCO before selecting another');
-    let ok = runtime.processNavigationRequest(suspended ? 'resumeAll' : !current ? 'start' : 'choice', scoId ?? playbackActivities(manifest)[0].activity.id);
+    let ok = runtime.processNavigationRequest(suspended ? 'resumeAll' : !current ? 'start' : 'choice', scoId ?? current?.activity.id ?? playbackActivities(manifest)[0].activity.id);
     if (ok && !suspended && !current && scoId && deliveredSCO(runtime, manifest)?.activity.id !== scoId) ok = runtime.processNavigationRequest('choice', scoId);
     if (!ok) reject('FORBIDDEN', 'Sequencing denies activity delivery'); current = deliveredSCO(runtime, manifest);
   } else if (scoId && scoId !== current.activity.id) {

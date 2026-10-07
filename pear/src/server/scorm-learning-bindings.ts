@@ -6,6 +6,7 @@ import type {LearningService} from './service.ts';
 import {playbackActivities} from './scorm-activities.ts';
 import {usesSequencing} from './scorm-sequencing.ts';
 import {reject} from './errors.ts';
+import {scoEvidence, meetsSCORMPolicy} from './scorm-evidence.ts';
 
 export interface SCORMLearningContext {
   bindingKey: string; reference: SCORMReference; context: unknown;
@@ -39,15 +40,8 @@ export class SCORMLearningBindings {
     if (!c || registration.mode !== 'normal') return false;
     if (this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=? AND attempt_id=?').get(registration.id, attemptId)) return false;
     const rows = this.db.prepare('SELECT s.* FROM scorm_sco_attempts s WHERE s.attempt_id=? AND s.tenant=? AND s.sco_attempt_number=(SELECT max(n.sco_attempt_number) FROM scorm_sco_attempts n WHERE n.attempt_id=s.attempt_id AND n.sco_id=s.sco_id)').all(attemptId, p.tenant) as any[];
-    const evidence = playbackActivities(manifest).map(({activity}) => {
-      const row = rows.find(r => r.sco_id === activity.id), state = row ? JSON.parse(row.runtime_state) : {}, scores = manifest.standard === '1.2' ? state.core?.score : state.score;
-      let score: number | null = null;
-      if (manifest.standard === '1.2' && scores?.raw !== undefined && scores.raw !== '' && Number.isFinite(Number(scores.raw))) score = Number(scores.raw);
-      else if (scores?.scaled !== undefined && scores.scaled !== '' && Number.isFinite(Number(scores.scaled))) score = Number(scores.scaled) * 100;
-      else if (scores?.raw !== undefined && scores.raw !== '' && scores.min !== undefined && scores.min !== '' && scores.max !== undefined && scores.max !== '' && Number(scores.max) > Number(scores.min)) score = (Number(scores.raw) - Number(scores.min)) / (Number(scores.max) - Number(scores.min)) * 100;
-      return {scoId: activity.id, finished: row?.finished === 1, status: manifest.standard === '1.2' ? state.core?.lesson_status ?? 'not attempted' : state.completion_status ?? 'unknown', success: manifest.standard === '1.2' ? state.core?.lesson_status ?? 'not attempted' : state.success_status ?? 'unknown', score, seconds: row?.reported_seconds ?? 0, revision: row?.revision ?? 0};
-    });
-    if (evidence.some(e => !e.finished || (manifest.standard === '1.2' ? !['completed', 'passed'].includes(e.status) : e.status !== 'completed') || c.reference.completion === 'passed' && e.success !== 'passed' || c.reference.minimumScore !== undefined && (e.score === null || e.score < c.reference.minimumScore || e.score > 100))) return false;
+    const evidence = playbackActivities(manifest).map(({activity}) => scoEvidence(manifest.standard, activity.id, rows.find(r => r.sco_id === activity.id)));
+    if (evidence.some(e => !meetsSCORMPolicy(manifest.standard, e, c.reference))) return false;
     let rollup: Record<string, any> | undefined;
     if (usesSequencing(manifest)) {
       const overall = this.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(attemptId, p.tenant) as any;

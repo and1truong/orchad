@@ -7,6 +7,7 @@ import {tokenHash} from './integration-credentials.ts';
 import {packagePath, inspectManifest} from './scorm-package-reader.ts';
 import {validateSCORM12Checkpoint, scormSeconds, scormTime} from './scorm-runtime-validation.ts';
 import {reject} from './errors.ts';
+import {scoEvidence, meetsSCORMPolicy} from './scorm-evidence.ts';
 import {scorm12Activities, playbackActivities, activityStates, activityAvailable} from './scorm-activities.ts';
 import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
 import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
@@ -70,7 +71,10 @@ export class SCORMPlayerService {
       const candidates = playbackActivities(manifest).filter(p => activityAvailable(p, states));
       // Default 2004 launch follows the trusted current delivery/start flow;
       // menu visibility must not turn it into a choice of a different SCO.
-      const profile = engine ? selectSCO(engine, manifest, scoId) : scoId ? launchProfile(manifest, scoId) : candidates.find(p => !['completed', 'passed'].includes(states.get(p.activity.id) ?? '')) ?? candidates[0];
+      const needsEvidence = (id: string) => !meetsSCORMPolicy(manifest.standard, scoEvidence(manifest.standard, id, rows.find(r => r.sco_id === id)), context?.reference ?? {completion: 'completed_or_passed'});
+      const suspended = engine ? JSON.parse(engine.serializeSequencingState()).sequencing?.suspendedActivity : undefined;
+      const replayTarget = engine && rows.length && !engine.getSequencingState()?.currentActivity?.isActive && !suspended ? candidates.find(p => needsEvidence(p.activity.id) && reviewed.activities.some(a => a.id === p.activity.id && a.available))?.activity.id : undefined;
+      const profile = engine ? selectSCO(engine, manifest, scoId ?? replayTarget) : scoId ? launchProfile(manifest, scoId) : candidates.find(p => needsEvidence(p.activity.id)) ?? candidates[0];
       if (!profile || !activityAvailable(profile, states)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
       const id = randomUUID(), token = randomBytes(32).toString('base64url'), now = Date.now();
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND closed=0').run(registered.attemptId);
