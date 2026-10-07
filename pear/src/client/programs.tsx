@@ -1,3 +1,4 @@
+import {AwardCourseLearner,AwardCourseCoordinator} from "./award-courses.tsx";
 import {OriginalCollectionSharing} from "./collection-sharing.tsx";
 import {PrimaryAssignment,AssessmentNotices} from "./moderation-assignments.tsx";
 import {awardUnitLabel} from "../shared/programs.ts";
@@ -153,7 +154,7 @@ function EvidenceForm({
           kind="document"
           scope={{ awardEnrollmentId: enrollmentId, criterionPath }}
           onUploaded={setAssetId}
-          onUploading={setUploading}
+          onUploading={value=>{if(value)setAssetId("");setUploading(value);}}
         />
         {assetId && <p role="status">{translateUI("Evidence PDF attached")}</p>}
         <label>{translateUI("Claimed")}{" "}{unit}
@@ -221,12 +222,14 @@ function Progress({
                           await props.mutate("learning_enroll_award_course", {
                             awardEnrollmentId: enrollmentId,
                             courseId: ref.id,
+                            criterionPath:r.criterionPath,
                           });
                           props.studyCourse?.();
                         })
                       }
                     >{translateUI("Study course for this award")}</button>
                   )}
+                  {active&&<AwardCourseLearner address={{awardEnrollmentId:enrollmentId,criterionPath:r.criterionPath,courseId:ref.id}} actions={props} onCreated={props.studyCourse}/>}
                 </div>
               ) : ref.kind==="item"?(
                 <div><p>{translateUI("Standalone item:")} {ref.id} · {translateUI("Version")} {ref.version} · {translateUI(ref.completed?"Reading confirmed":"In progress")}</p><p>{translateUI("Only real human-confirmed reading of the pinned item version counts. No assessment score is inferred.")}</p>
@@ -349,6 +352,7 @@ export function Programs(props: Props) {
         {administrative ? "Programs administration" : "Playlists and awards"}
       </h2>
       {loadError && <p role="alert">{loadError}</p>}
+      {administrative&&["admin","manager"].includes(role)&&<AwardCourseCoordinator actions={props}/>}
       {!administrative && (
         <>
           <p>{translateUI("Playlists are reading collections. Awards have their own required learning and credit targets.")}</p>

@@ -46,7 +46,7 @@ test("offer, draft, counterpart revision and redacted audit roll back together i
 });
 test("immutable addressed offers and independently mapped drafts survive actual SQLite reopen without auto-publication",()=>{
  const dir=mkdtempSync(join(tmpdir(),"pear-collection-share-"));let f=shareFixture(join(dir,"state.sqlite"));try{
-  const id=data(offer(f)).offerId;data(accept(f,id));const before=f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),award=f.award;f.db.close();f={...fixture(join(dir,"state.sqlite")),award};assert.deepEqual(f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),before);assert.equal(incoming(f)[0].state,"accepted");assert.equal(f.db.prepare("SELECT max(version) n FROM schema_version").get()!.n,41);
+  const id=data(offer(f)).offerId;data(accept(f,id));const before=f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),award=f.award;f.db.close();f={...fixture(join(dir,"state.sqlite")),award};assert.deepEqual(f.db.prepare("SELECT * FROM collections WHERE id='share-receiver-award'").get(),before);assert.equal(incoming(f)[0].state,"accepted");assert.equal(f.db.prepare("SELECT max(version) n FROM schema_version").get()!.n,42);
  }finally{f.db.close();rmSync(dir,{recursive:true,force:true});}
 });
 test("actual HTTP requires addressed human cookie/epoch/CSRF and independent destination administrator; model bridge cannot offer or accept",async()=>{
@@ -54,7 +54,13 @@ test("actual HTTP requires addressed human cookie/epoch/CSRF and independent des
  async function login(user:string){const r=await app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4372",origin},payload:{username:user,password:user+"-dev"}});assert.equal(r.statusCode,200);return {host:"127.0.0.1:4372",origin,cookie:String(r.headers["set-cookie"]).split(";")[0]!,"x-csrf-token":r.json().csrf,"x-pear-epoch":r.json().sessionEpoch};}
  try{
   const id=data(offer(f)).offerId,headers=await login("receiver"),body={requestId:"original-share-http",documentId:"library:other",toolName:"human_accept_original_collection_offer",arguments:{offerId:id,expectedVersion:0,references,confirmed:true},expectedRevision:f.service.context("receiver","library:other").revision,idempotencyKey:"share-http"};
-  assert.equal((await app.inject({method:"POST",url:"/api/human/invoke",headers:{...headers,"x-csrf-token":"wrong"},payload:body})).statusCode,403);assert.equal((await app.inject({method:"POST",url:"/api/invoke",headers,payload:body})).json().ok,false);
+  assert.equal((await app.inject({method:"POST",url:"/api/human/invoke",headers:{...headers,"x-csrf-token":"wrong"},payload:body})).statusCode,403);
+  const bridgeDenied=await app.inject({method:"POST",url:"/api/bridge/invoke",headers,payload:body});
+  assert.equal(bridgeDenied.statusCode,403);
+  assert.equal(bridgeDenied.json().ok,false);
+  assert.equal(bridgeDenied.json().error.code,"FORBIDDEN");
+  assert.equal(f.db.prepare("SELECT 1 FROM collections WHERE id='share-receiver-award'").get(),undefined);
+  assert.equal(f.db.prepare("SELECT state FROM original_collection_offers WHERE id=?").get(id)!.state,"pending");
   const wrong=await login("receiver-two");assert.equal((await app.inject({method:"POST",url:"/api/human/invoke",headers:wrong,payload:body})).json().ok,false);assert.equal(f.db.prepare("SELECT 1 FROM collections WHERE id='share-receiver-award'").get(),undefined);
   const accepted=await app.inject({method:"POST",url:"/api/human/invoke",headers,payload:body});assert.equal(accepted.json().ok,true,accepted.body);assert.equal(f.db.prepare("SELECT state FROM collections WHERE id='share-receiver-award'").get()!.state,"draft");
  }finally{await app.close();f.db.close();}

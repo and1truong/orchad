@@ -1,3 +1,4 @@
+import {ProgramService} from "./programs.ts";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -297,6 +298,11 @@ export function openDatabase(path: string, seed = false) {
     db.exec("PRAGMA foreign_keys=OFF; BEGIN IMMEDIATE");
     try {db.exec(readFileSync(new URL("../../migrations/041.sql",import.meta.url),"utf8"));if(db.prepare("PRAGMA foreign_key_check").all().length)throw new Error("Standalone retake migration violates foreign keys");db.exec("COMMIT; PRAGMA foreign_keys=ON");}
     catch(e){db.exec("ROLLBACK; PRAGMA foreign_keys=ON");db.close();throw e;}
+  }
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=42").get()) {
+    db.exec("BEGIN IMMEDIATE");
+    try {db.exec(readFileSync(new URL("../../migrations/042.sql",import.meta.url),"utf8"));new ProgramService(db).snapshotLegacyCertificates();if(db.prepare("PRAGMA foreign_key_check").all().length)throw new Error("Award binding migration violates foreign keys");db.exec("COMMIT");}
+    catch(e){db.exec("ROLLBACK");db.close();throw e;}
   }
   if (seed) {
     db.exec("BEGIN IMMEDIATE");

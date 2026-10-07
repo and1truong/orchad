@@ -94,7 +94,10 @@ test("static group members resolve only same-client managed users; deletes tombs
   assert.deepEqual(s.scim.mutate(s.header,"Groups",group.body.id,"DELETE",undefined,empty.body.meta.version,"delete-group"),deleted);
   assert.throws(()=>s.scim.read(s.header,"Groups",group.body.id),/unavailable/);
   assert.equal(s.db.prepare("SELECT COUNT(*) AS n FROM learning_groups WHERE id=(SELECT group_id FROM scim_groups WHERE id=?)").get(group.body.id)!.n,1);
+  const retained=s.scim.mutate(s.header,"Groups",undefined,"POST",{displayName:"Retained team",members:[{value:a.body.id},{value:b.body.id}]},undefined,"retained-team");
+  const internal=s.db.prepare("SELECT user_id FROM scim_users WHERE id=?").get(a.body.id)!.user_id;
   s.scim.mutate(s.header,"Users",a.body.id,"DELETE",undefined,a.body.meta.version,"delete-user");
+  const definition=JSON.parse(String(s.db.prepare("SELECT definition FROM learning_groups WHERE id=(SELECT group_id FROM scim_groups WHERE id=?)").get(retained.body.id)!.definition));assert.equal(definition.memberIds.includes(internal),false);assert.equal(s.scim.read(s.header,"Groups",retained.body.id).members.length,1);
   assert.throws(()=>s.scim.read(s.header,"Users",a.body.id),/unavailable/);
   const replacement=s.create(undefined,"create-replacement");assert.notEqual(replacement.body.id,a.body.id);
   assert.throws(()=>s.create(undefined,"create-alice"),/already exists/);

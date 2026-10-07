@@ -30,7 +30,7 @@ export class TranslationService{
   const variants:any[]=original?[{...original,provenance:"original",disclosure:"Original authored content"}]:[],unavailable:any[]=[];
   for(const v of this.db.prepare("SELECT * FROM translation_variants WHERE identity_id=? AND tenant=? AND active=1 ORDER BY language,id").all(row.id,p.tenant) as any[]){
    let source:any;try{source=this.source(p,kind,v.source_id);}catch(e){if((e as any).code!=="NOT_FOUND")throw e;unavailable.push({language:v.language,reason:"Reviewed variant is unavailable"});continue;}
-   if(!original||source.version!==v.source_version||original.version!==v.original_version||source.language!==v.language){unavailable.push({language:v.language,reason:"Published source changed; a new translation review is required"});continue;}
+   if(source.version!==v.source_version||(original&&original.version!==v.original_version)||source.language!==v.language){unavailable.push({language:v.language,reason:"Published source changed; a new translation review is required"});continue;}
    variants.push({...source,provenance:v.provenance,...(access==="human"?{qualityReview:v.quality_review}:{}),humanQualityReviewed:true,disclosure:v.provenance==="ai_assisted_reviewed"?"AI-assisted derivative reviewed by a human":"Human-authored derivative reviewed by a human"});
   }
   const preferred=variants.find(v=>v.language===preferredLanguage),fallback=!preferred;

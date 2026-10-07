@@ -7,14 +7,14 @@ export class InsightService{
  constructor(readonly db:DatabaseSync){}
  read(p:Principal,a:{offset?:number;limit?:number;snapshotHash?:string}){
   const ledger=new ReportService(this.db).ownLedger(p),skills=new Map<string,any>();
-  let untaggedContentRecords=0,recordsWithTimer=0,observedSeconds=0,intendedCourseMinutes=0;
+  let untaggedContentRecords=0,recordsWithTimer=0,observedMilliseconds=0,intendedCourseMinutes=0;
   const snapshotRecords=ledger.map(r=>{
    if(r.kind==="award")return {...r,skills:[]};
    const value=JSON.parse(String(this.db.prepare(r.kind==="course"?"SELECT content FROM course_versions WHERE course_id=? AND version=?":"SELECT content FROM content_item_versions WHERE item_id=? AND version=?").get(r.contentId,r.version)!.content));
    const tags=[...new Map((value.discovery?.skills??[]).map((label:string)=>[label.normalize("NFKC").trim().toLowerCase(),label.trim()])).entries()] as [string,string][];
    if(!tags.length)untaggedContentRecords++;
    const measured=this.db.prepare("SELECT elapsed_ms FROM study_totals WHERE tenant=? AND learner=? AND kind=? AND target_id=?").get(p.tenant,p.id,r.kind,r.id) as any;
-   if(measured){recordsWithTimer++;observedSeconds+=Math.floor(measured.elapsed_ms/1000);}
+   if(measured){recordsWithTimer++;observedMilliseconds+=measured.elapsed_ms;}
    if(r.kind==="course")intendedCourseMinutes+=r.estimatedMinutes??0;
    for(const [key,label]of tags){
     let skill=skills.get(key);if(!skill){skill={skill:label,key,enrollmentRecords:0,completedRecords:0,openRecords:0,examples:[],exampleLimit:5,provenance:"author_declared_content_tags",mastery:null};skills.set(key,skill);}
@@ -30,7 +30,7 @@ export class InsightService{
    selfConfirmedItemCompletions:ledger.filter(r=>r.kind==="item"&&r.status==="completed").length,
    awardCompletions:ledger.filter(r=>r.kind==="award"&&r.status==="completed").length,
    openRecords:ledger.filter(r=>["in_progress","overdue"].includes(r.status)).length,overdueRecords:ledger.filter(r=>r.status==="overdue").length,
-   intendedCourseMinutes,observedSeconds,recordsWithTimer,untaggedContentRecords,declaredSkillCount:rows.length,
+   intendedCourseMinutes,observedSeconds:Math.floor(observedMilliseconds/1000),recordsWithTimer,untaggedContentRecords,declaredSkillCount:rows.length,
   };
   const snapshotHash=createHash("sha256").update(JSON.stringify({tenant:p.tenant,principal:p.id,authVersion:p.auth_version,records:snapshotRecords,summary,rows})).digest("hex");
   if(a.snapshotHash&&a.snapshotHash!==snapshotHash)reject("STALE_CONTEXT","Own insight ledger changed; refresh the first page");

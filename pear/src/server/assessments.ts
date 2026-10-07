@@ -82,6 +82,8 @@ export class AssessmentService {
           "FORBIDDEN",
           "Only active unfinished learning can receive further attempts",
         );
+      if(!this.db.prepare("SELECT 1 FROM attempts WHERE enrollment_id=? AND submitted=1 AND grading_state='graded' AND passed=0").get(e.id))
+        reject("FORBIDDEN", "A graded failed assessment is required before a retry allowance");
       if (
         this.db
           .prepare(

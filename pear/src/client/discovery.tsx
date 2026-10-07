@@ -24,8 +24,11 @@ export function Discovery(p:Props){
   if(filters.processing)a.aiProcessingAllowed=filters.processing==="allowed";
   return a;
  };
+ const [submitted,setSubmitted]=useState<Record<string,unknown>|null>(null);
  const search=async(page:number,direction:"reset"|"next"|"previous"="reset")=>{
-  const result=await p.op("learning_search",args(page));
+  const query=direction==="reset"?args(page):{...submitted,offset:page};
+  const result=await p.op("learning_search",query);
+  if(direction==="reset")setSubmitted(query);
   if(!p.isCurrent())return;setRows(result.items);setHistory(h=>direction==="next"?[...h,offset]:direction==="previous"?h.slice(0,-1):[]);setOffset(page);setNext(result.nextOffset);setComparison(null);
  };
  useEffect(()=>{let current=true;void p.op("learning_get_recommendations",{limit:10}).then(r=>{

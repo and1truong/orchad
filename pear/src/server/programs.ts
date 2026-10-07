@@ -375,13 +375,17 @@ export class ProgramService {
       return { ...ref, state: "unavailable", title: ref.id };
     return { ...ref, state: row.state, title: json(version.content).title };
   }
-  private evaluation(enrollment: any, files = false) {
+  private evaluation(enrollment: any, files = false, historical = false) {
+    if(enrollment.completed_at&&!historical){
+      const saved=this.db.prepare('SELECT progress FROM award_completion_snapshots WHERE certificate_id=?').get(enrollment.certificate_id) as any;
+      if(saved){const progress=json(saved.progress);if(files){const attach=(node:any)=>{for(const r of node.requirements??[])for(const ref of r.alternatives){for(const record of ref.records??[]){const asset=this.db.prepare('SELECT asset_id FROM external_records WHERE id=? AND enrollment_id=?').get(record.id,enrollment.id) as any;if(asset?.asset_id)record.assetId=asset.asset_id;}attach(ref);}};attach(progress);}return {...progress,...enrollment,completed:true};}
+    }
     const root = this.version(enrollment.award_id, enrollment.version) as Award;
     const records = this.db
       .prepare(
-        "SELECT id,criterion_path,amount,state,asset_id FROM external_records WHERE enrollment_id=? ORDER BY created_at,id",
+        "SELECT id,criterion_path,amount,state,asset_id FROM external_records WHERE enrollment_id=? AND (? IS NULL OR created_at<=?) ORDER BY created_at,id",
       )
-      .all(enrollment.id) as any[];
+      .all(enrollment.id,historical?enrollment.completed_at:null,historical?enrollment.completed_at:null) as any[];
     const cycleStart = enrollment.assignment_cycle_id
       ? (
           this.db
@@ -399,22 +403,29 @@ export class ProgramService {
         let earned = 0,nestedComplete=false,nestedCapacity=0;
         const alternatives = r.alternatives.map((ref) => {
           if (ref.kind === "course") {
+            const binding=this.db.prepare("SELECT * FROM award_course_bindings WHERE award_enrollment_id=? AND criterion_path=? AND course_id=?").get(enrollment.id,criterionPath,ref.id) as any;
+            if(binding&&binding.pinned_version!==ref.version)reject("INTERNAL","Award binding pin mismatch");
+            const version=binding?.current_version??ref.version;
             const recipient=this.db.prepare("SELECT id,tenant,name,role,manager_id,active,auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(enrollment.learner,enrollment.tenant) as unknown as Principal;
-            let permitted=false;
-            if(recipient){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"course",ref.id,ref.version!);access.current(recipient,"course",ref.id);permitted=true;}catch{}}
-            const completed=permitted&&!!this.db.prepare("SELECT 1 FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND version=? AND status='completed' AND (? IS NULL OR completed_at>=?)").get(enrollment.learner,enrollment.tenant,ref.id,ref.version!,cycleStart,cycleStart);
+            let permitted=historical;
+            if(recipient&&!historical){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"course",ref.id,ref.version!);access.enrolled(recipient,"course",ref.id,version);access.current(recipient,"course",ref.id);permitted=true;}catch{}}
+            const completed=permitted&&!!this.db.prepare("SELECT 1 FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND version=? AND status='completed' AND completed_at IS NOT NULL AND (? IS NULL OR completed_at>=?) AND (? IS NULL OR id=?) AND (? IS NULL OR assignment_cycle_id=?) AND (? IS NULL OR completed_at<=?)").get(enrollment.learner,enrollment.tenant,ref.id,version,cycleStart,cycleStart,binding?.id??null,binding?.course_enrollment_id??null,enrollment.assignment_cycle_id,enrollment.assignment_cycle_id,historical?enrollment.completed_at:null,historical?enrollment.completed_at:null);
             if (completed) earned = r.credits;
-            return { ...ref, completed };
+            return { ...ref, version, originalVersion:ref.version, bindingRevision:binding?.revision??0, completed };
           }
           if (ref.kind === "item") {
             const recipient=this.db.prepare("SELECT id,tenant,name,role,manager_id,active,auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(enrollment.learner,enrollment.tenant) as unknown as Principal;
-            let permitted=false;
-            if(recipient){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"item",ref.id,ref.version!);access.current(recipient,"item",ref.id);permitted=true;}catch{}}
-            const completed=permitted&&!!this.db.prepare("SELECT 1 FROM item_enrollments WHERE learner=? AND tenant=? AND item_id=? AND version=? AND completed_at IS NOT NULL AND (? IS NULL OR completed_at>=?)").get(enrollment.learner,enrollment.tenant,ref.id,ref.version!,cycleStart,cycleStart);
+            let permitted=historical;
+            if(recipient&&!historical){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"item",ref.id,ref.version!);access.current(recipient,"item",ref.id);permitted=true;}catch{}}
+            const completed=permitted&&!!this.db.prepare("SELECT 1 FROM item_enrollments WHERE learner=? AND tenant=? AND item_id=? AND version=? AND completed_at IS NOT NULL AND (? IS NULL OR completed_at>=?) AND (? IS NULL OR completed_at<=?)").get(enrollment.learner,enrollment.tenant,ref.id,ref.version!,cycleStart,cycleStart,historical?enrollment.completed_at:null,historical?enrollment.completed_at:null);
             if(completed)earned=r.credits;
             return {...ref,completed,proof:"human_confirmed_standalone_reading",assessmentScore:false};
           }
           if (ref.kind === "award") {
+            if(!historical){const recipient=this.db.prepare("SELECT id,tenant,name,role,manager_id,active,auth_version FROM accounts WHERE id=? AND tenant=? AND active=1").get(enrollment.learner,enrollment.tenant) as unknown as Principal;
+              const row=this.collection({tenant:enrollment.tenant} as Principal,ref.id),pin=this.version(ref.id,ref.version!),latest=this.version(ref.id,row.latest_version);
+              if(!recipient||!this.visible(recipient,row,pin)||!this.visible(recipient,row,latest))return {...ref,completed:false,earned:0,capacity:0,requirements:[],unavailable:true};
+            }
             const child = evaluate(
               this.version(ref.id, ref.version!) as Award,
               `${criterionPath}/${ref.id}@${ref.version}/`,
@@ -502,14 +513,25 @@ export class ProgramService {
         "SELECT * FROM award_enrollments WHERE tenant=? AND learner=? AND completed_at IS NULL AND assignment_state='active'",
       )
       .all(tenant, learner) as any[];
-    for (const row of rows)
-      if (this.evaluation(row).completed)
-        this.db
-          .prepare(
-            "UPDATE award_enrollments SET completed_at=?,certificate_id=? WHERE id=? AND completed_at IS NULL",
-          )
-          .run(new Date().toISOString(), randomUUID(), row.id);
+    const recipient=this.db.prepare('SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1').get(learner,tenant) as unknown as Principal;
+    if(!recipient)return;
+    for (const row of rows){
+      const collection=this.collection(recipient,row.award_id);
+      if(!this.visible(recipient,collection,this.version(row.award_id,row.version))||!this.visible(recipient,collection,this.version(row.award_id,collection.latest_version)))continue;
+      const progress=this.evaluation(row);
+      if(!progress.completed)continue;
+      const issuedAt=new Date().toISOString(),certificateId=randomUUID();
+      this.db.prepare('UPDATE award_enrollments SET completed_at=?,certificate_id=? WHERE id=? AND completed_at IS NULL').run(issuedAt,certificateId,row.id);
+      this.db.prepare('INSERT INTO award_completion_snapshots VALUES(?,?,?)').run(certificateId,JSON.stringify(progress),'issuance');
+    }
   }
+  snapshotLegacyCertificates(){
+    for(const row of this.db.prepare('SELECT * FROM award_enrollments WHERE completed_at IS NOT NULL AND certificate_id IS NOT NULL').all() as any[]){
+      const progress=this.evaluation(row,false,true);
+      this.db.prepare('INSERT INTO award_completion_snapshots VALUES(?,?,?)').run(row.certificate_id,JSON.stringify(progress),'legacy_ledger_at_upgrade');
+    }
+  }
+
   private enroll(
     p: Principal,
     collectionId: string,

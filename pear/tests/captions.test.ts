@@ -51,6 +51,8 @@ test("published and pinned caption reads enforce tenant/enrollment/prerequisite/
   assert.equal(f.service.media.read(p,caption.id,{itemId:"caption-item",version:1}).id,caption.id);
   assert.throws(()=>f.service.media.read(p,caption.id,{}),/authorized/);
   assert.throws(()=>f.service.media.read(f.service.principal("outsider"),caption.id,{itemId:"caption-item",version:1}),/denied/);
+  const drafts=data(f.call("editor","learning_get_content_drafts"));assert.equal(JSON.stringify(drafts).includes(caption.id),false);
+  assert.equal(JSON.stringify(data(f.call("editor","learning_get_content_drafts",{},"human"))).includes(caption.id),true);
   const tracked=data(f.call("learner-a","learning_enroll_item",{itemId:"caption-item"}));
   assert.equal(JSON.stringify(data(f.call("learner-a","learning_get_item_enrollment",{itemEnrollmentId:tracked.itemEnrollmentId}))).includes(caption.id),false);
   const course=structuredClone(courses["systems-basics"]);course.lessons[1]={...course.lessons[1],kind:"audio",assetId:item.assetId,transcript:item.transcript,captions:item.captions as any};

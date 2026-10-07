@@ -821,7 +821,7 @@ function App() {
         <h2>Chat</h2>
         {target?.appId==="orchard-pear"&&<fieldset>
           <legend>Learning assistance</legend>
-          <label>Learning workflow<select disabled={running} aria-label="Learning workflow" value={learningWorkflow} onChange={e=>{workflowGeneration.current++;history.current=[];setLearningWorkflow(e.target.value as LearningWorkflow);}}>
+          <label>Learning workflow<select disabled={running} aria-label="Learning workflow" value={learningWorkflow} onChange={e=>{workflowGeneration.current++;history.current=[];setText("");setLearningWorkflow(e.target.value as LearningWorkflow);}}>
           {learningWorkflows.map(mode=><option key={mode} value={mode}>{workflowLabels[mode]}</option>)}</select></label>
           {learningWorkflow==="practice"&&<><p>Optional AI practice · unofficial. Questions use only permitted lesson text. Skip at any time; official learning stays unchanged.</p><button className="secondary" onClick={()=>{workflowGeneration.current++;run.current?.abort();history.current=[];setText("");setLearningWorkflow("general");setStatus("practice skipped");}}>Skip practice</button></>}
         </fieldset>}

@@ -34,13 +34,13 @@ export class IdentityService {
   try{
    this.live(p);if(!this.config)reject("FORBIDDEN","OIDC provider is not configured");
    if(!a||Object.keys(a).sort().join(",")!=="action,key,reason,revision,subject,userId"||!["link","unlink"].includes(a.action)||
-     !/^[a-zA-Z0-9_-]{1,128}$/.test(a.key)||typeof a.subject!=="string"||!/^[\x21-\x7e]{1,255}$/.test(a.subject)||
+     typeof a.key!=="string"||!/^[a-zA-Z0-9_-]{1,128}$/.test(a.key)||typeof a.subject!=="string"||!/^[\x21-\x7e]{1,255}$/.test(a.subject)||
      typeof a.userId!=="string"||a.userId.length>64||typeof a.reason!=="string"||!a.reason.trim()||a.reason.length>300||
      !Number.isSafeInteger(a.revision)||a.revision<0)reject("INVALID_ARGUMENT","Invalid reviewed identity mapping");
-   const target=this.db.prepare("SELECT id FROM accounts WHERE id=? AND tenant=? AND active=1").get(a.userId,p.tenant);
-   if(!target)reject("FORBIDDEN","Active same-tenant user required");
    const doc="library:"+p.tenant,payload=digest(JSON.stringify(Object.fromEntries(Object.entries(a).filter(([key])=>key!=="revision")))),old=this.db.prepare("SELECT payload,result FROM idempotency WHERE principal=? AND document_id=? AND key=?").get(p.id,doc,a.key) as any;
    if(old){if(old.payload!==payload)reject("IDEMPOTENCY_CONFLICT","Identity mapping request changed");this.db.exec("COMMIT");return JSON.parse(old.result);}
+   const target=this.db.prepare("SELECT id FROM accounts WHERE id=? AND tenant=? AND active=1").get(a.userId,p.tenant);
+   if(!target)reject("FORBIDDEN","Active same-tenant user required");
    const workspace=this.db.prepare("SELECT revision FROM workspaces WHERE id=?").get(doc) as any;
    if(workspace.revision!==a.revision)reject("STALE_CONTEXT","Identity settings changed; refresh");
    const existing=this.db.prepare("SELECT user_id FROM identity_links WHERE issuer=? AND subject=?").get(this.config!.issuer,a.subject) as any;
@@ -49,7 +49,7 @@ export class IdentityService {
     const other=this.db.prepare("SELECT subject FROM identity_links WHERE issuer=? AND user_id=?").get(this.config!.issuer,a.userId) as any;
     if(other&&other.subject!==a.subject)reject("INVALID_ARGUMENT","User already has a subject for this issuer");
     this.db.prepare("INSERT OR IGNORE INTO identity_links VALUES(?,?,?,?,?)").run(p.tenant,this.config!.issuer,a.subject,a.userId,new Date().toISOString());
-   }else this.db.prepare("DELETE FROM identity_links WHERE tenant=? AND issuer=? AND subject=? AND user_id=?").run(p.tenant,this.config!.issuer,a.subject,a.userId);
+   }else {const removed=this.db.prepare("DELETE FROM identity_links WHERE tenant=? AND issuer=? AND subject=? AND user_id=?").run(p.tenant,this.config!.issuer,a.subject,a.userId);if(Number(removed.changes)!==1)reject("FORBIDDEN","Current exact identity mapping required");}
    this.db.prepare("UPDATE accounts SET auth_version=auth_version+1 WHERE id=? AND tenant=?").run(a.userId,p.tenant);
    this.db.prepare("DELETE FROM sessions WHERE principal=?").run(a.userId);
    this.db.prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?").run(doc);

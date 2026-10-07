@@ -46,6 +46,7 @@ export class RetakeService{
  private upgradeSource(p:Principal,id:string){
   const e=this.db.prepare("SELECT * FROM enrollments WHERE id=? AND learner=? AND tenant=?").get(id,p.id,p.tenant) as any;
   if(!e||e.status!=="in_progress"||e.completed_at||e.assigned_by||e.assignment_cycle_id)reject("FORBIDDEN","Own unfinished self-directed learning required");
+  if(e.award_binding_id)reject("FORBIDDEN","Use the exact award course binding review");
   new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
   if(e.assignment_state!=="active"&&!(e.assignment_state==="withdrawn"&&this.db.prepare("SELECT 1 FROM enrollments WHERE retake_of=?").get(e.id)))reject("FORBIDDEN","Active unfinished learning required");
   return e;

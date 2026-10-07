@@ -46,7 +46,7 @@ export class TelemetryService {
           this.db.prepare("UPDATE study_totals SET elapsed_ms=elapsed_ms+? WHERE kind=? AND target_id=? AND learner=? AND tenant=?")
             .run(delta,a.kind,a.targetId,p.id,p.tenant);
         if (a.action==="stop") this.db.prepare("DELETE FROM study_sessions WHERE learner=? AND token=?").run(p.id,a.token!);
-        else this.db.prepare("UPDATE study_sessions SET last_at=? WHERE learner=? AND token=?").run(now,p.id,a.token!);
+        else this.db.prepare("UPDATE study_sessions SET last_at=? WHERE learner=? AND token=?").run(Math.max(now,session.last_at),p.id,a.token!);
       }
       if (a.action!=="pulse")
         this.db.prepare("INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)")

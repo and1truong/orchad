@@ -193,6 +193,7 @@ function App() {
       if (window.agentBridgeV1 === bridge) delete window.agentBridgeV1;
     };
   }, [session]);
+  const navigate=(next:typeof view)=>{setAssistantGroup(({admin:"content",programs:"programs",notifications:"assignments",transcript:"reports",profile:"people"} as Record<string,ToolGroup>)[next]??"learning");setView(next);};
   const run = async (fn: () => Promise<void>) => {
     const capturedSession = sessionRef.current;
     setBusy(true);
@@ -325,6 +326,7 @@ function App() {
     draftOffset,
     contentOffset,
     standaloneOffset,
+    assistantGroup,
   ]);
   const mutate = async (
     name: string,
@@ -381,7 +383,7 @@ function App() {
                   password: d.get("password"),
                 }),
               );
-              setView("catalog");
+              navigate("catalog");
               clearLearning();
             });
           }}
@@ -462,7 +464,7 @@ function App() {
                     } as Record<string, ToolGroup>
                   )[id] ?? "learning",
                 );
-                setView(id);
+                navigate(id);
               }}
             >
               {text}
@@ -559,7 +561,7 @@ function App() {
               </label>
               <label>{translateUI("Content language")}<select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
+                  onChange={(e) => {setCatalogOffset(0);setStandaloneOffset(0);setLanguage(e.target.value);}}
                 >
                   <option value="">{translateUI("All languages")}</option>
                   <option value="en">{translateUI("English")}</option>
@@ -580,9 +582,9 @@ function App() {
                   onChange={(e) => setTopic(e.target.value)}
                 >
                   <option value="">{translateUI("All topics")}</option>
-                  <option>{translateUI("Distributed systems")}</option>
-                  <option>{translateUI("Learning skills")}</option>
-                  <option>{translateUI("Security")}</option>
+                  <option value="Distributed systems">{translateUI("Distributed systems")}</option>
+                  <option value="Learning skills">{translateUI("Learning skills")}</option>
+                  <option value="Security">{translateUI("Security")}</option>
                 </select>
               </label>
               <button disabled={busy}>{translateUI("Search")}</button>
@@ -624,7 +626,7 @@ function App() {
                           void run(async () => {
                             await mutate("learning_enroll", { courseId: c.id });
                             clearLearning();
-                            setView("learning");
+                            navigate("learning");
                           })
                         }
                       >
@@ -1197,7 +1199,7 @@ function App() {
         {view === "admin" &&
           ["admin", "content_admin", "assessor"].includes(role) && (
             <>
-              {canEdit&&<QuestionBanks key={"question-banks:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
+              {canEdit&&<QuestionBanks principalId={session.principal.id} admin={session.principal.role==="admin"} key={"question-banks:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
               <SessionManagement key={"session-management:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>
               {["admin", "assessor"].includes(role) && (
                 <BlendedReviews
@@ -1278,11 +1280,11 @@ function App() {
             op={op}
             mutate={mutate}
             run={run}
-            studyItem={()=>{clearLearning();setLearningOffset(0);setView("learning");}}
+            studyItem={()=>{clearLearning();setLearningOffset(0);navigate("learning");}}
             studyCourse={() => {
               clearLearning();
               setLearningOffset(0);
-              setView("learning");
+              navigate("learning");
             }}
             certificate={(id) =>
               request(

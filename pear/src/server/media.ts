@@ -1,4 +1,5 @@
 import {ModerationAssignments} from "./moderation-assignments.ts";
+import {AwardCourses} from "./award-courses.ts";
 import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
@@ -98,6 +99,7 @@ export class MediaService {
           .get(input.enrollmentId, p.tenant, p.id) as any;
         if (!e || e.assignment_state !== "active" || e.status === "completed")
           reject("FORBIDDEN", "Open own assignment required");
+        new AwardCourses(this.db).requireCurrentCourse(p,e.id,true);
         const course = JSON.parse(e.content) as Course,
           l = course.lessons.find((l) => l.id === input.lessonId);
         if (
@@ -167,6 +169,10 @@ export class MediaService {
           .get(doc) as any;
       if (w.revision !== Number(input.revision))
         reject("STALE_CONTEXT", "Library changed; refresh before uploading");
+      if(purpose!=="content"){
+        const owned=this.db.prepare("SELECT count(*) n,COALESCE(SUM(length(bytes)),0) total FROM assets WHERE tenant=? AND owner=? AND purpose!='content'").get(p.tenant,p.id) as any;
+        if(Number(owned.n)>=16||Number(owned.total)+bytes.length>32*1024*1024)reject('INVALID_ARGUMENT','Learner upload quota reached');
+      }
       const used = this.db
         .prepare(
           "SELECT COALESCE(SUM(length(bytes)),0) AS total,COUNT(*) AS count FROM assets WHERE tenant=?",
@@ -251,7 +257,7 @@ export class MediaService {
         .get(id, p.tenant) as any;
     if (!row) reject("FORBIDDEN", "Asset access denied");
     if (
-      row.owner === p.id ||
+      (row.owner === p.id && (row.purpose!=="content"||["admin","content_admin"].includes(p.role))) ||
       (row.purpose === "content" && new ContentAccess(this.db).assetForAuthor(p,id))
     )
       return row;
@@ -316,6 +322,7 @@ export class MediaService {
         .get(c.enrollmentId, p.tenant, p.id) as any;
       if (e && (e.assignment_state === "active" || e.status === "completed")) {
         new ContentAccess(this.db).enrolled(p,"course",e.course_id,e.version);
+        new AwardCourses(this.db).requireCurrentCourse(p,e.id,true);
         const course = JSON.parse(e.content) as Course,
           lesson = course.lessons.find((l) => l.id === c.lessonId),
           done = JSON.parse(e.completed_lessons);

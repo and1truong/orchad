@@ -39,3 +39,5 @@ test("digest displays exact UTC plus selected zone/DST, stable whole-row bounds,
   assert.equal(service.read(f.service.principal("learner-a"),{minutes:1},"bridge").items.length,0);
  }finally{f.db.close();}
 });
+
+test("Vietnamese digest localizes reasons and deadlines while preserving semantic action and pinned title",()=>{const f=fixture();try{const e=data(f.call("learner-a","learning_enroll",{courseId:"systems-basics"}));data(f.call("learner-a","learning_save_profile",{preferredLanguage:"vi",interests:[]}));f.db.prepare("UPDATE enrollments SET due_date='2099-01-02T10:00:00Z' WHERE id=?").run(e.enrollmentId);const r=data(f.call("learner-a","learning_get_digest",{minutes:1}));assert.match(r.items[0].reason,/Bài học/);assert.equal(r.items[0].action,"open_lesson");assert.equal(r.items[0].dueAt,"2099-01-02T10:00:00Z");}finally{f.db.close();}});

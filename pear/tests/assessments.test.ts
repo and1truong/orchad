@@ -678,3 +678,5 @@ test("one-to-one matching earns exact fractional credit at a weighted pass thres
     f.db.close();
   }
 });
+
+test("retry allowance cannot be preallocated before an eligible graded failed assessment",()=>{const f=fixture();try{const e=data(f.call("learner-a","learning_enroll",{courseId:"learning-vi"}));assert.equal(f.call("admin","human_reset_assessment",{enrollmentId:e.enrollmentId,extraAttempts:1,reason:"Reviewed retry"},"human").error?.code,"FORBIDDEN");assert.equal(f.db.prepare("SELECT count(*) n FROM assessment_resets").get()!.n,0);}finally{f.db.close();}});

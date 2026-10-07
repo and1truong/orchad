@@ -72,6 +72,7 @@ export const awardSchema = optionalAudience({
   ),
 });
 export const programLibraryWrites = [
+  "human_offer_award_course_change", "human_cancel_award_course_change",
   "learning_save_playlist",
   "learning_save_award",
   "learning_publish_collection",

@@ -51,6 +51,7 @@ const download = (text: string, filename: string) => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 export function People(p: Props) {
+  const [editingUserId,setEditingUserId]=useState<string|null>(null);
   const [users, setUsers] = useState<any[]>([]),
     [groups, setGroups] = useState<any[]>([]),
     [offset, setOffset] = useState(0),
@@ -179,7 +180,7 @@ export function People(p: Props) {
                   className="ghost"
                   onClick={() => {
                     const { createdAt, ...fields } = row;
-                    setU(fields);
+                    setEditingUserId(fields.id);setU(fields);
                   }}
                 >{translateUI("Edit user")}</button>
               )}
@@ -248,6 +249,7 @@ export function People(p: Props) {
             <fieldset disabled={p.busy}>
               <label>{translateUI("User ID")}<input
                   value={u.id}
+                  readOnly={editingUserId!==null}
                   required
                   maxLength={64}
                   pattern="[A-Za-z0-9_-]+"
@@ -369,7 +371,7 @@ export function People(p: Props) {
               <button
                 type="button"
                 className="ghost"
-                onClick={() => setU(user())}
+                onClick={() => {setEditingUserId(null);setU(user());}}
               >{translateUI("New user")}</button>
             </fieldset>
             <p>{translateUI("Synthetic accounts use their ID plus “-dev”. Production login remains disabled until an identity adapter is configured. Deactivation preserves records and revokes sessions.")}</p>
@@ -528,8 +530,8 @@ export function People(p: Props) {
                       changeGroup({ ...g, mode: e.target.value as any })
                     }
                   >
-                    <option>{translateUI("ALL")}</option>
-                    <option>{translateUI("ANY")}</option>
+                    <option value="ALL">{translateUI("ALL")}</option>
+                    <option value="ANY">{translateUI("ANY")}</option>
                   </select>
                 </label>
                 {g.rules.map((r, i) => (

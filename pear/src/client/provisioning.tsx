@@ -8,7 +8,7 @@ export function ProvisioningClients(p:{session:Session;busy:boolean;run:(fn:()=>
  async function mutate(action:string,clientId?:string){
   await p.run(async()=>{
    const context=await request<any>("/api/context?documentId="+encodeURIComponent("library:"+p.session.principal.tenant),p.session);
-   const args=action==="issue"?{action,name,reason,ttlDays:days,scopes:[...(catalogRead||catalogWrite?["catalog.read"]:[]),...(catalogWrite?["catalog.write"]:[]),...(external||externalWrite?["xapi.read"]:[]),...(externalWrite?["xapi.write"]:[]),...(events?["events.read"]:[]),...(data?.provisioningEnabled&&(!events||write)?["provisioning.read"]:[]),...(write?["provisioning.write"]:[])]}:{action,clientId,reason};
+   const args=action==="issue"?{action,name,reason,ttlDays:days,scopes:[...(catalogRead||catalogWrite?["catalog.read"]:[]),...(catalogWrite?["catalog.write"]:[]),...(external||externalWrite?["xapi.read"]:[]),...(externalWrite?["xapi.write"]:[]),...(events?["events.read"]:[]),...(data?.provisioningEnabled&&(!events||write||external||externalWrite)?["provisioning.read"]:[]),...(write||external||externalWrite?["provisioning.write"]:[])]}:{action,clientId,reason};
    const result=await request<any>("/api/provisioning-clients",p.session,{...args,key:crypto.randomUUID(),revision:context.revision});
    if(p.isCurrent()){setSecret(result.token??null);setRefresh(n=>n+1);}
   });
@@ -21,12 +21,12 @@ export function ProvisioningClients(p:{session:Session;busy:boolean;run:(fn:()=>
  <label>{t("Provisioning review reason")}<input aria-label={t("Provisioning review reason")} required maxLength={300} value={reason} onChange={e=>setReason(e.target.value)}/></label>
  <label>{t("Credential duration in days")}<input aria-label={t("Credential duration in days")} type="number" min={1} max={30} value={days} onChange={e=>setDays(Number(e.target.value))}/></label>
  <label><input type="checkbox" disabled={!data?.provisioningEnabled} checked={write} onChange={e=>setWrite(e.target.checked)}/>{t("Allow provisioning writes")}</label>
- <label><input type="checkbox" disabled={!data?.provisioningEnabled} checked={events} onChange={e=>setEvents(e.target.checked)}/>{t("Allow organization event reads")}</label>
+ <label><input type="checkbox" checked={events} onChange={e=>setEvents(e.target.checked)}/>{t("Allow organization event reads")}</label>
  <label><input type="checkbox" disabled={!data?.provisioningEnabled} checked={external} onChange={e=>setExternal(e.target.checked)}/>{t("Allow external activity reads")}</label>
  <label><input type="checkbox" disabled={!data?.provisioningEnabled} checked={externalWrite} onChange={e=>setExternalWrite(e.target.checked)}/>{t("Allow external activity statement writes")}</label>
  <label><input type="checkbox" disabled={!data?.catalogEnabled} checked={catalogRead} onChange={e=>setCatalogRead(e.target.checked)}/>{t("Allow provider catalog reconciliation reads")}</label>
  <label><input type="checkbox" disabled={!data?.catalogEnabled} checked={catalogWrite} onChange={e=>setCatalogWrite(e.target.checked)}/>{t("Allow provider metadata and entitlement feed writes")}</label>
- <button disabled={!data?.provisioningEnabled&&!catalogRead&&!catalogWrite}>{t("Issue reviewed credential")}</button></fieldset></form>
+ <button disabled={!data?.provisioningEnabled&&!catalogRead&&!catalogWrite&&!events}>{t("Issue reviewed credential")}</button></fieldset></form>
  {secret&&<aside aria-label={t("One-time provisioning secret")}><p>{t("Save this secret now. It is not stored in the browser and cannot be displayed again.")}</p>
  <code data-testid="provisioning-secret">{secret}</code><button disabled={p.busy} onClick={()=>setSecret(null)}>{t("Hide provisioning secret")}</button></aside>}
  {data?.items.map((row:any)=><div key={row.id}><p>{row.name} · {row.scopes.join(", ")} · {row.expiresAt} · {row.active?t("Active"):t("Revoked")}</p>

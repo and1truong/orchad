@@ -16,6 +16,15 @@ export class ContentAccess {
    if(!Array.isArray(value.groupIds)||!value.groupIds.length||value.groupIds.length>8||new Set(value.groupIds).size!==value.groupIds.length||value.groupIds.some(id=>!/^[A-Za-z0-9_-]{1,64}$/.test(id)||!this.db.prepare("SELECT 1 FROM learning_groups WHERE tenant=? AND id=?").get(p.tenant,id)))reject("INVALID_ARGUMENT","Select one to eight distinct existing own-tenant groups");
   }else if(value.groupIds!==undefined)reject("INVALID_ARGUMENT","Group IDs require the groups audience");
  }
+ newCourse(p:Principal,id:string,version:number){
+  this.enrolled(p,"course",id,version);this.current(p,"course",id);
+  const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(id,version) as any).content);
+  for(const lesson of value.lessons){if(!lesson.contentRef)continue;const ref=lesson.contentRef;
+   const row=this.db.prepare("SELECT c.state,v.content FROM content_items c JOIN content_item_versions v ON v.item_id=c.id AND v.version=? WHERE c.id=? AND c.tenant=?").get(ref.version,ref.itemId,p.tenant) as any;
+   if(!row||row.state!=="published")reject("FORBIDDEN","Referenced content is not accepting new learning");
+   this.requireVisible(p,"item",ref.itemId,JSON.parse(row.content));this.current(p,"item",ref.itemId);
+  }
+ }
  enrolled(p:Principal,kind:ContentKind,id:string,version:number){
   const table=kind==="course"?"course_versions":"content_item_versions",column=kind==="course"?"course_id":"item_id";
   const row=this.db.prepare("SELECT content FROM "+table+" WHERE "+column+"=? AND version=?").get(id,version) as any;

@@ -24,7 +24,7 @@ export const discoveryTools=[
  tool("learning_get_recommendations","read",{offset:integer(100000),limit:integer(10,1)},
   "Rank permitted not-yet-enrolled courses using own declared interests/language and organization curation. Source IDs and rule-based reasons; no inferred skills or completion.",[])
 ];
-export const normalize=(s:string)=>s.normalize("NFKD").replace(/\p{M}/gu,"").toLowerCase().replaceAll("đ","d");
+export const normalize=(s:string)=>s.trim().normalize("NFKD").replace(/\p{M}/gu,"").toLowerCase().replaceAll("đ","d");
 const concepts=[
  {id:"retries",terms:["retry","retries","backoff","retry storm","try again","thu lai"]},
  {id:"idempotency",terms:["idempotency","idempotent","lost response","same work twice","duplicate operation","mat phan hoi","trung lap"]},

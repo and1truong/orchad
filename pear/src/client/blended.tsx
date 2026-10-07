@@ -150,7 +150,7 @@ export function BlendedPlayer(
 
                 </>
               )}
-              {["booked","present","cancelled"].includes(b.state)&&<button disabled={p.busy} onClick={()=>void p.run(()=>calendar(b.id))}>{translateUI(b.state==="cancelled"?"Download cancelled calendar":"Download calendar")}</button>}
+              {["booked","present","cancelled"].includes(b.state)&&(b.state!=="cancelled"||!!b.cancelledAt)&&<button disabled={p.busy} onClick={()=>void p.run(()=>calendar(b.id))}>{translateUI(b.state==="cancelled"?"Download cancelled calendar":"Download calendar")}</button>}
             </div>
           ))}
         </>
@@ -192,7 +192,7 @@ export function BlendedReviews(p: Ops & { session: Session }) {
       {rows.map((row) => (
         <section className="learning-row" key={row.id}>
           <p>
-            {row.kind} · {row.learnerId} · {row.lessonId}
+            {row.kind} · {row.learnerId} · {row.lessonId}{row.sessionId&&` · ${row.sessionId} · ${row.startsAt} · ${row.timezone} · ${row.location}`}
           </p>
           <button
             disabled={p.busy}

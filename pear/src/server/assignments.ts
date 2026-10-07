@@ -1,3 +1,4 @@
+import {AwardCourses} from "./award-courses.ts";
 import {ContentAccess} from "./content-access.ts";
 import { releaseInactiveBookings } from "./blended.ts";
 import { calendarMonth, nextCalendarRun, calendarRunIndex, calendarPreview } from "../shared/calendar.ts";
@@ -8,7 +9,7 @@ import type { Principal } from "../shared/model.ts";
 import { planSchema, type AssignmentPlan } from "../shared/assignments.ts";
 import { PeopleService } from "./people.ts";
 import { ProgramService } from "./programs.ts";
-import { reject, boundedPage } from "./errors.ts";
+import { DomainError, reject, boundedPage } from "./errors.ts";
 const day = 86400000,
   idPattern = /^[A-Za-z0-9_-]{1,64}$/;
 const date = (value: string) => {
@@ -268,7 +269,7 @@ export class AssignmentService {
             .run(state, id);
           this.db
             .prepare(
-              "UPDATE enrollments SET assignment_state=? WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL AND NOT EXISTS(SELECT 1 FROM enrollments successor WHERE successor.retake_of=enrollments.id)",
+              "UPDATE enrollments SET assignment_state=? WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL AND NOT EXISTS(SELECT 1 FROM enrollments successor WHERE successor.retake_of=enrollments.id) AND NOT EXISTS(SELECT 1 FROM award_course_reviews r JOIN award_course_bindings b ON b.id=r.binding_id WHERE r.source_enrollment_id=enrollments.id AND r.state='accepted' AND b.course_enrollment_id!=enrollments.id)",
             )
             .run(state, cycle.id, d.learner);
           releaseInactiveBookings(this.db, p.tenant);
@@ -284,9 +285,21 @@ export class AssignmentService {
           changed++;
         }
       }
+      if(d.award_enrollment_id){
+        const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(d.learner,p.tenant) as unknown as Principal;
+        const children=this.db.prepare("SELECT e.*,b.pinned_version,b.current_version FROM award_course_bindings b JOIN enrollments e ON e.id=b.course_enrollment_id WHERE b.award_enrollment_id=? AND e.completed_at IS NULL").all(d.award_enrollment_id) as any[];
+        for(const child of children){
+          let allowed=!!recipient&&desired.has(d.learner)&&d.state!=="cancelled";
+          if(allowed){try{const access=new ContentAccess(this.db);access.enrolled(recipient,"course",child.course_id,child.pinned_version);access.enrolled(recipient,"course",child.course_id,child.current_version);access.current(recipient,"course",child.course_id);}catch{allowed=false;}}
+          const state=d.state==="cancelled"?"cancelled":allowed?"active":"withdrawn";
+          if(child.assignment_state!==state){this.db.prepare("UPDATE enrollments SET assignment_state=? WHERE id=?").run(state,child.id);this.advance(p,d.learner);changed++;}
+        }
+      }
+      releaseInactiveBookings(this.db, p.tenant);
     }
     for (const learner of desired) {
       if (current.some((d) => d.learner === learner)) continue;
+      if(s.targetKind==="course"){try{const recipient=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(learner,p.tenant) as unknown as Principal;new ContentAccess(this.db).newCourse(recipient,cycle.target_id,cycle.target_version);}catch(error){if(error instanceof DomainError)continue;throw error;}}
       const id = randomUUID(),
         due = this.due(s, cycle.run_at, now);
       if (s.targetKind === "course")
@@ -368,76 +381,9 @@ export class AssignmentService {
     return rows.length;
   }
   private enrollAwardCourse(p: Principal, a: any, authorizeOnly = false) {
-    const award = this.db
-      .prepare(
-        "SELECT * FROM award_enrollments WHERE id=? AND learner=? AND tenant=? AND assignment_state='active'",
-      )
-      .get(a.awardEnrollmentId, p.id, p.tenant) as any;
-    if (!award) reject("FORBIDDEN", "Active own award enrollment required");
-    new ProgramService(this.db).requireEnrolled(p,award.id);
-    const root = JSON.parse(
-      (
-        this.db
-          .prepare(
-            "SELECT content FROM collection_versions WHERE collection_id=? AND version=?",
-          )
-          .get(award.award_id, award.version) as any
-      ).content,
-    );
-    const versions = new Set<number>();
-    const walk = (content: any, depth: number) => {
-      if (depth > 4) reject("INTERNAL", "Award graph invalid");
-      for (const r of content.requirements)
-        for (const ref of r.alternatives) {
-          if (ref.kind === "course" && ref.id === a.courseId)
-            versions.add(ref.version);
-          else if (ref.kind === "award")
-            walk(
-              JSON.parse(
-                (
-                  this.db
-                    .prepare(
-                      "SELECT content FROM collection_versions WHERE collection_id=? AND version=?",
-                    )
-                    .get(ref.id, ref.version) as any
-                ).content,
-              ),
-              depth + 1,
-            );
-        }
-    };
-    walk(root, 1);
-    if (!versions.size) reject("FORBIDDEN", "Course outside enrolled award rules");
-    if(versions.size!==1)reject("FORBIDDEN","Award references conflicting course versions; author review is required");
-    const version=[...versions][0]!;
-    const course = this.db.prepare("SELECT tenant FROM courses WHERE id=?").get(a.courseId) as any;
-    if (course?.tenant !== p.tenant) reject("FORBIDDEN", "Course unavailable");
-    const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(a.courseId,version) as any).content);
-    new ContentAccess(this.db).current(p,"course",a.courseId);new ContentAccess(this.db).requireVisible(p,"course",a.courseId,value);
-    const old=this.db.prepare("SELECT id,version,assignment_state FROM enrollments WHERE learner=? AND tenant=? AND course_id=? AND assignment_cycle_id IS ? ORDER BY rowid DESC LIMIT 1").get(p.id,p.tenant,a.courseId,award.assignment_cycle_id) as any;
-    if(old){
-      if(old.version!==version)reject("FORBIDDEN","Existing course version differs from the award; reviewed learning changes are required");
-      if(old.assignment_state!=="active")reject("FORBIDDEN","Current award course obligation is not active");
-      return {enrollmentId:old.id,version:old.version,alreadyEnrolled:true};
-    }
-    if (authorizeOnly) return { authorized: true };
-    const id = randomUUID();
-    this.db
-      .prepare(
-        "INSERT INTO enrollments(id,tenant,learner,course_id,version,assigned_by,assignment_cycle_id,due_date) VALUES(?,?,?,?,?,?,?,?)",
-      )
-      .run(
-        id,
-        p.tenant,
-        p.id,
-        a.courseId,
-        version,
-        award.assigned_by,
-        award.assignment_cycle_id,
-        award.due_date,
-      );
-    return { enrollmentId: id, version, alreadyEnrolled: false };
+    return new AwardCourses(this.db).open(p,a,authorizeOnly);
   }
+
   // Caller owns an IMMEDIATE transaction. Clock is injectable only in trusted server/tests.
   runDue(tenant: string, now = new Date().toISOString(), maxCycles = 5) {
     date(now);
@@ -477,13 +423,6 @@ export class AssignmentService {
         continue;
       }
       const s = JSON.parse(row.definition) as AssignmentPlan;
-      if (s.endAt && now > s.endAt) {
-        this.db
-          .prepare("UPDATE assignment_plans SET state='closed' WHERE id=?")
-          .run(row.id);
-        changes++;
-        continue;
-      }
       try {
         this.target(p, s, row.target_version);
       } catch {
@@ -564,6 +503,7 @@ export class AssignmentService {
           .run(runAt, row.id);
         changes++;
       }
+      if(s.endAt&&String(this.db.prepare('SELECT next_run FROM assignment_plans WHERE id=?').get(row.id)!.next_run)>s.endAt){this.db.prepare("UPDATE assignment_plans SET state='closed' WHERE id=?").run(row.id);changes++;}
       const learners = this.db
         .prepare(
           "SELECT DISTINCT d.learner FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id WHERE c.plan_id=?",
@@ -802,7 +742,7 @@ export class AssignmentService {
               .run(id);
             this.db
               .prepare(
-                "UPDATE enrollments SET assignment_state='cancelled' WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL AND NOT EXISTS(SELECT 1 FROM enrollments successor WHERE successor.retake_of=enrollments.id)",
+                "UPDATE enrollments SET assignment_state='cancelled' WHERE assignment_cycle_id=? AND learner=? AND completed_at IS NULL AND NOT EXISTS(SELECT 1 FROM enrollments successor WHERE successor.retake_of=enrollments.id) AND NOT EXISTS(SELECT 1 FROM award_course_reviews r JOIN award_course_bindings b ON b.id=r.binding_id WHERE r.source_enrollment_id=enrollments.id AND r.state='accepted' AND b.course_enrollment_id!=enrollments.id)",
               )
               .run(d.cycle_id, d.learner);
             releaseInactiveBookings(this.db, p.tenant);

@@ -13,6 +13,7 @@ import {courses} from "../src/server/seed.ts";
 const question={id:"formatted",title:"Original titled question",prompt:"**Original bold** and *original italic* and __original underline__\n\n- Original bullet\n- Second bullet\n\n1. Original numbered\n2. Second numbered\n\n<img src=x onerror=alert(1)> https://example.invalid/",promptFormat:"original_markup" as const,options:["Original right","Original wrong"],correct:0};
 test("bounded original question formatting produces only explicit React text/format/list nodes; raw HTML/URLs and unmatched markers stay literal",()=>{
  const html=renderToStaticMarkup(React.createElement(QuestionPrompt,{q:question}));
+ assert.deepEqual(questionInline("***both***"),[{kind:"strong",children:[{kind:"em",children:[{kind:"text",text:"both"}]}]}]);
  assert.match(html,/<strong>Original bold<\/strong>/);assert.match(html,/<em>original italic<\/em>/);assert.match(html,/<u>original underline<\/u>/);assert.match(html,/<ul><li>Original bullet<\/li><li>Second bullet<\/li><\/ul>/);assert.match(html,/<ol><li>Original numbered<\/li><li>Second numbered<\/li><\/ol>/);
  assert.equal(html.includes("<img"),false);assert.equal(html.includes("<a "),false);assert.match(html,/&lt;img src=x onerror=alert\(1\)&gt;/);assert.equal(html.includes("https://example.invalid/"),true);
  assert.deepEqual(questionInline("Original **unclosed"),[{kind:"text",text:"Original **unclosed"}]);assert.equal(questionBlocks("First paragraph\n\nSecond paragraph").length,2);

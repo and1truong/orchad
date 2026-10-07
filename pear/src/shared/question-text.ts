@@ -6,16 +6,16 @@ export type PromptBlock={kind:"paragraph";lines:InlineText[][]}|{kind:"ordered"|
 export function questionInline(text:string,depth=0,budget={nodes:0}):InlineText[]{
  if(depth>=4||budget.nodes>=128)return [{kind:"text",text}];
  const out:InlineText[]=[];let cursor=0;
- const markers:[string,"strong"|"em"|"underline"][]=[["**","strong"],["__","underline"],["*","em"]];
+ const markers:[string,"strong"|"em"|"underline"|"both"][]=[["***","both"],["**","strong"],["__","underline"],["*","em"]];
  while(cursor<text.length){
   if(budget.nodes>=128){out.push({kind:"text",text:text.slice(cursor)});break;}
-  let begin=text.length,token:"strong"|"em"|"underline"="em",marker="";
+  let begin=text.length,token:"strong"|"em"|"underline"|"both"="em",marker="";
   for(const [candidate,kind] of markers){const at=text.indexOf(candidate,cursor);if(at>=0&&at<begin){begin=at;marker=candidate;token=kind;}}
   if(!marker){out.push({kind:"text",text:text.slice(cursor)});budget.nodes++;break;}
   const end=text.indexOf(marker,begin+marker.length);
   if(end<0){out.push({kind:"text",text:text.slice(cursor)});budget.nodes++;break;}
   if(begin>cursor){out.push({kind:"text",text:text.slice(cursor,begin)});budget.nodes++;}
-  budget.nodes++;out.push({kind:token,children:questionInline(text.slice(begin+marker.length,end),depth+1,budget)});cursor=end+marker.length;
+  budget.nodes++;out.push(token==="both"?{kind:"strong",children:[{kind:"em",children:questionInline(text.slice(begin+marker.length,end),depth+2,budget)}]}:{kind:token,children:questionInline(text.slice(begin+marker.length,end),depth+1,budget)});cursor=end+marker.length;
  }
  return out;
 }

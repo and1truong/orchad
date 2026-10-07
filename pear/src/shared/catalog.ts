@@ -1,3 +1,4 @@
+import {awardCourseHumanTools} from "./award-courses.ts";
 import {assignedQuizHumanTools} from "./assigned-quiz.ts";
 import {collectionSharingHumanTools,collectionSharingWrites} from "./collection-sharing.ts";
 import {primaryModerationHumanTools} from "./moderation-assignments.ts";
@@ -422,6 +423,7 @@ export function catalog(role: Role, group: ToolGroup = "learning"): Tool[] {
 // These operations are deliberately absent from the agent catalog. Host approvals
 // authorize domain mutations, but never supply learner assessment confirmation.
 export const humanTools: Tool[] = [
+  ...awardCourseHumanTools,
   ...assignedQuizHumanTools,
   ...collectionSharingHumanTools,
   ...primaryModerationHumanTools,

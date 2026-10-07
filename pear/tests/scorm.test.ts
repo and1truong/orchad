@@ -38,6 +38,9 @@ test("manifest profile rejects entities, unsafe external resources, unsupported 
  }
  assert.throws(()=>parseManifest(Buffer.from([0xff,0xfe])));assert.throws(()=>parseManifest(Buffer.from("<manifest>".repeat(9)+"</manifest>".repeat(9))));
 });
+test("inline SCO rejects declared external resources and navigation rather than silently accepting an unlaunchable package",()=>{
+ for(const tag of ['<script src="https://example.test/a.js"></script>','<img src="https://example.test/a.png">','<meta http-equiv="refresh" content="0;url=https://example.test">','<style>@import "https://example.test/a.css";</style>','<iframe src="/other"></iframe>','<form action="https://example.test"></form>'])assert.throws(()=>inspectSCORM(zip([{name:"imsmanifest.xml",data:Buffer.from(manifest)},{name:"index.html",data:Buffer.from(sco.replace('<body>','<body>'+tag))}])),/inline SCO profile/);
+});
 test("imports quarantine executable bytes; review requires content role/hash/CAS/exact retry and audit rollback preserves history",()=>{
  const s=scormFixture();try{
   assert.equal(s.scorm.list(s.learner).items.length,0);assert.throws(()=>s.start(),/not accepting|Quarantined/);

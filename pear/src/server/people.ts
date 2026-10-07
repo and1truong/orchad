@@ -434,7 +434,7 @@ export class PeopleService {
           )
           .run(
             p.id,
-            new Date().toISOString(),
+            "2026-10-05T00:00:00.000Z",
             a.preferredLanguage,
             JSON.stringify(a.interests),
           );

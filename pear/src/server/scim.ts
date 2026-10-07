@@ -134,6 +134,10 @@ export class SCIMService{
     if(kind==="Users"){
      const current=this.resource(row,kind);delete current.id;delete current.meta;
      this.saveUser(principal,client,resourceId,this.userInput({...current,active:false},false),row);
+     for(const group of this.db.prepare("SELECT * FROM scim_groups WHERE tenant=? AND client_id=? AND deleted=0").all(client.tenant,client.id) as any[]){
+      const live=this.group(group),definition=JSON.parse(live.definition);
+      if(live.kind==="static"&&definition.memberIds.includes(row.user_id))this.saveGroup(principal,client,group.id,{displayName:live.name,memberIds:definition.memberIds.filter((id:string)=>id!==row.user_id),externalId:group.external_id},group);
+     }
      this.db.prepare("UPDATE scim_users SET deleted=1,user_name_key=? WHERE id=?").run("__deleted__"+resourceId,resourceId);
     }else{
      this.saveGroup(principal,client,resourceId,{displayName:this.group(row).name,memberIds:[],externalId:row.external_id},row);

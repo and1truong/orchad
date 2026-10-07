@@ -20,6 +20,9 @@ export class OutboxService{
    if(url.username||url.password||url.hash||url.search||url.href!==raw.url||url.href.length>1024||(url.protocol!=="https:"&&!(fixture&&url.protocol==="http:"&&["127.0.0.1","localhost","[::1]"].includes(url.hostname))))throw Error("Webhook endpoints require exact reviewed HTTPS URLs");
    this.endpoints.set(raw.id,{...raw});
   }
+  // Server configuration changes are durable revocations, never automatic grant resurrection.
+  for(const row of this.db.prepare('SELECT * FROM webhook_subscriptions WHERE active=1').all() as any[]){const endpoint=this.endpoints.get(row.endpoint_id);if(!endpoint||this.hash(endpoint)!==row.config_hash){this.db.prepare('UPDATE webhook_subscriptions SET active=0 WHERE id=?').run(row.id);}}
+
  }
  private live(p:Principal){
   const a=this.db.prepare("SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1").get(p.id,p.tenant) as any;
@@ -94,7 +97,8 @@ export class OutboxService{
  private claim(now:number){
   this.db.exec("BEGIN IMMEDIATE");
   try{
-   const subscriptions=this.db.prepare("SELECT * FROM webhook_subscriptions ORDER BY id").all() as any[];
+   const after=String(this.db.prepare('SELECT subscription_id FROM webhook_claim_cursor WHERE id=1').get()!.subscription_id);
+   const subscriptions=this.db.prepare('SELECT * FROM webhook_subscriptions ORDER BY (id<=?),id').all(after) as any[];
    for(const row of subscriptions){
     if(!this.enabled(row))continue;
     // Strict ordering: the first selected unacknowledged event blocks all later selected events.
@@ -109,6 +113,7 @@ export class OutboxService{
      if(delivery.state==="failed"||delivery.next_attempt>now||delivery.state==="sending"&&delivery.lease_until>now)break;
      const lease=randomUUID();
      this.db.prepare("UPDATE webhook_deliveries SET state='sending',attempts=attempts+1,lease=?,lease_until=? WHERE subscription_id=? AND event_sequence=?").run(lease,now+30000,row.id,event.sequence);
+     this.db.prepare('UPDATE webhook_claim_cursor SET subscription_id=? WHERE id=1').run(row.id);
      this.db.exec("COMMIT");return {row,event,lease,attempt:delivery.attempts+1};
     }
    }

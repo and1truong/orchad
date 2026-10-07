@@ -11,6 +11,7 @@ export class AssignedQuiz{
  private source(p:Principal,id:string,accepted=false,reviewId?:string){
   const e=this.db.prepare("SELECT * FROM enrollments WHERE id=? AND tenant=?").get(id,p.tenant) as any;
   if(!e||!e.assigned_by||e.status!=="in_progress"||e.completed_at||(e.assignment_state!=="active"&&!(accepted&&e.assignment_state==="withdrawn")))reject("FORBIDDEN","Active unfinished direct assignment required");
+  if(e.award_binding_id)reject("FORBIDDEN","Use the exact award course binding review");
   this.principal(e.learner,p.tenant);
   if(e.assignment_cycle_id){
    const d=this.db.prepare("SELECT d.*,c.target_kind,c.target_id,c.plan_id,c.definition,p.state plan_state,p.owner,p.tenant FROM assignment_deliveries d JOIN assignment_cycles c ON c.id=d.cycle_id JOIN assignment_plans p ON p.id=c.plan_id WHERE d.cycle_id=? AND d.learner=?").get(e.assignment_cycle_id,e.learner) as any;
@@ -83,7 +84,7 @@ export class AssignedQuiz{
   if(row.state!=="pending")reject("INVALID_ARGUMENT","Assignment review is no longer pending");
   this.db.prepare("UPDATE assigned_quiz_reviews SET state='cancelled',cancelled_by=? WHERE id=? AND state='pending'").run(p.id,row.id);
   this.db.prepare("UPDATE workspaces SET revision=revision+1 WHERE id=?").run("learning:"+p.tenant+":"+row.learner);
-  return {reviewId:row.id,sourceEnrollmentId:row.source_enrollment,state:"cancelled",officialLearningChanged:false};
+  return {reviewId:row.id,sourceEnrollmentId:row.source_enrollment,mode:row.restart_mode,state:"cancelled",officialLearningChanged:false};
  }
  accept(p:Principal,a:any){
   const {row,e}=this.review(p,a.reviewId);if(a.targetVersion!==row.target_version)reject("STALE_CONTEXT","Assigned quiz target changed; request a new coordinator review");

@@ -1,3 +1,4 @@
+import {canonical} from "@orchard/bridge-contract";
 import {ContentAccess} from "./content-access.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
@@ -54,6 +55,7 @@ export class BlendedService {
     if(revision&& !row)reject("NOT_FOUND","Session booking history unavailable");
     return {session:row?JSON.parse(row.definition) as EventSession:s,revision:row?.revision??0,state:row?.kind==="cancel"?"cancelled":"scheduled",reason:row?.reason??null,changedAt:row?.changed_at??null};
   }
+  learnerSession(e:any,original:EventSession){const effective=this.effective(original),session={...effective.session};if(e.assignment_state!=="active"||effective.state!=="scheduled"||!this.db.prepare("SELECT 1 FROM bookings WHERE enrollment_id=? AND session_id=? AND state IN ('booked','present')").get(e.id,original.id))delete session.joinUrl;return session;}
   private changeSession(p:Principal,a:any){
     const row=this.managedSession(p,a.sessionId),current=this.effective(JSON.parse(row.definition));
     if(!a.reason.trim())reject("INVALID_ARGUMENT","Explain the session change");
@@ -143,7 +145,7 @@ export class BlendedService {
   pin(p: Principal, courseId: string, c: Course) {
     for (const l of c.lessons)
       for (const s of l.sessions ?? []) {
-        const definition = JSON.stringify(s),
+        const definition = canonical(s),
           old = this.db
             .prepare("SELECT * FROM event_sessions WHERE id=?")
             .get(s.id) as any;
@@ -152,7 +154,7 @@ export class BlendedService {
           (old.tenant !== p.tenant ||
             old.course_id !== courseId ||
             old.lesson_id !== l.id ||
-            old.definition !== definition)
+            canonical(JSON.parse(old.definition)) !== definition)
         )
           reject(
             "INVALID_ARGUMENT",
@@ -324,7 +326,7 @@ export class BlendedService {
           .get(s.id) as any;
         return {
           ...(source === "human"
-            ? s
+            ? this.learnerSession(e,original)
             : {
                 id: s.id,
                 startsAt: s.startsAt,
@@ -366,7 +368,7 @@ export class BlendedService {
           .all(p.tenant, p.tenant) as any[]
       )
         .filter(scoped)
-        .map(({ course_id, ...r }) => r);
+        .map(({ course_id, ...r }) => {if(r.kind!=="event")return r;const b=this.db.prepare("SELECT session_id,session_revision FROM bookings WHERE id=?").get(r.id) as any;const event=this.db.prepare("SELECT definition FROM event_sessions WHERE id=?").get(b.session_id) as any;const session=this.effective(JSON.parse(event.definition),b.session_revision).session;return {...r,sessionId:b.session_id,sessionRevision:b.session_revision,startsAt:session.startsAt,endsAt:session.endsAt,timezone:session.timezone,location:session.location};});
       return boundedPage(rows, a.offset ?? 0, a.limit ?? 20);
     }
     reject("UNSUPPORTED", "Unknown learning operation");

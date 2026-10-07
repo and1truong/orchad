@@ -19,20 +19,20 @@ test("study timer credits only bounded server intervals and cannot alter learnin
     s=t.act(p,"session-a",{action:"pulse",kind:"course",targetId:id,token:s.token});
     assert.equal(s.totalSeconds,15);now+=10000;
     const stopped=t.act(p,"session-a",{action:"stop",kind:"course",targetId:id,token:s.token});
-    assert.equal(stopped.totalSeconds,25);assert.equal(stopped.active,false);
+    assert.equal(stopped.totalSeconds,24);assert.equal(stopped.active,false);
     assert.throws(()=>t.act(p,"session-a",{action:"stop",kind:"course",targetId:id,token:s.token}),/lease changed/);
     assert.equal(JSON.stringify(f.db.prepare("SELECT * FROM enrollments").all()),before);
     assert.equal(f.service.context(p.id).revision,revision);
     assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM attempts").get()!.n,0);
     assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM certificates").get()!.n,0);
     const row=data(f.call(p.id,"learning_get_transcript")).items[0];
-    assert.equal(row.observedSeconds,25);assert.ok(row.estimatedMinutes>0);assert.equal(row.score,null);assert.equal(row.progress,0);
+    assert.equal(row.observedSeconds,24);assert.ok(row.estimatedMinutes>0);assert.equal(row.score,null);assert.equal(row.progress,0);
     const spec={...freshReport(),columns:["learnerId","estimatedMinutes","observedSeconds"] as any};
-    assert.equal(data(f.call("manager","learning_report_preview",{spec})).items[0].observedSeconds,25);
+    assert.equal(data(f.call("manager","learning_report_preview",{spec})).items[0].observedSeconds,24);
     f.db.exec("UPDATE accounts SET manager_id=NULL WHERE id='learner-a'");
     assert.equal(data(f.call("manager","learning_report_preview",{spec})).total,0);
     const exported=data(f.call("admin","learning_export_report",{spec,rows:"filtered",columns:"visible"}));
-    assert.ok(exported.csv.includes("25"));
+    assert.ok(exported.csv.includes("24"));
   }finally{f.db.close();}
 });
 test("one lease per learner prevents overlapping tab totals, wrong session/owner/tenant and revoked authority fail closed",()=>{

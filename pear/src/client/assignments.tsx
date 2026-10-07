@@ -97,7 +97,8 @@ export function Assignments(p: Props) {
                 {row.cycleCount} cycles · Target version {row.target_version}
               </p>
               <p>{translateUI("Starts")}{" "}{row.plan.startsAt} ·{" "}
-                {row.plan.repeatDays
+                {row.plan.repeatMonths
+                  ? `Every ${row.plan.repeatMonths} calendar months · ${row.plan.timeZone}` : row.plan.repeatDays
                   ? `Every ${row.plan.repeatDays} UTC days`
                   : "Once"}{" "}
                 · {row.plan.dueKind} deadline · {row.plan.membership} membership
@@ -272,7 +273,7 @@ export function Assignments(p: Props) {
                 />
               </label>
               <label className="choice">
-                <input type="checkbox" checked={!!spec.repeatMonths} onChange={(e) => {
+                <input type="checkbox" checked={spec.repeatMonths!==undefined} onChange={(e) => {
                   if (e.target.checked) change({...spec, repeatDays: 0, repeatMonths: 1,
                     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, dstChoice: "earlier"});
                   else {
@@ -280,7 +281,7 @@ export function Assignments(p: Props) {
                     change(legacy);
                   }
                 }} />{translateUI("Use calendar-month recurrence")}</label>
-              {spec.repeatMonths ? <>
+              {spec.repeatMonths!==undefined ? <>
                 <label>{translateUI("Repeat every calendar months")}<input type="number" min={1} max={12} required value={spec.repeatMonths}
                     onChange={e => change({...spec, repeatMonths: Number(e.target.value)})} />
                 </label>

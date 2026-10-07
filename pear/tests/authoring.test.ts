@@ -586,7 +586,7 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
         db
           .prepare("SELECT * FROM enrollments")
           .all()
-          .map(({ assignment_cycle_id, assignment_state, retake_of, ...row }: any) => row),
+          .map(({ assignment_cycle_id, assignment_state, retake_of, award_binding_id, ...row }: any) => row),
       ),
       legacyEnrollment,
     );
@@ -619,7 +619,7 @@ test("additive migration preserves v1 course/enrollment records, standalone vers
     assert.equal(
       (db.prepare("SELECT MAX(version) AS n FROM schema_version").get() as any)
         .n,
-      41,
+      42,
     );
     const r = service.invoke("learner-a", {
       requestId: "persist",

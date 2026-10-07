@@ -47,8 +47,9 @@ export function assignmentTools(role: Role): Tool[] {
     tool(
       "learning_enroll_award_course",
       "write",
-      { awardEnrollmentId: string(), courseId: string(64) },
+      { awardEnrollmentId: string(), courseId: string(64), criterionPath:string(768) },
       "Enroll own course referenced by an enrolled award, retaining its permitted version; recurring award cycles receive a fresh course ledger.",
+      ["awardEnrollmentId","courseId"],
     ),
     tool(
       "learning_get_notifications",

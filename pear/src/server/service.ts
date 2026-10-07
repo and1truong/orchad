@@ -1,3 +1,4 @@
+import {AwardCourses} from "./award-courses.ts";
 import {AssignedQuiz} from "./assigned-quiz.ts";
 import {CollectionSharing} from "./collection-sharing.ts";
 import {ModerationAssignments} from "./moderation-assignments.ts";
@@ -259,6 +260,7 @@ export class LearningService {
     new ModerationAssignments(this.db).authorize(p,c.toolName,a);
     new CollectionSharing(this.db).authorize(p,c.toolName,a);
     new AssignedQuiz(this.db).authorize(p,c.toolName,a);
+    new AwardCourses(this.db).authorize(p,c.toolName,a);
     this.people.authorize(p, c.toolName, a);
     this.assignments.authorize(p, c.toolName, a);
     this.reports.authorize(p, c.toolName, a);
@@ -273,6 +275,7 @@ export class LearningService {
             ].includes(c.toolName)
           ? this.attempt(p, a.attemptId).e
           : null;
+    if(scopedEnrollment)new AwardCourses(this.db).requireCurrentCourse(p,scopedEnrollment.id,["human_complete_lesson","learning_start_attempt","human_save_answer","human_check_question","human_submit_attempt","human_submit_submission","learning_book_session"].includes(c.toolName));
     if (
       scopedEnrollment &&
       [
@@ -293,6 +296,7 @@ export class LearningService {
       if(c.toolName==="learning_get_session_changes"){ /* Delegated author/instructor scope checked above. */ }
       else if(["learning_update_course","learning_publish_course","learning_unpublish_course","learning_retire_course","learning_get_course_draft","learning_set_course_assessor","learning_apply_question_bank"].includes(c.toolName))
         new ContentAccess(this.db).author(p,"course",row.id,decode(row.draft));
+      else if(["learning_get_course_ratings","human_get_course_feedback","human_list_course_feedback"].includes(c.toolName)){ /* Exact requested version is checked by FeedbackService. */ }
       else if(row.latest_version&&!(c.toolName==="learning_set_bookmark"&&a.saved===false))new ContentAccess(this.db).requireVisible(p,"course",row.id,this.version(row.id,row.latest_version));
     }
     if (a.itemId && c.toolName !== "learning_create_content_item") {
@@ -376,6 +380,7 @@ export class LearningService {
             "IDEMPOTENCY_CONFLICT",
             "Operation key reused with another payload",
           );
+        if(c.toolName==="learning_enroll_award_course")new AwardCourses(this.db).requireOpeningResult(p,c.arguments,decode(old.result).data);
         this.db.exec("COMMIT");
         transaction = false;
         return decode(old.result);
@@ -433,7 +438,9 @@ export class LearningService {
         );
       // Private assessment answer values are not copied to operational audit.
       const auditArgs =
-        ["human_offer_assigned_quiz_restart","human_accept_assigned_quiz_restart","human_cancel_assigned_quiz_review"].includes(c.toolName)
+        ["human_requalify_award_course","human_offer_award_course_change","human_accept_award_course_change","human_cancel_award_course_change"].includes(c.toolName)
+          ? {awardEnrollmentId:c.arguments.awardEnrollmentId,criterionPath:c.arguments.criterionPath,courseId:c.arguments.courseId,sourceEnrollmentId:c.arguments.sourceEnrollmentId,targetVersion:c.arguments.targetVersion,reviewId:data.reviewId,enrollmentId:data.enrollmentId}
+          : ["human_offer_assigned_quiz_restart","human_accept_assigned_quiz_restart","human_cancel_assigned_quiz_review"].includes(c.toolName)
           ? {reviewId:data.reviewId,sourceEnrollmentId:data.sourceEnrollmentId,targetVersion:c.arguments.targetVersion,mode:data.mode??c.arguments.mode??"objective_only",newEnrollmentId:data.enrollmentId}
           : ["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(c.toolName)
           ? {offerId:data.offerId,collectionId:c.arguments.collectionId??c.arguments.destinationCollectionId,sourceVersion:c.arguments.sourceVersion,referenceCount:Array.isArray(c.arguments.references)?c.arguments.references.length:0,state:data.state}
@@ -513,9 +520,10 @@ export class LearningService {
         : failure("INTERNAL", "Internal learning operation error");
     }
   }
-  private preview(row: any, content: Course) {
+  private bridgeDraft(value:any):any { if(!value||typeof value!=="object")return value;if(Array.isArray(value))return value.map(v=>this.bridgeDraft(v));return Object.fromEntries(Object.entries(value).filter(([key])=>key!=="captions").map(([key,v])=>[key,this.bridgeDraft(v)])); }
+  private preview(row: any, content: Course, source: string) {
     const { lessons, quiz, ...metadata } = content;
-    if(!content.aiProcessingAllowed && metadata.discovery)metadata.discovery={...metadata.discovery,outcomes:[]};
+    if(source==="bridge" && !content.aiProcessingAllowed && metadata.discovery)metadata.discovery={...metadata.discovery,outcomes:[]};
     return {
       id: row.id,
       state: row.state,
@@ -565,6 +573,7 @@ export class LearningService {
     if(name==="learning_get_my_provider_launches")return this.providerCatalog.history(p,a.offset??0,source as "human"|"bridge");
     if(name==="human_get_portal_branding")return new PortalService(this.db).read(p);
     if(name==="human_get_original_collection_offers")return new CollectionSharing(this.db).read(p,a);
+    if(name==="human_get_award_course_review")return new AwardCourses(this.db).read(p,a);
     if(name==="human_get_assigned_quiz_review")return new AssignedQuiz(this.db).read(p,a);
     if(name==="human_get_latest_course_restart")return new RetakeService(this.db).readFresh(p,a);
     if(name==="human_get_latest_quiz_options")return new RetakeService(this.db).readUpgrade(p,a);
@@ -634,7 +643,7 @@ export class LearningService {
                     aiProcessingAllowed: false,
                     contentWithheld: true,
                   }
-                : item;
+                : source==="bridge"?this.bridgeDraft(item):item;
             return {
               ...row,
               draft: sanitize(decode(draft)),
@@ -651,7 +660,7 @@ export class LearningService {
         const c = this.course(p, a.courseId);
         if (c.state !== "published")
           reject("NOT_FOUND", "Course is not available for discovery");
-        return this.preview(c, this.version(c.id, c.latest_version));
+        return this.preview(c, this.version(c.id, c.latest_version),source);
       }
       case "learning_get_digest": return new DigestService(this.db).read(p,a,source);
       case "learning_get_my_learning": {
@@ -670,7 +679,7 @@ export class LearningService {
                 state: this.course(p, e.course_id).state,
                 latest_version: e.version,
               },
-              this.version(e.course_id, e.version),
+              this.version(e.course_id, e.version),source,
             ),
           })),
           a.offset ?? 0,
@@ -722,7 +731,7 @@ export class LearningService {
           kind: l.kind,
           text: l.text,
           submission: source === "human" ? (l.submission ?? null) : null,
-          sessions: source === "human" ? (l.sessions ?? null) : null,
+          sessions: source === "human" ? (l.sessions?.map(s=>this.blended.learnerSession(e,s)) ?? null) : null,
           assetId: source==="human" ? (l.assetId ?? null) : null,
           ...(source==="human"&&l.captions?{captions:l.captions}:{}),
           url: l.url ?? null,
@@ -794,7 +803,7 @@ export class LearningService {
                     aiProcessingAllowed: false,
                   },
                 }
-              : { ...c, draft: d };
+              : { ...c, draft: source==="bridge"?this.bridgeDraft(d):d };
           }),
           a.offset ?? 0,
           a.limit ?? 20,
@@ -812,7 +821,7 @@ export class LearningService {
                 aiProcessingAllowed: false,
               },
             }
-          : { ...row, draft: d };
+          : { ...row, draft: source==="bridge"?this.bridgeDraft(d):d };
       }
       case "learning_report_query": {
         const rows = this.db
@@ -1030,7 +1039,7 @@ export class LearningService {
     new ContentAccess(this.db).requireVisible(this.principal(learner),"course",courseId,this.version(c.id,c.latest_version));
     const existing = this.db
       .prepare(
-        "SELECT * FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS NULL AND retake_of IS NULL",
+        "SELECT * FROM enrollments WHERE learner=? AND course_id=? AND assignment_cycle_id IS NULL AND retake_of IS NULL AND award_binding_id IS NULL",
       )
       .get(learner, courseId) as any;
     if (existing)
@@ -1039,6 +1048,7 @@ export class LearningService {
         alreadyEnrolled: true,
         version: existing.version,
       };
+    new ContentAccess(this.db).newCourse(this.principal(learner),courseId,c.latest_version);
     const id = randomUUID();
     this.db
       .prepare(
@@ -1076,6 +1086,7 @@ export class LearningService {
     if(name==="human_open_provider_content")return this.providerCatalog.open(p,a);
     if(name==="human_save_portal_branding")return new PortalService(this.db).write(p,a);
     if(["human_offer_original_collection","human_cancel_original_collection_offer","human_accept_original_collection_offer"].includes(name))return new CollectionSharing(this.db).write(p,name,a);
+    if(["human_requalify_award_course","human_offer_award_course_change","human_accept_award_course_change","human_cancel_award_course_change"].includes(name))return new AwardCourses(this.db).write(p,name,a);
     if(name==="human_cancel_assigned_quiz_review")return new AssignedQuiz(this.db).cancel(p,a);
     if(name==="human_offer_assigned_quiz_restart")return new AssignedQuiz(this.db).offer(p,a);
     if(name==="human_accept_assigned_quiz_restart")return new AssignedQuiz(this.db).accept(p,a);

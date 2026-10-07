@@ -35,10 +35,8 @@ test("human reviewed recurring assignment, due job dedup, private notification, 
   await editor
     .getByLabel("Assignment learner IDs · one per line", { exact: true })
     .fill("e2e-scheduled");
-  const past = new Date(Date.now() - 60000);
-  const local = new Date(past.getTime() - past.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
+  // Derive datetime-local in the browser's configured timezone, not the runner's TZ.
+  const local = await page.evaluate(() => {const past=new Date(Date.now()-60000);return new Date(past.getTime()-past.getTimezoneOffset()*60000).toISOString().slice(0,16);});
   await editor
     .getByLabel("Starts · your local time", { exact: true })
     .fill(local);

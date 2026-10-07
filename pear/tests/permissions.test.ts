@@ -1,10 +1,11 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
 import {fixture} from "./helpers.ts";
+import {startIdentityFixture} from "./identity-fixture.ts";
 import {createApp} from "../src/server/app.ts";
 import {toolGroups,scopedWorkspace} from "../src/shared/tool-groups.ts";
 test("actual HTTP settings matrix: only tenant admin accesses identity/provisioning/webhooks; cookies and bearers never substitute channels",async()=>{
- const f=fixture(),origin="http://127.0.0.1:4314",{app}=await createApp({db:f.db,origin,developmentAuth:true,identityFixture:true,scimEnabled:true,xapiEnabled:true,webhookEndpoints:[{id:"matrix-fixture",url:"http://127.0.0.1:49999/events",secret:"d".repeat(64)}]});
+ const f=fixture(),origin="http://127.0.0.1:4314",provider=await startIdentityFixture(origin+"/api/auth/callback"),{app}=await createApp({db:f.db,origin,developmentAuth:true,oidc:provider.config,identityFixture:true,scimEnabled:true,xapiEnabled:true,webhookEndpoints:[{id:"matrix-fixture",url:"http://127.0.0.1:49999/events",secret:"d".repeat(64)}]});
  async function login(user:string){
   const r=await app.inject({method:"POST",url:"/api/login",headers:{host:"127.0.0.1:4314",origin},payload:{username:user,password:user+"-dev"}});assert.equal(r.statusCode,200);
   const s=r.json();return {host:"127.0.0.1:4314",origin,cookie:String(r.headers["set-cookie"]).split(";")[0],"x-csrf-token":s.csrf,"x-pear-epoch":s.sessionEpoch};
@@ -46,5 +47,5 @@ test("actual HTTP settings matrix: only tenant admin accesses identity/provision
   assert.equal((await app.inject({url:"/integrations/v1/events",headers:{host:"127.0.0.1:4314",authorization:"Bearer "+token}})).statusCode,401);
   assert.equal(f.db.prepare("SELECT revision FROM workspaces WHERE id='library:demo'").get()!.revision,oldRevision);
   assert.deepEqual(f.db.prepare("PRAGMA foreign_key_check").all(),[]);
- }finally{await app.close();f.db.close();}
+ }finally{await app.close();await provider.close();f.db.close();}
 });

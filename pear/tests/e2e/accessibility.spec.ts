@@ -14,8 +14,8 @@ test("mobile, tablet and desktop reflow; keyboard skip/navigation/lesson/quiz an
   await page.evaluate(()=>{(document.activeElement as HTMLElement)?.blur();});await page.keyboard.press("Control+Home");await page.keyboard.press("Tab");
   const skip=page.getByRole("link",{name:"Skip to learning content",exact:true});await skip.focus();await expect(skip).toBeFocused();await expect(skip).toBeInViewport();await page.keyboard.press("Enter");await expect(page.getByRole("main")).toBeFocused();
   for(const width of [320,390,768,1440]){
-   await page.setViewportSize({width,height:960});await keyboardButton("Explore");await expect(page.getByRole("button",{name:"Explore",exact:true})).toHaveAttribute("aria-current","page");await reflow("catalog-"+width);
-   for(const name of ["My learning","Programs","Imported packages","Notifications","Transcript","Learning preferences"]){await keyboardButton(name);await expect(page.locator("main h1")).toBeFocused();await reflow(name+"-"+width);}
+   await page.setViewportSize({width,height:960});await keyboardButton("Explore");await expect(page.getByRole("button",{name:"Explore",exact:true})).toHaveAttribute("aria-current","page");await expect(page.locator(".cards article").first()).toBeVisible();await reflow("catalog-"+width);
+   for(const name of ["My learning","Programs","Imported packages","Notifications","Transcript","Learning preferences"]){await keyboardButton(name);await expect(page.locator("main h1")).toBeFocused();await expect(page.locator("main").getByText("Loading…",{exact:true})).toHaveCount(0);await page.waitForLoadState("networkidle");await reflow(name+"-"+width);}
   }
   await page.setViewportSize({width:390,height:844});await keyboardButton("Explore");
   await page.getByLabel("Content language").selectOption("vi");

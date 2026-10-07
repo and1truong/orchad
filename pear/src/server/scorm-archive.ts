@@ -75,5 +75,7 @@ export function inspectSCORM(bytes:Buffer){
  const file=child(resource,"file");attrs(file,["href"]);children(file,[]);if(file.attrs.href!=="index.html")fail("only inline SCO file declared");
  let html:string;try{html=decoder.decode(files.get("index.html")!);}catch{fail("SCO must be UTF-8");}
  if(!/<html[\s>]/i.test(html!)||!/<body[\s>]/i.test(html!)||!/<\/body>/i.test(html!)||/[\u0000]/.test(html!))fail("complete UTF-8 inline HTML SCO required");
+ // Validate declared resources in this restricted inline profile; this is not a JS egress proof.
+ if(/<(?:base|link|iframe|object|embed|form)\b|<meta\b[^>]*http-equiv\s*=|\b(?:src|href|action|poster|srcset)\s*=|@import\b|url\s*\(/i.test(html!))fail("external resources/navigation declarations are outside the inline SCO profile");
  return {profile:"pear-scorm12-inline/1",title,entry:"index.html",html:html!,sha256:createHash("sha256").update(bytes).digest("hex"),expandedBytes:[...files.values()].reduce((n,b)=>n+b.length,0)};
 }
