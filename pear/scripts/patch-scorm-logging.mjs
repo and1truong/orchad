@@ -1,19 +1,20 @@
 // Checksum-locked adaptation of the pinned MIT engine: direct-log removal and
-// selection corrections documented in ADR-092. Preserve copyright/license.
+// selection and duration corrections documented in ADR-092/094. Preserve copyright/license.
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const root = new URL('../node_modules/scorm-again/', import.meta.url), metadata = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 if (metadata.version !== '3.4.5') throw Error('Review the SCORM integration adaptation before changing engine version');
 const path = new URL('dist/esm/scorm2004.js', root), source = readFileSync(path, 'utf8'), digest = value => createHash('sha256').update(value).digest('hex');
-const original = '93e463ed4ba87bd59a2fe228c94c879faf4aa7469a687166ffab8fac4a4d1f69', loggingOnly = '6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936', patched = '206daee49525dbf352bf9d6920f6d1ccc03ad9e8834db57a8d7d5ee2efb93cc0';
+const original = '93e463ed4ba87bd59a2fe228c94c879faf4aa7469a687166ffab8fac4a4d1f69', loggingOnly = '6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936', selection = '206daee49525dbf352bf9d6920f6d1ccc03ad9e8834db57a8d7d5ee2efb93cc0', patched = 'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e';
 if (digest(source) === patched) process.exit(0);
-if (![original, loggingOnly].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
+if (![original, loggingOnly, selection].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
 let output = source;
 if (digest(source) === original) for (const statement of ['console.debug(`Activity delivered: ${activity.id} - ${activity.title}`);', 'console.debug("Sequencing state restored successfully");', 'console.error(`Failed to restore sequencing state: ${error}`);']) {
   if (output.split(statement).length !== 2) throw Error('SCORM direct-log patch no longer matches');
   output = output.replace(statement, '/* Pear: omit direct upstream sequencing logs. */');
 }
 const replaceOnce = (before, after) => {if (output.split(before).length !== 2) throw Error('SCORM selection correction no longer matches'); output = output.replace(before, after);};
+if (digest(source) !== selection) {
 replaceOnce('if (selectCount === null || selectCount > 0) {', 'if (selectCount === null || selectCount >= 0) {');
 replaceOnce(`    const children = [...activity.children];
     if (controls.selectionTiming === SelectionTiming.NEVER) {`, `    const children = [...activity.children];
@@ -48,5 +49,12 @@ replaceOnce(`  static applySelectionAndRandomization(activity, isNewAttempt = fa
       return activity.getAvailableChildren();
     }
     const controls = activity.sequencingControls;`);
+}
+replaceOnce("return this._attemptAbsoluteDurationLimit || \"PT0H0M0S\";", "return this._attemptAbsoluteDuration;");
+replaceOnce("this._attemptAbsoluteDurationLimit = duration;", "this._attemptAbsoluteDuration = duration;");
+replaceOnce("return this._activityAbsoluteDurationLimit || \"PT0H0M0S\";", "return this._activityAbsoluteDuration;");
+replaceOnce("this._activityAbsoluteDurationLimit = duration;", "this._activityAbsoluteDuration = duration;");
+replaceOnce("  checkLimitConditions(activity) {\n    if (activity.isSuspended)", "  checkLimitConditions(activity) {\n    if (activity._pearDurationLimitCheck) return activity._pearDurationLimitCheck(activity);\n    if (activity.isSuspended)");
+replaceOnce("  checkLimitConditions(activity) {\n    let result = true;", "  checkLimitConditions(activity) {\n    if (activity._pearDurationLimitCheck) return !activity._pearDurationLimitCheck(activity);\n    let result = true;");
 if (digest(output) !== patched) throw Error('SCORM adapted source checksum mismatch');
 writeFileSync(path, output);

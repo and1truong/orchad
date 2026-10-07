@@ -1,6 +1,7 @@
 import type {Element} from '@xmldom/xmldom';
 import type {SCORMStandard} from '../shared/scorm-engine.ts';
 import {reject} from './errors.ts';
+import {durationKeys, durationSeconds} from '../shared/scorm-duration.ts';
 const SN = 'http://www.imsglobal.org/xsd/imsss';
 const ADL = 'http://www.adlnet.org/xsd/adlseq_v1p3';
 const NAV = 'http://www.adlnet.org/xsd/adlnav_v1p3';
@@ -199,7 +200,8 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
         break;
       }
       case 'limitConditions': {
-        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
+        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
+        for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(n.getAttribute(key)!) + 'S';} catch {fail();}}
         const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');
         if (begin !== undefined) out.beginTimeLimit = begin; if (end !== undefined) out.endTimeLimit = end;
         if (begin !== undefined && end !== undefined && Date.parse(begin) > Date.parse(end)) fail();

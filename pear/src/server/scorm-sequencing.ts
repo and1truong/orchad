@@ -3,6 +3,7 @@ import {playbackActivities} from './scorm-activities.ts';
 import {sequencingRuntime, navigationTarget} from '../shared/scorm-sequencing-runtime.ts';
 import {SCORM_ENGINE} from '../shared/scorm-engine.ts';
 import {reject} from './errors.ts';
+import {durationAllowsDelivery} from '../shared/scorm-duration.ts';
 
 export function sequencingTree(manifest: SCORMManifest) {
   playbackActivities(manifest);
@@ -23,7 +24,7 @@ export function sequencingTree(manifest: SCORMManifest) {
 }
 export function trustedSequencing(manifest: SCORMManifest, persisted: string, scope: {attemptId: string; sha256: string}) {
   const tree = sequencingTree(manifest), envelope = JSON.parse(persisted);
-  if (Object.keys(envelope).length && (envelope.attemptId !== scope.attemptId || envelope.sha256 !== scope.sha256 || envelope.standard !== manifest.standard || envelope.engine?.version !== SCORM_ENGINE.version || envelope.engine?.adaptation !== undefined && envelope.engine.adaptation !== SCORM_ENGINE.adaptation || typeof envelope.snapshot !== 'string')) reject('FORBIDDEN', 'SCORM sequencing snapshot identity changed');
+  if (Object.keys(envelope).length && (envelope.attemptId !== scope.attemptId || envelope.sha256 !== scope.sha256 || envelope.standard !== manifest.standard || envelope.engine?.version !== SCORM_ENGINE.version || envelope.engine?.adaptation !== undefined && !['pear-selection-v2', SCORM_ENGINE.adaptation].includes(envelope.engine.adaptation) || typeof envelope.snapshot !== 'string')) reject('FORBIDDEN', 'SCORM sequencing snapshot identity changed');
   return sequencingRuntime(tree, envelope.snapshot);
 }
 export function saveSequencing(runtime: ReturnType<typeof sequencingRuntime>, manifest: SCORMManifest, scope: {attemptId: string; sha256: string}) {
@@ -38,6 +39,7 @@ export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifes
   if (scoId && !playbackActivities(manifest).some(p => p.activity.id === scoId)) reject('FORBIDDEN', 'Exact sequencing SCO required');
   let current = deliveredSCO(runtime, manifest);
   const activity = runtime.getSequencingState()?.currentActivity;
+  if (current && activity?.isActive && (!scoId || scoId === current.activity.id) && !durationAllowsDelivery(runtime)) reject('FORBIDDEN', 'Sequencing duration denies activity delivery');
   if (!current || !activity?.isActive) {
     const suspended = JSON.parse(runtime.serializeSequencingState()).sequencing?.suspendedActivity;
     if (suspended && scoId && suspended !== scoId) reject('FORBIDDEN', 'Resume the suspended SCO before selecting another');

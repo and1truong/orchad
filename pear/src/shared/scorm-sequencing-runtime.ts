@@ -1,4 +1,5 @@
 import Scorm2004API from 'scorm-again/scorm2004';
+import {installDurationClock} from './scorm-duration.ts';
 /** Host-only engine construction. Serialized state is always from the trusted database. */
 export function sequencingRuntime(tree: Record<string, any>, snapshot?: string) {
   const runtime = new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false,
@@ -29,6 +30,7 @@ export function sequencingRuntime(tree: Record<string, any>, snapshot?: string) 
     };
     restore(runtime.getSequencingState()?.rootActivity);
   }
+  installDurationClock(runtime, tree, snapshot);
   return runtime;
 }
 export function navigationTarget(request: string) {

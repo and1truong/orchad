@@ -1,6 +1,6 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–093. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-selection-v2` to the exact ESM entry: ADR-082 direct-log removal plus the selection corrections in ADR-092. A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–094. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-limits-v3` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094. A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
@@ -23,11 +23,12 @@ Version: epic #133 / ADR-075–093. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | System-global objectives | — | Tested profile | Tested profile | Tested profile | Tenant/learner mapped tracking values, original access flags, cross-package prerequisite delivery, field deltas, unofficial separation and schema 50 (ADR-091) |
 | System-global shared data | — | — | — | Tested profile | Tenant/learner working stores, current mapped permissions, explicit-delta concurrency/receipts, unofficial isolation, schema 49 and backup/quota/revocation evidence (ADR-090) |
 | Registration-local shared data | — | — | — | Tested profile | Explicit sharedDataGlobalToSystem=false; mapped read/write stores, durable delta receipts, technical retake preservation and hidden backing-state redaction (ADR-089) |
+| Absolute/experienced sequencing durations | — | Tested profile | Tested profile | Tested profile | Trusted host attempt/activity clocks; suspend/close/expiry, retries/reconstruction, zero/untracked conditions; bounded day/time XML profile (ADR-094) |
 | Calendar delivery windows | — | Tested profile | Tested profile | Tested profile | Host-clock begin/end checks, explicit timezone, Gregorian validation, inclusive endpoints; bounded precision/profile (ADR-088) |
 | ADL developer-guide licensed wrapper | — | Unverified | Tested | Unverified | Exact byte-preserved file, CC BY-SA 3.0 notices retained; full Roses/Flash course not bundled |
 | Enrollment/standalone/nested award version/cycle projection | Tested | Tested | Tested | Tested | All required SCO evidence; live authorization, immutable proof/audit/receipt; quiz remains required for course certificate |
 
-Explicitly refused playback profiles: absolute/experienced duration limits. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
+Explicitly refused duration bindings: negative, calendar year/month, week or finer-than-centisecond limits; see the admitted day/time profile in ADR-094. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
 
 | Lane | Observed result | Remaining gate |
 |---|---|---|

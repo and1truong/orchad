@@ -17,6 +17,7 @@ import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
 import {hasSelection, beforeSelection, selectionNeedsStart} from './scorm-selection.ts';
 import {sequencingRuntime, validNavigation} from '../shared/scorm-sequencing-runtime.ts';
 import {loadSystemObjectives, saveSystemObjectives, objectiveSnapshot, objectiveClientSnapshot} from './scorm-system-objectives.ts';
+import {exposeDuration, pauseDuration} from '../shared/scorm-duration.ts';
 import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
 import {SCORM_RUNTIME_LIMITS} from '../shared/scorm-operations.ts';
@@ -97,11 +98,12 @@ export class SCORMPlayerService {
       Object.assign(initialState, {launch_data: profile.activity.launchData ?? '', student_data: {mastery_score: profile.activity.masteryScore ?? '', max_time_allowed: profile.activity.maxTimeAllowed ?? '', time_limit_action: profile.activity.timeLimitAction ?? ''}});
       if (manifest.standard !== '1.2') {
         for (const k of Object.keys(initialState)) delete initialState[k];
-        Object.assign(initialState, {learner_id: p.id, learner_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : previous.exit === 'suspend' ? 'resume' : '', total_time: scorm2004Time(sco.reported_seconds), launch_data: profile.activity.launchData ?? '', completion_threshold: profile.activity.completionThreshold ?? '', scaled_passing_score: profile.activity.sequencing?.primaryObjective?.satisfiedByMeasure ? String(profile.activity.sequencing.primaryObjective.minNormalizedMeasure ?? 1) : '', max_time_allowed: '', time_limit_action: profile.activity.timeLimitAction ?? 'continue,no message'});
+        Object.assign(initialState, {learner_id: p.id, learner_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : previous.exit === 'suspend' ? 'resume' : '', total_time: scorm2004Time(sco.reported_seconds), launch_data: profile.activity.launchData ?? '', completion_threshold: profile.activity.completionThreshold ?? '', scaled_passing_score: profile.activity.sequencing?.primaryObjective?.satisfiedByMeasure ? String(profile.activity.sequencing.primaryObjective.minNormalizedMeasure ?? 1) : '', max_time_allowed: profile.activity.sequencing?.attemptAbsoluteDurationLimit ?? '', time_limit_action: profile.activity.timeLimitAction ?? 'continue,no message'});
       }
       if (engine) {
         // Use a fresh API communication session on the already selected activity tree.
         const fresh = trustedSequencing(manifest, saveSequencing(engine, manifest, sequenceScope), sequenceScope);
+        exposeDuration(fresh, Math.min(session.expires, now + 60 * 60 * 1000));
         fresh.loadFromJSON({...previous, ...initialState, exit: '', session_time: 'PT0S'}); fresh.Initialize('');
         const seeded = fresh.renderCMIToJSONObject().cmi as Record<string, any>;
         for (const key of ['scaled_passing_score', 'completion_threshold', 'max_time_allowed', 'time_limit_action']) initialState[key] = seeded[key];
@@ -281,6 +283,14 @@ export class SCORMPlayerService {
     return this.transaction(() => {
       const status = this.status(p, id, sessionHash);
       if (status.closed) return {closed: true};
+      const launch = this.db.prepare('SELECT * FROM scorm_engine_launches WHERE id=?').get(id) as any;
+      const registration = this.store.registration(p, launch.registration_id);
+      const manifest = this.manifest(registration.package_id, registration.version, p.tenant);
+      if (usesSequencing(manifest)) {
+        const attempt = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(launch.attempt_id, p.tenant) as any;
+        const scope = {attemptId: attempt.id, sha256: registration.sha256}, engine = trustedSequencing(manifest, attempt.sequencing_state, scope);
+        if (pauseDuration(engine)) this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(engine, manifest, scope), attempt.id, p.tenant);
+      }
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE id=?').run(id);
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, 'learning:' + p.tenant + ':' + p.id, 'human_scorm_engine_close', JSON.stringify({launchId: id, sequence: status.sequence}), new Date().toISOString());
       return {closed: true};
