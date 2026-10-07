@@ -144,3 +144,33 @@ test('online whole-DB backup and offline restore preserve accepted sequencing/re
     } finally {r.db.close();}
   } finally {f.db.close(); rmSync(dir, {recursive: true, force: true});}
 });
+
+
+test('licensed wrapper fixtures match the declared upstream bytes and normalization', () => {
+  const pip = readFileSync(new URL('./fixtures/scorm/pipwerks-wrapper.js', import.meta.url));
+  assert.equal(createHash('sha256').update(pip).digest('hex'), 'ec1702f1b0e620d7d1dc6a737b0daf47487a3b893fe5cab5deb35850f2901706');
+  const original = Buffer.from(pip.toString('utf8').replaceAll('\n', '\r\n'));
+  assert.equal(createHash('sha1').update(Buffer.from('blob ' + original.length + '\0')).update(original).digest('hex'), 'e4693b346aa9520be078cf64cb88396de004b0bc');
+  const adl = Buffer.from(readFileSync(new URL('./fixtures/scorm/adl-2004-wrapper.base64', import.meta.url), 'utf8'), 'base64');
+  assert.equal(createHash('sha256').update(adl).digest('hex'), '252099ca61c5f50c303c666d14155648d172940cabd714f2041b2bc81ad70311');
+});
+
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': initial Terminate without prior Commit preserves default-objective semantics and completes rollup exactly once', async () => {
+  const f = await scormLearningFixture(undefined, sequencingPackage(edition)), binding = f.enroll();
+  try {
+    for (const [scoId, navigation] of [['intro', 'continue'], ['practice', 'exitAll']]) {
+      const launch = f.launch(binding, scoId), b = f.player.bootstrap(launch.token); let state: any;
+      const api = createSCORM2004API({edition, state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot, checkpoint(value) {state = value;}});
+      assert.equal(api.Initialize(''), 'true');
+      for (const [key, value] of Object.entries({'cmi.exit': 'suspend', 'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'cmi.session_time': 'PT20S', 'adl.nav.request': navigation!})) assert.equal(api.SetValue(key, value), 'true');
+      assert.equal(api.Terminate(''), 'true');
+      const request = {sequence: 1, revision: 0, state, finished: true, navigation}, accepted = f.player.checkpoint(launch.token, request);
+      assert.equal(accepted.officialLearningChanged, scoId === 'practice'); assert.deepEqual(f.player.checkpoint(launch.token, request), accepted);
+    }
+    const envelope = JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state));
+    assert.equal(JSON.parse(envelope.snapshot).sequencing.activityStates.org.completionStatus, 'completed');
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 1);
+    assert.equal(f.db.prepare('SELECT sum(reported_seconds) n FROM scorm_sco_attempts').get()!.n, 40);
+  } finally {f.db.close();}
+});

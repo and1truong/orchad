@@ -22,9 +22,11 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
   if (Buffer.byteLength(JSON.stringify(input) ?? '') > scorm2004CheckpointBytes || !trustedRuntime && !scorm2004ExitRequests.includes(navigation)) reject('INVALID_ARGUMENT', 'SCORM 2004 checkpoint or navigation quota/profile rejected');
   const incoming = leaves(input), runtime = trustedRuntime ?? new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   runtime.loadFromJSON(seed);
-  const baseline = leaves(runtime.renderCMIToJSONObject().cmi);
-  const protectedValues: Record<string, string> = {...baseline, 'cmi.total_time': seed.total_time ?? 'PT0S'};
+  const protectedValues: Record<string, string> = {...leaves(runtime.renderCMIToJSONObject().cmi), 'cmi.total_time': seed.total_time ?? 'PT0S'};
   runtime.Initialize('');
+  // Initialize seeds local objectives from the trusted manifest/snapshot. Their
+  // default unknown values are not content writes that may override top-level CMI.
+  const baseline = leaves(runtime.renderCMIToJSONObject().cmi);
   const priority = (key: string) => key.endsWith('.id') ? 0 : key.endsWith('.type') ? 1 : 2;
   for (const [key, value] of Object.entries(incoming).sort(([a], [b]) => priority(a) - priority(b) || a.localeCompare(b, 'en', {numeric: true}))) {
     if (readonly.test(key)) {if (value !== protectedValues[key]) reject('FORBIDDEN', 'Server-owned CMI value changed'); continue;}

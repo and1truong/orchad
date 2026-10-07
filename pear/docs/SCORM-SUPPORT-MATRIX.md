@@ -23,7 +23,7 @@ Explicitly refused playback profiles: asset activity leaves, nondefault `isvisib
 | Built Chromium desktop | Wrapper, multi-SCO, enrollment/quiz, lost ACK/retry, adversarial fixtures | This browser lane does not prove every egress channel on every engine |
 | Built Chromium narrow viewport | Human SCORM workflow; no extension required | Third-party package layout is content-owned; real mobile Safari/Android remains unverified |
 | Actual unpacked Lime + local scripted Mango | PASS in #140 CI, run 37591223932; metadata read while SCORM active | Extension-page UI, not native Side Panel container; no live-model inference claim |
-| Coconut Tauri / Linux WebKit | Dedicated S8 `native-scorm-acceptance.mjs` lane; record its exact CI result | Local Cargo/xvfb/WebKit are unavailable; generic Coconut acceptance is insufficient |
+| Coconut Tauri / Linux WebKit | PASS: real SCORM Tauri/WebKit, 9/9 checks in run 37594546875 at 41b4fbe14597aa79e976bfc12e645730f26ec946 | Licensed wrapper save/resume/finish, isolation and real external MCP; other OS engines remain open |
 | Coconut Windows/macOS | Unverified | Actual WebView2/WKWebView playback, authority and egress counterexamples |
 | Production / strict all-egress | Disabled | Reviewed credentialless content origin, deployment isolation, native/browser channel policy and negative evidence |
 | Main integration | Pending | Separate #49 owner must land the selected predecessor; preserve dependency/review gates |

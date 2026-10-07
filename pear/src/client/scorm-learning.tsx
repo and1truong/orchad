@@ -42,14 +42,14 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
         if (!active || activeLaunch.current !== current || saved.sequence < data.sequence) return;
         setStatus(saved.officialLearningChanged ? 'SCORM completion accepted for this enrollment.' : saved.finished ? 'SCO finished and saved. Other SCOs or completion requirements remain.' : 'SCO progress saved by the server.');
         await refresh(); await p.onSaved();
-        if (saved.finished && saved.nextScoId && active && activeLaunch.current === current && !current.navigating) {
+        if (saved.finished && saved.nextScoId && active && activeLaunch.current === current && !current.navigating && !current.closing) {
           current.navigating = true;
           await request('/api/scorm-engine/launches/' + current.launchId + '/close', p.session, {});
           if (!active || activeLaunch.current !== current) return;
           activeLaunch.current = null; setLaunch(null);
           await play(saved.nextScoId, current);
         }
-      }).catch(e => {if (active) setError(e.message);});
+      }).catch(e => {if (active && activeLaunch.current === current) {current.navigating = false; setError(e.message);}});
     }
     window.addEventListener('message', message); return () => {active = false; window.removeEventListener('message', message);};
   }, [p.session, binding]);
@@ -62,9 +62,12 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
     });
   }
   async function close() {
-    await p.run(async () => {
+    const current = activeLaunch.current;
+    if (!current || current.closing || current.navigating) return;
+    current.closing = true;
+    try {await p.run(async () => {
       const sequence = await new Promise<number>((resolve, reject) => {
-        const current = launch, target = frame.current?.contentWindow;
+        const target = frame.current?.contentWindow;
         const timer = setTimeout(() => {window.removeEventListener('message', message); reject(Error('Final checkpoint is not acknowledged. Retry before closing.'));}, 12_000);
         function message(event: MessageEvent) {
           if (event.source !== target || event.origin !== current.contentOrigin || event.data?.kind !== 'pear-scorm-engine-ready-to-close' || event.data.launchId !== current.launchId || !Number.isSafeInteger(event.data.sequence)) return;
@@ -72,11 +75,11 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
         }
         window.addEventListener('message', message); target?.postMessage({kind: 'pear-scorm-engine-flush', launchId: current.launchId}, current.contentOrigin);
       });
-      const saved = await request<any>('/api/scorm-engine/launches/' + launch.launchId, p.session);
+      const saved = await request<any>('/api/scorm-engine/launches/' + current.launchId, p.session);
       if (saved.sequence !== sequence) throw Error('Final checkpoint is not durable.');
-      await request('/api/scorm-engine/launches/' + launch.launchId + '/close', p.session, {});
-      activeLaunch.current = null; setLaunch(null); await refresh(); await p.onSaved();
-    });
+      await request('/api/scorm-engine/launches/' + current.launchId + '/close', p.session, {});
+      if (sessionRef.current === p.session && activeLaunch.current === current) {activeLaunch.current = null; setLaunch(null); await refresh(); await p.onSaved();}
+    });} finally {current.closing = false;}
   }
   return <section aria-label="Enrolled SCORM player"><p>This package reports completion for this exact enrollment. Every required SCO must meet the published policy.</p>
     {error && <p role="alert">{error}</p>}
@@ -92,6 +95,6 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
       });}}>Start fresh SCORM attempt</button></fieldset>}
     {launch && <><button disabled={p.busy} onClick={() => {void p.run(() => downloadSCORMSupport(p.session, launch.launchId, () => sessionRef.current === p.session && activeLaunch.current === launch));}}>Download SCORM support details</button><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{status}</p>
       <button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button>
-      <button disabled={p.busy} onClick={() => {void close();}}>Close SCO and choose another</button></>}
+      <button disabled={p.busy || launch.navigating || launch.closing} onClick={() => {void close();}}>Close SCO and choose another</button></>}
   </section>;
 }

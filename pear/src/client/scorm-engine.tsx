@@ -19,14 +19,14 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
       void request<any>('/api/scorm-engine/launches/' + current.launchId, p.session).then(async result => {
         if (!active || !p.isCurrent() || currentLaunch.current !== current || result.sequence < value.sequence) return;
         setPlayStatus(result.finished ? 'Package finished and saved by the server; official learning is unchanged.' : 'Package progress saved by the server; official learning is unchanged.');
-        if (result.finished && result.nextScoId && !current.navigating) {
+        if (result.finished && result.nextScoId && !current.navigating && !current.closing) {
           current.navigating = true;
           await request('/api/scorm-engine/launches/' + current.launchId + '/close', p.session, {});
           if (!active || !p.isCurrent() || currentLaunch.current !== current) return;
           currentLaunch.current = null; setLaunch(null);
           await play(current.package, result.nextScoId, current.consented);
         }
-      }).catch(e => {if (active && p.isCurrent()) setPlayStatus(e.message);});
+      }).catch(e => {if (active && p.isCurrent() && currentLaunch.current === current) {current.navigating = false; setPlayStatus(e.message);}});
     };
     window.addEventListener('message', message);
     return () => {active = false; window.removeEventListener('message', message); currentLaunch.current = null;};
@@ -85,9 +85,12 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
     });
   }
   async function close() {
-    await p.run(async () => {
+    const current = currentLaunch.current;
+    if (!current || current.closing || current.navigating) return;
+    current.closing = true;
+    try {await p.run(async () => {
       const sequence = await new Promise<number>((resolve, reject) => {
-        const target = frame.current?.contentWindow, current = launch;
+        const target = frame.current?.contentWindow;
         const timer = setTimeout(() => {window.removeEventListener('message', message); reject(Error('Package has not acknowledged its final checkpoint. Retry before closing.'));}, 12_000);
         function message(event: MessageEvent) {
           if (event.source !== target || event.origin !== current.contentOrigin || event.data?.kind !== 'pear-scorm-engine-ready-to-close' || event.data.launchId !== current.launchId || !Number.isSafeInteger(event.data.sequence)) return;
@@ -96,11 +99,11 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
         window.addEventListener('message', message);
         target?.postMessage({kind: 'pear-scorm-engine-flush', launchId: current.launchId}, current.contentOrigin);
       });
-      const status = await request<any>('/api/scorm-engine/launches/' + launch.launchId, p.session);
+      const status = await request<any>('/api/scorm-engine/launches/' + current.launchId, p.session);
       if (status.sequence !== sequence) throw Error('Package final checkpoint is not durable yet. Retry before closing.');
-      await request('/api/scorm-engine/launches/' + launch.launchId + '/close', p.session, {});
-      if (p.isCurrent()) {currentLaunch.current = null; setLaunch(null); setPlayStatus(''); await readActivities(selectedPackage);}
-    });
+      await request('/api/scorm-engine/launches/' + current.launchId + '/close', p.session, {});
+      if (p.isCurrent() && currentLaunch.current === current) {currentLaunch.current = null; setLaunch(null); setPlayStatus(''); await readActivities(current.package);}
+    });} finally {current.closing = false;}
   }
   return <section className="panel" aria-label="SCORM engine packages"><h2>SCORM engine packages</h2>
     <p>Multi-file packages. {data?.runtimeEnabled ? 'SCORM 1.2 and supported SCORM 2004 playback are available. Package-reported progress is separate from official learning.' : 'Playback is currently unavailable.'}</p>
@@ -121,7 +124,7 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
       {data?.runtimeEnabled && row.state === 'published' && <>{!row.playbackSupported && <p>This package requires SCORM features outside the current playback support.</p>}<button disabled={p.busy || !consent || !!launch || !row.playbackSupported} onClick={() => {void play(row);}}>{p.author ? 'Preview engine package' : 'Play or resume engine package'}</button></>}
     </article>)}
     {selectedPackage && <nav aria-label="Practice SCORM activities">{activities.map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available} onClick={() => {void play(selectedPackage, a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>}
-    {launch && <><button disabled={p.busy} onClick={() => {void p.run(() => downloadSCORMSupport(p.session, launch.launchId, p.isCurrent));}}>Download SCORM support details</button><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{playStatus}</p><button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button><button disabled={p.busy} onClick={() => {void close();}}>Close engine package</button></>}
+    {launch && <><button disabled={p.busy} onClick={() => {void p.run(() => downloadSCORMSupport(p.session, launch.launchId, p.isCurrent));}}>Download SCORM support details</button><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{playStatus}</p><button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button><button disabled={p.busy || launch.navigating || launch.closing} onClick={() => {void close();}}>Close engine package</button></>}
     <button disabled={p.busy || offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Previous engine packages</button>
     <button disabled={p.busy || data?.nextOffset == null} onClick={() => setOffset(data.nextOffset)}>Next engine packages</button>
   </section>;
