@@ -10,6 +10,7 @@ import {reject} from './errors.ts';
 import {scorm12Activities, playbackActivities, activityStates, activityAvailable} from './scorm-activities.ts';
 import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
 import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
+import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 
 export function scorm12LaunchProfile(manifest: SCORMManifest, scoId?: string) {
@@ -27,6 +28,9 @@ export class SCORMPlayerService {
   readonly store: SCORMEngineStore;
   constructor(readonly db: DatabaseSync, readonly bindings?: SCORMLearningBindings) {this.store = new SCORMEngineStore(db, bindings ? (p, r) => bindings.guard(p, r) : undefined);}
   private transaction<T>(fn: () => T) {this.db.exec('BEGIN IMMEDIATE'); try {const result = fn(); this.db.exec('COMMIT'); return result;} catch(e) {this.db.exec('ROLLBACK'); throw e;}}
+  private scos(attemptId: string, tenant: string) {
+    return this.db.prepare('SELECT s.* FROM scorm_sco_attempts s WHERE s.attempt_id=? AND s.tenant=? AND s.sco_attempt_number=(SELECT max(n.sco_attempt_number) FROM scorm_sco_attempts n WHERE n.attempt_id=s.attempt_id AND n.sco_id=s.sco_id)').all(attemptId, tenant) as any[];
+  }
   private manifest(packageId: string, version: number, tenant: string) {
     // Reparse the retained immutable original XML, including features added after import.
     const paths = this.db.prepare('SELECT path FROM scorm_engine_resources WHERE package_id=? AND version=? AND tenant=?').all(packageId, version, tenant) as {path: string}[];
@@ -35,7 +39,7 @@ export class SCORMPlayerService {
     if (xml) files.set('imsmanifest.xml', Buffer.from(xml.bytes));
     return inspectManifest(files);
   }
-  playbackSupported(packageId: string, version: number, tenant: string) {try {launchProfile(this.manifest(packageId, version, tenant)); return true;} catch {return false;}}
+  playbackSupported(packageId: string, version: number, tenant: string) {try {const m = this.manifest(packageId, version, tenant); launchProfile(m); if (usesSequencing(m)) sequencingTree(m); return true;} catch {return false;}}
   launch(p: Principal, sessionHash: string, request: Parameters<SCORMEngineStore['register']>[1] & {binding?: Record<string, unknown>; scoId?: string}) {
     const {binding, scoId, ...args} = request ?? {};
     if (scoId !== undefined && (typeof scoId !== 'string' || !scoId)) reject('INVALID_ARGUMENT', 'Exact SCO identifier required');
@@ -52,22 +56,38 @@ export class SCORMPlayerService {
     if (!session) reject('UNAUTHORIZED', 'Current application session required');
     const registered = this.store.register(p, args, context ? {key: context.bindingKey, attach: id => this.bindings!.attach(p, id, context)} : undefined);
     return this.transaction(() => {
-      this.store.registration(p, registered.registrationId);
-      const rows = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=?').all(registered.attemptId, p.tenant) as any[], states = activityStates(manifest, rows);
-      const profile = scoId ? launchProfile(manifest, scoId) : playbackActivities(manifest).find(p => activityAvailable(p, states));
+      const registration = this.store.registration(p, registered.registrationId);
+      const rows = this.scos(registered.attemptId, p.tenant), states = activityStates(manifest, rows);
+      const overall = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(registered.attemptId, p.tenant) as any;
+      const sequenceScope = {attemptId: registered.attemptId, sha256: registration.sha256}, engine = usesSequencing(manifest) ? trustedSequencing(manifest, overall.sequencing_state, sequenceScope) : undefined;
+      const currentId = engine?.getSequencingState()?.currentActivity?.id, current = rows.find(r => r.sco_id === currentId);
+      if (engine && current && !current.finished) {engine.loadFromJSON(JSON.parse(current.runtime_state)); engine.Initialize('');}
+      const target = scoId ?? reviewed.activities.find(a => a.available)?.id;
+      const profile = engine ? selectSCO(engine, manifest, target) : scoId ? launchProfile(manifest, scoId) : playbackActivities(manifest).find(p => activityAvailable(p, states));
       if (!profile || !activityAvailable(profile, states)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
       const id = randomUUID(), token = randomBytes(32).toString('base64url'), now = Date.now();
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND closed=0').run(registered.attemptId);
-      this.db.prepare('INSERT OR IGNORE INTO scorm_sco_attempts(attempt_id,tenant,sco_id) VALUES(?,?,?)').run(registered.attemptId, p.tenant, profile.activity.id);
-      const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1').get(registered.attemptId, profile.activity.id) as any, previous = JSON.parse(sco.runtime_state), account = p as any;
-      this.db.prepare('UPDATE scorm_sco_attempts SET finished=0 WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1').run(registered.attemptId, profile.activity.id);
+      const previousSco = rows.find(r => r.sco_id === profile.activity.id), engineAttempt = engine?.getSequencingState()?.currentActivity?.attemptCount ?? 1;
+      const scoAttempt = engine ? Math.max(1, engineAttempt, previousSco?.sco_attempt_number ?? 1) : 1;
+      this.db.prepare('INSERT OR IGNORE INTO scorm_sco_attempts(attempt_id,tenant,sco_id,sco_attempt_number) VALUES(?,?,?,?)').run(registered.attemptId, p.tenant, profile.activity.id, scoAttempt);
+      const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=?').get(registered.attemptId, profile.activity.id, scoAttempt) as any, previous = JSON.parse(sco.runtime_state), account = p as any;
+      this.db.prepare('UPDATE scorm_sco_attempts SET finished=0 WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=?').run(registered.attemptId, profile.activity.id, scoAttempt);
       const initialState: Record<string, any> = {core: {student_id: p.id, student_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', lesson_mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : previous.core?.exit === 'suspend' ? 'resume' : '', total_time: scormTime(sco.reported_seconds)}};
       Object.assign(initialState, {launch_data: profile.activity.launchData ?? '', student_data: {mastery_score: profile.activity.masteryScore ?? '', max_time_allowed: profile.activity.maxTimeAllowed ?? '', time_limit_action: profile.activity.timeLimitAction ?? ''}});
       if (manifest.standard !== '1.2') {
         for (const k of Object.keys(initialState)) delete initialState[k];
-        Object.assign(initialState, {learner_id: p.id, learner_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : previous.exit === 'suspend' ? 'resume' : '', total_time: scorm2004Time(sco.reported_seconds), launch_data: profile.activity.launchData ?? '', completion_threshold: profile.activity.completionThreshold ?? '', scaled_passing_score: '', max_time_allowed: '', time_limit_action: profile.activity.timeLimitAction ?? 'continue,no message'});
+        Object.assign(initialState, {learner_id: p.id, learner_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : previous.exit === 'suspend' ? 'resume' : '', total_time: scorm2004Time(sco.reported_seconds), launch_data: profile.activity.launchData ?? '', completion_threshold: profile.activity.completionThreshold ?? '', scaled_passing_score: profile.activity.sequencing?.primaryObjective?.satisfiedByMeasure ? String(profile.activity.sequencing.primaryObjective.minNormalizedMeasure ?? 1) : '', max_time_allowed: '', time_limit_action: profile.activity.timeLimitAction ?? 'continue,no message'});
+      }
+      if (engine) {
+        // Use a fresh API communication session on the already selected activity tree.
+        const fresh = trustedSequencing(manifest, saveSequencing(engine, manifest, sequenceScope), sequenceScope);
+        fresh.loadFromJSON({...previous, ...initialState, exit: '', session_time: 'PT0S'}); fresh.Initialize('');
+        const seeded = fresh.renderCMIToJSONObject().cmi as Record<string, any>;
+        for (const key of ['scaled_passing_score', 'completion_threshold', 'max_time_allowed', 'time_limit_action']) initialState[key] = seeded[key];
+        this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(fresh, manifest, sequenceScope), registered.attemptId, p.tenant);
       }
       this.db.prepare('INSERT INTO scorm_engine_launches(id,token_hash,tenant,registration_id,attempt_id,sco_id,session_hash,auth_version,expires,initial_state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id, tokenHash(token), p.tenant, registered.registrationId, registered.attemptId, profile.activity.id, sessionHash, p.auth_version, Math.min(session.expires, now + 60 * 60 * 1000), JSON.stringify(initialState), new Date(now).toISOString());
+      this.db.prepare('UPDATE scorm_engine_launches SET sco_attempt_number=? WHERE id=?').run(scoAttempt, id);
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, 'learning:' + p.tenant + ':' + p.id, 'human_scorm_engine_launch', JSON.stringify({launchId: id, registrationId: registered.registrationId, attemptId: registered.attemptId, scoId: profile.activity.id, mode: args.mode}), new Date(now).toISOString());
       return {...registered, launchId: id, token, title: profile.activity.title, scoId: profile.activity.id, standard: manifest.standard};
     });
@@ -83,7 +103,7 @@ export class SCORMPlayerService {
     const registration = this.store.registration(p, launch.registration_id);
     const attempt = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=? AND registration_id=?').get(launch.attempt_id, launch.tenant, registration.id) as any;
     if (!attempt) reject('FORBIDDEN', 'Bound registration attempt required');
-    const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=? AND sco_id=? AND sco_attempt_number=1').get(attempt.id, launch.tenant, launch.sco_id) as any;
+    const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=? AND sco_id=? AND sco_attempt_number=?').get(attempt.id, launch.tenant, launch.sco_id, launch.sco_attempt_number) as any;
     if (!sco) reject('FORBIDDEN', 'Bound SCO attempt required');
     return {launch, registration, attempt, sco, p};
   }
@@ -102,7 +122,8 @@ export class SCORMPlayerService {
     const c = this.capability(token), manifest = this.manifest(c.registration.package_id, c.registration.version, c.launch.tenant), profile = launchProfile(manifest, c.launch.sco_id);
     if (c.launch.finished) reject('FORBIDDEN', 'Finished communication session must be relaunched');
     const latest = this.db.prepare('SELECT result FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, c.launch.sequence) as any;
-    return {standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
+    const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
+    return {...(engine ? {sequencingTree: sequencingTree(manifest), sequencingSnapshot: engine.serializeSequencingState()} : {}), standard: manifest.standard, navigation: latest ? JSON.parse(latest.result).navigation ?? '_none_' : '_none_', launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
   }
   context(p: Principal, a: {packageId?: string; version?: string; enrollmentId?: string; lessonId?: string; itemEnrollmentId?: string; mode?: string}) {
     const {mode = 'normal', ...args} = a;
@@ -118,13 +139,22 @@ export class SCORMPlayerService {
     if (context) this.bindings!.validate(p, context, packageId!, version);
     else if (!pkg || pkg.state !== 'published') reject('FORBIDDEN', 'Published practice package required');
     const r = this.db.prepare("SELECT id FROM scorm_registrations WHERE tenant=? AND learner=? AND package_id=? AND version=? AND binding_key=? AND mode=?").get(p.tenant, p.id, packageId!, version, context?.bindingKey ?? 'standalone', mode) as any;
-    const attempt = r ? this.db.prepare('SELECT id FROM scorm_engine_attempts WHERE registration_id=? ORDER BY attempt_number DESC LIMIT 1').get(r.id) as any : null;
-    const rows = attempt ? this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=?').all(attempt.id, p.tenant) as any[] : [];
+    const attempt = r ? this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE registration_id=? ORDER BY attempt_number DESC LIMIT 1').get(r.id) as any : null;
+    const rows = attempt ? this.scos(attempt.id, p.tenant) : [];
     const manifest = this.manifest(packageId!, version, p.tenant), states = activityStates(manifest, rows);
+    const engine = usesSequencing(manifest) ? trustedSequencing(manifest, attempt?.sequencing_state ?? '{}', {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}) : undefined;
+    if (engine) {
+      const row = rows.find(r => r.sco_id === engine.getSequencingState()?.currentActivity?.id);
+      if (row && !row.finished) {engine.loadFromJSON(JSON.parse(row.runtime_state)); engine.Initialize('');}
+    }
+    const available = (id: string) => {
+      if (!engine) return true;
+      try {const copy = trustedSequencing(manifest, saveSequencing(engine, manifest, {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}), {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}); selectSCO(copy, manifest, id); return true;} catch {return false;}
+    };
     return {packageId, version, reference: context?.reference ?? null, officialLearning: !!context,
       registrationId: r?.id ?? null, attemptId: attempt?.id ?? null, retakeAvailable: rows.some(row => row.revision > 0),
       completed: !!r && !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(r.id),
-      activities: playbackActivities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, available: activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
+      activities: playbackActivities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, available: available(profile.activity.id) && activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
   }
   retake(p: Principal, a: {registrationId: string; attemptId: string; confirmed: boolean; revision: number; key: string}) {
     return this.transaction(() => {
@@ -164,16 +194,20 @@ export class SCORMPlayerService {
       if (old) {if (old.payload_hash !== payloadHash) reject('IDEMPOTENCY_CONFLICT', 'Checkpoint sequence payload changed'); return JSON.parse(old.result);}
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
       if (manifest.standard !== '1.2' && a.navigation !== undefined && typeof a.navigation !== 'string') reject('INVALID_ARGUMENT', 'Exact navigation request required');
-      const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation);
+      const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
+      if (engine && deliveredSCO(engine, manifest)?.activity.id !== c.launch.sco_id) reject('STALE_CONTEXT', 'Sequencing has delivered a different SCO');
+      const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation, engine);
       const seconds = manifest.standard === '1.2' ? scormSeconds(state.core.session_time) : scorm2004Seconds(state.session_time);
       if (seconds < c.launch.session_seconds) reject('INVALID_ARGUMENT', 'Session time cannot decrease within a launch');
       const revision = c.sco.revision + 1, now = new Date().toISOString();
-      this.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?,revision=?,reported_seconds=reported_seconds+?,finished=? WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1 AND tenant=?').run(JSON.stringify(state), revision, seconds - c.launch.session_seconds, a.finished ? 1 : 0, c.attempt.id, c.launch.sco_id, c.launch.tenant);
+      this.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?,revision=?,reported_seconds=reported_seconds+?,finished=? WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=? AND tenant=?').run(JSON.stringify(state), revision, seconds - c.launch.session_seconds, a.finished ? 1 : 0, c.attempt.id, c.launch.sco_id, c.launch.sco_attempt_number, c.launch.tenant);
+      if (engine) this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(engine, manifest, {attemptId: c.attempt.id, sha256: c.registration.sha256}), c.attempt.id, c.launch.tenant);
       this.db.prepare('UPDATE scorm_engine_launches SET sequence=?,session_seconds=?,finished=? WHERE id=?').run(a.sequence, seconds, a.finished ? 1 : 0, c.launch.id);
       this.db.prepare('UPDATE scorm_engine_attempts SET revision=revision+1 WHERE id=?').run(c.attempt.id);
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run('learning:' + c.p.tenant + ':' + c.p.id);
       const officialLearningChanged = a.finished && !!this.bindings?.project(c.p, c.registration, c.attempt.id, this.manifest(c.registration.package_id, c.registration.version, c.p.tenant));
-      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
+      const nextScoId = engine && a.finished ? deliveredSCO(engine, manifest)?.activity.id ?? null : null;
+      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine ? {nextScoId: nextScoId !== c.launch.sco_id ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
       this.db.prepare('INSERT INTO scorm_engine_checkpoints VALUES(?,?,?,?)').run(c.launch.id, a.sequence, payloadHash, JSON.stringify(result));
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(c.p.tenant, c.p.id, 'learning:' + c.p.tenant + ':' + c.p.id, 'runtime_scorm_engine_checkpoint', JSON.stringify({launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished}), now);
       return result;
@@ -181,10 +215,11 @@ export class SCORMPlayerService {
   }
   status(p: Principal, id: string, sessionHash: string) {
     this.store.live(p);
-    const row = this.db.prepare('SELECT l.id,l.sequence,l.finished,l.closed,l.expires,s.revision,s.runtime_state,s.reported_seconds,l.registration_id FROM scorm_engine_launches l JOIN scorm_sco_attempts s ON s.attempt_id=l.attempt_id AND s.sco_id=l.sco_id AND s.tenant=l.tenant AND s.sco_attempt_number=1 JOIN scorm_registrations r ON r.id=l.registration_id AND r.tenant=l.tenant WHERE l.id=? AND l.tenant=? AND r.learner=? AND l.session_hash=?').get(id, p.tenant, p.id, sessionHash) as any;
+    const row = this.db.prepare('SELECT l.id,l.sequence,l.finished,l.closed,l.expires,s.revision,s.runtime_state,s.reported_seconds,l.registration_id FROM scorm_engine_launches l JOIN scorm_sco_attempts s ON s.attempt_id=l.attempt_id AND s.sco_id=l.sco_id AND s.tenant=l.tenant AND s.sco_attempt_number=l.sco_attempt_number JOIN scorm_registrations r ON r.id=l.registration_id AND r.tenant=l.tenant WHERE l.id=? AND l.tenant=? AND r.learner=? AND l.session_hash=?').get(id, p.tenant, p.id, sessionHash) as any;
     if (!row) reject('FORBIDDEN', 'Own session launch required');
     this.store.registration(p, row.registration_id);
-    return {...row, runtime_state: JSON.parse(row.runtime_state), officialLearningChanged: !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(row.registration_id)};
+    const receipt = this.db.prepare('SELECT result FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(row.id, row.sequence) as any;
+    return {...row, nextScoId: receipt ? JSON.parse(receipt.result).nextScoId ?? null : null, runtime_state: JSON.parse(row.runtime_state), officialLearningChanged: !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(row.registration_id)};
   }
   close(p: Principal, id: string, sessionHash: string) {
     return this.transaction(() => {

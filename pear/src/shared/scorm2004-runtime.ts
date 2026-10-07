@@ -1,4 +1,5 @@
 import Scorm2004API from 'scorm-again/scorm2004';
+import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
 import type {SCORMStandard} from './scorm-engine.ts';
 
 export type SCORM2004Edition = Exclude<SCORMStandard, '1.2'>;
@@ -31,8 +32,8 @@ export function scorm2004FieldError(edition: SCORM2004Edition, key: string, valu
 }
 
 /** Exactly the eight IEEE synchronous methods; engine helpers never reach the SCO. */
-export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; navigation?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string) => unknown}) {
-  const runtime = new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
+export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string) => unknown}) {
+  const runtime = options.sequencingTree ? sequencingRuntime(options.sequencingTree, options.sequencingSnapshot) : new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   if (options.state) runtime.loadFromJSON(options.state);
   let initialized = false, finished = false, error: string | null = null, navigation = options.navigation ?? '_none_';
   const bad = (code: string) => {error = code; return 'false';};
@@ -56,7 +57,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
       const fieldError = scorm2004FieldError(options.edition, key, value); if (fieldError) return bad(fieldError);
       // Navigation involving another activity is enabled only with trusted sequencing.
-      if (key === 'adl.nav.request' && !scorm2004ExitRequests.includes(value)) return bad('406');
+      if (key === 'adl.nav.request' && !options.sequencingTree && !scorm2004ExitRequests.includes(value)) return bad('406');
       error = null; const result = runtime.SetValue(key, scorm2004EngineValue(key, value)); if (result === 'true' && key === 'adl.nav.request') navigation = value; return result;
     },
     Commit(argument: string) {
@@ -70,6 +71,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const code = inactive('112', '113'); if (code) return bad(code);
       if (argument !== '') return bad('201');
       error = null;
+      if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');
       // Queue acceptance precedes termination so an unavailable durable queue is retryable.
       if (options.checkpoint?.(snapshot(), true, navigation) === false) return bad('111');
       const result = runtime.Terminate(argument); if (result === 'true') finished = true; return result;

@@ -3,6 +3,7 @@ import yauzl from 'yauzl';
 import {DOMParser, type Element} from '@xmldom/xmldom';
 import type {SCORMActivity, SCORMManifest, SCORMResource, SCORMStandard} from '../shared/scorm-engine.ts';
 import {crc32} from './scorm-archive.ts';
+import {parseSequencing} from './scorm-sequencing-parser.ts';
 import {reject} from './errors.ts';
 
 export const packageLimits = {archive: 32 * 1024 * 1024, expanded: 64 * 1024 * 1024, file: 16 * 1024 * 1024, files: 2048, manifest: 1024 * 1024};
@@ -109,7 +110,12 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
       if (parent?.localName !== 'item' || parent.namespaceURI !== ns) invalid('misplaced runtime extension');
       features.add(node.localName!);
     }
-    if (node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && node.localName === 'sequencing') features.add(node.localName!);
+    if (node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && ['sequencing', 'sequencingCollection'].includes(node.localName!)) {
+      const parent = node.parentNode as Element;
+      if (node.localName === 'sequencing' && (!['item', 'organization'].includes(parent?.localName ?? '') || parent.namespaceURI !== ns)) invalid('misplaced sequencing definition');
+      features.add(node.localName!);
+    }
+    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlseq_v1p3' || node.namespaceURI === 'http://www.adlnet.org/xsd/adlnav_v1p3') features.add('unsupportedNavigationExtension');
     for (const n of elements(node)) stack.push({node: n, depth: depth + 1});
   }
   const metadata = one(root!, 'metadata', ns!), schema = one(metadata, 'schema', ns!).textContent?.trim(), edition = one(metadata, 'schemaversion', ns!).textContent?.trim();
@@ -173,11 +179,11 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
         } else if (text) {if (!numeric(text)) invalid('invalid completion threshold'); extensions.completionThreshold = text;}
       }
     }
-    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, children: elements(el, 'item', ns!).map(activity)};
+    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard)} : {}), children: elements(el, 'item', ns!).map(activity)};
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');
-  return {standard, identifier, title, organizationId, activities, resources, runtimeFeatures: [...features].sort()};
+  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard), objectivesGlobalToSystem: org.getAttribute('objectivesGlobalToSystem') !== 'false'} : {}), runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {

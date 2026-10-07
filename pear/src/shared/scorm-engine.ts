@@ -17,6 +17,7 @@ export interface SCORMActivity {
   launchData?: string;
   masteryScore?: string;
   completionThreshold?: string;
+  sequencing?: Record<string, any>;
   maxTimeAllowed?: string;
   timeLimitAction?: string;
   children: SCORMActivity[];
@@ -29,6 +30,8 @@ export interface SCORMManifest {
   activities: SCORMActivity[];
   resources: SCORMResource[];
   runtimeFeatures?: string[];
+  sequencing?: Record<string, any>;
+  objectivesGlobalToSystem?: boolean;
 }
 export function scormStandard(value: unknown): SCORMStandard {
   if (!SCORM_STANDARDS.includes(value as SCORMStandard)) throw new Error('Unsupported SCORM edition');

@@ -41,7 +41,7 @@ if (config.standard === '1.2') {
   const api = createSCORM12API(options); commit = () => api.LMSCommit('');
   Object.defineProperty(window, 'API', {value: Object.freeze({...api, LMSInitialize(argument: string) {const result = api.LMSInitialize(argument); if (result === 'true') active = true; return result;}}), writable: false, configurable: false});
 } else {
-  const api = createSCORM2004API({...options, edition: config.standard, navigation: config.navigation}); commit = () => api.Commit('');
+  const api = createSCORM2004API({...options, edition: config.standard, navigation: config.navigation, sequencingTree: config.sequencingTree, sequencingSnapshot: config.sequencingSnapshot}); commit = () => api.Commit('');
   Object.defineProperty(window, 'API_1484_11', {value: Object.freeze({...api, Initialize(argument: string) {const result = api.Initialize(argument); if (result === 'true') active = true; return result;}}), writable: false, configurable: false});
 }
 retry.onclick = () => {failed = false; void save();};

@@ -18,3 +18,8 @@ The user already authorized implementation, tests, commits, remote branch update
 ## S5 continuation (this session)
 
 The next owned slice implements the real SCORM 2004 API for 2nd/3rd/4th editions on S4. Read ADR-079 for the explicit single-SCO profile, edition limits, completion policy, primary sources and remaining interoperability findings. S6 must provide trusted activity-tree sequencing, objective/rollup navigation and durable snapshots before multi-SCO 2004 is enabled. Continue independent S6–S8 work without per-PR approval; do not merge or modify the separate #49 session's branches. Production execution remains disabled until the documented platform gates have real evidence.
+
+
+## S6 continuation (this session)
+
+S6 installs the trusted multi-SCO 2004 sequencing profile described in ADR-080, including transactional snapshots, server-verified choice/flow/objective maps/rollup, technical attempt limits and authenticated automatic delivery after Terminate ACK. The strict unsupported-profile list remains visible; do not advertise complete sequencing conformance. Continue S7 licensed wrapper/reference fixtures and host isolation, then S8 operational diagnostics and integrated acceptance. The separate #49 owner and production/main gates remain untouched.

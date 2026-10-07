@@ -4,6 +4,7 @@ import type {SCORMManifest} from '../shared/scorm-engine.ts';
 import {SCORM_ENGINE} from '../shared/scorm-engine.ts';
 import type {LearningService} from './service.ts';
 import {playbackActivities} from './scorm-activities.ts';
+import {usesSequencing} from './scorm-sequencing.ts';
 import {reject} from './errors.ts';
 
 export interface SCORMLearningContext {
@@ -37,7 +38,7 @@ export class SCORMLearningBindings {
     const c = this.guard(p, registration);
     if (!c || registration.mode !== 'normal') return false;
     if (this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=? AND attempt_id=?').get(registration.id, attemptId)) return false;
-    const rows = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=? AND sco_attempt_number=1').all(attemptId, p.tenant) as any[];
+    const rows = this.db.prepare('SELECT s.* FROM scorm_sco_attempts s WHERE s.attempt_id=? AND s.tenant=? AND s.sco_attempt_number=(SELECT max(n.sco_attempt_number) FROM scorm_sco_attempts n WHERE n.attempt_id=s.attempt_id AND n.sco_id=s.sco_id)').all(attemptId, p.tenant) as any[];
     const evidence = playbackActivities(manifest).map(({activity}) => {
       const row = rows.find(r => r.sco_id === activity.id), state = row ? JSON.parse(row.runtime_state) : {}, scores = manifest.standard === '1.2' ? state.core?.score : state.score;
       let score: number | null = null;
@@ -47,7 +48,14 @@ export class SCORMLearningBindings {
       return {scoId: activity.id, finished: row?.finished === 1, status: manifest.standard === '1.2' ? state.core?.lesson_status ?? 'not attempted' : state.completion_status ?? 'unknown', success: manifest.standard === '1.2' ? state.core?.lesson_status ?? 'not attempted' : state.success_status ?? 'unknown', score, seconds: row?.reported_seconds ?? 0, revision: row?.revision ?? 0};
     });
     if (evidence.some(e => !e.finished || (manifest.standard === '1.2' ? !['completed', 'passed'].includes(e.status) : e.status !== 'completed') || c.reference.completion === 'passed' && e.success !== 'passed' || c.reference.minimumScore !== undefined && (e.score === null || e.score < c.reference.minimumScore || e.score > 100))) return false;
-    const now = new Date().toISOString(), proof = {packageId: registration.package_id, version: registration.version, sha256: registration.sha256, engine: SCORM_ENGINE, reference: c.reference, context: c.context, scos: evidence};
+    let rollup: Record<string, any> | undefined;
+    if (usesSequencing(manifest)) {
+      const overall = this.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(attemptId, p.tenant) as any;
+      const envelope = JSON.parse(overall.sequencing_state), root = JSON.parse(envelope.snapshot).sequencing?.activityStates?.[manifest.organizationId];
+      if (!root || root.completionStatus !== 'completed' || c.reference.completion === 'passed' && root.successStatus !== 'passed') return false;
+      rollup = {activityId: manifest.organizationId, completion: root.completionStatus, success: root.successStatus, normalizedMeasure: root.objectiveMeasureStatus ? root.objectiveNormalizedMeasure : null};
+    }
+    const now = new Date().toISOString(), proof = {packageId: registration.package_id, version: registration.version, sha256: registration.sha256, engine: SCORM_ENGINE, reference: c.reference, context: c.context, scos: evidence, ...(rollup ? {rollup} : {})};
     this.db.prepare('INSERT INTO scorm_completion_proofs VALUES(?,?,?,?,?)').run(registration.id, attemptId, p.tenant, JSON.stringify(proof), now);
     if (c.courseEnrollmentId) {
       const e = this.db.prepare('SELECT completed_lessons FROM enrollments WHERE id=? AND tenant=? AND learner=?').get(c.courseEnrollmentId, p.tenant, p.id) as any, completed = JSON.parse(e.completed_lessons);

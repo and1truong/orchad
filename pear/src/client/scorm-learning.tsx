@@ -40,15 +40,23 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
         if (!active || activeLaunch.current !== current || saved.sequence < data.sequence) return;
         setStatus(saved.officialLearningChanged ? 'SCORM completion accepted for this enrollment.' : saved.finished ? 'SCO finished and saved. Other SCOs or completion requirements remain.' : 'SCO progress saved by the server.');
         await refresh(); await p.onSaved();
+        if (saved.finished && saved.nextScoId && active && activeLaunch.current === current && !current.navigating) {
+          current.navigating = true;
+          await request('/api/scorm-engine/launches/' + current.launchId + '/close', p.session, {});
+          if (!active || activeLaunch.current !== current) return;
+          activeLaunch.current = null; setLaunch(null);
+          await play(saved.nextScoId, current);
+        }
       }).catch(e => {if (active) setError(e.message);});
     }
     window.addEventListener('message', message); return () => {active = false; window.removeEventListener('message', message);};
   }, [p.session, binding]);
-  async function play(scoId: string) {
+  async function play(scoId: string, previous?: any) {
     await p.run(async () => {
       const revision = await request<any>('/api/context?documentId=' + encodeURIComponent('learning:' + p.session.principal.tenant + ':' + p.session.principal.id), p.session);
-      const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: context.packageId, version: context.version, mode: 'normal', binding: p.binding, scoId, confirmed: consent, revision: revision.revision, key: crypto.randomUUID()});
-      activeLaunch.current = value; setLaunch(value); setStatus('SCO loaded; progress is not saved yet.'); setError('');
+      const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: previous?.packageId ?? context.packageId, version: previous?.version ?? context.version, mode: 'normal', binding: p.binding, scoId, confirmed: previous?.consented ?? consent, revision: revision.revision, key: crypto.randomUUID()});
+      const current = {...value, packageId: previous?.packageId ?? context.packageId, version: previous?.version ?? context.version, consented: previous?.consented ?? consent};
+      activeLaunch.current = current; setLaunch(current); setStatus('SCO loaded; progress is not saved yet.'); setError('');
     });
   }
   async function close() {

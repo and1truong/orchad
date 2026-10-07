@@ -94,7 +94,7 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
     });
   }
   return <section className="panel" aria-label="SCORM engine packages"><h2>SCORM engine packages</h2>
-    <p>Multi-file packages. {data?.runtimeEnabled ? 'SCORM 1.2 playback is available. Package-reported progress is separate from official learning.' : 'Playback is currently unavailable.'}</p>
+    <p>Multi-file packages. {data?.runtimeEnabled ? 'SCORM 1.2 and supported SCORM 2004 playback are available. Package-reported progress is separate from official learning.' : 'Playback is currently unavailable.'}</p>
     {!data?.importsEnabled && <p>Package imports require reviewed loopback development fixtures.</p>}
     {error && <p role="alert">{error}</p>}
     {job && <div role="status">Import: {job.status}{job.error && <p role="alert">{job.error}</p>}{job.warnings?.map((w: string) => <p key={w}>{w}</p>)}</div>}
