@@ -14,7 +14,7 @@ import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
-import {hasSelection, beforeSelection} from './scorm-selection.ts';
+import {hasSelection, beforeSelection, selectionNeedsStart} from './scorm-selection.ts';
 import {sequencingRuntime} from '../shared/scorm-sequencing-runtime.ts';
 import {loadSystemObjectives, saveSystemObjectives, objectiveSnapshot, objectiveClientSnapshot} from './scorm-system-objectives.ts';
 import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
@@ -61,6 +61,10 @@ export class SCORMPlayerService {
     if (!args || typeof args.packageId !== 'string' || !args.packageId || !Number.isSafeInteger(args.version) || args.version < 1) reject('INVALID_ARGUMENT', 'Exact package version required');
     const manifest = this.manifest(args.packageId, args.version, p.tenant);
     playbackActivities(manifest);
+    if (scoId && hasSelection(manifest)) {
+      const attempt = this.db.prepare("SELECT a.sequencing_state FROM scorm_engine_attempts a JOIN scorm_registrations r ON r.id=a.registration_id AND r.tenant=a.tenant WHERE r.tenant=? AND r.learner=? AND r.package_id=? AND r.version=? AND r.binding_key=? AND r.mode=? ORDER BY a.attempt_number DESC LIMIT 1").get(p.tenant, p.id, args.packageId, args.version, context?.bindingKey ?? 'standalone', args.mode) as any;
+      if (selectionNeedsStart(manifest, attempt?.sequencing_state, scoId)) reject('FORBIDDEN', 'Start the package flow before choosing within an unselected pool');
+    }
     const reviewed = this.context(p, binding ?? {packageId: args.packageId, version: String(args.version), mode: args.mode});
     if (scoId && !reviewed.activities.some(a => a.id === scoId && a.available) || !reviewed.activities.some(a => a.available)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
     const session = this.db.prepare('SELECT * FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(sessionHash, p.id, p.auth_version, Date.now()) as any;
@@ -175,7 +179,7 @@ export class SCORMPlayerService {
     return {packageId, version, reference: context?.reference ?? null, officialLearning: !!context,
       registrationId: r?.id ?? null, attemptId: attempt?.id ?? null, retakeAvailable: rows.some(row => row.revision > 0),
       completed: !!r && !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(r.id),
-      activities: playbackActivities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, visible: profile.activity.isVisible !== false, available: available(profile.activity.id) && activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
+      activities: playbackActivities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, visible: profile.activity.isVisible !== false, choiceAvailable: !selectionNeedsStart(manifest, attempt?.sequencing_state, profile.activity.id), available: available(profile.activity.id) && activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
   }
   retake(p: Principal, a: {registrationId: string; attemptId: string; confirmed: boolean; revision: number; key: string}) {
     return this.transaction(() => {

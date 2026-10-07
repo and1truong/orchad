@@ -115,3 +115,24 @@ test('selected pool/order and exact receipts survive actual database/server reop
     assert.equal(opened.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
   } finally {opened.db.close(); rmSync(dir, {recursive: true, force: true});}
 });
+
+
+test('explicit fresh choices cannot reroll a host pool, including a retake carrying a snapshot', async t => {
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', selectionManifest()));
+  const random = t.mock.method(Math, 'random', () => 0);
+  try {
+    const binding = f.enroll();
+    for (let i = 0; i < 8; i++) assert.throws(() => f.launch(binding, 'practice'), /Start the package flow/);
+    assert.equal(random.mock.callCount(), 0); assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_registrations').get()!.n, 0);
+    const context = f.player.context(f.service.principal('learner-a'), binding); assert.equal(context.activities.find(a => a.id === 'practice')!.choiceAvailable, false);
+    const first = f.launch(binding), b = f.player.bootstrap(first.token); assert.equal(JSON.parse(b.sequencingSnapshot!).currentActivityId, 'intro');
+    random.mock.mockImplementation(() => 0.999);
+    for (let i = 0; i < 8; i++) assert.throws(() => f.launch(binding, 'practice'), /prerequisite|denies/);
+    const original = JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state)); assert.deepEqual(JSON.parse(original.snapshot).sequencing.activityStates.org.selectionRandomizationState.selectedChildIds, ['intro']);
+    f.player.checkpoint(first.token, sequenceCheckpoint(f, first, {'cmi.completion_status': 'incomplete', 'cmi.success_status': 'failed', 'cmi.score.scaled': '0.2', 'adl.nav.request': 'exitAll'}));
+    const current = f.player.context(f.service.principal('learner-a'), binding);
+    f.player.retake(f.service.principal('learner-a'), {registrationId: current.registrationId!, attemptId: current.attemptId!, confirmed: true, revision: f.service.context('learner-a','learning:demo:learner-a').revision, key: 'selection-retake'});
+    for (let i = 0; i < 8; i++) assert.throws(() => f.launch(binding, 'intro'), /Start the package flow/);
+    const next = f.launch(binding), nextB = f.player.bootstrap(next.token); assert.equal(JSON.parse(nextB.sequencingSnapshot!).currentActivityId, 'practice');
+  } finally {random.mock.restore(); f.db.close();}
+});

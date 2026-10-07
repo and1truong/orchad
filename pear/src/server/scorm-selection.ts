@@ -27,3 +27,15 @@ export function selectionEvidence(manifest: SCORMManifest, serialized: string) {
   visit({id: manifest.organizationId, children: manifest.activities}, manifest.sequencing?.sequencingControls);
   return {scos: playbackActivities(manifest).filter(p => !excluded.has(p.activity.id)), clusters};
 }
+
+/** A rejected explicit choice must never spend and roll back a random pool draw. */
+export function selectionNeedsStart(manifest: SCORMManifest, persisted: string | undefined, scoId: string) {
+  const profile = playbackActivities(manifest).find(p => p.activity.id === scoId);
+  if (!profile) return false;
+  const envelope = persisted ? JSON.parse(persisted) : {}, states = envelope.snapshot ? JSON.parse(envelope.snapshot).sequencing?.activityStates ?? {} : {};
+  const path = [{id: manifest.organizationId, children: manifest.activities, sequencing: manifest.sequencing}, ...profile.ancestors];
+  return path.some(node => {
+    const controls = node.sequencing?.sequencingControls;
+    return controls?.selectionTiming && controls.selectionTiming !== 'never' && typeof controls.selectCount === 'number' && controls.selectCount < node.children.length && states[node.id]?.selectionRandomizationState?.selectionCountStatus !== true;
+  });
+}

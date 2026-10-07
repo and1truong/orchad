@@ -86,7 +86,7 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
     {context?.completed && <p>SCORM completion accepted.</p>}
     <label><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />I consent to SCORM progress tracking for this enrollment.</label>
     <button disabled={p.busy || !!launch || !consent || !context?.activities.some((a: any) => a.available)} onClick={() => {void play();}}>Play or resume enrolled SCORM package</button>
-    <nav aria-label="SCORM activities">{context?.activities.filter((a: any) => a.visible !== false).map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available} onClick={() => {void play(a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>
+    <nav aria-label="SCORM activities">{context?.activities.filter((a: any) => a.visible !== false).map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available || a.choiceAvailable === false} onClick={() => {void play(a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>
     {!launch && context?.retakeAvailable && !context.completed && <fieldset disabled={p.busy}><legend>Fresh SCORM attempt</legend><p>This starts with empty SCO progress and preserves the previous attempt.</p>
       <label><input type="checkbox" checked={retakeConfirmed} onChange={e => setRetakeConfirmed(e.target.checked)} />I confirm starting a fresh SCORM attempt.</label>
       <button disabled={!retakeConfirmed} onClick={() => {void p.run(async () => {
