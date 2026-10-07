@@ -1,3 +1,5 @@
+import {SCORMReferenceEditor} from './scorm-learning.tsx';
+import type {Session} from './api.ts';
 import {translateUI} from "./i18n.ts";
 import React from "react";
 import type { Lesson } from "../shared/model.ts";
@@ -17,10 +19,13 @@ export const newEventSession = (): EventSession => {
 export function LessonSettings({
   lesson,
   onChange,
+  session,
 }: {
   lesson: Lesson;
+  session?: Session;
   onChange: (patch: Partial<Lesson>) => void;
 }) {
+  if (lesson.kind === 'scorm' && session) return <SCORMReferenceEditor session={session} value={lesson.scorm} onChange={scorm => onChange({scorm})} />;
   if (lesson.kind === "submission")
     return (
       <fieldset>

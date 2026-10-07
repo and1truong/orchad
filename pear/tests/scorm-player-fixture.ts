@@ -23,3 +23,19 @@ export function singleSCOPackage(xml = singleSCOManifest()) {
     {name: 'assets/style.css', data: Buffer.from('body{color:rgb(17,34,51)}'), method: 8},
   ]);
 }
+
+export function multiSCOPlayerPackage() {
+  const xml = multiFileManifest().replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:prerequisites type="aicc_script">intro</runtime:prerequisites>');
+  const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save SCO progress</button><button id="finish">Finish SCO</button><script src="../assets/player.js"></script></body></html>';
+  return zip([
+    {name: 'imsmanifest.xml', data: Buffer.from(xml), method: 8},
+    {name: 'lessons/intro.html', data: Buffer.from(html('Original introduction SCO')), method: 8},
+    {name: 'lessons/practice.html', data: Buffer.from(html('Original practice SCO')), method: 8},
+    {name: 'assets/player.js', data: Buffer.from(`const api=parent.API; api.LMSInitialize("");
+      document.getElementById("entry").textContent="SCO entry: "+api.LMSGetValue("cmi.core.entry")+"; bookmark: "+api.LMSGetValue("cmi.core.lesson_location");
+      const update=()=>{api.LMSSetValue("cmi.core.lesson_location",location.pathname.endsWith("intro.html")?"intro-page":"practice-page");api.LMSSetValue("cmi.core.exit","suspend");api.LMSSetValue("cmi.core.score.raw","90");api.LMSSetValue("cmi.core.score.min","0");api.LMSSetValue("cmi.core.score.max","100");api.LMSSetValue("cmi.core.session_time","00:00:20");};
+      document.getElementById("save").onclick=()=>{update();api.LMSSetValue("cmi.core.lesson_status","incomplete");document.getElementById("result").textContent="Commit: "+api.LMSCommit("");};
+      document.getElementById("finish").onclick=()=>{update();api.LMSSetValue("cmi.core.lesson_status","passed");document.getElementById("result").textContent="Finish: "+api.LMSFinish("");};`), method: 8},
+    {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
+  ]);
+}

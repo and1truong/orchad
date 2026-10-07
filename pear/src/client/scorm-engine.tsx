@@ -6,6 +6,7 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
   const [provenance, setProvenance] = useState(''), [reason, setReason] = useState(''), [confirmed, setConfirmed] = useState(false), [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0), [offset, setOffset] = useState(0);
   const [launch, setLaunch] = useState<any>(null), [consent, setConsent] = useState(false), [playStatus, setPlayStatus] = useState('');
+  const [selectedPackage, setSelectedPackage] = useState<any>(null), [activities, setActivities] = useState<any[]>([]);
   const frame = useRef<HTMLIFrameElement>(null), currentLaunch = useRef<any>(null);
   useEffect(() => {
     let active = true;
@@ -63,11 +64,15 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
       const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = row.filename; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
-  async function play(row: any) {
+  async function readActivities(row: any) {
+    const value = await request<any>('/api/scorm-engine/player-context?' + new URLSearchParams({packageId: row.id, version: String(row.version), mode: p.author ? 'preview' : 'normal'}), p.session);
+    if (p.isCurrent()) setActivities(value.activities);
+  }
+  async function play(row: any, scoId?: string) {
     await p.run(async () => {
       const context = await request<any>('/api/context?documentId=' + encodeURIComponent('learning:' + p.session.principal.tenant + ':' + p.session.principal.id), p.session);
-      const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: row.id, version: row.version, mode: p.author ? 'preview' : 'normal', confirmed: consent, revision: context.revision, key: crypto.randomUUID()});
-      if (p.isCurrent()) {currentLaunch.current = value; setLaunch(value); setPlayStatus('Package progress has not been saved yet.');}
+      const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: row.id, version: row.version, mode: p.author ? 'preview' : 'normal', ...(scoId ? {scoId} : {}), confirmed: consent, revision: context.revision, key: crypto.randomUUID()});
+      if (p.isCurrent()) {currentLaunch.current = value; setLaunch(value); setPlayStatus('Package progress has not been saved yet.'); setSelectedPackage(row); await readActivities(row);}
     });
   }
   async function close() {
@@ -85,11 +90,11 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
       const status = await request<any>('/api/scorm-engine/launches/' + launch.launchId, p.session);
       if (status.sequence !== sequence) throw Error('Package final checkpoint is not durable yet. Retry before closing.');
       await request('/api/scorm-engine/launches/' + launch.launchId + '/close', p.session, {});
-      if (p.isCurrent()) {currentLaunch.current = null; setLaunch(null); setPlayStatus('');}
+      if (p.isCurrent()) {currentLaunch.current = null; setLaunch(null); setPlayStatus(''); await readActivities(selectedPackage);}
     });
   }
   return <section className="panel" aria-label="SCORM engine packages"><h2>SCORM engine packages</h2>
-    <p>Multi-file packages. {data?.runtimeEnabled ? 'SCORM 1.2 single-SCO playback is available. Package-reported progress is separate from official learning.' : 'Playback is currently unavailable.'}</p>
+    <p>Multi-file packages. {data?.runtimeEnabled ? 'SCORM 1.2 playback is available. Package-reported progress is separate from official learning.' : 'Playback is currently unavailable.'}</p>
     {!data?.importsEnabled && <p>Package imports require reviewed loopback development fixtures.</p>}
     {error && <p role="alert">{error}</p>}
     {job && <div role="status">Import: {job.status}{job.error && <p role="alert">{job.error}</p>}{job.warnings?.map((w: string) => <p key={w}>{w}</p>)}</div>}
@@ -106,6 +111,7 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
         <button disabled={p.busy || !data.importsEnabled} onClick={() => {void exportPackage(row);}}>Export original engine ZIP</button></>}
       {data?.runtimeEnabled && row.state === 'published' && <>{!row.playbackSupported && <p>This package requires SCORM features outside the current playback support.</p>}<button disabled={p.busy || !consent || !!launch || !row.playbackSupported} onClick={() => {void play(row);}}>{p.author ? 'Preview engine package' : 'Play or resume engine package'}</button></>}
     </article>)}
+    {selectedPackage && <nav aria-label="Practice SCORM activities">{activities.map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available} onClick={() => {void play(selectedPackage, a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>}
     {launch && <><iframe ref={frame} title="Isolated SCORM engine player" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width: '100%', height: '80vh', border: 0}} /><p role="status">{playStatus}</p><button disabled={p.busy} onClick={() => frame.current?.contentWindow?.postMessage({kind: 'pear-scorm-engine-retry', launchId: launch.launchId}, launch.contentOrigin)}>Retry engine checkpoint</button><button disabled={p.busy} onClick={() => {void close();}}>Close engine package</button></>}
     <button disabled={p.busy || offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Previous engine packages</button>
     <button disabled={p.busy || data?.nextOffset == null} onClick={() => setOffset(data.nextOffset)}>Next engine packages</button>

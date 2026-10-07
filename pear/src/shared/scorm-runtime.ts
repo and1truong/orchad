@@ -29,6 +29,7 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
     LMSSetValue(key: string, value: string) {
       if (!active()) return bad('301');
       if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
+      if (key === 'cmi.core.lesson_status' && value === 'not attempted') return bad('405');
       localError = null; return runtime.LMSSetValue(key, value);
     },
     LMSCommit(argument: string) {
@@ -45,6 +46,7 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       localError = null;
       const state = snapshot();
       if (options.checkpoint?.(state, true) === false) return bad('101');
+      runtime.settings = {...runtime.settings, mastery_override: state.core?.lesson_status !== 'incomplete'};
       const value = runtime.LMSFinish(argument);
       if (value === 'true') finished = true;
       return value;

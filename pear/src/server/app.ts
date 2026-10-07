@@ -1,5 +1,6 @@
 import {SCORMPackageService} from "./scorm-package-service.ts";
 import {registerSCORMEngine} from "./scorm-engine-routes.ts";
+import {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 import {SCORMPlayerService} from "./scorm-player-service.ts";
 import {createSCORMContentHost, contentHostOrigins} from "./scorm-content-host.ts";
 import {reportPDF} from "./report-pdf.ts";
@@ -60,7 +61,8 @@ export async function createApp(opts: {
   const scormEnabled = !!opts.identityFixture || !!opts.developmentAuth && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
   if (opts.scormContent && !scormEnabled) throw Error("SCORM player requires reviewed loopback development fixtures");
   const scormOrigins = opts.scormContent ? contentHostOrigins(opts.origin, opts.scormContent.origin) : undefined;
-  const scormPlayer = opts.scormContent ? new SCORMPlayerService(opts.db) : undefined;
+  const learningService = new LearningService(opts.db,opts.origin,opts.catalogAdapters);
+  const scormPlayer = opts.scormContent ? new SCORMPlayerService(opts.db, new SCORMLearningBindings(opts.db, learningService)) : undefined;
   const scormContentApp = scormOrigins && scormPlayer ? createSCORMContentHost({pearOrigin: opts.origin, contentOrigin: scormOrigins.contentOrigin, player: scormPlayer, runtimeBundle: opts.scormContent!.runtimeBundle}) : undefined;
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)
     throw new Error("APP_ORIGIN must be an exact origin");
@@ -88,7 +90,7 @@ export async function createApp(opts: {
     },
   });
   await app.register(cookie);
-  const service = new LearningService(opts.db,opts.origin,opts.catalogAdapters),
+  const service = learningService,
     name = opts.secureCookies ? "__Host-pear-session" : "pear-session";
   const launchSecret = randomBytes(32);
   const loginBudget = new Map<

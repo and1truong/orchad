@@ -85,7 +85,7 @@ test('populated v42 migration/reopen preserves legacy package status without off
     const launch = legacy.start();
     const before = legacy.db.prepare('SELECT * FROM scorm_records').get();
     // The legacy fixture uses openDatabase, so rewind only the new empty schema to simulate populated v42.
-    legacy.db.exec('DROP TABLE scorm_engine_checkpoints; DROP TABLE scorm_engine_launches; DROP TABLE scorm_import_jobs; DROP TABLE scorm_sco_attempts; DROP TABLE scorm_engine_attempts; DROP TABLE scorm_registrations; DROP TABLE scorm_engine_resources; DROP TABLE scorm_engine_versions; DROP TABLE scorm_engine_packages; DROP INDEX accounts_id_tenant; DELETE FROM schema_version WHERE version>=43');
+    legacy.db.exec('DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; DROP TABLE scorm_engine_checkpoints; DROP TABLE scorm_engine_launches; DROP TABLE scorm_import_jobs; DROP TABLE scorm_sco_attempts; DROP TABLE scorm_engine_attempts; DROP TABLE scorm_registrations; DROP TABLE scorm_engine_resources; DROP TABLE scorm_engine_versions; DROP TABLE scorm_engine_packages; DROP INDEX accounts_id_tenant; DELETE FROM schema_version WHERE version>=43');
     legacy.db.close();
     const db = openDatabase(path);
     assert.deepEqual(db.prepare('SELECT * FROM scorm_records').get(), before);

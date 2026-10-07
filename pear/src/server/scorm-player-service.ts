@@ -7,16 +7,18 @@ import {tokenHash} from './integration-credentials.ts';
 import {packagePath, inspectManifest} from './scorm-package-reader.ts';
 import {validateSCORM12Checkpoint, scormSeconds, scormTime} from './scorm-runtime-validation.ts';
 import {reject} from './errors.ts';
+import {scorm12Activities, activityStates, activityAvailable} from './scorm-activities.ts';
+import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 
-export function scorm12LaunchProfile(manifest: SCORMManifest) {
-  const activity = manifest.activities?.[0], resource = manifest.resources?.find(r => r.id === activity?.resourceId);
-  if (manifest.standard !== '1.2' || manifest.activities?.length !== 1 || !activity || activity.children.length || !resource || resource.kind !== 'sco' || manifest.resources.filter(r => r.kind === 'sco').length !== 1 || manifest.runtimeFeatures?.length) reject('INVALID_ARGUMENT', 'This player currently supports SCORM 1.2 single-SCO packages without prerequisite or sequencing extensions');
-  return {activity, resource};
+export function scorm12LaunchProfile(manifest: SCORMManifest, scoId?: string) {
+  const profiles = scorm12Activities(manifest), profile = scoId ? profiles.find(p => p.activity.id === scoId) : profiles[0];
+  if (!profile) reject('FORBIDDEN', 'Exact organization SCO required');
+  return profile;
 }
 
 export class SCORMPlayerService {
   readonly store: SCORMEngineStore;
-  constructor(readonly db: DatabaseSync) {this.store = new SCORMEngineStore(db);}
+  constructor(readonly db: DatabaseSync, readonly bindings?: SCORMLearningBindings) {this.store = new SCORMEngineStore(db, bindings ? (p, r) => bindings.guard(p, r) : undefined);}
   private transaction<T>(fn: () => T) {this.db.exec('BEGIN IMMEDIATE'); try {const result = fn(); this.db.exec('COMMIT'); return result;} catch(e) {this.db.exec('ROLLBACK'); throw e;}}
   private manifest(packageId: string, version: number, tenant: string) {
     // Reparse the retained immutable original XML, including features added after import.
@@ -27,23 +29,36 @@ export class SCORMPlayerService {
     return inspectManifest(files);
   }
   playbackSupported(packageId: string, version: number, tenant: string) {try {scorm12LaunchProfile(this.manifest(packageId, version, tenant)); return true;} catch {return false;}}
-  launch(p: Principal, sessionHash: string, args: Parameters<SCORMEngineStore['register']>[1]) {
+  launch(p: Principal, sessionHash: string, request: Parameters<SCORMEngineStore['register']>[1] & {binding?: Record<string, unknown>; scoId?: string}) {
+    const {binding, scoId, ...args} = request ?? {};
+    if (scoId !== undefined && (typeof scoId !== 'string' || !scoId)) reject('INVALID_ARGUMENT', 'Exact SCO identifier required');
+    const context = binding ? this.bindings?.resolve(p, binding) : undefined;
+    if (binding && (!context || args.mode !== 'normal')) reject('FORBIDDEN', 'Authorized normal learning context required');
+    if (context) this.bindings!.validate(p, context, args.packageId, args.version);
     this.store.live(p, args?.mode === 'preview');
     if (!args || typeof args.packageId !== 'string' || !args.packageId || !Number.isSafeInteger(args.version) || args.version < 1) reject('INVALID_ARGUMENT', 'Exact package version required');
-    const profile = scorm12LaunchProfile(this.manifest(args.packageId, args.version, p.tenant));
+    const manifest = this.manifest(args.packageId, args.version, p.tenant);
+    scorm12Activities(manifest);
+    const reviewed = this.context(p, binding ?? {packageId: args.packageId, version: String(args.version), mode: args.mode});
+    if (scoId && !reviewed.activities.some(a => a.id === scoId && a.available) || !reviewed.activities.some(a => a.available)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
     const session = this.db.prepare('SELECT * FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(sessionHash, p.id, p.auth_version, Date.now()) as any;
     if (!session) reject('UNAUTHORIZED', 'Current application session required');
-    const registered = this.store.register(p, args);
+    const registered = this.store.register(p, args, context ? {key: context.bindingKey, attach: id => this.bindings!.attach(p, id, context)} : undefined);
     return this.transaction(() => {
       this.store.registration(p, registered.registrationId);
+      const rows = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=?').all(registered.attemptId, p.tenant) as any[], states = activityStates(manifest, rows);
+      const profile = scoId ? scorm12LaunchProfile(manifest, scoId) : scorm12Activities(manifest).find(p => activityAvailable(p, states));
+      if (!profile || !activityAvailable(profile, states)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
       const id = randomUUID(), token = randomBytes(32).toString('base64url'), now = Date.now();
-      this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND sco_id=? AND closed=0').run(registered.attemptId, profile.activity.id);
+      this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND closed=0').run(registered.attemptId);
       this.db.prepare('INSERT OR IGNORE INTO scorm_sco_attempts(attempt_id,tenant,sco_id) VALUES(?,?,?)').run(registered.attemptId, p.tenant, profile.activity.id);
       const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1').get(registered.attemptId, profile.activity.id) as any, previous = JSON.parse(sco.runtime_state), account = p as any;
+      this.db.prepare('UPDATE scorm_sco_attempts SET finished=0 WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1').run(registered.attemptId, profile.activity.id);
       const initialState = {core: {student_id: p.id, student_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', lesson_mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : previous.core?.exit === 'suspend' ? 'resume' : '', total_time: scormTime(sco.reported_seconds)}};
+      Object.assign(initialState, {launch_data: profile.activity.launchData ?? '', student_data: {mastery_score: profile.activity.masteryScore ?? '', max_time_allowed: profile.activity.maxTimeAllowed ?? '', time_limit_action: profile.activity.timeLimitAction ?? ''}});
       this.db.prepare('INSERT INTO scorm_engine_launches(id,token_hash,tenant,registration_id,attempt_id,sco_id,session_hash,auth_version,expires,initial_state,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(id, tokenHash(token), p.tenant, registered.registrationId, registered.attemptId, profile.activity.id, sessionHash, p.auth_version, Math.min(session.expires, now + 60 * 60 * 1000), JSON.stringify(initialState), new Date(now).toISOString());
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, 'learning:' + p.tenant + ':' + p.id, 'human_scorm_engine_launch', JSON.stringify({launchId: id, registrationId: registered.registrationId, attemptId: registered.attemptId, scoId: profile.activity.id, mode: args.mode}), new Date(now).toISOString());
-      return {...registered, launchId: id, token, title: profile.activity.title, standard: '1.2'};
+      return {...registered, launchId: id, token, title: profile.activity.title, scoId: profile.activity.id, standard: '1.2'};
     });
   }
   private capability(token: string) {
@@ -63,14 +78,58 @@ export class SCORMPlayerService {
   }
   private seed(c: ReturnType<SCORMPlayerService['capability']>) {
     const state = JSON.parse(c.sco.runtime_state), initial = JSON.parse(c.launch.initial_state);
-    state.core = {...state.core, ...initial.core, exit: state.core?.exit ?? '', session_time: scormTime(c.launch.session_seconds)};
+    state.core = {...state.core, ...initial.core, exit: c.launch.sequence === 0 ? '' : state.core?.exit ?? '', session_time: scormTime(c.launch.session_seconds)};
+    state.launch_data = initial.launch_data ?? ''; state.student_data = {...state.student_data, ...initial.student_data};
     if (!state.core.lesson_status) state.core.lesson_status = 'not attempted';
     return state;
   }
   bootstrap(token: string) {
-    const c = this.capability(token), manifest = this.manifest(c.registration.package_id, c.registration.version, c.launch.tenant), profile = scorm12LaunchProfile(manifest);
+    const c = this.capability(token), manifest = this.manifest(c.registration.package_id, c.registration.version, c.launch.tenant), profile = scorm12LaunchProfile(manifest, c.launch.sco_id);
     if (c.launch.finished) reject('FORBIDDEN', 'Finished communication session must be relaunched');
     return {launchId: c.launch.id, state: this.seed(c), revision: c.sco.revision, sequence: c.launch.sequence, title: profile.activity.title, href: profile.resource.href, parameters: profile.activity.parameters ?? '', officialLearningChanged: false};
+  }
+  context(p: Principal, a: {packageId?: string; version?: string; enrollmentId?: string; lessonId?: string; itemEnrollmentId?: string; mode?: string}) {
+    const {mode = 'normal', ...args} = a;
+    if (!['normal', 'preview'].includes(mode)) reject('INVALID_ARGUMENT', 'Exact launch mode required');
+    this.store.live(p, mode === 'preview');
+    const bound = args.enrollmentId || args.lessonId || args.itemEnrollmentId;
+    if (bound && mode !== 'normal') reject('FORBIDDEN', 'Preview cannot bind official learning');
+    if (!bound && Object.keys(args).some(k => !['packageId', 'version'].includes(k))) reject('INVALID_ARGUMENT', 'Exact package context required');
+    const context = bound ? this.bindings?.resolve(p, args) : undefined;
+    if (bound && !context) reject('FORBIDDEN', 'Learning bindings unavailable');
+    const packageId = context?.reference.packageId ?? args.packageId, version = context?.reference.version ?? Number(args.version);
+    const pkg = this.db.prepare('SELECT * FROM scorm_engine_versions WHERE package_id=? AND version=? AND tenant=?').get(packageId ?? '', version, p.tenant) as any;
+    if (context) this.bindings!.validate(p, context, packageId!, version);
+    else if (!pkg || pkg.state !== 'published') reject('FORBIDDEN', 'Published practice package required');
+    const r = this.db.prepare("SELECT id FROM scorm_registrations WHERE tenant=? AND learner=? AND package_id=? AND version=? AND binding_key=? AND mode=?").get(p.tenant, p.id, packageId!, version, context?.bindingKey ?? 'standalone', mode) as any;
+    const attempt = r ? this.db.prepare('SELECT id FROM scorm_engine_attempts WHERE registration_id=? ORDER BY attempt_number DESC LIMIT 1').get(r.id) as any : null;
+    const rows = attempt ? this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND tenant=?').all(attempt.id, p.tenant) as any[] : [];
+    const manifest = this.manifest(packageId!, version, p.tenant), states = activityStates(manifest, rows);
+    return {packageId, version, reference: context?.reference ?? null, officialLearning: !!context,
+      registrationId: r?.id ?? null, attemptId: attempt?.id ?? null, retakeAvailable: rows.some(row => row.revision > 0),
+      completed: !!r && !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(r.id),
+      activities: scorm12Activities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, available: activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
+  }
+  retake(p: Principal, a: {registrationId: string; attemptId: string; confirmed: boolean; revision: number; key: string}) {
+    return this.transaction(() => {
+      if (!a || Object.keys(a).some(k => !['registrationId', 'attemptId', 'confirmed', 'revision', 'key'].includes(k)) || typeof a.registrationId !== 'string' || typeof a.attemptId !== 'string' || a.confirmed !== true || !Number.isSafeInteger(a.revision) || typeof a.key !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(a.key)) reject('INVALID_ARGUMENT', 'Review and confirm the exact SCORM attempt');
+      const registration = this.store.registration(p, a.registrationId), doc = 'learning:' + p.tenant + ':' + p.id;
+      const payload = tokenHash(JSON.stringify({action: 'scorm_retake', registrationId: a.registrationId, attemptId: a.attemptId}));
+      const old = this.db.prepare('SELECT * FROM idempotency WHERE principal=? AND document_id=? AND key=?').get(p.id, doc, a.key) as any;
+      if (old) {if (old.payload !== payload) reject('IDEMPOTENCY_CONFLICT', 'SCORM retake payload changed'); return JSON.parse(old.result);}
+      if (registration.binding_key !== 'standalone' && this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(registration.id)) reject('FORBIDDEN', 'Completed learning requires a fresh authorized course or item enrollment');
+      const previous = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE registration_id=? ORDER BY attempt_number DESC LIMIT 1').get(registration.id) as any;
+      if (previous.id !== a.attemptId || (this.db.prepare('SELECT revision FROM workspaces WHERE id=?').get(doc) as any)?.revision !== a.revision) reject('STALE_CONTEXT', 'SCORM retake context changed');
+      if (!this.db.prepare('SELECT 1 FROM scorm_sco_attempts WHERE attempt_id=? AND revision>0').get(previous.id)) reject('FORBIDDEN', 'Start the current attempt before requesting another');
+      const id = randomUUID(), now = new Date().toISOString();
+      this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE registration_id=?').run(registration.id);
+      this.db.prepare('INSERT INTO scorm_engine_attempts(id,tenant,registration_id,attempt_number,created_at) VALUES(?,?,?,?,?)').run(id, p.tenant, registration.id, previous.attempt_number + 1, now);
+      const result = {registrationId: registration.id, attemptId: id, attemptNumber: previous.attempt_number + 1, officialLearningChanged: false};
+      this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run(doc);
+      this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, doc, 'human_scorm_engine_retake', JSON.stringify({registrationId: registration.id, previousAttemptId: previous.id, attemptId: id}), now);
+      this.db.prepare('INSERT INTO idempotency VALUES(?,?,?,?,?)').run(p.id, doc, a.key, payload, JSON.stringify(result));
+      return result;
+    });
   }
   resource(token: string, path: string) {
     const c = this.capability(token);
@@ -86,14 +145,15 @@ export class SCORMPlayerService {
       const payloadHash = tokenHash(JSON.stringify(a)), old = this.db.prepare('SELECT * FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, a.sequence) as any;
       if (old) {if (old.payload_hash !== payloadHash) reject('IDEMPOTENCY_CONFLICT', 'Checkpoint sequence payload changed'); return JSON.parse(old.result);}
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
-      const state = validateSCORM12Checkpoint(a.state, this.seed(c)), seconds = scormSeconds(state.core.session_time);
+      const state = validateSCORM12Checkpoint(a.state, this.seed(c), a.finished), seconds = scormSeconds(state.core.session_time);
       if (seconds < c.launch.session_seconds) reject('INVALID_ARGUMENT', 'Session time cannot decrease within a launch');
       const revision = c.sco.revision + 1, now = new Date().toISOString();
-      this.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?,revision=?,reported_seconds=reported_seconds+? WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1 AND tenant=?').run(JSON.stringify(state), revision, seconds - c.launch.session_seconds, c.attempt.id, c.launch.sco_id, c.launch.tenant);
+      this.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?,revision=?,reported_seconds=reported_seconds+?,finished=? WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=1 AND tenant=?').run(JSON.stringify(state), revision, seconds - c.launch.session_seconds, a.finished ? 1 : 0, c.attempt.id, c.launch.sco_id, c.launch.tenant);
       this.db.prepare('UPDATE scorm_engine_launches SET sequence=?,session_seconds=?,finished=? WHERE id=?').run(a.sequence, seconds, a.finished ? 1 : 0, c.launch.id);
       this.db.prepare('UPDATE scorm_engine_attempts SET revision=revision+1 WHERE id=?').run(c.attempt.id);
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run('learning:' + c.p.tenant + ':' + c.p.id);
-      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged: false};
+      const officialLearningChanged = a.finished && !!this.bindings?.project(c.p, c.registration, c.attempt.id, this.manifest(c.registration.package_id, c.registration.version, c.p.tenant));
+      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged};
       this.db.prepare('INSERT INTO scorm_engine_checkpoints VALUES(?,?,?,?)').run(c.launch.id, a.sequence, payloadHash, JSON.stringify(result));
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(c.p.tenant, c.p.id, 'learning:' + c.p.tenant + ':' + c.p.id, 'runtime_scorm_engine_checkpoint', JSON.stringify({launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished}), now);
       return result;
@@ -104,7 +164,7 @@ export class SCORMPlayerService {
     const row = this.db.prepare('SELECT l.id,l.sequence,l.finished,l.closed,l.expires,s.revision,s.runtime_state,s.reported_seconds,l.registration_id FROM scorm_engine_launches l JOIN scorm_sco_attempts s ON s.attempt_id=l.attempt_id AND s.sco_id=l.sco_id AND s.tenant=l.tenant AND s.sco_attempt_number=1 JOIN scorm_registrations r ON r.id=l.registration_id AND r.tenant=l.tenant WHERE l.id=? AND l.tenant=? AND r.learner=? AND l.session_hash=?').get(id, p.tenant, p.id, sessionHash) as any;
     if (!row) reject('FORBIDDEN', 'Own session launch required');
     this.store.registration(p, row.registration_id);
-    return {...row, runtime_state: JSON.parse(row.runtime_state), officialLearningChanged: false};
+    return {...row, runtime_state: JSON.parse(row.runtime_state), officialLearningChanged: !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(row.registration_id)};
   }
   close(p: Principal, id: string, sessionHash: string) {
     return this.transaction(() => {

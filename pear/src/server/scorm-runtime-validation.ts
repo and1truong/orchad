@@ -26,7 +26,7 @@ export function scormTime(seconds: number) {
 }
 
 /** Reapply each changed writable value through the real server-side runtime. Never load untrusted JSON directly. */
-export function validateSCORM12Checkpoint(input: unknown, seed: Record<string, any>) {
+export function validateSCORM12Checkpoint(input: unknown, seed: Record<string, any>, finished = false) {
   if (Buffer.byteLength(JSON.stringify(input) ?? '') > 128 * 1024) reject('INVALID_ARGUMENT', 'CMI checkpoint quota exceeded');
   const incoming = leaves(input), runtime = new Scorm12API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false});
   runtime.loadFromJSON(seed);
@@ -37,9 +37,12 @@ export function validateSCORM12Checkpoint(input: unknown, seed: Record<string, a
   for (const [key, value] of Object.entries(incoming).sort(([a], [b]) => priority(a) - priority(b) || a.localeCompare(b, 'en', {numeric: true}))) {
     if (readonly.test(key)) {if (value !== protectedValues[key]) reject('FORBIDDEN', 'Server-owned CMI value changed'); continue;}
     if (!writable.test(key)) reject('INVALID_ARGUMENT', 'Unsupported CMI field');
+    if (key === 'cmi.core.lesson_status' && value === 'not attempted' && value !== baseline[key]) reject('INVALID_ARGUMENT', 'Only the LMS may set not attempted');
     // Empty optional defaults in a newly exported objective/interaction need no SetValue.
     if (value === baseline[key] || value === '' && baseline[key] === undefined) continue;
     if (runtime.LMSSetValue(key, value) !== 'true') reject('INVALID_ARGUMENT', 'SCORM data model rejected checkpoint');
   }
+  runtime.settings = {...runtime.settings, mastery_override: runtime.LMSGetValue('cmi.core.lesson_status') !== 'incomplete'};
+  if (finished && runtime.LMSFinish('') !== 'true') reject('INVALID_ARGUMENT', 'SCORM engine rejected Finish');
   return runtime.renderCMIToJSONObject().cmi as Record<string, any>;
 }

@@ -1,11 +1,12 @@
 import {PeopleService} from "./people.ts";
 import type {DatabaseSync} from "node:sqlite";
-import type {Principal} from "../shared/model.ts";
+import type {Principal, SCORMReference} from "../shared/model.ts";
 import {reject} from "./errors.ts";
 export type ContentAudience={access?:"tenant"|"author"|"groups";groupIds?:string[]};
 export type ContentKind="course"|"item";
 export class ContentAccess {
  constructor(readonly db:DatabaseSync){}
+ scormNew(p:Principal,ref?:SCORMReference){if(ref&&!this.db.prepare("SELECT 1 FROM scorm_engine_versions WHERE package_id=? AND version=? AND tenant=? AND sha256=? AND state='published'").get(ref.packageId,ref.version,p.tenant,ref.sha256))reject('FORBIDDEN','SCORM package is not accepting new learning');}
  owner(p:Pick<Principal,"tenant">,kind:ContentKind,id:string){return (this.db.prepare("SELECT owner FROM content_authors WHERE tenant=? AND kind=? AND content_id=?").get(p.tenant,kind,id) as any)?.owner;}
  register(p:Principal,kind:ContentKind,id:string){this.db.prepare("INSERT INTO content_authors VALUES(?,?,?,?)").run(p.tenant,kind,id,p.id);}
  visible(p:Principal,kind:ContentKind,id:string,value:ContentAudience){return (value.access??"tenant")==="tenant"||this.owner(p,kind,id)===p.id||value.access==="groups"&&!!value.groupIds?.some(groupId=>new PeopleService(this.db).isMember(p.tenant,groupId,p.id));}
@@ -19,7 +20,7 @@ export class ContentAccess {
  newCourse(p:Principal,id:string,version:number){
   this.enrolled(p,"course",id,version);this.current(p,"course",id);
   const value=JSON.parse((this.db.prepare("SELECT content FROM course_versions WHERE course_id=? AND version=?").get(id,version) as any).content);
-  for(const lesson of value.lessons){if(!lesson.contentRef)continue;const ref=lesson.contentRef;
+  for(const lesson of value.lessons){this.scormNew(p,lesson.scorm);if(!lesson.contentRef)continue;const ref=lesson.contentRef;
    const row=this.db.prepare("SELECT c.state,v.content FROM content_items c JOIN content_item_versions v ON v.item_id=c.id AND v.version=? WHERE c.id=? AND c.tenant=?").get(ref.version,ref.itemId,p.tenant) as any;
    if(!row||row.state!=="published")reject("FORBIDDEN","Referenced content is not accepting new learning");
    this.requireVisible(p,"item",ref.itemId,JSON.parse(row.content));this.current(p,"item",ref.itemId);

@@ -104,7 +104,12 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   while (stack.length) {
     const {node, depth} = stack.pop()!;
     if (++count > 12000 || depth > 32) invalid('manifest node/depth quota');
-    if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore'].includes(node.localName ?? '') || node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && node.localName === 'sequencing') features.add(node.localName!);
+    if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore'].includes(node.localName ?? '')) {
+      const parent = node.parentNode as Element;
+      if (parent?.localName !== 'item' || parent.namespaceURI !== ns) invalid('misplaced runtime extension');
+      features.add(node.localName!);
+    }
+    if (node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && node.localName === 'sequencing') features.add(node.localName!);
     for (const n of elements(node)) stack.push({node: n, depth: depth + 1});
   }
   const metadata = one(root!, 'metadata', ns!), schema = one(metadata, 'schema', ns!).textContent?.trim(), edition = one(metadata, 'schemaversion', ns!).textContent?.trim();
@@ -138,7 +143,18 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     const aid = id(el), resourceId = el.getAttribute('identifierref') || undefined, parameters = el.getAttribute('parameters') || undefined;
     if (resourceId && !resourceIds.has(resourceId)) invalid('activity references unknown resource');
     if (parameters && (parameters.length > 2048 || /[\u0000-\u001f]/.test(parameters))) invalid('activity parameters quota');
-    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), children: elements(el, 'item', ns!).map(activity)};
+    const pre = elements(el, 'prerequisites', cp);
+    if (pre.length > 1 || pre.some(p => p.getAttribute('type') && p.getAttribute('type') !== 'aicc_script')) invalid('unsupported prerequisite type');
+    const prerequisites = pre[0]?.textContent?.trim();
+    const extensions: Partial<SCORMActivity> = {};
+    if (standard === '1.2') {
+      for (const [tag, key] of [['datafromlms', 'launchData'], ['masteryscore', 'masteryScore'], ['maxtimeallowed', 'maxTimeAllowed'], ['timelimitaction', 'timeLimitAction']] as const) {
+        const nodes = elements(el, tag, cp); if (nodes.length > 1) invalid('duplicate runtime extension');
+        if (nodes.length) extensions[key] = tag === 'datafromlms' ? nodes[0].textContent ?? '' : nodes[0].textContent?.trim() ?? '';
+      }
+      if (extensions.launchData !== undefined && extensions.launchData.length > 4096 || extensions.masteryScore !== undefined && (!/^\d{1,3}(?:\.\d+)?$/.test(extensions.masteryScore) || Number(extensions.masteryScore) > 100) || extensions.maxTimeAllowed !== undefined && !/^\d{2,4}:[0-5]\d:[0-5]\d(?:\.\d{1,2})?$/.test(extensions.maxTimeAllowed) || extensions.timeLimitAction !== undefined && !['exit,message', 'exit,no message', 'continue,message', 'continue,no message'].includes(extensions.timeLimitAction)) invalid('invalid runtime launch data, mastery or time policy');
+    }
+    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, children: elements(el, 'item', ns!).map(activity)};
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');

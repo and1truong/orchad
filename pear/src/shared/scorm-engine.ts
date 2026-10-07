@@ -13,6 +13,11 @@ export interface SCORMActivity {
   title: string;
   resourceId?: string;
   parameters?: string;
+  prerequisites?: string;
+  launchData?: string;
+  masteryScore?: string;
+  maxTimeAllowed?: string;
+  timeLimitAction?: string;
   children: SCORMActivity[];
 }
 export interface SCORMManifest {

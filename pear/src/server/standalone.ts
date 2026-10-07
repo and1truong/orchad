@@ -15,6 +15,13 @@ export class StandaloneService {
     new ContentAccess(this.db).enrolled(p,"item",e.item_id,e.version);
     return e;
   }
+  scormContext(p: Principal, id: string) {
+    const e = this.enrollment(p, id), item = JSON.parse(e.content) as ContentItem;
+    new ContentAccess(this.db).current(p, 'item', e.item_id);
+    if (item.kind !== 'scorm' || !item.scorm) reject('FORBIDDEN', 'Exact enrolled SCORM item required');
+    if (this.db.prepare('SELECT 1 FROM item_enrollments WHERE retake_of=?').get(e.id)) reject('FORBIDDEN', 'Continue the current standalone successor');
+    return {bindingKey: 'item:' + e.id, reference: item.scorm, itemEnrollmentId: e.id, context: {itemEnrollmentId: e.id, itemId: e.item_id, version: e.version, reference: item.scorm}};
+  }
   private published(p: Principal, a: any, live = true) {
     const item = this.db
       .prepare("SELECT * FROM content_items WHERE id=? AND tenant=?")
@@ -38,6 +45,7 @@ export class StandaloneService {
   }
   private retake(p:Principal,a:any){
     const e=this.enrollment(p,a.itemEnrollmentId);
+    new ContentAccess(this.db).scormNew(p,JSON.parse(e.content).scorm);
     if(!e.completed_at)reject("FORBIDDEN","Completed own standalone reading required");
     if(a.version!==e.version)reject("STALE_CONTEXT","Standalone retake version changed; review again");
     this.published(p,{itemId:e.item_id,version:e.version});return e;
@@ -63,7 +71,7 @@ export class StandaloneService {
       status: e.completed_at ? "completed" : "in_progress",
       enrolledAt: e.enrolled_at,
       completedAt: e.completed_at,
-      completionPolicy: "learner_confirmed_reading",
+      completionPolicy: item.kind === 'scorm' ? 'accepted_scorm_evidence' : "learner_confirmed_reading",
       certificateAvailable: false,
     };
   }
@@ -112,6 +120,8 @@ export class StandaloneService {
       const { item, version } = this.published(p, a);
       const existing=this.db.prepare("SELECT id,version,completed_at FROM item_enrollments WHERE learner=? AND tenant=? AND item_id=? AND version=? ORDER BY rowid DESC LIMIT 1").get(p.id,p.tenant,item.id,version) as any;
       if(existing)return {itemEnrollmentId:existing.id,version:existing.version,status:existing.completed_at?"completed":"in_progress"};
+      const selected = this.db.prepare('SELECT content FROM content_item_versions WHERE item_id=? AND version=?').get(item.id,version) as any;
+      new ContentAccess(this.db).scormNew(p,JSON.parse(selected.content).scorm);
       const id=randomUUID();
       this.db
         .prepare(
@@ -130,6 +140,7 @@ export class StandaloneService {
       };
     }
     const e = this.enrollment(p, a.itemEnrollmentId);
+    if (JSON.parse(e.content).kind === 'scorm') reject('FORBIDDEN', 'SCORM items require accepted engine evidence');
     if (!e.completed_at)
       this.db
         .prepare(

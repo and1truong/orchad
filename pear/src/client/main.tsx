@@ -1,3 +1,4 @@
+import {SCORMLearningPlayer} from './scorm-learning.tsx';
 import {CourseFreshRestart} from "./course-restart.tsx";
 import {AssignedQuizReview,AssignedQuizCoordinator} from "./assigned-quiz.tsx";
 import {QuizUpgrade} from "./quiz-upgrade.tsx";
@@ -739,6 +740,11 @@ function App() {
               session={session}
               item={readingItem}
               busy={busy}
+              scormRun={run}
+              onSCORMSaved={async () => {
+                const value = await op('learning_get_item_enrollment', {itemEnrollmentId: readingItem.itemEnrollmentId});
+                if (sessionRef.current === session && docRef.current === doc) {setReadingItem({...value.item, itemEnrollmentId: readingItem.itemEnrollmentId, status: value.status}); setTick(n => n + 1);}
+              }}
               onClose={() => setReadingItem(null)}
               onTrack={() =>
                 void run(async () => {
@@ -982,6 +988,10 @@ function App() {
                   <>
                     <h3>{lesson.title}</h3>
                     <p className="lesson-text">{lesson.text}</p>
+                    {lesson.kind === 'scorm' && <SCORMLearningPlayer key={session.sessionEpoch + ':' + active.id + ':' + lesson.id} session={session} binding={{enrollmentId: active.id, lessonId: lesson.id}} busy={busy} run={run} onSaved={async () => {
+                      const value = await op('learning_get_lesson', {enrollmentId: active.id, lessonId: lesson.id});
+                      if (sessionRef.current === session && docRef.current === doc) {setLesson(value); setTick(n => n + 1);}
+                    }} />}
                     <UploadedMedia
                       key={"media:" + active.id + ":" + lesson.id}
                       session={session}
@@ -1018,13 +1028,13 @@ function App() {
                     <p className="muted">
                       {["submission", "event"].includes(lesson.kind)
                         ? "Completion policy: authorized human review or attendance, followed by a passing quiz."
-                        : "Completion policy: personal acknowledgement plus a passing quiz."}
+                        : lesson.kind === "scorm" ? "Completion policy: accepted SCORM evidence, followed by a passing quiz." : "Completion policy: personal acknowledgement plus a passing quiz."}
                     </p>
                     <button
                       disabled={
                         busy ||
                         lesson.completed ||
-                        ["submission", "event"].includes(lesson.kind) ||
+                        ["submission", "event", "scorm"].includes(lesson.kind) ||
                         active.assignment_state !== "active"
                       }
                       onClick={() =>
@@ -1368,6 +1378,7 @@ function App() {
                   >{translateUI("Next courses")}</button>
                 </div>
                 <CourseEditor
+                  session={session}
                   key={String(editorKey) + ":" + session.sessionEpoch}
                   selection={
                     editing ?? { id: "", course: newCourse(), exists: false }

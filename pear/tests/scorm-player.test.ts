@@ -130,9 +130,9 @@ test('content host serves capability-scoped assets and refuses application crede
   } finally {await content.close(); f.db.close();}
 });
 
-test('player refuses unimplemented multi-SCO, 2004 and prerequisite semantics instead of flattening them', async () => {
-  for (const bytes of [multiFilePackage(), multiFilePackage('2004-4'), singleSCOPackage(singleSCOManifest().replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:prerequisites type="aicc_script">other</runtime:prerequisites>'))]) {
-    const inspected = await inspectSCORMPackage(bytes); assert.throws(() => scorm12LaunchProfile(inspected.manifest), /currently supports/);
+test('player accepts multi-SCO and refuses unsupported editions or unknown prerequisite activities', async () => {
+  for (const bytes of [multiFilePackage('2004-4'), singleSCOPackage(singleSCOManifest().replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:prerequisites type="aicc_script">other</runtime:prerequisites>'))]) {
+    const inspected = await inspectSCORMPackage(bytes); assert.throws(() => scorm12LaunchProfile(inspected.manifest), /Unsupported|unknown AICC/);
   }
 });
 

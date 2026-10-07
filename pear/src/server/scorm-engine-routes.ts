@@ -28,6 +28,12 @@ export async function registerSCORMEngine(app: FastifyInstance, packages: SCORMP
       return {...result, contentOrigin: runtime!.contentOrigin, url: runtime!.contentOrigin + '/launch/' + token};
     } catch(e) {return error(e, reply);}
   });
+  app.get('/api/scorm-engine/player-context', async (req, reply) => {
+    try {if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured'); return runtime!.player.context(principal(req), req.query as any);} catch(e) {return error(e, reply);}
+  });
+  app.post('/api/scorm-engine/retake', {preHandler: guard}, async (req, reply) => {
+    try {if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured'); return runtime!.player.retake(principal(req), req.body as any);} catch(e) {return error(e, reply);}
+  });
   app.get('/api/scorm-engine/launches/:id', async (req, reply) => {
     try {if (!runtime) reject('FORBIDDEN', 'SCORM content host is not configured'); return runtime!.player.status(principal(req), (req.params as any).id, (req as any).session.token_hash);} catch(e) {return error(e, reply);}
   });
