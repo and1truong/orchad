@@ -7,6 +7,26 @@ import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
 import {sequencingManifest, collectionManifest, retryManifest} from './scorm-sequencing-fixture.ts';
 
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': hidden SCOs retain flow, current delivery, choice validity and completion obligations', async () => {
+  const xml = sequencingManifest(edition).replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"');
+  const f = await scormLearningFixture(undefined, multiFilePackage(edition, xml));
+  try {
+    const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+    const choiceXML = multiFileManifest(edition).replace('identifier="practice"', 'identifier="practice" isvisible="false"');
+    const engine = sequencingRuntime(sequencingTree((await inspectSCORMPackage(multiFilePackage(edition, choiceXML))).manifest));
+    assert.equal(engine.processNavigationRequest('start'), true); assert.equal(engine.processNavigationRequest('choice', 'practice'), true);
+    const binding = f.enroll(), context = f.player.context(f.service.principal('learner-a'), binding);
+    assert.equal(context.activities.length, 2); assert.ok(context.activities.every(a => !a.visible));
+    assert.throws(() => f.launch(binding, 'practice'), /prerequisites|denies/);
+    const first = f.launch(binding); assert.equal(first.scoId, 'intro');
+    f.player.checkpoint(first.token, sequenceCheckpoint(f, first, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'}));
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+    const next = f.launch(binding); assert.equal(next.scoId, 'practice');
+    const reopened = f.launch(binding, 'practice'); assert.equal(reopened.scoId, 'practice');
+    assert.equal(f.player.checkpoint(reopened.token, sequenceCheckpoint(f, reopened, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const action of ['retry', 'retryAll'] as const) test(edition + ': ' + action + ' redelivers the same SCO in a new technical attempt without rewriting history or granting proof', async () => {
   const f = await scormLearningFixture(undefined, multiFilePackage(edition, retryManifest(edition, action)));
   try {

@@ -67,8 +67,10 @@ export class SCORMPlayerService {
       const sequenceScope = {attemptId: registered.attemptId, sha256: registration.sha256}, engine = usesSequencing(manifest) ? trustedSequencing(manifest, overall.sequencing_state, sequenceScope) : undefined;
       const currentId = engine?.getSequencingState()?.currentActivity?.id, current = rows.find(r => r.sco_id === currentId);
       if (engine && current && !current.finished) {engine.loadFromJSON(JSON.parse(current.runtime_state)); engine.Initialize('');}
-      const target = scoId ?? reviewed.activities.find(a => a.available)?.id;
-      const profile = engine ? selectSCO(engine, manifest, target) : scoId ? launchProfile(manifest, scoId) : playbackActivities(manifest).find(p => activityAvailable(p, states));
+      const candidates = playbackActivities(manifest).filter(p => activityAvailable(p, states));
+      // Default 2004 launch follows the trusted current delivery/start flow;
+      // menu visibility must not turn it into a choice of a different SCO.
+      const profile = engine ? selectSCO(engine, manifest, scoId) : scoId ? launchProfile(manifest, scoId) : candidates.find(p => !['completed', 'passed'].includes(states.get(p.activity.id) ?? '')) ?? candidates[0];
       if (!profile || !activityAvailable(profile, states)) reject('FORBIDDEN', 'SCO prerequisites are not satisfied');
       const id = randomUUID(), token = randomBytes(32).toString('base64url'), now = Date.now();
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND closed=0').run(registered.attemptId);
@@ -160,7 +162,7 @@ export class SCORMPlayerService {
     return {packageId, version, reference: context?.reference ?? null, officialLearning: !!context,
       registrationId: r?.id ?? null, attemptId: attempt?.id ?? null, retakeAvailable: rows.some(row => row.revision > 0),
       completed: !!r && !!this.db.prepare('SELECT 1 FROM scorm_completion_proofs WHERE registration_id=?').get(r.id),
-      activities: playbackActivities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, available: available(profile.activity.id) && activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
+      activities: playbackActivities(manifest).map(profile => ({id: profile.activity.id, title: profile.activity.title, visible: profile.activity.isVisible !== false, available: available(profile.activity.id) && activityAvailable(profile, states), status: states.get(profile.activity.id)}))};
   }
   retake(p: Principal, a: {registrationId: string; attemptId: string; confirmed: boolean; revision: number; key: string}) {
     return this.transaction(() => {

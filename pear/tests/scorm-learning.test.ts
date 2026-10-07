@@ -11,6 +11,22 @@ import {SCORMPlayerService} from '../src/server/scorm-player-service.ts';
 import {SCORMLearningBindings} from '../src/server/scorm-learning-bindings.ts';
 import {publishBindingAward, awardDefinition, ownAward, courseChange, groupDefinition} from './award-binding-fixture.ts';
 
+test('1.2 default launch advances hidden required SCOs and resumes unfinished state without widening prerequisites', async () => {
+  const xml = multiFileManifest().replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:prerequisites type="aicc_script">intro</runtime:prerequisites>');
+  const f = await scormLearningFixture(undefined, multiFilePackage('1.2', xml));
+  try {
+    const binding = f.enroll(); assert.ok(f.player.context(f.service.principal('learner-a'), binding).activities.every(a => !a.visible));
+    assert.throws(() => f.launch(binding, 'practice'), /prerequisites/);
+    const first = f.launch(binding); assert.equal(first.scoId, 'intro');
+    assert.equal(f.checkpoint(first).result.officialLearningChanged, false);
+    const second = f.launch(binding); assert.equal(second.scoId, 'practice');
+    f.checkpoint(second, 'incomplete', '90', false, 'hidden-bookmark');
+    const resumed = f.launch(binding); assert.equal(resumed.scoId, 'practice');
+    assert.equal(f.player.bootstrap(resumed.token).state.core.lesson_location, 'hidden-bookmark');
+    assert.equal(f.checkpoint(resumed).result.officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
 test('AICC prerequisites parse bounded logical, status, set and threshold expressions without executing source', () => {
   const states = new Map([['a', 'passed'], ['b', 'failed'], ['block', 'completed']]);
   for (const expression of ['a & ~b', '(b | a) & block', 'a="passed" & b<>"passed"', '2*{a,b,block}', '{a,block}', 'a | b & block']) assert.equal(prerequisite(expression, states), true, expression);

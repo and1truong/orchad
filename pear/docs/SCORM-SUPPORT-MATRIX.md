@@ -1,6 +1,6 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–084. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked logging-only adaptation `pear-no-direct-sequencing-logs-v1` to the exact ESM entry (ADR-082). A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–085. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked logging-only adaptation `pear-no-direct-sequencing-logs-v1` to the exact ESM entry (ADR-082). A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
@@ -14,11 +14,12 @@ Version: epic #133 / ADR-075–084. Engine: **scorm-again 3.4.5**, pinned MIT pa
 | Flow/choice, rules, local objective maps, rollup, attempt limits | AICC profile | Tested profile | Tested profile | Tested profile | Flow-only initial start and ADL-namespaced local maps tested; Commit does not navigate; Terminate/delivery/root rollup remain authoritative (ADR-080/082) |
 | Manifest-local sequencing collections / IDRef | — | Tested profile | Tested profile | Tested profile | Whole XML group replacement, control defaults, objective gates and durable official rollup (ADR-083) |
 | Post-condition retry / retryAll | — | Tested profile | Tested profile | Tested profile | New technical SCO attempt and scoped capability; immutable history and domain-retake separation; denied retry at attempt limit (ADR-084) |
+| Manifest isvisible presentation | Tested | Tested | Tested | Tested | Hidden menus, non-inherited child visibility, default play/resume and unchanged flow/choice/prerequisite/proof requirements (ADR-085) |
 | pipwerks licensed wrapper save/resume/finish | Tested | Tested | Tested | Tested | Pinned original wrapper and original course assets; not a commercial authoring export |
 | ADL developer-guide licensed wrapper | — | Unverified | Tested | Unverified | Exact byte-preserved file, CC BY-SA 3.0 notices retained; full Roses/Flash course not bundled |
 | Enrollment/standalone/nested award version/cycle projection | Tested | Tested | Tested | Tested | All required SCO evidence; live authorization, immutable proof/audit/receipt; quiz remains required for course certificate |
 
-Explicitly refused playback profiles: asset activity leaves, nondefault `isvisible`, duration limits, selection/randomization, ADL presentation/rollup extensions, system-global objective maps, weighted completion and fourth-edition shared data. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
+Explicitly refused playback profiles: asset activity leaves, duration limits, selection/randomization, ADL presentation/rollup extensions, system-global objective maps, weighted completion and fourth-edition shared data. Malformed recognized definitions fail validation; unknown metadata is retained without being represented as implemented runtime semantics. Future profile changes must reparse the retained original manifest and add concrete conformance counterexamples.
 
 | Lane | Observed result | Remaining gate |
 |---|---|---|

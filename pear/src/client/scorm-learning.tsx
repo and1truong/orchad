@@ -53,7 +53,7 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
     }
     window.addEventListener('message', message); return () => {active = false; window.removeEventListener('message', message);};
   }, [p.session, binding]);
-  async function play(scoId: string, previous?: any) {
+  async function play(scoId?: string, previous?: any) {
     await p.run(async () => {
       const revision = await request<any>('/api/context?documentId=' + encodeURIComponent('learning:' + p.session.principal.tenant + ':' + p.session.principal.id), p.session);
       const value = await request<any>('/api/scorm-engine/launch', p.session, {packageId: previous?.packageId ?? context.packageId, version: previous?.version ?? context.version, mode: 'normal', binding: p.binding, scoId, confirmed: previous?.consented ?? consent, revision: revision.revision, key: crypto.randomUUID()});
@@ -85,7 +85,8 @@ export function SCORMLearningPlayer(p: {session: Session; binding: {enrollmentId
     {error && <p role="alert">{error}</p>}
     {context?.completed && <p>SCORM completion accepted.</p>}
     <label><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />I consent to SCORM progress tracking for this enrollment.</label>
-    <nav aria-label="SCORM activities">{context?.activities.map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available} onClick={() => {void play(a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>
+    <button disabled={p.busy || !!launch || !consent || !context?.activities.some((a: any) => a.available)} onClick={() => {void play();}}>Play or resume enrolled SCORM package</button>
+    <nav aria-label="SCORM activities">{context?.activities.filter((a: any) => a.visible !== false).map((a: any) => <button key={a.id} disabled={p.busy || !!launch || !consent || !a.available} onClick={() => {void play(a.id);}}>{a.title} · {a.status}{!a.available && ' · locked'}</button>)}</nav>
     {!launch && context?.retakeAvailable && !context.completed && <fieldset disabled={p.busy}><legend>Fresh SCORM attempt</legend><p>This starts with empty SCO progress and preserves the previous attempt.</p>
       <label><input type="checkbox" checked={retakeConfirmed} onChange={e => setRetakeConfirmed(e.target.checked)} />I confirm starting a fresh SCORM attempt.</label>
       <button disabled={!retakeConfirmed} onClick={() => {void p.run(async () => {

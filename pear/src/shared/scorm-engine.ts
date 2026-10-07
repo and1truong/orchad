@@ -11,6 +11,7 @@ export interface SCORMResource {
 export interface SCORMActivity {
   id: string;
   title: string;
+  isVisible?: boolean;
   resourceId?: string;
   parameters?: string;
   prerequisites?: string;

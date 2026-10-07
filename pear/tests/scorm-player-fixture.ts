@@ -25,8 +25,9 @@ export function singleSCOPackage(xml = singleSCOManifest()) {
   ]);
 }
 
-export function multiSCOPlayerPackage() {
-  const xml = multiFileManifest().replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:prerequisites type="aicc_script">intro</runtime:prerequisites>');
+export function multiSCOPlayerPackage(hidden = false) {
+  let xml = multiFileManifest().replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:prerequisites type="aicc_script">intro</runtime:prerequisites>');
+  if (hidden) xml = xml.replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"');
   const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save SCO progress</button><button id="finish">Finish SCO</button><script src="../assets/player.js"></script></body></html>';
   return zip([
     {name: 'imsmanifest.xml', data: Buffer.from(xml), method: 8},

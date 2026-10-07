@@ -52,10 +52,15 @@ test('real sequenced launch/CMI rejection and trusted-state recovery produce no 
   } finally {for (const method of methods) console[method] = original[method]; f.db.close();}
 });
 
-test('nondefault manifest visibility is an explicit unsupported profile rather than silently shown as ordinary content', async () => {
+test('manifest visibility is retained for presentation, defaults independently for children and rejects invalid booleans', async () => {
   for (const standard of ['1.2', '2004-4'] as const) {
     const bytes = multiFilePackage(standard, multiFileManifest(standard).replace('identifier="intro"', 'identifier="intro" isvisible="false"'));
-    const parsed = await inspectSCORMPackage(bytes); assert.ok(parsed.manifest.runtimeFeatures?.includes('unsupportedActivityVisibility')); assert.throws(() => playbackActivities(parsed.manifest), /Unsupported/);
+    const parsed = await inspectSCORMPackage(bytes); const profiles = playbackActivities(parsed.manifest);
+    assert.equal(profiles.find(p => p.activity.id === 'intro')!.activity.isVisible, false);
+    assert.equal(profiles.find(p => p.activity.id === 'practice')!.activity.isVisible, undefined);
+    const folderXML = multiFileManifest(standard).replace('<p:item identifier="intro"', '<p:item identifier="folder" isvisible="false"><p:title>Hidden folder</p:title><p:item identifier="intro"').replace('</p:organization>', '</p:item></p:organization>');
+    const nested = playbackActivities((await inspectSCORMPackage(multiFilePackage(standard, folderXML))).manifest);
+    assert.ok(nested.every(p => p.activity.isVisible === undefined && p.ancestors[0].isVisible === false));
     await assert.rejects(() => inspectSCORMPackage(multiFilePackage(standard, multiFileManifest(standard).replace('identifier="intro"', 'identifier="intro" isvisible="bogus"'))), /visibility/);
   }
 });

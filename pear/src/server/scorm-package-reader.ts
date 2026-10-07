@@ -150,7 +150,6 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   const activity = (el: Element): SCORMActivity => {
     const visibility = el.getAttribute('isvisible');
     if (visibility !== null && !['true', 'false', '1', '0'].includes(visibility)) invalid('invalid activity visibility');
-    if (visibility === 'false' || visibility === '0') features.add('unsupportedActivityVisibility');
     const aid = id(el), resourceId = el.getAttribute('identifierref') || undefined, parameters = el.getAttribute('parameters') || undefined;
     if (resourceId && !resourceIds.has(resourceId)) invalid('activity references unknown resource');
     if (parameters && (parameters.length > 2048 || /[\u0000-\u001f]/.test(parameters))) invalid('activity parameters quota');
@@ -184,7 +183,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
         } else if (text) {if (!numeric(text)) invalid('invalid completion threshold'); extensions.completionThreshold = text;}
       }
     }
-    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard, collections)} : {}), children: elements(el, 'item', ns!).map(activity)};
+    return {id: aid, title: label(el, ns!), ...(visibility !== null ? {isVisible: visibility !== 'false' && visibility !== '0'} : {}), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard, collections)} : {}), children: elements(el, 'item', ns!).map(activity)};
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');

@@ -6,6 +6,8 @@ import {reject} from './errors.ts';
 
 export function sequencingTree(manifest: SCORMManifest) {
   playbackActivities(manifest);
+  // IMS CP isvisible affects menu rendering only. Do not forward it as the
+  // engine's isVisible, which also denies otherwise valid choice navigation.
   const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, children: a.children.map(node), ...(a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
   const tree = {id: manifest.organizationId, title: manifest.title, ...manifest.sequencing, children: manifest.activities.map(node)};
   const inspect = (n: Record<string, any>) => {
