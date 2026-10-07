@@ -41,3 +41,10 @@ export function retryManifest(edition: SCORM2004Edition = '2004-4', action: 'ret
 export function weightedManifest() {
   return sequencingManifest().replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:completionThreshold completedByMeasure="true" minProgressMeasure="0.5" progressWeight="0.75"/>').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:completionThreshold completedByMeasure="true" minProgressMeasure="0.5" progressWeight="0.25"/>');
 }
+
+export function adlManifest(edition: SCORM2004Edition = '2004-4') {
+  return sequencingManifest(edition).replace('<p:manifest ', '<p:manifest xmlns:n="http://www.adlnet.org/xsd/adlnav_v1p3" ')
+    .replace('</s:sequencing>', '<a:constrainedChoiceConsiderations constrainChoice="false" preventActivation="false"/></s:sequencing>')
+    .replace('</s:sequencingRules></s:sequencing>', '</s:sequencingRules><a:rollupConsiderations requiredForCompleted="ifAttempted" requiredForSatisfied="ifNotSkipped" measureSatisfactionIfActive="false"/></s:sequencing>')
+    .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><n:presentation><n:navigationInterface><n:hideLMSUI>continue</n:hideLMSUI><n:hideLMSUI>exit</n:hideLMSUI></n:navigationInterface></n:presentation>');
+}

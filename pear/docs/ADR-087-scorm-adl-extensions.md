@@ -1,0 +1,13 @@
+# ADR-087 — ADL presentation and sequencing extensions
+
+Status: implemented successor to ADR-086; epic #133 remains open.
+
+Parse adlnav presentation/navigationInterface/hideLMSUI on resource activities. The second edition permits continue/previous/exit/abandon; later editions additionally permit suspendAll/exitAll/abandonAll. Preserve directives in the trusted engine tree and snapshot reconstruction. These directives hide corresponding LMS navigation controls; they do not prohibit a SCO's own navigation request. Pear currently supplies no matching LMS navigation toolbar controls. Its app close/checkpoint/retry controls remain usable; these are outside adl.nav navigation commands. Built authored SCO continue buttons must still work.
+
+Parse adlseq constrainedChoiceConsiderations and rollupConsiderations with their standard defaults. Reject the wrong IMS namespace instead of silently treating it as an ADL extension. Namespace-qualified group keys permit both imsss and adlseq objectives, and whole-XML-group overrides remain independent for collections. Every organization's extension syntax/references is validated, including unselected activities. Misplaced/unknown/duplicate/malformed definitions fail before playback.
+
+Fourth-edition adlseq objectives/mapInfo extends an existing local IMS objective's raw/min/max score, completion and progress mapping. Resolve objective linkage only after collection/inline XML merge; this permits a collected extension to reference an inline local objective. Merge maps to the same target while preserving IMS satisfied/normalized mappings. Read flags default true, write flags false. Reject fourth-edition attributes in IMS mapInfo and reject ADL objective extensions in earlier editions. System-global objective persistence remains a separate required policy/implementation; these tests use manifest-local scope.
+
+References: official [ADL navigation schema](https://github.com/adlnet/SCORM-2004-4ed-SampleRTE/blob/master/xml/xsd/adlnav_v1p3.xsd), [ADL sequencing schema](https://github.com/adlnet/SCORM-2004-4ed-SampleRTE/blob/master/xml/xsd/adlseq_v1p3.xsd), and IMS SS XML Binding. No ADL engine code or licensed commercial packages are vendored.
+
+Tests exercise all three 2004 editions through delivery, content continue/exit, rollup and official per-SCO policy, raw/min/max/completion/progress maps in the fourth edition, namespace/placement/vocabulary/default/range/edition and unselected-branch negatives, and collected overrides/linkage. Built browser journeys retain save/resume/lost-ACK/next-SCO/proof behavior with ADL directives. No migration or authority expansion; full reference/conformance/production/platform gates remain open.

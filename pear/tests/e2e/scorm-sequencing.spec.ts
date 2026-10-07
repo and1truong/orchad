@@ -1,6 +1,6 @@
 import {test, expect} from '@playwright/test';
 import {scormLearningFixture} from '../scorm-learning-fixture.ts';
-import {sequencingPackage, sequencingManifest, collectionManifest, retryManifest, weightedManifest} from '../scorm-sequencing-fixture.ts';
+import {sequencingPackage, sequencingManifest, collectionManifest, retryManifest, weightedManifest, adlManifest} from '../scorm-sequencing-fixture.ts';
 import {createApp} from '../../src/server/app.ts';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -25,8 +25,8 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const action
     expect(f.db.prepare("SELECT reported_seconds FROM scorm_sco_attempts WHERE sco_id='intro' AND sco_attempt_number=1").get()!.reported_seconds).toBe(20);
   } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
 });
-for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profile of (edition === '2004-4' ? ['choice', 'flow-only', 'collections', 'hidden', 'weighted'] : ['choice', 'flow-only', 'collections', 'hidden'])) test(edition + ' ' + profile + ': built sequencing player recovers lost ACK and delivers next SCO only through authenticated server navigation', async ({page}) => {
-  const f = await scormLearningFixture(undefined, sequencingPackage(edition, profile === 'weighted' ? weightedManifest() : profile === 'hidden' ? sequencingManifest(edition).replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"') : profile === 'collections' ? collectionManifest(edition) : profile === 'choice' ? sequencingManifest(edition) : sequencingManifest(edition).replace('choice="true"', 'choice="false"'))); f.enroll();
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profile of (edition === '2004-4' ? ['choice', 'flow-only', 'collections', 'hidden', 'weighted', 'adl'] : ['choice', 'flow-only', 'collections', 'hidden', 'adl'])) test(edition + ' ' + profile + ': built sequencing player recovers lost ACK and delivers next SCO only through authenticated server navigation', async ({page}) => {
+  const f = await scormLearningFixture(undefined, sequencingPackage(edition, profile === 'adl' ? adlManifest(edition) : profile === 'weighted' ? weightedManifest() : profile === 'hidden' ? sequencingManifest(edition).replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"') : profile === 'collections' ? collectionManifest(edition) : profile === 'choice' ? sequencingManifest(edition) : sequencingManifest(edition).replace('choice="true"', 'choice="false"'))); f.enroll();
   const origin = 'http://127.0.0.1:4344', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4345', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
   try {
     await content!.listen({port: 4345, host: '127.0.0.1'}); await app.listen({port: 4344, host: '127.0.0.1'});

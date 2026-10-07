@@ -8,7 +8,7 @@ export function sequencingTree(manifest: SCORMManifest) {
   playbackActivities(manifest);
   // IMS CP isvisible affects menu rendering only. Do not forward it as the
   // engine's isVisible, which also denies otherwise valid choice navigation.
-  const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, children: a.children.map(node), ...(a.completionMeasure ? {completionThreshold: a.completionMeasure} : a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
+  const node = (a: SCORMActivity): Record<string, any> => ({id: a.id, title: a.title, ...a.sequencing, ...(a.hideLmsUi?.length ? {hideLmsUi: a.hideLmsUi} : {}), children: a.children.map(node), ...(a.completionMeasure ? {completionThreshold: a.completionMeasure} : a.completionThreshold !== undefined ? {completionThreshold: {completedByMeasure: true, minProgressMeasure: Number(a.completionThreshold)}} : {})});
   const tree = {id: manifest.organizationId, title: manifest.title, ...manifest.sequencing, children: manifest.activities.map(node)};
   const inspect = (n: Record<string, any>) => {
     const objectives = [...(n.objectives ?? []), ...(n.primaryObjective ? [n.primaryObjective] : [])];
@@ -49,6 +49,6 @@ export function selectSCO(runtime: ReturnType<typeof sequencingRuntime>, manifes
   return current;
 }
 export function usesSequencing(manifest: SCORMManifest) {
-  const configured = (a: SCORMActivity) => a.sequencing || a.completionMeasure && a.completionMeasure.progressWeight !== 1;
+  const configured = (a: SCORMActivity) => a.sequencing || a.hideLmsUi?.length || a.completionMeasure && a.completionMeasure.progressWeight !== 1;
   return manifest.standard !== '1.2' && (!!manifest.sequencing || playbackActivities(manifest).length > 1 || playbackActivities(manifest).some(p => configured(p.activity) || p.ancestors.some(configured)));
 }

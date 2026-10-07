@@ -5,7 +5,71 @@ import {multiFileManifest, multiFilePackage} from './scorm-package-fixture.ts';
 import {createSCORM2004API, type SCORM2004Edition} from '../src/shared/scorm2004-runtime.ts';
 import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
-import {sequencingManifest, collectionManifest, retryManifest, weightedManifest} from './scorm-sequencing-fixture.ts';
+import {sequencingManifest, collectionManifest, retryManifest, weightedManifest, adlManifest} from './scorm-sequencing-fixture.ts';
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': ADL presentation and rollup settings retain content-requested navigation and required SCO evidence', async () => {
+  const xml = adlManifest(edition), f = await scormLearningFixture(undefined, multiFilePackage(edition, xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding), b = f.player.bootstrap(first.token);
+    assert.deepEqual(b.sequencingTree!.children[0].hideLmsUi, ['continue', 'exit']);
+    const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+    const engine = sequencingRuntime(b.sequencingTree!, b.sequencingSnapshot);
+    assert.deepEqual(engine.getSequencingState()!.currentActivity.hideLmsUi, ['continue', 'exit']);
+    const considerations = engine.getSequencingState()!.rootActivity.children[1].rollupConsiderations;
+    assert.equal(considerations.requiredForCompleted, 'ifAttempted'); assert.equal(considerations.requiredForSatisfied, 'ifNotSkipped');
+    assert.equal(considerations.requiredForIncomplete, 'always'); assert.equal(considerations.measureSatisfactionIfActive, false);
+    assert.equal(f.player.checkpoint(first.token, sequenceCheckpoint(f, first, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'})).officialLearningChanged, false);
+    const next = f.launch(binding); assert.equal(next.scoId, 'practice');
+    assert.equal(f.player.checkpoint(next.token, sequenceCheckpoint(f, next, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
+test('fourth-edition ADL objective maps share raw scores without replacing IMS objective maps or their gates', async () => {
+  const firstMap = '<a:objectives><a:objective objectiveID="primary"><a:mapInfo targetObjectiveID="shared-mastery" writeRawScore="true" writeMinScore="true" writeMaxScore="true" writeCompletionStatus="true" writeProgressMeasure="true"/></a:objective></a:objectives>';
+  const secondMap = '<a:objectives><a:objective objectiveID="required-intro"><a:mapInfo targetObjectiveID="shared-mastery"/></a:objective></a:objectives>';
+  const xml = adlManifest().replace('</s:primaryObjective></s:objectives></s:sequencing>', '</s:primaryObjective></s:objectives>' + firstMap + '</s:sequencing>').replace('</s:sequencingRules><a:rollupConsiderations', '</s:sequencingRules>' + secondMap + '<a:rollupConsiderations');
+  const f = await scormLearningFixture(undefined, multiFilePackage('2004-4', xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding);
+    f.player.checkpoint(first.token, sequenceCheckpoint(f, first, {'cmi.completion_status': 'completed', 'cmi.progress_measure': '0.8', 'cmi.score.scaled': '0.9', 'cmi.score.raw': '90', 'cmi.score.min': '0', 'cmi.score.max': '100', 'adl.nav.request': 'continue'}));
+    const next = f.launch(binding), b = f.player.bootstrap(next.token);
+    const api = createSCORM2004API({edition: '2004-4', state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot}); assert.equal(api.Initialize(''), 'true');
+    const index = Array.from({length: Number(api.GetValue('cmi.objectives._count'))}, (_, i) => i).find(i => api.GetValue(`cmi.objectives.${i}.id`) === 'required-intro');
+    assert.notEqual(index, undefined);
+    assert.equal(api.GetValue(`cmi.objectives.${index}.score.raw`), '90'); assert.equal(api.GetValue(`cmi.objectives.${index}.score.min`), '0'); assert.equal(api.GetValue(`cmi.objectives.${index}.score.max`), '100');
+    assert.equal(api.GetValue(`cmi.objectives.${index}.completion_status`), 'completed'); assert.equal(api.GetValue(`cmi.objectives.${index}.progress_measure`), '0.8');
+    assert.equal(f.player.checkpoint(next.token, sequenceCheckpoint(f, next, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
+test('ADL extensions reject misplaced, malformed, unknown, duplicate and wrong-edition semantics', async () => {
+  const xml = adlManifest();
+  for (const bad of [
+    xml.replace('requiredForCompleted="ifAttempted"', 'requiredForCompleted="unknown"'), xml.replace('measureSatisfactionIfActive="false"', 'measureSatisfactionIfActive="maybe"'),
+    xml.replace('<a:rollupConsiderations ', '<a:rollupConsiderations bogus="true" '), xml.replace('</s:sequencingRules><a:rollupConsiderations', '</s:sequencingRules><a:rollupConsiderations/><a:rollupConsiderations'),
+    xml.replace('<n:hideLMSUI>continue', '<n:hideLMSUI>choice'), xml.replace('<n:presentation>', '<n:presentation bogus="true">'),
+    xml.replace('<n:navigationInterface>', '<n:hideLMSUI>continue</n:hideLMSUI><n:navigationInterface>'),
+    xml.replace('</p:manifest>', '<a:rollupConsiderations/></p:manifest>'),
+    xml.replace('<a:constrainedChoiceConsiderations', '<s:constrainedChoiceConsiderations'),
+    xml.replace('<s:mapInfo targetObjectiveID=', '<s:mapInfo readProgressMeasure="true" targetObjectiveID='),
+    xml.replace('</s:sequencingRules><a:rollupConsiderations', '</s:sequencingRules><a:objectives><a:objective objectiveID="missing"><a:mapInfo targetObjectiveID="other"/></a:objective></a:objectives><a:rollupConsiderations'),
+    xml.replace('</p:organizations>', '<p:organization identifier="unused"><p:title>Unused</p:title><s:sequencing><a:unknown/></s:sequencing></p:organization></p:organizations>'),
+  ]) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', bad)), /Unsupported|misplaced/);
+  await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-2', adlManifest('2004-2').replace('>exit<', '>suspendAll<'))), /Unsupported/);
+  await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-3', xml.replace('2004 4th Edition', '2004 3rd Edition').replace('</s:sequencingRules><a:rollupConsiderations', '</s:sequencingRules><a:objectives><a:objective objectiveID="required-intro"><a:mapInfo targetObjectiveID="scores"/></a:objective></a:objectives><a:rollupConsiderations'))), /Unsupported/);
+});
+
+test('ADL collection groups override independently and objective extensions can bind to inline IMS objectives', async () => {
+  const xml = collectionManifest().replace('<s:sequencing ID="shared-0">', '<s:sequencing ID="shared-0"><a:rollupConsiderations requiredForCompleted="ifNotSuspended"/>').replace('<s:sequencing IDRef="shared-0"/>', '<s:sequencing IDRef="shared-0"><a:rollupConsiderations requiredForSatisfied="ifAttempted"/></s:sequencing>');
+  const tree: Record<string, any> = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', xml))).manifest);
+  assert.equal(tree.rollupConsiderations.requiredForCompleted, 'always'); assert.equal(tree.rollupConsiderations.requiredForSatisfied, 'ifAttempted');
+  assert.equal(tree.sequencingControls.flow, true); assert.equal(tree.rollupRules.rules.length, 2);
+  const objective = '<a:objectives><a:objective objectiveID="primary"><a:mapInfo targetObjectiveID="shared-mastery" writeRawScore="true"/></a:objective></a:objectives>';
+  const bound = sequencingManifest().replace('<p:title>Introduction</p:title><s:sequencing>', '<p:title>Introduction</p:title><s:sequencing IDRef="scores">').replace('</p:manifest>', '<s:sequencingCollection><s:sequencing ID="scores">' + objective + '</s:sequencing></s:sequencingCollection></p:manifest>');
+  const resolved = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', bound))).manifest);
+  assert.equal(resolved.children[0].primaryObjective.mapInfo[0].writeRawScore, true);
+  assert.equal(resolved.children[0].primaryObjective.mapInfo[0].writeSatisfiedStatus, true);
+});
 
 test('fourth-edition weighted completion survives engine reconstruction and appears in immutable official rollup evidence', async () => {
   const xml = weightedManifest();

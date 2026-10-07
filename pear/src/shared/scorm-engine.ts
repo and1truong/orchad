@@ -19,6 +19,7 @@ export interface SCORMActivity {
   masteryScore?: string;
   completionThreshold?: string;
   completionMeasure?: {completedByMeasure: boolean; minProgressMeasure: number; progressWeight: number};
+  hideLmsUi?: string[];
   sequencing?: Record<string, any>;
   maxTimeAllowed?: string;
   timeLimitAction?: string;

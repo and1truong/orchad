@@ -3,7 +3,7 @@ import yauzl from 'yauzl';
 import {DOMParser, type Element} from '@xmldom/xmldom';
 import type {SCORMActivity, SCORMManifest, SCORMResource, SCORMStandard} from '../shared/scorm-engine.ts';
 import {crc32} from './scorm-archive.ts';
-import {parseSequencing, parseSequencingCollections} from './scorm-sequencing-parser.ts';
+import {parseSequencing, parseSequencingCollections, parsePresentation} from './scorm-sequencing-parser.ts';
 import {reject} from './errors.ts';
 
 export const packageLimits = {archive: 32 * 1024 * 1024, expanded: 64 * 1024 * 1024, file: 16 * 1024 * 1024, files: 2048, manifest: 1024 * 1024};
@@ -116,7 +116,16 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
       if (node.localName === 'sequencingCollection' && parent !== root!) invalid('misplaced sequencing collection');
       features.add(node.localName!);
     }
-    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlseq_v1p3' || node.namespaceURI === 'http://www.adlnet.org/xsd/adlnav_v1p3') features.add('unsupportedNavigationExtension');
+    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlseq_v1p3') {
+      let owner = node.parentNode as Element | null;
+      while (owner && !(owner.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && owner.localName === 'sequencing')) owner = owner.parentNode as Element | null;
+      if (!owner) invalid('misplaced ADL sequencing extension'); features.add('adlSequencing');
+    }
+    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlnav_v1p3') {
+      const parent = node.parentNode as Element;
+      if (!(node.localName === 'presentation' && parent?.namespaceURI === ns && parent.localName === 'item' || node.localName === 'navigationInterface' && parent?.namespaceURI === node.namespaceURI && parent.localName === 'presentation' || node.localName === 'hideLMSUI' && parent?.namespaceURI === node.namespaceURI && parent.localName === 'navigationInterface')) invalid('misplaced or unknown ADL presentation extension');
+      features.add('presentation');
+    }
     for (const n of elements(node)) stack.push({node: n, depth: depth + 1});
   }
   const metadata = one(root!, 'metadata', ns!), schema = one(metadata, 'schema', ns!).textContent?.trim(), edition = one(metadata, 'schemaversion', ns!).textContent?.trim();
@@ -143,6 +152,13 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   }
   const resourceIds = new Set(resources.map(r => r.id));
   if (!resources.some(r => r.kind === 'sco') || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('SCO or resource dependency missing');
+  // Validate extension syntax/references in every organization, not just the
+  // selected execution tree. A hidden/unselected branch cannot hide malformed
+  // or unsupported ADL semantics behind the selected profile's feature flags.
+  for (const el of [...Array.from(root!.getElementsByTagNameNS(ns!, 'organization')), ...Array.from(root!.getElementsByTagNameNS(ns!, 'item'))]) {
+    parseSequencing(el, standard, collections);
+    if (parsePresentation(el, standard) && !resourceIds.has(el.getAttribute('identifierref') ?? '')) invalid('presentation requires a resource activity');
+  }
   const organizations = one(root!, 'organizations', ns!), orgs = elements(organizations, 'organization', ns!);
   const org = orgs.find(o => o.getAttribute('identifier') === organizations.getAttribute('default')) ?? (orgs.length === 1 ? orgs[0] : undefined);
   if (!org) invalid('default organization unavailable');
@@ -157,6 +173,8 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     if (pre.length > 1 || pre.some(p => p.getAttribute('type') && p.getAttribute('type') !== 'aicc_script')) invalid('unsupported prerequisite type');
     const prerequisites = pre[0]?.textContent?.trim();
     const extensions: Partial<SCORMActivity> = {};
+    const presentation = parsePresentation(el, standard);
+    if (presentation) {if (!resourceId) invalid('presentation requires a resource activity'); extensions.hideLmsUi = presentation;}
     if (standard === '1.2') {
       for (const [tag, key] of [['datafromlms', 'launchData'], ['masteryscore', 'masteryScore'], ['maxtimeallowed', 'maxTimeAllowed'], ['timelimitaction', 'timeLimitAction']] as const) {
         const nodes = elements(el, tag, cp); if (nodes.length > 1) invalid('duplicate runtime extension');
