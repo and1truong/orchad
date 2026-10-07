@@ -28,6 +28,9 @@ for (const {standard, wrapper} of cases) test(standard + ': offline licensed ' +
     }
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click();
     await player.getByRole('button', {name: /Introduction/}).click(); await expect(sco.getByText('Licensed entry: resume; bookmark: licensed-page', {exact: true})).toBeVisible();
+    // A resumed nested frame may be below the viewport after the shell action.
+    // Bring its container into view before Chromium's inner-frame rAF stability check.
+    await page.locator('iframe[title="Isolated SCORM engine player"]').scrollIntoViewIfNeeded();
     await sco.getByRole('button', {name: 'Finish licensed content', exact: true}).click(); await expect(player.getByRole('status')).toContainText('completion accepted');
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(1);
   } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
