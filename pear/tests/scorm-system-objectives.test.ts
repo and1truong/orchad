@@ -156,3 +156,18 @@ test('system objective count limit rolls back all tracking and preserves prior a
     assert.throws(() => f.player.checkpoint(launch.token, request), /objective count quota/); assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_system_objectives').get()!.n, 4096); assert.equal(f.player.bootstrap(launch.token).sequence, 0);
   } finally {f.db.close();}
 });
+
+test('legal prototype-named objective targets survive host persistence, client read maps and suspension copies', async () => {
+  for (const id of ['__proto__', 'constructor']) {
+    const xml = globalManifest('2004-4').replaceAll('shared-mastery', id), f = await scormLearningFixture(undefined, multiFilePackage('2004-4', xml));
+    try {
+      const launch = f.launch(f.enroll(), 'intro'); f.player.checkpoint(launch.token, sequenceCheckpoint(f, launch, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'}));
+      const row = f.db.prepare('SELECT * FROM scorm_system_objectives WHERE target_id=?').get(id)!; assert.ok(row); assert.equal(JSON.parse(String(row.state)).normalizedMeasure, 0.9);
+      const reader = await readerPackage(f, '2004-4', xml), read = reader.launch(), b = f.player.bootstrap(read.token), snapshot = JSON.parse(b.sequencingSnapshot!);
+      assert.equal(Object.hasOwn(snapshot.globalObjectiveMap, id), true); assert.equal(snapshot.globalObjectiveMap[id].normalizedMeasure, 0.9);
+      assert.equal(Object.hasOwn(snapshot.suspensionState.globalObjectives, id), true);
+      const api = createSCORM2004API({edition: '2004-4', state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot}); assert.equal(api.Initialize(''), 'true'); assert.equal(api.GetValue('cmi.objectives.0.score.scaled'), '0.9');
+      f.player.checkpoint(read.token, sequenceCheckpoint(f, read, {'cmi.location': 'legal-objective-reader'}, false)); assert.deepEqual(f.db.prepare('SELECT * FROM scorm_system_objectives WHERE target_id=?').get(id), row);
+    } finally {f.db.close();}
+  }
+});

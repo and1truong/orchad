@@ -56,7 +56,7 @@ export function objectiveClientSnapshot(serialized: string, runtime: Scorm2004AP
     let permitted = read.get(map.targetObjectiveID); if (!permitted) read.set(map.targetObjectiveID, permitted = new Set());
     for (const field of fields) if ((map as any)[flag('read', field)]) permitted.add(field);
   }
-  const filtered: Record<string, any> = {};
+  const filtered: Record<string, any> = Object.create(null);
   for (const [id, value] of Object.entries(snapshot.globalObjectiveMap ?? {}) as [string, any][]) {
     const allowed = read.get(id); if (!allowed?.size) continue;
     filtered[id] = {id}; for (const field of allowed) {filtered[id][field] = value[field]; filtered[id][field + 'Known'] = value[field + 'Known'];}
