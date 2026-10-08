@@ -62,3 +62,24 @@ before buffered data finished. The controller now waits for child close under
 the existing five-second bound before collecting phases. The existing real
 fixture checks also wait for close and assert all SCORM cleanup phases.
 New-head CI remains required; no shutdown timeout or acceptance gate is relaxed.
+
+70452253/run37846133703 macOS failed native-runtime before SCORM:
+ui-response:consent never arrived despite successful UI heartbeat responses.
+Keep that failure; no platform PASS. Actual component polling reproduced a
+starvation defect: every reply slower than the one-second poll is discarded
+by comparing its sequence to the newest issued request, leaving no target
+snapshot to trigger consent revocation. Accept strictly newer completed
+snapshots instead, retaining out-of-order refusal and hidden-UI heartbeat
+suppression. Original actual-component tests failed1/2 before correction;
+new full Coconut/native CI remains required to establish runtime recovery.
+The deterministic polling defect is proved; that does not infer every cause
+of the recorded macOS timeout or earlier Windows fixture failure.
+
+Completed local Coconut61/61 and build after preparing the worktree's missing
+sidecar/workspace dependencies; initial two missing-artifact failures retained.
+Current5f296be6/CI37846479621 Windows failed SCORM1.2 shutdown: received,
+connections/sink/app-closed markers arrived, but cleanup-complete did not.
+Add database-closed to distinguish DB close from directory removal. Even on
+forced kill, drain child close/output for at most one diagnostic second; the
+five-second shutdown deadline still sets fixtureForced and cannot PASS.
+No Windows cleanup cause is inferred or assertion waived; new CI required.
