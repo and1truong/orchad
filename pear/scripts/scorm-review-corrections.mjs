@@ -74,6 +74,18 @@ const realUpdates = [
     "  speed_range: \"0#*\","
   ]
 ];
+const derivedOriginal = "2872964c5545baf04c2de580be6ece0dafafe76c83d04efedc7b5d5cec7720df";
+const derivedPatched = "dbc20732465b9b4ffce672ac11a5d5dee48384d4f0beabf562c00215cf051281";
+const derivedUpdates = [
+  [
+    "    if (CMIElement === \"adl.nav.request\") {\n      this.throwSCORMError(\n        CMIElement,\n        scorm2004_errors.WRITE_ONLY_ELEMENT,",
+    "    // Pear: successful early-return model handlers reset previous errors too.\n    this.lastErrorCode = \"0\";\n    if (CMIElement === \"adl.nav.request\") {\n      this.throwSCORMError(\n        CMIElement,\n        scorm2004_errors.WRITE_ONLY_ELEMENT,"
+  ],
+  [
+    "    if (stringMatches(CMIElement, adlNavRequestRegex)) {\n      this.lastErrorCode = \"0\";\n      const matches = CMIElement.match(adlNavRequestRegex);",
+    "    if (stringMatches(CMIElement, adlNavRequestRegex)) {\n      const matches = CMIElement.match(adlNavRequestRegex);"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -88,9 +100,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, realUpdates);
     if (hash(source) !== realPatched) throw Error('SCORM real checksum mismatch');
   }
+  if (hash(source) === derivedOriginal) {
+    source = replace(source, derivedUpdates);
+    if (hash(source) !== derivedPatched) throw Error('SCORM derived-read checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === derivedPatched) {
+    source = replace(source, derivedUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== derivedOriginal) throw Error('SCORM derived-read reverse checksum mismatch');
+  }
   if (hash(source) === realPatched) {
     source = replace(source, realUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== realOriginal) throw Error('SCORM real reverse checksum mismatch');

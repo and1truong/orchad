@@ -14,8 +14,11 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const current2004=unreviewedSCORMSource(corrected2004),current12=unreviewedSCORMSource(corrected12);
   const reviewScript=readFileSync(new URL('../scripts/scorm-review-corrections.mjs',import.meta.url),'utf8');
   const navUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const navigationUpdates = ')+'const navigationUpdates = '.length,reviewScript.indexOf(';\nconst realOriginal',reviewScript.indexOf('const navigationUpdates = '))));
-  const realUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const realUpdates = ')+'const realUpdates = '.length,reviewScript.indexOf(';\nexport function',reviewScript.indexOf('const realUpdates = '))));
-  let predecessorReviewed2004=corrected2004;for(const [before,after] of realUpdates.toReversed()){assert.equal(predecessorReviewed2004.split(after).length,2);predecessorReviewed2004=predecessorReviewed2004.replace(after,()=>before);}
+  const realUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const realUpdates = ')+'const realUpdates = '.length,reviewScript.indexOf(';\nconst derivedOriginal',reviewScript.indexOf('const realUpdates = '))));
+  const derivedUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const derivedUpdates = ')+'const derivedUpdates = '.length,reviewScript.indexOf(';\nexport function',reviewScript.indexOf('const derivedUpdates = '))));
+  let derivedPredecessor=corrected2004;for(const [before,after] of derivedUpdates.toReversed()){assert.equal(derivedPredecessor.split(after).length,2);derivedPredecessor=derivedPredecessor.replace(after,()=>before);}
+  assert.equal(hash(derivedPredecessor),'2872964c5545baf04c2de580be6ece0dafafe76c83d04efedc7b5d5cec7720df');
+  let predecessorReviewed2004=derivedPredecessor;for(const [before,after] of realUpdates.toReversed()){assert.equal(predecessorReviewed2004.split(after).length,2);predecessorReviewed2004=predecessorReviewed2004.replace(after,()=>before);}
   assert.equal(hash(predecessorReviewed2004),'a8d9018516119e5180c5cccd9931bb8b56335f3c282c0367cfe116e73d420007');
   let previousReviewed2004=predecessorReviewed2004;for(const [before,after] of navUpdates.toReversed()){assert.equal(previousReviewed2004.split(after).length,2);previousReviewed2004=previousReviewed2004.replace(after,()=>before);}
   assert.equal(hash(previousReviewed2004),'0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9');
@@ -87,7 +90,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   try {
     const directory=join(root,'node_modules/scorm-again'),entries=join(directory,'dist/esm');mkdirSync(entries,{recursive:true});mkdirSync(join(root,'scripts'));
     const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));writeFileSync(join(root,'scripts/scorm-review-corrections.mjs'),readFileSync(new URL('../scripts/scorm-review-corrections.mjs',import.meta.url)));
-    for(const input of [...new Set([pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,timestamps2004,initialized2004,atomic2004,current2004,previousReviewed2004,predecessorReviewed2004].flatMap(value=>[value,reviewedSCORMSource(value)]))]){
+    for(const input of [...new Set([pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,timestamps2004,initialized2004,atomic2004,current2004,previousReviewed2004,predecessorReviewed2004,derivedPredecessor].flatMap(value=>[value,reviewedSCORMSource(value)]))]){
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),corrected2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);
     }

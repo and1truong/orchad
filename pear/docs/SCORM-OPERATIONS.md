@@ -67,3 +67,5 @@ API model-access correction (ADR-111) retains exact v15 ESM/stored snapshots and
 Navigation target binding (ADR-112) changes only checksum-locked 2004 lexical/access behavior. Known v15 snapshots remain compatible; 1.2 bytes and existing attempt/receipt/host replay authority are unchanged. Full deployment/platform/operational gates remain unresolved.
 
 Real capacity (ADR-113) broadens known 2004 numeric inputs while preserving the 4096-character host scalar envelope and rejecting non-finite Number inputs before local writes or server receipts. Exact strings survive replay/retry; 1.2 bytes/history are unchanged and known v16 snapshot markers remain accepted. No migration, purge or production enablement.
+
+Derived-read error reset (ADR-114) changes only synchronous successful GetValue error reporting. Stored CMI, receipts, proofs and trusted loading remain unchanged; known v17 snapshots are accepted and the 1.2 engine stays exact. No migration/history rewrite or production enablement.

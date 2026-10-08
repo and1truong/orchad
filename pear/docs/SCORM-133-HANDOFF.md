@@ -137,3 +137,15 @@ dev/built browser; #177 unchanged e9d6cf38 / run37813555426 attempt2 completed
 SUCCESS8/8, domain641 and162/162 dev/built, retaining its first assignment-status
 failure. Exact successor CI must complete before ready; full conformance and
 external/deployment gates remain OPEN/BLOCKED, epic open/production disabled.
+
+ADR-114 is stacked on #183 head a8dbc9d6. pear-derived-read-errors-v18
+resets active GetValue errors before early-return completion/success/navigation
+handlers while retaining failed-read and lifecycle codes. Stored values and 1.2
+bytes are unchanged; known v17 snapshots remain supported. Full domain completed
+685/685 across 99 files; focused 37/37, threshold vectors 3/3 and build passed.
+Built derived/target/real attempt passed 8/9, with one inherited target DOM session
+closed failure on Chromium 151; that unchanged case reran PASS. First failure
+remains recorded. #182 head f0f0de3d / run 37817524964 completed SUCCESS 8/8,
+domain 673 and 175/175 dev/built browser. Successor CI must finish before ready.
+Independent clause-level work and real external/deployment gates remain open;
+no epic closure or production enablement.
