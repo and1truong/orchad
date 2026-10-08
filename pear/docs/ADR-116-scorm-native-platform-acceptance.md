@@ -66,3 +66,8 @@ and the required identical retry; retain its initial-entry, zero-proof/calls,
 resume/bookmark, completion/quiz and driver-error assertions. Remove only the
 new redundant four-profile driver file in favor of the existing suite. The
 production durability guard is unchanged. First CI failures remain recorded.
+
+Windows SCO native invocation is now bounded for diagnostics: an unresolved
+Promise records only API/transport types and remains nativeDenied=false, so
+timeout cannot count as denial or platform PASS. No CSP or native capability
+is relaxed. The four-profile preflight still checks the same durability flow.
