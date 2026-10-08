@@ -17,7 +17,10 @@ const script = `
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
   const top=parent.parent;
   for(const [key,read] of Object.entries({pearCookieDenied:()=>top.document.cookie,pearStorageDenied:()=>top.localStorage.length,pearBridgeDenied:()=>top.agentBridgeV1,pearNativeDenied:()=>top.__TAURI_INTERNALS__}))try{read();}catch{evidence[key]=true;}
-  try{const native=window.__TAURI_INTERNALS__||parent.__TAURI_INTERNALS__;if(native)await native.invoke('host_request',{request:{action:'heartbeat'}});else evidence.nativeDenied=true;}catch{evidence.nativeDenied=true;}
+  const native=window.__TAURI_INTERNALS__||parent.__TAURI_INTERNALS__;
+  evidence.nativeSurface={invoke:typeof native?.invoke,ipc:typeof native?.ipc,postMessage:typeof native?.postMessage,messageChannel:typeof window.ipc?.postMessage,pattern:native?.__TAURI_PATTERN__?.pattern??null,pending:false};
+  if(!native)evidence.nativeDenied=true;
+  else await Promise.race([Promise.resolve().then(()=>native.invoke('host_request',{request:{action:'heartbeat'}})).catch(()=>{evidence.nativeDenied=true;}),new Promise(resolve=>setTimeout(()=>{evidence.nativeSurface.pending=true;resolve();},5000))]);
   try{await fetch('http://127.0.0.1:4316/external-fetch');}catch{evidence.externalFetchDenied=true;}
   const image=new Image();image.src='http://127.0.0.1:4316/external-image';document.body.append(image);
   document.getElementById('save').onclick();
