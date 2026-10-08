@@ -4,7 +4,8 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const root = new URL('../node_modules/scorm-again/', import.meta.url), metadata = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 if (metadata.version !== '3.4.5') throw Error('Review the SCORM integration adaptation before changing engine version');
-const path = new URL('dist/esm/scorm2004.js', root), source = readFileSync(path, 'utf8'), digest = value => createHash('sha256').update(value).digest('hex');
+const path = new URL('dist/esm/scorm2004.js', root), digest = value => createHash('sha256').update(value).digest('hex');
+let source = readFileSync(path, 'utf8');
 const original = '93e463ed4ba87bd59a2fe228c94c879faf4aa7469a687166ffab8fac4a4d1f69', loggingOnly = '6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936', selection = '206daee49525dbf352bf9d6920f6d1ccc03ad9e8834db57a8d7d5ee2efb93cc0', limits = 'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e', patched = '8c6468541bf6f07353307758f5a828e7e9e04da0619c859500c9b108015db5da';
 
 const localized = '445f18f920d5424b335c666594e532fb9a3238b84cc76f522d5185e41aabbd08';
@@ -130,13 +131,39 @@ const separatorUpdates = [
   ]
 ];
 
+const identifiers = '8b30d65901cf1aee04991a23f8c55fc61050556e9d1bf448ea0da34a92fbaff9';
+const identifierUpdates = [
+  [
+    "  CMIShortIdentifier: \"^(?=.*\\\\w)[\\\\w\\\\-\\\\(\\\\)\\\\+\\\\.\\\\:\\\\=\\\\@\\\\;\\\\$\\\\_\\\\!\\\\*\\\\'\\\\%\\\\/\\\\#]{1,250}$\",",
+    "  CMIShortIdentifier: \"^(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILongIdentifier: \"^(?:(?!urn:)\\\\S{1,4000}|urn:[A-Za-z0-9-]{1,31}:\\\\S{1,4000}|.{1,4000})$\",",
+    "  CMILongIdentifier: \"^(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  if (!textual && !responseDef.delimiter && pattern.includes(\",\")) {\n    throw new Scorm2004ValidationError(\n      \"cmi.interactions.n.correct_responses.n.pattern\",\n      scorm2004_errors.TYPE_MISMATCH\n    );\n  }\n",
+    "  // Pear: bare commas are URI data; each response type validates its own grammar.\n"
+  ],
+  [
+    "        if (this._interactionType === \"matching\" && /\\\\[.,]/.test(pattern)) ; else {\n          validatePattern(this._interactionType, pattern, responseDef);\n        }",
+    "        validatePattern(this._interactionType, pattern, responseDef);"
+  ]
+];
+
+// The exact known v9 output reverses to the known v8 input before upgrades.
+// Never undo or accept an unknown source, even if replacement text matches.
+if (digest(source) === identifiers) for (const [before, after] of identifierUpdates.toReversed()) {
+  if (source.split(after).length !== 2) throw Error('SCORM identifier reverse patch no longer matches');
+  source = source.replace(after, () => before);
+}
 if (![original, loggingOnly, selection, limits, patched, localized, collections, responsesPrevious, responses, separators].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
 let output = source;
 if (digest(source) === original) for (const statement of ['console.debug(`Activity delivered: ${activity.id} - ${activity.title}`);', 'console.debug("Sequencing state restored successfully");', 'console.error(`Failed to restore sequencing state: ${error}`);']) {
   if (output.split(statement).length !== 2) throw Error('SCORM direct-log patch no longer matches');
   output = output.replace(statement, '/* Pear: omit direct upstream sequencing logs. */');
 }
-const replaceOnce = (before, after) => {if (output.split(before).length !== 2) throw Error('SCORM selection correction no longer matches'); output = output.replace(before, after);};
+const replaceOnce = (before, after) => {if (output.split(before).length !== 2) throw Error('SCORM selection correction no longer matches'); output = output.replace(before, () => after);};
 if (![selection, limits, patched, localized, collections, responsesPrevious, responses, separators].includes(digest(source))) {
 replaceOnce('if (selectCount === null || selectCount > 0) {', 'if (selectCount === null || selectCount >= 0) {');
 replaceOnce(`    const children = [...activity.children];
@@ -193,6 +220,8 @@ if (![responses, separators].includes(digest(output))) for (const [before, after
 if (![responses, separators].includes(digest(output))) throw Error('SCORM textual-response checksum mismatch');
 if (digest(output) !== separators) for (const [before, after] of separatorUpdates) replaceOnce(before, after);
 if (digest(output) !== separators) throw Error('SCORM reserved-separator checksum mismatch');
+for (const [before, after] of identifierUpdates) replaceOnce(before, after);
+if (digest(output) !== identifiers) throw Error('SCORM URI identifier checksum mismatch');
 writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root), source12 = readFileSync(path12, 'utf8');
