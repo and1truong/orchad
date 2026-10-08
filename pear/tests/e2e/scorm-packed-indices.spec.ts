@@ -11,8 +11,8 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(editi
     if(get('cmi.objectives._count')==='0'){if(set('cmi.objectives.0.id','urn:pear:o')!=='true'||set('cmi.objectives.0.score.raw','50')!=='true')throw Error('valid objective');}
     for(const index of ['0junk','0e1','0x0','0 ', '0\\n','0\\r','+0','-0']){
       const key='cmi.objectives.'+index+'.score.raw';
-      if(get(key)!==''||error()!=='401')throw Error('invalid index read '+index);
-      if(set(key,'75')!=='false'||error()!=='401')throw Error('invalid index write '+index);
+      if(get(key)!==''||error()!=='${edition === '1.2' ? '201' : '401'}')throw Error('invalid index read '+index);
+      if(set(key,'75')!=='false'||error()!=='${edition === '1.2' ? '201' : '401'}')throw Error('invalid index write '+index);
       if(get('cmi.objectives.0.score.raw')!=='50'||get('cmi.objectives._count')!=='1')throw Error('invalid index changed objective');
     }
     document.getElementById('entry').textContent='Packed indices verified';}`;

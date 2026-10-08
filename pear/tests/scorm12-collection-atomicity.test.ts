@@ -9,10 +9,10 @@ import {multiFilePackage} from './scorm-package-fixture.ts';
 const invalidWrites = [
   ['cmi.objectives.0.score.raw', 'bad', '405'],
   ['cmi.objectives.0.score.raw', '101', '405'],
-  ['cmi.objectives.0.unknown', 'x', '401'],
+  ['cmi.objectives.0.unknown', 'x', '201'],
   ['cmi.interactions.0.type', 'invalid', '405'],
   ['cmi.interactions.0.result', 'invalid', '405'],
-  ['cmi.interactions.0.unknown', 'x', '401'],
+  ['cmi.interactions.0.unknown', 'x', '201'],
 ] as const;
 
 test('1.2: rollback retains typed errors and state when Array.prototype.toReversed is unavailable', () => {
@@ -49,7 +49,7 @@ test('1.2: failed next and nested appends preserve existing records; valid retry
     ['cmi.objectives.1.score.raw', 'bad', '405'],
     ['cmi.interactions.1.type', 'invalid', '405'],
     ['cmi.interactions.0.objectives.0.id', 'x'.repeat(256), '405'],
-    ['cmi.interactions.0.correct_responses.0.unknown', 'a', '401'],
+    ['cmi.interactions.0.correct_responses.0.unknown', 'a', '201'],
     ['cmi.objectives.0.score.raw', '101', '405'],
   ]) {
     assert.equal(engine.LMSSetValue(key, value), 'false', key); assert.equal(engine.LMSGetLastError(), error, key);

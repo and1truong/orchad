@@ -5,33 +5,25 @@ import {createApp} from '../../src/server/app.ts';
 import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 import {interopPackage} from '../scorm-interop-fixture.ts';
 
-for (const edition of ['1.2'] as const) test(edition + ': built failed collection writes survive lost ACK and close/resume', async ({page}) => {
-  const script = `{const api=parent.API,prior=api.LMSGetValue('cmi.objectives._count');
-    const reverse=Object.getOwnPropertyDescriptor(parent.Array.prototype,'toReversed');
-    Object.defineProperty(parent.Array.prototype,'toReversed',{value:undefined,configurable:true});
-    try{for(const [key,value,error] of [
-      ['cmi.objectives.'+prior+'.score.raw','bad','405'],
-      ['cmi.objectives.'+prior+'.score.raw','101','405'],
-      ['cmi.objectives.'+prior+'.unknown','x','201'],
-      ['cmi.interactions.0.type','invalid','405'],
-      ['cmi.interactions.0.unknown','x','201']
-    ]){if(api.LMSSetValue(key,value)!=='false'||api.LMSGetLastError()!==error)throw Error('rejected write '+key);
-      if(api.LMSGetValue('cmi.objectives._count')!==prior||api.LMSGetValue('cmi.interactions._count')!=='0')throw Error('failed write changed count');
+for (const edition of ['1.2'] as const) test(edition + ': built invalid CMI errors survive lost ACK and close/resume', async ({page}) => {
+  const script = `{const api=parent.API,get=k=>api.LMSGetValue(k),set=(k,v)=>api.LMSSetValue(k,v),error=()=>api.LMSGetLastError(),original=get('cmi.core.lesson_location');
+    for(const key of ['cmi.core.zip_code','cmi.core.score.zip_code','cmi.unknown','cmi.objectives.0.zip_code']){
+      if(get(key)!==''||error()!=='201'||set(key,'forged')!=='false'||error()!=='201')throw Error('invalid CMI '+key);
+      if(get('cmi.core.lesson_location')!==original||get('cmi.objectives._count')!=='0')throw Error('invalid CMI changed state');
     }
-    }finally{if(reverse)Object.defineProperty(parent.Array.prototype,'toReversed',reverse);else delete parent.Array.prototype.toReversed;}
-    if(prior==='0'){if(api.LMSSetValue('cmi.objectives.0.id','urn:pear:o')!=='true'||api.LMSSetValue('cmi.objectives.0.score.raw','50')!=='true')throw Error('valid retry');}
-    if(api.LMSGetValue('cmi.objectives.0.score.raw')!=='50'||api.LMSGetValue('cmi.objectives._count')!=='1')throw Error('original objective');
-    document.getElementById('entry').textContent='SCORM 1.2 atomicity verified';}`;
+    if(get('xyz.score.result')!==''||error()!=='401')throw Error('unsupported model');
+    if(set('cmi.core.student_id','forged')!=='false'||error()!=='403'||get('cmi.core.exit')!==''||error()!=='404')throw Error('access errors');
+    document.getElementById('entry').textContent='CMI errors preserved';}`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); f.enroll();
-  const origin = 'http://127.0.0.1:4756', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4757', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
+  const origin = 'http://127.0.0.1:4716', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4717', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
   try {
-    await content!.listen({port: 4757, host: '127.0.0.1'}); await app.listen({port: 4756, host: '127.0.0.1'});
+    await content!.listen({port: 4717, host: '127.0.0.1'}); await app.listen({port: 4716, host: '127.0.0.1'});
     await page.goto(origin); await page.getByLabel('Account', {exact: true}).fill('learner-a'); await page.getByLabel('Password', {exact: true}).fill('learner-a-dev'); await page.getByRole('button', {name: 'Sign in', exact: true}).click();
     await page.getByRole('button', {name: 'My learning', exact: true}).click();
     await page.locator('.learning-row').filter({has: page.getByRole('heading', {name: 'Original SCORM course', exact: true})}).getByRole('button', {name: 'Continue learning', exact: true}).click();
     const player = page.getByLabel('Enrolled SCORM player', {exact: true}), outer = page.frameLocator('iframe[title="Isolated SCORM engine player"]'), sco = outer.frameLocator('iframe[title="SCORM SCO"]');
     await player.getByLabel('I consent to SCORM progress tracking for this enrollment.', {exact: true}).check(); await player.getByRole('button', {name: /Introduction/}).click();
-    await expect(sco.getByText('SCORM 1.2 atomicity verified', {exact: true})).toBeVisible();
+    await expect(sco.getByText('CMI errors preserved', {exact: true})).toBeVisible();
     // pipwerks commits its initial incomplete status before this explicit save.
     await expect(player.getByRole('status')).toContainText('saved by the server');
     const initialRevision = Number(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision);
@@ -48,9 +40,9 @@ for (const edition of ['1.2'] as const) test(edition + ': built failed collectio
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    expect(Object.keys(stored.objectives)).toEqual(['0']); expect(stored.objectives[0].score.raw).toBe('50'); expect(stored.interactions).toEqual({});
+    expect(stored.core.lesson_status).toBe('incomplete'); expect(stored.objectives).toEqual({});
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
-    await expect(sco.getByText('SCORM 1.2 atomicity verified', {exact: true})).toBeVisible();
+    await expect(sco.getByText('CMI errors preserved', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
   } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
 });

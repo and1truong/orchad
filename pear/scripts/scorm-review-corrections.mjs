@@ -98,6 +98,22 @@ const languageUpdates = [
     "    if (check2004ValidFormat(this._cmi_element + \".language\", language, scorm2004_regex.CMILang, true)) {"
   ]
 ];
+const model12Original = "220469e4b8764960e49fe797f899a00fcdbc10d341cf01e534241bf4b0947a32";
+const model12Patched = "3c6715ad2bdd07c445af58d24509ded9a8388345ccc1931b5c467ccb9c8f9cec";
+const model12Updates = [
+  [
+    "  /**\n   * Gets the appropriate error code for undefined data model elements.\n   * Both SCORM 2004 and SCORM 1.2 use UNDEFINED_DATA_MODEL (401): an\n   * unrecognized element is \"Not implemented\", not a general exception. SCORM\n   * 1.2 previously returned GENERAL (101) here, which is non-conformant \u2014 the\n   * ADL 1.2 CTS and the SCORM 1.2 RTE spec expect 401 for an unknown element.\n   */\n  getUndefinedDataModelErrorCode() {\n    return getErrorCode(this.context.errorCodes, \"UNDEFINED_DATA_MODEL\");\n  }\n",
+    "  /** Invalid names inside CMI use 201; unsupported outside models use 401. */\n  getUndefinedDataModelErrorCode(CMIElement) {\n    return getErrorCode(this.context.errorCodes, CMIElement === \"cmi\" || CMIElement.startsWith(\"cmi.\") ? \"ARGUMENT_ERROR\" : \"UNDEFINED_DATA_MODEL\");\n  }\n"
+  ],
+  [
+    "    const invalidErrorCode = this.getUndefinedDataModelErrorCode();\n    const collections = [];",
+    "    const invalidErrorCode = this.getUndefinedDataModelErrorCode(CMIElement);\n    const collections = [];"
+  ],
+  [
+    "    const invalidErrorCode = this.getUndefinedDataModelErrorCode();\n    for (let idx",
+    "    const invalidErrorCode = this.getUndefinedDataModelErrorCode(CMIElement);\n    for (let idx"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -120,9 +136,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, languageUpdates);
     if (hash(source) !== languagePatched) throw Error('SCORM preference-language checksum mismatch');
   }
+  if (hash(source) === model12Original) {
+    source = replace(source, model12Updates);
+    if (hash(source) !== model12Patched) throw Error('SCORM 1.2 model-error checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === model12Patched) {
+    source = replace(source, model12Updates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== model12Original) throw Error('SCORM 1.2 model-error reverse checksum mismatch');
+  }
   if (hash(source) === languagePatched) {
     source = replace(source, languageUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== languageOriginal) throw Error('SCORM preference-language reverse checksum mismatch');
