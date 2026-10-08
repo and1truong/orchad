@@ -262,6 +262,30 @@ const descriptionPresenceUpdates = [
     "/^cmi\\.(?:comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location|timestamp)|(?:objectives|interactions)\\.\\d+\\.description)$/.test(CMIElement) ?"
   ]
 ];
+const learnerResponsePresenceOriginal = "bb1e42b70479ed21a68fc99f5b25a6dc875975d4336b6db0be23115c3aedd8ba";
+const learnerResponsePresencePatched = "acc64c8c88268bbfaf8429cd0c4805ed2c0c4110888514e0dca8369b60480019";
+const learnerResponsePresenceUpdates = [
+  [
+    "  _weighting = \"\";\n  _learner_response = \"\";\n  _result = \"\";",
+    "  _weighting = \"\";\n  _learner_response;\n  _result = \"\";"
+  ],
+  [
+    "    this._weighting = \"\";\n    this._learner_response = \"\";\n    this._result = \"\";",
+    "    this._weighting = \"\";\n    this._learner_response = void 0;\n    this._result = \"\";"
+  ],
+  [
+    "  get learner_response() {\n    return this._learner_response;\n  }",
+    "  get learner_response() {\n    if (this.initialized && !this.jsonString && this._learner_response === void 0) {\n      throw new Scorm2004ValidationError(this._cmi_element + \".learner_response\", scorm2004_errors.VALUE_NOT_INITIALIZED);\n    }\n    return this._learner_response;\n  }"
+  ],
+  [
+    "    for (const key in json) {\n      // Pear: a stored empty correct-response pattern is a record, not absent data.",
+    "    const keys = Object.keys(json);\n    if (/^cmi\\.interactions\\.\\d+$/.test(CMIElement)) {\n      const priority = key => key === \"id\" ? 0 : key === \"type\" ? 1 : 2;\n      keys.sort((a, b) => priority(a) - priority(b));\n    }\n    for (const key of keys) {\n      // Pear: a stored empty correct-response pattern is a record, not absent data."
+  ],
+  [
+    "if (Object.prototype.hasOwnProperty.call(json, key) && (json[key] || json[key] === \"\" && /^cmi\\.",
+    "if (Object.prototype.hasOwnProperty.call(json, key) && (json[key] || json[key] === \"\" && key === \"learner_response\" && /^cmi\\.interactions\\.\\d+$/.test(CMIElement) && [\"choice\", \"matching\", \"sequencing\", \"performance\", \"fill-in\", \"long-fill-in\", \"other\"].includes(json.type) || json[key] === \"\" && /^cmi\\."
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -332,9 +356,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, descriptionPresenceUpdates);
     if (hash(source) !== descriptionPresencePatched) throw Error("SCORM description presence checksum mismatch");
   }
+  if (hash(source) === learnerResponsePresenceOriginal) {
+    source = replace(source, learnerResponsePresenceUpdates);
+    if (hash(source) !== learnerResponsePresencePatched) throw Error("SCORM learner response presence checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === learnerResponsePresencePatched) {
+    source = replace(source, learnerResponsePresenceUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== learnerResponsePresenceOriginal) throw Error("SCORM learner response presence reverse checksum mismatch");
+  }
   if (hash(source) === descriptionPresencePatched) {
     source = replace(source, descriptionPresenceUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== descriptionPresenceOriginal) throw Error("SCORM description presence reverse checksum mismatch");
