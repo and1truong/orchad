@@ -7,7 +7,9 @@ import {interopPackage} from '../scorm-interop-fixture.ts';
 
 for (const edition of ['1.2'] as const) test(edition + ': built failed collection writes survive lost ACK and close/resume', async ({page}) => {
   const script = `{const api=parent.API,prior=api.LMSGetValue('cmi.objectives._count');
-    for(const [key,value,error] of [
+    const reverse=Object.getOwnPropertyDescriptor(parent.Array.prototype,'toReversed');
+    Object.defineProperty(parent.Array.prototype,'toReversed',{value:undefined,configurable:true});
+    try{for(const [key,value,error] of [
       ['cmi.objectives.'+prior+'.score.raw','bad','405'],
       ['cmi.objectives.'+prior+'.score.raw','101','405'],
       ['cmi.objectives.'+prior+'.unknown','x','401'],
@@ -16,6 +18,7 @@ for (const edition of ['1.2'] as const) test(edition + ': built failed collectio
     ]){if(api.LMSSetValue(key,value)!=='false'||api.LMSGetLastError()!==error)throw Error('rejected write '+key);
       if(api.LMSGetValue('cmi.objectives._count')!==prior||api.LMSGetValue('cmi.interactions._count')!=='0')throw Error('failed write changed count');
     }
+    }finally{if(reverse)Object.defineProperty(parent.Array.prototype,'toReversed',reverse);else delete parent.Array.prototype.toReversed;}
     if(prior==='0'){if(api.LMSSetValue('cmi.objectives.0.id','urn:pear:o')!=='true'||api.LMSSetValue('cmi.objectives.0.score.raw','50')!=='true')throw Error('valid retry');}
     if(api.LMSGetValue('cmi.objectives.0.score.raw')!=='50'||api.LMSGetValue('cmi.objectives._count')!=='1')throw Error('original objective');
     document.getElementById('entry').textContent='SCORM 1.2 atomicity verified';}`;

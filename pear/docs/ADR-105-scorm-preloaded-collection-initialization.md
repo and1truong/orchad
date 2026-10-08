@@ -20,7 +20,7 @@ append; leave trusted preload unchanged. Thus valid, invalid, empty and
 malformed-surrogate writes all preserve the existing trusted values and count.
 
 Exact ESM SHA-256:
-`17b3f713e5ddf6caf3206c77d2ea19e17fef5d4610b2d61d267f523012064871`.
+`03213a703fe000cdf1ed1bb531f4f67dca0b68fb6f5d57f587ebd2c8ac2c1be3`.
 Known timestamps-v10 and earlier sources/snapshot markers remain compatible.
 Installation verifies input/output hashes, idempotency and unknown-byte/version
 refusal. No schema migration, stored-data repair or production enablement.
@@ -37,3 +37,5 @@ Version 1.1, 2009, §4.2.3 (Comments From LMS) and §4.1.1.3 (Collections):
 https://lms.technology/for/scorm/2004/4th_edition/standards/SCORM_2004_4ED_v1_1_RTE_20090814.pdf.
 Current-head CI and all unfulfilled conformance/reference/platform/production
 acceptance remain required. This correction does not close DM-03 or epic #133.
+
+Review correction: known comment/location/timestamp leaves on absent LMS rows retain 404; undefined leaves return 401 before any append, matching existing rows. Skipped packed indices retain their distinct 351 behavior. Three original regressions and built edition vectors cover values/count preservation. Exact reviewed output is checksum-locked; historical engine inputs remain accepted through reversible known-byte correction. Full corrected-head CI is required; earlier be0b27d5 evidence is historical.
