@@ -9,7 +9,14 @@ import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(edition + ': built learner corrects the current session time while earlier total stays fixed', async ({page}) => {
   const old = edition === '1.2', timeKey = old ? 'cmi.core.session_time' : 'cmi.session_time', totalKey = old ? 'cmi.core.total_time' : 'cmi.total_time';
   const values = [11.11, 30.03, 10.01, 0], format = (n: number) => old ? scormTime(n) : 'PT' + n + 'S';
+  const invalid = old ? ['1:00:01', '12345:00:01', '00:00:01.123'] : ['P', 'PT', 'P1W', 'P1.5Y', 'P1H', 'P1DT', 'PT1.001S'];
+  const latency = old ? '00:00:03.04' : 'PT3.04S';
   const script = `document.getElementById('entry').textContent='Initial total: '+get('${totalKey}');
+    const validation=document.createElement('button');validation.textContent='Check timeinterval binding';validation.onclick=()=>{
+      if(!set('cmi.interactions.0.id','urn:pear:duration')||!set('cmi.interactions.0.latency',${JSON.stringify(latency)}))throw Error('valid latency');
+      for(const value of ${JSON.stringify(invalid)})for(const key of ['${timeKey}','cmi.interactions.0.latency']){
+        if(set(key,value)||parent.${old ? 'API' : 'API_1484_11'}.${old ? 'LMSGetLastError' : 'GetLastError'}()!=='${old ? '405' : '406'}')throw Error('invalid timeinterval accepted');
+      }document.getElementById('result').textContent='Timeinterval binding verified';};document.body.append(validation);
     for(const [n,time] of ${JSON.stringify(values.map(n => [n, format(n)]))}) {const button=document.createElement('button');button.textContent='Report '+n;
       button.onclick=()=>{if(!set('${old ? 'cmi.core.exit' : 'cmi.exit'}','suspend')||!set('${timeKey}',time)||!save())throw Error('time report');document.getElementById('result').textContent='Reported time: '+n;};document.body.append(button);}`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); f.enroll();
@@ -27,6 +34,8 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(editi
       await sco.getByRole('button', {name: 'Report ' + n, exact: true}).click();
       await expect(sco.getByText('Reported time: ' + n, {exact: true})).toBeVisible();
     }
+    await sco.getByRole('button', {name: 'Check timeinterval binding', exact: true}).click();
+    await expect(sco.getByText('Timeinterval binding verified', {exact: true})).toBeVisible();
     await reportTime(11.11);
     await expect.poll(() => f.db.prepare('SELECT reported_seconds FROM scorm_sco_attempts').get()!.reported_seconds).toBe(11.11);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
@@ -35,6 +44,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(editi
       await reportTime(n);
       await expect.poll(() => f.db.prepare('SELECT reported_seconds FROM scorm_sco_attempts').get()!.reported_seconds).toBe((1111 + Math.round(n * 100)) / 100);
       await expect(player.getByRole('status')).toContainText('saved by the server');
+      expect(JSON.parse(String(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state)).interactions[0].latency).toBe(latency);
       const runtimeTotal = await sco.locator('body').evaluate((_body, key) => (parent as any)[key.startsWith('cmi.core') ? 'API' : 'API_1484_11'][key.startsWith('cmi.core') ? 'LMSGetValue' : 'GetValue'](key), totalKey);
       expect(runtimeTotal).toBe(format(11.11));
     }
