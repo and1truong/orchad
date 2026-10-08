@@ -33,7 +33,7 @@ external input is absent. No profile PASS means certification or full compliance
 | OPS-02 | Epic backup/restore/RPO/DR/revocation | PARTIAL: whole-DB offline recovery | Chosen deployment/load/RPO targets and real failure/restore/revocation evidence |
 | REF-01 | ADL/reference suite and provenance | BLOCKED: legacy license/platform unresolved | Resolve exact license/platform or independently implement requirement-equivalent original vectors; no certification claim |
 | REF-02 | Storyline/Captivate/Rise + Rustici differential | BLOCKED: authorized exports/account not supplied | Same licensed package hashes; compare completion/success/score/time/navigation/resume; fix required differences |
-| PLATFORM-01 | Windows WebView2, macOS WKWebView, Safari/Android | BLOCKED: actual platforms/runners unavailable here | Actual playback/authority/recovery/egress traces; Chromium viewport is not substitute |
+| PLATFORM-01 | Windows WebView2, macOS WKWebView, Safari/Android | OPEN: ADR-116 adds actual Windows/macOS Tauri runner gates and four-profile Linux/WebView2/WKWebView journeys; results pending | Require completed actual native logs for each head; Safari/Android remain BLOCKED without actual runners/devices. Full authority/recovery/all-egress matrix still OPEN; Chromium driver evidence is supplementary |
 | PLATFORM-02 | Native Chrome Side Panel container | OPEN: extension-page harness only | Actual container consent/rebind/revoke/player journey, recorded evidence |
 | FINAL-01 | Epic requirement review and #49 G05/G10/G14/G18 | OPEN | No unresolved required code/validation/platform/production gate; integrated and main CI on exact heads, docs/ancestry verified |
 

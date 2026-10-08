@@ -14,7 +14,7 @@ const pearRoot=fileURLToPath(new URL("../../pear/",import.meta.url));
 const TRUSTED="http://127.0.0.1:4310",SMOKE_PORT=4319,MCP_PORT=14313;
 const nonce=randomUUID(),lane="native-pear",checks=[];
 const check=(name,cond)=>{checks.push(name);console.log(`  ${cond?"PASS":"FAIL"} ${name}`);if(!cond)throw Error("Acceptance failed: "+name);};
-const fixture=spawn(process.execPath,["--import","tsx","scripts/native-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe"]});
+const fixture=spawn(process.execPath,["--import","tsx","scripts/native-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe","ipc"]});
 let fixtureOutput="",fixtureError="",fixtureExit=null;
 fixture.stdout.on("data",d=>fixtureOutput+=d);fixture.stderr.on("data",d=>fixtureError+=d);fixture.on("exit",c=>fixtureExit=c);
 await new Promise((resolve,reject)=>{
@@ -49,7 +49,7 @@ const close=async()=>{
  if(client)await client.close().catch(()=>{});
  try{await smoke("quit",{},3000);}catch{}
  if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
- fixture.kill("SIGTERM");
+ if(fixture.connected)fixture.send({kind:"close"});
  if(fixtureExit===null)await new Promise(resolve=>{const t=setTimeout(()=>{fixture.kill("SIGKILL");resolve();},5000);fixture.once("exit",()=>{clearTimeout(t);resolve();});});
 };
 try{
