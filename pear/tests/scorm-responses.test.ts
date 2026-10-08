@@ -32,7 +32,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
     assert.equal(api.SetValue(key, maximum), 'true'); assert.equal(api.GetValue(key), maximum);
     assert.equal(api.SetValue(key, maximum + 'x'), 'false'); assert.equal(api.GetLastError(), '406');
     assert.equal(api.GetValue(key), maximum);
-    assert.equal(api.SetValue('cmi.interactions.3.correct_responses.0.pattern', '{case_matters=invalid}bad'), 'false'); assert.equal(api.GetLastError(), '408');
+    assert.equal(api.SetValue(`cmi.interactions.${responseVectors.length}.correct_responses.0.pattern`, '{case_matters=invalid}bad'), 'false'); assert.equal(api.GetLastError(), '408');
   });
 
   test(edition + ': browser-equivalent state replays transactionally, retries exactly and resumes original response bytes', async () => {
