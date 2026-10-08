@@ -109,6 +109,7 @@ for (const edition of SCORM_STANDARDS) test(edition + ': actual Chrome Side Pane
     const beforeRebind = gateway.requestCount;
     await panel.getByLabel('Message', {exact: true}).fill('The old consent must not read after an account change.'); await send.click();
     await expect(panel.locator('header .status')).toHaveText('error');
+    await panel.getByText('Tool activity', {exact: true}).click();
     await expect(panel.getByText(/STALE_CONTEXT/)).toBeVisible(); expect(gateway.requestCount).toBe(beforeRebind);
     await pin('learning:demo:learner-b'); await expect(send).toBeDisabled();
     await panel.getByRole('button', {name: 'Disconnect', exact: true}).click(); await expect(send).toBeDisabled(); await expect(panel.getByLabel('Gateway token')).toHaveValue('');
