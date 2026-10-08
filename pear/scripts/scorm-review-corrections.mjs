@@ -114,6 +114,22 @@ const model12Updates = [
     "    const invalidErrorCode = this.getUndefinedDataModelErrorCode(CMIElement);\n    for (let idx"
   ]
 ];
+const time12Original = "3c6715ad2bdd07c445af58d24509ded9a8388345ccc1931b5c467ccb9c8f9cec";
+const time12Patched = "eb75395928406b5a4722d344fd52ef3614e83797c736fb5d79d00f50d47cb642";
+const time12Updates = [
+  [
+    "  CMITimespan: \"^([0-9]+):([0-9]{2}):([0-9]{2})(\\\\.\\\\d{1,2})?$\",",
+    "  CMITimespan: \"^([0-9]{2,4}):([0-9]{2}):([0-9]{2})(\\\\.\\\\d{1,2})?$\","
+  ]
+];
+const time2004Original = "1755d776fb21a84a37918169e77ffe6b7c64b6b0f82052d78d08dc018fb566a1";
+const time2004Patched = "86189a9e5d9990b064f114ec7a8eecfea9ef05731ac87405e9e280b1e2a7cae1";
+const time2004Updates = [
+  [
+    "  CMITimespan: \"^P(?:([.,\\\\d]+)Y)?(?:([.,\\\\d]+)M)?(?:([.,\\\\d]+)W)?(?:([.,\\\\d]+)D)?(?:T?(?:([.,\\\\d]+)H)?(?:([.,\\\\d]+)M)?(?:(\\\\d+(?:\\\\.\\\\d{1,2})?)S)?)?$\",",
+    "  CMITimespan: \"^P(?=\\\\d|T\\\\d)(?!.*W)(?!.*T$)(?:(\\\\d+)Y)?(?:(\\\\d+)M)?(?:(\\\\d+)W)?(?:(\\\\d+)D)?(?:T(?:(\\\\d+)H)?(?:(\\\\d+)M)?(?:(\\\\d+(?:\\\\.\\\\d{1,2})?)S)?)?$\","
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -140,9 +156,25 @@ export function reviewedSCORMSource(source) {
     source = replace(source, model12Updates);
     if (hash(source) !== model12Patched) throw Error('SCORM 1.2 model-error checksum mismatch');
   }
+  if (hash(source) === time12Original) {
+    source = replace(source, time12Updates);
+    if (hash(source) !== time12Patched) throw Error('SCORM timeinterval checksum mismatch');
+  }
+  if (hash(source) === time2004Original) {
+    source = replace(source, time2004Updates);
+    if (hash(source) !== time2004Patched) throw Error('SCORM timeinterval checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === time2004Patched) {
+    source = replace(source, time2004Updates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== time2004Original) throw Error('SCORM timeinterval reverse checksum mismatch');
+  }
+  if (hash(source) === time12Patched) {
+    source = replace(source, time12Updates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== time12Original) throw Error('SCORM timeinterval reverse checksum mismatch');
+  }
   if (hash(source) === model12Patched) {
     source = replace(source, model12Updates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== model12Original) throw Error('SCORM 1.2 model-error reverse checksum mismatch');
