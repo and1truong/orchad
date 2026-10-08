@@ -19,10 +19,14 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const delimiterUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const responseDelimiterUpdates = ')+'const responseDelimiterUpdates = '.length,installer.indexOf(';\n\nconst separators',installer.indexOf('const responseDelimiterUpdates = '))));
   const separatorUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const separatorUpdates = ')+'const separatorUpdates = '.length,installer.indexOf(';\n\nconst identifiers',installer.indexOf('const separatorUpdates = '))));
   const identifierUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const identifierUpdates = ')+'const identifierUpdates = '.length,installer.indexOf(';\n\nconst timestamps',installer.indexOf('const identifierUpdates = '))));
-  const timestampUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const timestampUpdates = ')+'const timestampUpdates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const timestampUpdates = '))));
-  let identifiers2004=current2004;
+  const timestampUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const timestampUpdates = ')+'const timestampUpdates = '.length,installer.indexOf(';\n\nconst initialized',installer.indexOf('const timestampUpdates = '))));
+  const initializationUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const initializationUpdates = ')+'const initializationUpdates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const initializationUpdates = '))));
+  let timestamps2004=current2004;
+  for(const [before,after] of initializationUpdates.toReversed()){assert.equal(timestamps2004.split(after).length,2);timestamps2004=timestamps2004.replace(after,()=>before);}
+  assert.equal(hash(current2004),'17b3f713e5ddf6caf3206c77d2ea19e17fef5d4610b2d61d267f523012064871');
+  let identifiers2004=timestamps2004;
   for(const [before,after] of timestampUpdates.toReversed()){assert.equal(identifiers2004.split(after).length,2);identifiers2004=identifiers2004.replace(after,()=>before);}
-  assert.equal(hash(current2004),'bc9b1872658bcc18d5bd9fcb20f035e2d0d9657f9ea174f847905256af141938');
+  assert.equal(hash(timestamps2004),'bc9b1872658bcc18d5bd9fcb20f035e2d0d9657f9ea174f847905256af141938');
   let separators2004=identifiers2004;
   for(const [before,after] of identifierUpdates.toReversed()){assert.equal(separators2004.split(after).length,2);separators2004=separators2004.replace(after,()=>before);}
   assert.equal(hash(separators2004),'92eae7d9b66fc91c85c68e3ad53b3a4b1f9011b89e69698f0619c3187c69ff8c');
@@ -59,7 +63,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   try {
     const directory=join(root,'node_modules/scorm-again'),entries=join(directory,'dist/esm');mkdirSync(entries,{recursive:true});mkdirSync(join(root,'scripts'));
     const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));
-    for(const input of [pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,current2004]){
+    for(const input of [pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,timestamps2004,current2004]){
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);
     }

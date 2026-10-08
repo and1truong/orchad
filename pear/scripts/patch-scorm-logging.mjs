@@ -163,6 +163,23 @@ const timestampUpdates = [
   ]
 ];
 
+const initialized = '17b3f713e5ddf6caf3206c77d2ea19e17fef5d4610b2d61d267f523012064871';
+const initializationUpdates = [
+  [
+    "    this.childArray = [];\n  }\n  /**\n   * Called when the API has been reset",
+    "    this.childArray = [];\n  }\n  initialize() {\n    super.initialize();\n    for (const child of this.childArray) child.initialize();\n  }\n  /**\n   * Called when the API has been reset"
+  ],
+  [
+    "    } else if (stringMatches(CMIElement, \"cmi\\\\.comments_from_lms\\\\.\\\\d+\")) {\n      return new CMICommentsObject(true);",
+    "    } else if (stringMatches(CMIElement, \"cmi\\\\.comments_from_lms\\\\.\\\\d+\")) {\n      // Pear: reject content-owned LMS records before appending to the collection.\n      if (this.context.isInitialized()) {\n        this.context.throwSCORMError(CMIElement, scorm2004_errors.READ_ONLY_ELEMENT, CMIElement);\n        return null;\n      }\n      return new CMICommentsObject(true);"
+  ]
+];
+
+if (digest(source) === initialized) for (const [before, after] of initializationUpdates.toReversed()) {
+  if (source.split(after).length !== 2) throw Error('SCORM initialization reverse patch no longer matches');
+  source = source.replace(after, () => before);
+}
+
 if (digest(source) === timestamps) for (const [before, after] of timestampUpdates.toReversed()) {
   if (source.split(after).length !== 2) throw Error('SCORM timestamp reverse patch no longer matches');
   source = source.replace(after, () => before);
@@ -241,6 +258,8 @@ for (const [before, after] of identifierUpdates) replaceOnce(before, after);
 if (digest(output) !== identifiers) throw Error('SCORM URI identifier checksum mismatch');
 for (const [before, after] of timestampUpdates) replaceOnce(before, after);
 if (digest(output) !== timestamps) throw Error('SCORM timestamp checksum mismatch');
+for (const [before, after] of initializationUpdates) replaceOnce(before, after);
+if (digest(output) !== initialized) throw Error('SCORM initialization checksum mismatch');
 writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root), source12 = readFileSync(path12, 'utf8');
