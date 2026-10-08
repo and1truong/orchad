@@ -85,3 +85,16 @@ authorization remains unchanged. This avoids relying on subframe callback
 routing or relaxing SCO CSP/capabilities. Two original VM tests execute the
 actual included initializer; actual three-platform native CI remains required.
 Reference: https://docs.rs/tauri/2.12.1/tauri/struct.Builder.html#method.invoke_system
+
+
+Windows cleanup followup: exact e594815c run 37830380908 failed SCORM
+2004-3 shutdown; attempt 2 failed native Pear shutdown after its authority
+checks passed. Both failures remain recorded. An original incomplete-HTTP
+request regression reproduces Pear fixture shutdown failure (4/5 pass, Pear
+fails), because Fastify waits for live connections. CI-only Pear cleanup now
+closes those connections before Fastify/database cleanup, matching SCORM.
+The unchanged five-second budget and clean exit-0 requirements remain; forced
+kills cannot pass. Native/Pear fixture exit codes, signals, forced-kill and
+quit acknowledgement are logged separately to identify any further failure.
+Current-head native acceptance remains required; this fix does not prove the
+previous SCORM failure shares that cause.
