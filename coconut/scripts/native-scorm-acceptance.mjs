@@ -12,9 +12,10 @@ import {smokeLines} from "./smoke-lines.mjs";
 const coconutRoot=fileURLToPath(new URL("..",import.meta.url));
 const pearRoot=fileURLToPath(new URL("../../pear/",import.meta.url));
 const TRUSTED="http://127.0.0.1:4310",SMOKE_PORT=4319,MCP_PORT=14313;
-const nonce=randomUUID(),lane="native-scorm",checks=[];
+const edition=process.env.PEAR_NATIVE_SCORM_EDITION??"2004-4";
+const nonce=randomUUID(),lane="native-scorm:"+edition,checks=[];
 const check=(name,cond)=>{checks.push(name);console.log(`  ${cond?"PASS":"FAIL"} ${name}`);if(!cond)throw Error("Acceptance failed: "+name);};
-const fixture=spawn(process.execPath,["--import","tsx","scripts/native-scorm-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe"]});
+const fixture=spawn(process.execPath,["--import","tsx","scripts/native-scorm-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe","ipc"]});
 let fixtureOutput="",fixtureError="",fixtureExit=null;
 fixture.stdout.on("data",d=>fixtureOutput+=d);fixture.stderr.on("data",d=>fixtureError+=d);fixture.on("exit",c=>fixtureExit=c);
 await new Promise((resolve,reject)=>{
@@ -49,7 +50,7 @@ const close=async()=>{
  if(client)await client.close().catch(()=>{});
  try{await smoke("quit",{},3000);}catch{}
  if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
- fixture.kill("SIGTERM");
+ if(fixture.connected)fixture.send({kind:"close"});
  if(fixtureExit===null)await new Promise(resolve=>{const t=setTimeout(()=>{fixture.kill("SIGKILL");resolve();},5000);fixture.once("exit",()=>{clearTimeout(t);resolve();});});
 };
 try {
@@ -62,9 +63,11 @@ try {
  check('real Tauri WebView binds the authenticated Pear workspace during SCORM playback',!!target);
  await waitMarker(/^COCONUT_SMOKE:ui-response:consent$/,15000); await heartbeat();
  const first=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=1&&value.checkpoints>=1?value:false;},60000);
+ check('real requested edition and actual WebView user agent are recorded',first.edition===edition&&typeof first.probes[0].userAgent==='string'&&first.probes[0].userAgent.length>0);
+ console.log(JSON.stringify({platform:process.platform,edition,userAgent:first.probes[0].userAgent}));
  const isolated=probe=>['pearCookieDenied','pearStorageDenied','pearBridgeDenied','pearNativeDenied','noOwnBridge','nativeDenied','externalFetchDenied'].every(key=>probe[key]===true);
  check('native untrusted SCO cannot read Pear credentials/storage or invoke app/native authority',isolated(first.probes[0]));
- check('native SCORM reports incomplete progress without official proof or external fixture requests',first.proofs===0&&first.calls.length===0&&first.probes[0].entry==='ab-initio');
+ check('native SCORM reports incomplete progress without official proof or external fixture requests',first.proofs===0&&first.calls.length===0&&first.probes[0].entry==='ab-initio'&&first.droppedACK===true);
  const scope={targetId:target.targetId,pageInstanceId:target.pageInstanceId};
  const pair=await request({action:'pair',name:'Native SCORM fixture',scopes:['read'],targetIds:[target.targetId],readTools:['learning_get_lesson']});
  client=new Client({name:'native-scorm-acceptance',version:'0.1.0'});
@@ -76,6 +79,9 @@ try {
  check('real external MCP reads permitted source metadata while SCORM is active',lesson?.ok&&lesson.data.title==='Package lesson');
  check('native host source read excludes SCORM CMI/capabilities/private responses',['scorm','state','runtime_state','token','suspend_data','answers','csrf'].every(key=>!Object.hasOwn(lesson.data,key)));
  const command=async action=>{const result=await fetch(TRUSTED+'/native-scorm/'+nonce+'/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});if(!result.ok)throw Error('Synthetic fixture command denied');};
+ await command('retry');
+ await waitFor(async()=>{const value=await state();return value.exactRetry&&value.checkpoints>=2?value:false;},30000);
+ check('actual native lost ACK retries identical payload/receipt without another revision/history record',true);
  await command('resume');
  const resumed=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=2&&value.checkpoints>=2?value:false;},60000);
  check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1]));
