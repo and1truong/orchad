@@ -88,7 +88,14 @@ app.post(prefix + '/driver-error', async req => {driverErrors.push(String((req.b
 await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host: '127.0.0.1', port: 4315}); await app.listen({host: '127.0.0.1', port: 4310});
 console.log('PEAR_NATIVE_FIXTURE_READY');
 let closing = false;
-async function close() {if (closing) return; closing = true; sink.server.closeAllConnections(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await sink.close(); await app.close(); f.db.close(); rmSync(dir, {recursive: true, force: true}); process.exit(0);}
+async function close() {
+  if (closing) return; closing = true; console.log('PEAR_NATIVE_FIXTURE_CLOSE:received');
+  sink.server.closeAllConnections(); content!.server.closeAllConnections(); app.server.closeAllConnections();
+  console.log('PEAR_NATIVE_FIXTURE_CLOSE:connections-closed');
+  await sink.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:sink-closed');
+  await app.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:app-closed');
+  f.db.close(); rmSync(dir, {recursive: true, force: true}); console.log('PEAR_NATIVE_FIXTURE_CLOSE:cleanup-complete'); process.exit(0);
+}
 process.on('SIGTERM', () => void close()); process.on('SIGINT', () => void close());
 
 // Node IPC gives Windows the same graceful fixture cleanup as Unix signals.

@@ -45,14 +45,14 @@ const waitFor=async(fn,ms,step=250)=>{const t=Date.now()+ms;for(;;){const v=awai
 
 
 let client=null;
-const shutdown={quitAcknowledged:false,nativeForced:false,fixtureForced:false,nativeSignal:null,fixtureSignal:null};
+const shutdown={quitAcknowledged:false,nativeForced:false,fixtureForced:false,nativeSignal:null,fixtureSignal:null,fixtureCloseSent:false,fixtureIPCError:null};
 child.on('exit',(_code,signal)=>shutdown.nativeSignal=signal);fixture.on('exit',(_code,signal)=>shutdown.fixtureSignal=signal);
 const state=async()=>{const r=await fetch(TRUSTED+"/native-scorm/"+nonce+"/state");if(!r.ok)throw Error("Fixture state unavailable");return r.json();};
 const close=async()=>{
  if(client)await client.close().catch(()=>{});
  try{await smoke("quit",{},3000);shutdown.quitAcknowledged=true;}catch{}
  if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.nativeForced=true;child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
- if(fixture.connected)fixture.send({kind:"close"});
+ if(fixture.connected){shutdown.fixtureCloseSent=true;fixture.send({kind:"close"},error=>{shutdown.fixtureIPCError=error?.code??null;});}
  if(fixtureExit===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.fixtureForced=true;fixture.kill("SIGKILL");resolve();},5000);fixture.once("exit",()=>{clearTimeout(t);resolve();});});
 };
 try {
@@ -96,7 +96,7 @@ try {
  await waitFor(async()=>(await tool('host_list_targets',{}))?.data?.targets?.find(t=>t.documentId==='learning:demo:learner-b'),30000);
  const old=await mcp('host_call_tool',{...call,call:{...call.call,requestId:randomUUID()}});
  check('old native MCP pairing cannot read the SCORM source after identity change',old?.ok===false);
- await close(); console.log(JSON.stringify({shutdown,nativeExit:exitCode,fixtureExit}));check('native SCORM fixture shuts down cleanly',exitCode===0&&fixtureExit===0&&!shutdown.nativeForced&&!shutdown.fixtureForced);
+ await close(); console.log(JSON.stringify({shutdown,nativeExit:exitCode,fixtureExit,fixtureClosePhases:fixtureOutput.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g)??[]}));check('native SCORM fixture shuts down cleanly',exitCode===0&&fixtureExit===0&&!shutdown.nativeForced&&!shutdown.fixtureForced);
  console.log(`[${lane}] ${checks.length}/${checks.length} checks passed`);
 } catch(error) {console.error('['+lane+'] FAILED: '+error.message);
  const diagnostic=await state().catch(()=>null);if(diagnostic)console.error(JSON.stringify({edition:diagnostic.edition,driverErrors:diagnostic.driverErrors,contentRequests:diagnostic.contentRequests,probes:diagnostic.probes.length,sinkRequests:diagnostic.calls.length,dynamicProbes:diagnostic.probes.map(probe=>({popupDenied:probe.popupDenied,serviceWorkerDenied:probe.serviceWorkerDenied,formAttempted:probe.formAttempted,egressDirectives:probe.egressDirectives,egressViolations:probe.egressViolations,mediaPlayback:probe.mediaPlayback,mediaError:probe.mediaError})),nativeSurfaces:diagnostic.probes.map(probe=>probe.nativeSurface),checkpoints:diagnostic.checkpoints,droppedACK:diagnostic.droppedACK,exactRetry:diagnostic.exactRetry,proofs:diagnostic.proofs}));console.error(stderr.slice(-2000));console.error(fixtureError.slice(-1000));await close();process.exitCode=1;}
