@@ -151,6 +151,23 @@ const identifierUpdates = [
   ]
 ];
 
+const timestamps = 'bc9b1872658bcc18d5bd9fcb20f035e2d0d9657f9ea174f847905256af141938';
+const timestampUpdates = [
+  [
+    "  CMITime: \"^(19[7-9][0-9]|[2-9][0-9]{3})((-(0[1-9]|1[0-2]))((-(0[1-9]|[1-2][0-9]|3[0-1]))(T([0-1][0-9]|2[0-3])((:[0-5][0-9])((:[0-5][0-9])((\\\\.[0-9]{1,6})((Z|([+|-]([0-1][0-9]|2[0-3])))(:[0-5][0-9])?)?)?)?)?)?)?)?$\",",
+    "  CMITime: \"^(?:19[7-9][0-9]|20(?:[0-2][0-9]|3[0-8]))(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12][0-9]|3[01])(?:T(?:[01][0-9]|2[0-3])(?::[0-5][0-9](?::[0-5][0-9](?:\\\\.[0-9]{1,2}(?:(?:Z|[+-](?:[01][0-9]|2[0-3])(?::[0-5][0-9])?))?)?)?)?)?)?)?(?![\\\\s\\\\S])\","
+  ],
+  [
+    "function check2004ValidFormat(CMIElement, value, regexPattern, allowEmptyString) {\n  return checkValidFormat(\n    CMIElement,\n    value,\n    regexPattern,\n    scorm2004_errors.TYPE_MISMATCH,\n    Scorm2004ValidationError,\n    allowEmptyString\n  );\n}\n",
+    "function check2004ValidFormat(CMIElement, value, regexPattern, allowEmptyString) {\n  const valid = checkValidFormat(\n    CMIElement,\n    value,\n    regexPattern,\n    scorm2004_errors.TYPE_MISMATCH,\n    Scorm2004ValidationError,\n    allowEmptyString\n  );\n  // Pear: lexical day bounds must also respect the Gregorian month/year.\n  if (regexPattern === scorm2004_regex.CMITime && value.length >= 10) {\n    const year = Number(value.slice(0, 4)), month = Number(value.slice(5, 7)), day = Number(value.slice(8, 10));\n    if (day > new Date(Date.UTC(year, month, 0)).getUTCDate()) {\n      throw new Scorm2004ValidationError(CMIElement, scorm2004_errors.TYPE_MISMATCH);\n    }\n  }\n  return valid;\n}\n"
+  ]
+];
+
+if (digest(source) === timestamps) for (const [before, after] of timestampUpdates.toReversed()) {
+  if (source.split(after).length !== 2) throw Error('SCORM timestamp reverse patch no longer matches');
+  source = source.replace(after, () => before);
+}
+
 // The exact known v9 output reverses to the known v8 input before upgrades.
 // Never undo or accept an unknown source, even if replacement text matches.
 if (digest(source) === identifiers) for (const [before, after] of identifierUpdates.toReversed()) {
@@ -222,6 +239,8 @@ if (digest(output) !== separators) for (const [before, after] of separatorUpdate
 if (digest(output) !== separators) throw Error('SCORM reserved-separator checksum mismatch');
 for (const [before, after] of identifierUpdates) replaceOnce(before, after);
 if (digest(output) !== identifiers) throw Error('SCORM URI identifier checksum mismatch');
+for (const [before, after] of timestampUpdates) replaceOnce(before, after);
+if (digest(output) !== timestamps) throw Error('SCORM timestamp checksum mismatch');
 writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root), source12 = readFileSync(path12, 'utf8');
