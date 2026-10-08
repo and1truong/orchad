@@ -202,6 +202,22 @@ const responseNumericUpdates = [
     "        if (part2?.includes(\"[:]\")) for (const endpoint of splitDelimited(part2, \"[:]\")) check2004ValidFormat(\"cmi.interactions.n.correct_responses.n.pattern\", endpoint, scorm2004_regex.CMIDecimal, true);\n        if (fmt2 && part2 !== void 0 && !fmt2.test(part2)) {"
   ]
 ];
+const emptyLocationOriginal = "16ea129cb6cbf6e50774afe6c852afd3dfb861e52220286d368bbec535ac9d14";
+const emptyLocationPatched = "400811138e860165b56b9444bf5dbeeb65c5fc46c5cf37a88ac34ade7b2c4571";
+const emptyLocationUpdates = [
+  [
+    "location, scorm2004_regex.CMIString1000)",
+    "location, scorm2004_regex.CMIString1000, true)"
+  ],
+  [
+    "        location,\n        scorm2004_regex.CMIString250\n",
+    "        location,\n        scorm2004_regex.CMIString250,\n        true\n"
+  ],
+  [
+    "^cmi\\.interactions\\.\\d+\\.correct_responses\\.\\d+\\.pattern$",
+    "^cmi\\.(?:interactions\\.\\d+\\.correct_responses\\.\\d+\\.pattern|location|comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location))$"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -256,9 +272,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, responseNumericUpdates);
     if (hash(source) !== responseNumericPatched) throw Error("SCORM numeric response checksum mismatch");
   }
+  if (hash(source) === emptyLocationOriginal) {
+    source = replace(source, emptyLocationUpdates);
+    if (hash(source) !== emptyLocationPatched) throw Error("SCORM empty location checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === emptyLocationPatched) {
+    source = replace(source, emptyLocationUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== emptyLocationOriginal) throw Error("SCORM empty location reverse checksum mismatch");
+  }
   if (hash(source) === responseNumericPatched) {
     source = replace(source, responseNumericUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== responseNumericOriginal) throw Error("SCORM numeric response reverse checksum mismatch");

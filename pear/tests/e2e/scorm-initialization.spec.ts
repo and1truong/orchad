@@ -16,7 +16,17 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     for(const row of [0,1])for(const leaf of ['unknown','comment.extra','timestamp\\n'])if(api.SetValue('cmi.comments_from_lms.'+row+'.'+leaf,'forged')!=='false'||api.GetLastError()!=='401')throw Error('undefined LMS comment leaf');
     if(api.GetValue('cmi.comments_from_lms._count')!=='1')throw Error('LMS count changed');
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue('cmi.comments_from_learner.0.comment')!=='Original own comment')throw Error('own comment resume');
+    if(api.GetValue('cmi.entry')==='resume')for(const key of ['cmi.location','cmi.comments_from_learner.0.location','cmi.comments_from_learner.1.comment'])if(api.GetValue(key)!==''||api.GetLastError()!=='0')throw Error('cleared location/comment resume '+key);
     if(api.SetValue('cmi.comments_from_learner.0.comment','Original own comment')!=='true')throw Error('own comment write');
+    for(const key of ['cmi.location','cmi.comments_from_learner.0.location']) {
+      if(api.SetValue(key,'Original location')!=='true'||api.SetValue(key,'')!=='true'||api.GetValue(key)!==''||api.GetLastError()!=='0')throw Error('empty location '+key);
+      if(api.SetValue(key,'\\ud800')!=='false'||api.GetLastError()!=='406'||api.GetValue(key)!=='')throw Error('invalid location rollback');
+    }
+    if(api.SetValue('cmi.comments_from_learner.1.comment','')!=='true'||api.GetValue('cmi.comments_from_learner._count')!=='2')throw Error('empty comment record');
+    document.getElementById('save').onclick=()=>{
+      for(const [key,value] of [['cmi.location',''],['cmi.suspend_data','licensed-state'],['cmi.completion_status','incomplete'],['cmi.exit','suspend']])if(api.SetValue(key,value)!=='true')throw Error('cleared-location save '+key);
+      document.getElementById('result').textContent='Licensed save: '+save();
+    };
     document.getElementById('entry').textContent='Read-only comments verified';`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); const binding = f.enroll(), initial = f.launch(binding), seed = f.player.bootstrap(initial.token).state; seed.comments_from_lms = {0: lmsComment}; f.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?').run(JSON.stringify(seed)); f.player.close(f.service.principal('learner-a'), initial.launchId, 'session-learner-a');
   const origin = 'http://127.0.0.1:4456', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4457', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
@@ -45,6 +55,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
     expect(stored.comments_from_lms).toEqual({0: lmsComment}); expect(stored.comments_from_learner[0].comment).toBe('Original own comment');
+    expect(stored.location).toBe(''); expect(stored.comments_from_learner[0].location).toBe(''); expect(stored.comments_from_learner[1].comment).toBe(''); expect(Object.keys(stored.comments_from_learner)).toHaveLength(2);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Read-only comments verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);

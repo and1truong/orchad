@@ -112,3 +112,10 @@ new-head full CI pending. Local managed extension policy is unchanged.
 ADR-128 extends existing three built wide-real journeys to numeric learner/
 correct and performance bound overflow/range refusal, stored exact strings
 and lost-ACK retry/close-resume. Full new-head acceptance remains required.
+
+ADR-129 adds six original three-profile shared/facade/typed replay cases for
+empty locations/comment records and extends the existing three built read-only
+comment journeys with empty save, persisted count/value and lost-ACK/resume.
+Local734/106,focused50,build,three built journeys completed; new-head full CI
+and all native/review gates remain required. Durable initialized/unset presence
+and full field matrix remain OPEN.
