@@ -57,3 +57,5 @@ Collection append correction (ADR-106) uses checksum-locked atomicity-v12 and kn
 Packed-index correction (ADR-107) checksum-locks both engine entries and preserves known v12 snapshots. Historical malformed keys remain subject to trusted replay/refusal and explicit operator recovery; no silent canonicalization, migration, deletion or production change.
 
 SCORM 1.2 append correction (ADR-108) upgrades only known exact ESM inputs to atomicity-v14; prior v13 snapshot markers remain compatible. Existing empty records/history are preserved. No automatic repair, schema migration, purge or production enablement.
+
+Score-default correction (ADR-109) applies only to fresh/reset 1.2 score objects. Trusted historical maxima, including engine-defaulted 100 values whose provenance cannot be inferred, are preserved byte-for-byte through load. No automatic rewrite, migration, reset of stored attempts or production enablement. Known v14 snapshots remain compatible.

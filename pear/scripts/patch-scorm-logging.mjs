@@ -306,6 +306,22 @@ writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root);
 let source12 = readFileSync(path12, 'utf8');
+const score12 = '9e73552ee1a4f79998eb4817b62f3c72a8a920b2b1b9434f7bc2e96867d23dd0';
+const score12Updates = [
+  [
+    "    this._max = params.max || params.max === \"\" ? params.max : \"100\";",
+    "    // Pear: fresh 1.2 scores remain blank until explicitly set.\n    this._max = params.max ?? \"\";"
+  ],
+  [
+    "   * SCORE-01: Resets _raw and _min to empty strings to match subclass behavior.\n   * _max is NOT reset here as it has a non-trivial default (\"100\") that is\n   * handled by the constructor or reinitialization logic.\n   */\n  reset() {\n    this._initialized = false;\n    this._raw = \"\";\n    this._min = \"\";\n  }",
+    "   * Pear: reset every score component to its blank initial value.\n   */\n  reset() {\n    this._initialized = false;\n    this._raw = \"\";\n    this._min = \"\";\n    this._max = \"\";\n  }"
+  ]
+];
+
+if (digest(source12) === score12) for (const [before, after] of score12Updates.toReversed()) {
+  if (source12.split(after).length !== 2) throw Error('SCORM 1.2 score reverse patch no longer matches');
+  source12 = source12.replace(after, () => before);
+}
 const atomic12 = 'e34cb1536920b0597008b53dc97f13abddc71bb07911a0cd4daa55f127c551be';
 const atomicity12Updates = [
   [
@@ -352,4 +368,9 @@ for (const [before, after] of atomicity12Updates) {
   output12 = output12.replace(before, () => after);
 }
 if (digest(output12) !== atomic12) throw Error('SCORM 1.2 atomicity checksum mismatch');
+for (const [before, after] of score12Updates) {
+  if (output12.split(before).length !== 2) throw Error('SCORM 1.2 score-default correction no longer matches');
+  output12 = output12.replace(before, () => after);
+}
+if (digest(output12) !== score12) throw Error('SCORM 1.2 score-default checksum mismatch');
 writeFileSync(path12, output12);

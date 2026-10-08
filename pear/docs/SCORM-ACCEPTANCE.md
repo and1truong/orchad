@@ -62,3 +62,5 @@ ADR-106 extends named DM-03/API-02 state-preservation evidence to failed first/n
 ADR-107 extends DM-03 path binding to both engines: malformed full indices cannot alias existing records on GetValue/SetValue. Four-edition original vectors include nested arrays, keywords, decimal/large boundaries, private state preservation and built lost-ACK/resume. Exact-head acceptance remains required; no profile certification or production enablement.
 
 ADR-108 extends bounded failed-append atomicity to the 1.2 entry and verifies existing records, nested arrays, successful retry, typed errors, trusted preload and durable bound checkpoint/resume. The 2004 output is unchanged. Full 1.2 reference/API/data-model acceptance and remaining register families stay OPEN.
+
+ADR-109 aligns supported 1.2 core/objective score initialization/reset with the ADL blank-default recommendation and preserves explicit stored maxima. Named API/preload/bound-checkpoint/retry and built resume evidence adds a bounded DM-03 correction; it does not close optional-field or complete score/reference acceptance.

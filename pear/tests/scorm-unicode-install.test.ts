@@ -24,11 +24,14 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const atomicityUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const atomicityUpdates = ')+'const atomicityUpdates = '.length,installer.indexOf(';\n\nconst indexed',installer.indexOf('const atomicityUpdates = '))));
   const indexUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const indexUpdates = ')+'const indexUpdates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const indexUpdates = '))));
   const atomicity12Updates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const atomicity12Updates = ')+'const atomicity12Updates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const atomicity12Updates = '))));
-  let indexed12=current12;for(const [before,after] of atomicity12Updates.toReversed()){assert.equal(indexed12.split(after).length,2);indexed12=indexed12.replace(after,()=>before);}
+  const score12Updates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const score12Updates = ')+'const score12Updates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const score12Updates = '))));
+  let atomic12=current12;for(const [before,after] of score12Updates.toReversed()){assert.equal(atomic12.split(after).length,2);atomic12=atomic12.replace(after,()=>before);}
+  assert.equal(hash(atomic12),'e34cb1536920b0597008b53dc97f13abddc71bb07911a0cd4daa55f127c551be');
+  let indexed12=atomic12;for(const [before,after] of atomicity12Updates.toReversed()){assert.equal(indexed12.split(after).length,2);indexed12=indexed12.replace(after,()=>before);}
   assert.equal(hash(indexed12),'4d205a6b1c73d9af2b1f09b4f9a12b713cea07468b50bc3947f3c86370ce3e99');
   let atomic2004=current2004,unicode12=indexed12;
   for(const [before,after] of indexUpdates.toReversed()){assert.equal(atomic2004.split(after).length,2);atomic2004=atomic2004.replace(after,()=>before);assert.equal(unicode12.split(after).length,2);unicode12=unicode12.replace(after,()=>before);}
-  assert.equal(hash(current2004),'3fec364f6ea8cf9d4e5fbb226ced0646219fd456e5ae9f1bb1df0a739d826745'); assert.equal(hash(current12),'e34cb1536920b0597008b53dc97f13abddc71bb07911a0cd4daa55f127c551be');
+  assert.equal(hash(current2004),'3fec364f6ea8cf9d4e5fbb226ced0646219fd456e5ae9f1bb1df0a739d826745'); assert.equal(hash(current12),'9e73552ee1a4f79998eb4817b62f3c72a8a920b2b1b9434f7bc2e96867d23dd0');
   assert.equal(hash(unicode12),'2f8591ab1f08bd696ff11dc72b1e92c197d12512978ef870a39507ed9567e366');
   let initialized2004=atomic2004;
   for(const [before,after] of atomicityUpdates.toReversed()){assert.equal(initialized2004.split(after).length,2);initialized2004=initialized2004.replace(after,()=>before);}
@@ -79,7 +82,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);
     }
-    for(const input12 of [old12,unicode12,indexed12,current12]) {writeFileSync(join(entries,'scorm12.js'),input12);const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);}
+    for(const input12 of [old12,unicode12,indexed12,atomic12,current12]) {writeFileSync(join(entries,'scorm12.js'),input12);const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);}
     for(let n=0;n<2;n++){const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);}
     writeFileSync(join(entries,'scorm12.js'),current12+'\n// unexpected');assert.notEqual(spawnSync(process.execPath,[script]).status,0);
     writeFileSync(join(entries,'scorm12.js'),current12);writeFileSync(join(entries,'scorm2004.js'),current2004+'\n// unexpected');assert.notEqual(spawnSync(process.execPath,[script]).status,0);
