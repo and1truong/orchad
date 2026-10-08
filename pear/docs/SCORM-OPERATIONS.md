@@ -33,3 +33,9 @@ Schema 49 adds learner-scoped system shared-data working stores. Values, target-
 
 
 Schema 50 retains learner-owned system objective tracking with target/revision/source metadata. It counts toward runtime capacity and has a 4096-objective learner bound. Whole-database backup/offline restore preserves coherent values and closes old authority. Package revocation retains tracking history but blocks that package’s capabilities and old receipt replay; aggregate diagnostics do not disclose objective IDs/values. Production privacy/retention/archival gates remain open.
+
+Reported session time may be corrected downward. The last value replaces only
+the current launch's contribution; earlier sessions and initial total_time stay
+fixed. Receipt sequence/revision still enforce ordering and accepted retries
+cannot apply time twice. This content-reported field never replaces trusted host
+duration clocks. Unsafe cumulative centisecond totals roll back (ADR-099).
