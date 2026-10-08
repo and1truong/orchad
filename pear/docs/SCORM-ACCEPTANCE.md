@@ -1,9 +1,9 @@
 # SCORM #133 requirement acceptance
 
 This is the current requirement disposition, not a scope reduction or certification.
-Accepted baseline is main `016a040e76242d14e58d10623fdbc1ed94693bab`,
-tree `949d0d96101e3d0b2506511583608bf6fa7311f1`; push acceptance
-[37722879153](https://github.com/and1truong/orchad/actions/runs/37722879153) PASS.
+Accepted baseline is main `0888beee461e1656f1c717cefb205923f7705a6d`,
+tree `095549250484b8a8484d8c46a79e76eb8bd01f93`; push acceptance
+[37738101010](https://github.com/and1truong/orchad/actions/runs/37738101010) PASS.
 The source stack is integrated; earlier #164 local counts are historical evidence.
 [Completion register](SCORM-CONFORMANCE.md) assigns stable IDs to remaining
 code/validation/external gates. ADR-098 adds textual-response corrections and
@@ -11,6 +11,11 @@ original three-edition domain/built-browser vectors; full compliance is OPEN.
 ADR-099 corrects last-value session-time accounting in four editions, including
 downward/zero corrections, immutable prior-session total, centisecond precision,
 exact retry, rollback, DB reopen and built-browser close/resume.
+ADR-100 corrects shared reserved-separator handling in learner and correct
+responses. Original three-edition domain vectors cover bare punctuation, scalar
+limits, literal backslashes, bracketed matching/performance and numeric ranges.
+Built-browser ACK/close/resume vectors are authored; current-head CI is required.
+
 
 | Requirement | Implemented evidence | Outstanding acceptance |
 |---|---|---|

@@ -1,12 +1,17 @@
 # Current continuation — 2026-10-08
 
-Main baseline `016a040e76242d14e58d10623fdbc1ed94693bab`, exact tree
-`949d0d96101e3d0b2506511583608bf6fa7311f1`, push acceptance 37722879153 PASS.
-#165 has landed. Start new work from live main in an isolated checkout, preserving
+Main baseline `0888beee461e1656f1c717cefb205923f7705a6d`, exact tree
+`095549250484b8a8484d8c46a79e76eb8bd01f93`, push acceptance 37738101010 PASS.
+#165–167 have landed. Start new work from live main in an isolated checkout, preserving
 other worktrees/branches. The completion register is SCORM-CONFORMANCE.md;
 ADR-098 fixes shared textual-response grammar with known-snapshot compatibility.
 ADR-099 fixes last-value session-time replacement with centisecond accounting,
 previous-session preservation and four-edition durable/browser evidence.
+ADR-100 corrects shared reserved-separator handling in learner and correct
+responses. Original three-edition domain vectors cover bare punctuation, scalar
+limits, literal backslashes, bracketed matching/performance and numeric ranges.
+Built-browser ACK/close/resume vectors are authored; current-head CI is required.
+
 Full conformance/platform/reference/production gates remain open. Production
 stays disabled. No commercial upload/license purchase is authorized by coding.
 

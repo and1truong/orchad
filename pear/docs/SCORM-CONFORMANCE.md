@@ -1,7 +1,7 @@
 # SCORM #133 completion register
 
-Accepted baseline: main `016a040e76242d14e58d10623fdbc1ed94693bab`, tree
-`949d0d96101e3d0b2506511583608bf6fa7311f1`, push acceptance 37722879153
+Accepted baseline: main `0888beee461e1656f1c717cefb205923f7705a6d`, tree
+`095549250484b8a8484d8c46a79e76eb8bd01f93`, push acceptance 37738101010
 PASS. Source stack has landed. Historical handoff heads/pending statuses are not
 current blockers. This register indexes all remaining acceptance families;
 clause-level expansion and exhaustive conformance are still required.
@@ -18,7 +18,7 @@ external input is absent. No profile PASS means certification or full compliance
 | DM-02 | 2004 RTE 4.1.1.7 long/short URI identifiers | OPEN: upstream grammar not verified | RFC 3986 valid/invalid vectors, escaped delimiters, uniqueness/dependencies, exact storage |
 | DM-03 | 2004 RTE 4.2 data model; 1.2 CMI | PARTIAL: shared facade and server typed replay | Every mandatory field/access/default/vocabulary/range/collection limit; no silent host-envelope incompatibility |
 | RESP-01 | 2004 RTE 4.1.1.6 / 4.2.9.1a textual patterns | TESTED: ADR-098, responses domain/built-browser | Whitespace/newline/comma/property/repeated-record vectors covered; full type/edition/escaping matrix remains OPEN |
-| RESP-02 | 2004 RTE 4.2.9 learner/correct responses | PARTIAL: ADR-097/098 | Identifier types, semantic set uniqueness, replacement limits, numeric ranges, escaped separators, every interaction type |
+| RESP-02 | 2004 RTE 4.2.9 learner/correct responses | PARTIAL: ADR-097/098/100; shared bracketed-separator correction and original learner/replay vectors | Full identifier grammar, response-type/set/range matrix and every interaction type |
 | TIME-01 | 2004 RTE 4.1.1.7 / 4.2.21 / 4.2.25; 1.2 timespan | PARTIAL: ADR-099 last session-time replacement, fixed initial total, centisecond accounting/retry/rollback/reopen in four editions | Reference-aligned calendar-unit accounting and exhaustive overflow/precision/reset behavior; existing 365/30 reported-time policy remains bounded |
 | TIME-02 | IMS SS limitConditions and XML dateTime/duration | PARTIAL: ADR-088/094 | Full admitted standard duration/date binding, authoritative clocks, all boundaries and rollback/reopen |
 | LIFE-01 | Status/success/completion/credit/mode/entry/exit | PARTIAL: player/learning/2004 tests | Enumerate statuses and lifecycle transitions, reference reset/retake semantics and exactly-once time/proof |

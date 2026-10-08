@@ -16,8 +16,12 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const updates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const localizedUpdates = ')+'const localizedUpdates = '.length,installer.indexOf(';',installer.indexOf('const localizedUpdates = '))));
   assert.equal(updates.length,5);
   const responseUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const responseUpdates = ')+'const responseUpdates = '.length,installer.indexOf(';\n\nconst responseDelimiterUpdates',installer.indexOf('const responseUpdates = '))));
-  const delimiterUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const responseDelimiterUpdates = ')+'const responseDelimiterUpdates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const responseDelimiterUpdates = '))));
-  let previousResponses2004=current2004;
+  const delimiterUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const responseDelimiterUpdates = ')+'const responseDelimiterUpdates = '.length,installer.indexOf(';\n\nconst separators',installer.indexOf('const responseDelimiterUpdates = '))));
+  const separatorUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const separatorUpdates = ')+'const separatorUpdates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const separatorUpdates = '))));
+  let responses2004=current2004;
+  for(const [before,after] of separatorUpdates.toReversed()){assert.equal(responses2004.split(after).length,2);responses2004=responses2004.replace(after,()=>before);}
+  assert.equal(hash(responses2004),'5312ce9cf54a83580a5e839c03cf6338a3b1d30d18fb0ab81f955b2ec603cb6b');
+  let previousResponses2004=responses2004;
   for(const [before,after] of delimiterUpdates.toReversed()){assert.equal(previousResponses2004.split(after).length,2);previousResponses2004=previousResponses2004.replace(after,before);}
   assert.equal(hash(previousResponses2004),'8080f3641f2d758d3589ef6c7796a8703c4aae99d14a7069546070e7e2f942ad');
   let collections2004=previousResponses2004;
@@ -33,7 +37,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const actualScript=readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url),'utf8'),pairs:[string,string][]=[];
   // Reconstruct pinned historical inputs, then prove their exact known hashes.
   // Execute only the trusted replacement declarations with a capture callback.
-  runInNewContext(actualScript.slice(actualScript.indexOf('if (![selection, limits, patched, localized, collections, responsesPrevious, responses]'),actualScript.indexOf('if (![patched, localized, collections, responsesPrevious, responses].includes(digest(output))) throw')), {source:'',digest:()=>'',selection:'selection',limits:'limits',patched:'patched',localized:'localized',collections:'collections',responsesPrevious:'responsesPrevious',responses:'responses',replaceOnce:(a:string,b:string)=>pairs.push([a,b])});
+  runInNewContext(actualScript.slice(actualScript.indexOf('if (![selection, limits, patched, localized, collections, responsesPrevious, responses, separators]'),actualScript.indexOf('if (![patched, localized, collections, responsesPrevious, responses, separators].includes(digest(output))) throw')), {source:'',digest:()=>'',selection:'selection',limits:'limits',patched:'patched',localized:'localized',collections:'collections',responsesPrevious:'responsesPrevious',responses:'responses',separators:'separators',replaceOnce:(a:string,b:string)=>pairs.push([a,b])});
   assert.equal(pairs.length,11);
   let loggingOnly=unicode2004;
   for(const [before,after] of pairs.toReversed()){assert.equal(loggingOnly.split(after).length,2);loggingOnly=loggingOnly.replace(after,before);}
@@ -46,7 +50,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   try {
     const directory=join(root,'node_modules/scorm-again'),entries=join(directory,'dist/esm');mkdirSync(entries,{recursive:true});mkdirSync(join(root,'scripts'));
     const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));
-    for(const input of [pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,current2004]){
+    for(const input of [pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,current2004]){
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);
     }
