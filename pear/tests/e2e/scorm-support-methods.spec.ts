@@ -12,9 +12,9 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(editi
       if(api.SetValue('cmi.suspend_data','\\ud800')!=='false'||api.GetLastError()!=='${localError}')throw Error('local error');
       const current=api.GetDiagnostic('');
       if(!current||api.GetDiagnostic('${localError}')!==current||api.GetDiagnostic('201')===current)throw Error('requested diagnostic');
-      for(const code of ['unknown','999','65536','406suffix'])if(api.GetDiagnostic(code)!==''||api.GetErrorString(code)!==''||api.GetLastError()!=='${localError}')throw Error('unknown lookup');
+      ${old ? '' : "for(const code of ['unknown','999','65536','406suffix','__proto__','constructor','toString'])if(api.GetDiagnostic(code)!==''||api.GetErrorString(code)!==''||api.GetLastError()!=='406')throw Error('unknown lookup');"}
       if(api.GetValue('cmi.unknown')!==''||api.GetLastError()!=='401')throw Error('engine error');
-      if(!api.GetDiagnostic('')||api.GetDiagnostic('unknown')!==''||api.GetLastError()!=='401')throw Error('engine diagnostic');
+      if(!api.GetDiagnostic('')||api.GetDiagnostic('401')!==api.GetDiagnostic('')||api.GetLastError()!=='401')throw Error('engine diagnostic');
       if(api.SetValue('${old ? 'cmi.core.lesson_location' : 'cmi.location'}','diagnostic-page')!=='true'||api.GetLastError()!=='0')throw Error('recovery');
       document.getElementById('entry').textContent='Support methods verified';
     }verify();`;

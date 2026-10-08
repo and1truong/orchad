@@ -19,7 +19,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
       assert.ok(diagnostic.length > 0 && diagnostic.length <= 255, code);
       assert.equal(api.GetLastError(), expected);
     }
-    for (const unknown of ['unknown', '999', '65536', '406suffix']) {
+    for (const unknown of ['unknown', '999', '65536', '406suffix', '__proto__', 'constructor', 'toString']) {
       assert.equal(api.GetDiagnostic(unknown), '', unknown);
       assert.equal(api.GetErrorString(unknown), '', unknown);
       assert.equal(api.GetLastError(), expected);

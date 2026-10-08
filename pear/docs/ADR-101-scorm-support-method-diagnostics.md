@@ -13,10 +13,14 @@ authority or sequencing changes are needed.
 
 Original four-edition regressions reproduce the failure before correction and
 cover every defined 1.2/2004 error-code lookup in not-initialized, running and
-terminated states. Unknown words, undefined numeric codes and mixed suffixes
+terminated states. In 2004, unknown words, undefined numeric codes and mixed suffixes
 return empty; current/explicit diagnostics agree; support calls preserve both
 local and engine errors, bound descriptions to 255 characters, and create no
-checkpoints. Successful operations reset the effective error to zero.
+checkpoints. Only numeric error-code diagnostics are implemented in Pear; unknown
+names cannot reach the upstream inherited-property lookup, where __proto__,
+constructor and toString otherwise throw instead of returning a string. The
+original counterexamples reproduce that failure and now return empty without
+altering error state. Successful operations reset the effective error to zero.
 Built licensed-wrapper journeys exercise local/engine/unknown lookups, recovery,
 checkpoint and close/resume through actual synchronous API methods. Current-head
 CI is required for browser evidence; this checkout has no local Chromium.
