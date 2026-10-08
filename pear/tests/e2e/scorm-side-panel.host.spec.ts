@@ -20,6 +20,7 @@ test('actual Chrome Side Panel opens by user gesture and mounts the Lime UI', as
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker', {timeout: 10_000});
     const extensionId = new URL(worker.url()).hostname, panelURL = 'chrome-extension://' + extensionId + '/sidepanel.html';
     const opener = await context.newPage(); await opener.goto('chrome-extension://' + extensionId + '/opener.html');
+    await expect.poll(() => opener.locator('#open').evaluate(element => typeof (element as HTMLButtonElement).onclick)).toBe('function');
     await opener.getByRole('button', {name: 'Open actual Side Panel', exact: true}).click();
     await expect(opener.locator('body')).toHaveAttribute('data-opened', 'true');
     await expect.poll(() => worker.evaluate(async () => {
