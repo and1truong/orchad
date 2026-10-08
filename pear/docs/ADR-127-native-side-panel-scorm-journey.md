@@ -27,3 +27,5 @@ is blocked by managed ExtensionInstallBlocklist[*]. Full exact-head CI and
 review are required before recording these journeys as tested. Full other
 browser/platform, all-egress, operations/reference and integration gates
 remain OPEN/BLOCKED; epic stays open and production disabled.
+
+Actual #200 head c47b6daa/CI37849982707 failed all four journeys at panel automation attachment: SIDE_PANEL context, unique getContexts/report ID and CDP target type page were verified, but the original context.pages() did not include it. Reconnect through public connectOverCDP to the same loopback browser after verified mount, require exactly one existing panel page and independently recheck the same SIDE_PANEL document ID. No panel navigation, new panel tab, fallback, or assertion relaxation. Owner host typecheck and ordinary same-target CDP transport check passed; local managed extension blocklist still prevents actual-container execution. New-head full CI remains required. The initial data-URL transport probe was blocked by administrator policy; it was replaced by an ordinary synthetic loopback page without policy changes.
