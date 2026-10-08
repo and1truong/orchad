@@ -37,3 +37,9 @@ snapshot policy. No product authority, production gate, schema or historical
 learning data changes. Safari/Android actual devices/runners, full conformance,
 licensed package/Rustici differential and real isolation/operations remain
 OPEN/BLOCKED; epic stays open and production disabled.
+
+First Windows attempt on head 35a1121d failed in tauri-build because the default
+Windows resource icon was missing, before playback could run (job 113470724312,
+run 37823636259). Add only icons/icon.ico generated from the existing tracked
+64×64 icons/icon.png with the installed Tauri CLI (`tauri icon`); no replacement
+artwork or platform bypass. Actual Windows build/runtime evidence remains required.
