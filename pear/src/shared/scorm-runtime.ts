@@ -1,5 +1,6 @@
 import {scormCharacters, scorm12Writable} from './scorm-characterstring.ts';
 import Scorm12API from 'scorm-again/scorm12';
+import {scormModelPath} from './scorm-engine.ts';
 
 /** Only the standard synchronous API is exposed to content, never engine helpers. */
 export function createSCORM12API(options: {state?: Record<string, any>; checkpoint?: (state: Record<string, any>, finished: boolean) => unknown} = {}) {
@@ -25,11 +26,15 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
     LMSGetValue(key: string) {
       if (!active()) {bad('301'); return '';}
       if (typeof key !== 'string' || key === '') {bad('201'); return '';}
-      localError = null; return runtime.LMSGetValue(key);
+      if (!scormModelPath(key)) {bad('401'); return '';}
+      localError = null; const value = runtime.LMSGetValue(key);
+      if (typeof value !== 'string') {bad('401'); return '';}
+      return value;
     },
     LMSSetValue(key: string, value: string) {
       if (!active()) return bad('301');
       if (typeof key !== 'string' || key === '' || typeof value !== 'string') return bad('201');
+      if (!scormModelPath(key) || typeof runtime.LMSGetValue(key) !== 'string') return bad('401');
       if (scorm12Writable.test(key) && !Number.isFinite(scormCharacters(value)) || key === 'cmi.suspend_data' && scormCharacters(value) > 4096) return bad('405');
       if (key === 'cmi.core.lesson_status' && value === 'not attempted') return bad('405');
       localError = null; return runtime.LMSSetValue(key, value);

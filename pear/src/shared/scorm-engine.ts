@@ -1,6 +1,10 @@
 export const SCORM_STANDARDS = ['1.2', '2004-2', '2004-3', '2004-4'] as const;
 export type SCORMStandard = typeof SCORM_STANDARDS[number];
 export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-scorm12-score-defaults-v15'} as const;
+/** Model keywords are public; backing fields and engine roots are not API elements. */
+export function scormModelPath(key: string) {
+  return /^(?:cmi|adl)\./.test(key) && key.split('.').every(part => !part.startsWith('_') || ['_children', '_count', '_version'].includes(part));
+}
 export interface SCORMResource {
   id: string;
   kind: 'sco' | 'asset';
