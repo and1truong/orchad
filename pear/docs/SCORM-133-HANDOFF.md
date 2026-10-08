@@ -1,3 +1,18 @@
+# Current continuation — 2026-10-08
+
+Main baseline `016a040e76242d14e58d10623fdbc1ed94693bab`, exact tree
+`949d0d96101e3d0b2506511583608bf6fa7311f1`, push acceptance 37722879153 PASS.
+#165 has landed. Start new work from live main in an isolated checkout, preserving
+other worktrees/branches. The completion register is SCORM-CONFORMANCE.md;
+ADR-098 fixes shared textual-response grammar with known-snapshot compatibility.
+Full conformance/platform/reference/production gates remain open. Production
+stays disabled. No commercial upload/license purchase is authorized by coding.
+
+Everything below is historical handoff evidence; old missing-semantics and
+pending-main statements are superseded by the register and current epic status.
+
+---
+
 # Epic #133 — continuation handoff
 
 Current ownership (2026-10-08): user confirms no other session is working. This session owns SCORM integration and #49 register reconciliation. Earlier separate-owner prompts below are historical. Source tip #164 is 5281269795479540590176c07c7ce5570e4f1286 / tree 07fc9906a4aa1a87cfcdb41892d867fbbce03c92. All predecessor acceptance through #163 passed; #164 and integrated/main acceptance must be checked live. SCORM-ACCEPTANCE.md maps remaining requirements without claiming full conformance or production readiness.

@@ -67,14 +67,61 @@ const collectionUpdates = [
   ]
 ];
 
-if (![original, loggingOnly, selection, limits, patched, localized, collections].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
+const responsesPrevious = "8080f3641f2d758d3589ef6c7796a8703c4aae99d14a7069546070e7e2f942ad", responses = "5312ce9cf54a83580a5e839c03cf6338a3b1d30d18fb0ab81f955b2ec603cb6b";
+const responseUpdates = [
+  [
+    "  CMIFeedback: \"^.*$\",",
+    "  CMIFeedback: \"^(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF])*(?![\\\\s\\\\S])\","
+  ],
+  [
+    "const RESPONSE_PREFIX_RE = /^\\{(?:lang|case_matters|order_matters)=[^}]+\\}/;\nfunction stripResponsePrefixes(node) {\n  let result = node;\n  while (RESPONSE_PREFIX_RE.test(result)) {\n    result = result.replace(RESPONSE_PREFIX_RE, \"\");\n  }\n  return result;\n}\n",
+    "// Pear: interaction-wide boolean properties precede localized text/records.\n// Language remains on each localized string so its grammar and SPM are checked.\nfunction stripResponsePrefixes(node, type) {\n  const allowed = type === \"fill-in\" ? [\"case_matters\", \"order_matters\"] : type === \"long-fill-in\" ? [\"case_matters\"] : type === \"performance\" ? [\"order_matters\"] : [];\n  const seen = new Set();\n  let result = node, match;\n  while ((match = /^\\{(case_matters|order_matters)=([^}]*)\\}/.exec(result)) && allowed.includes(match[1])) {\n    if (seen.has(match[1]) || ![\"true\", \"false\"].includes(match[2])) {\n      throw new Scorm2004ValidationError(\"cmi.interactions.n.correct_responses.n.pattern\", scorm2004_errors.TYPE_MISMATCH);\n    }\n    seen.add(match[1]); result = result.slice(match[0].length);\n  }\n  return result;\n}\n"
+  ],
+  [
+    "function validatePattern(type, pattern, responseDef) {\n  if (pattern.trim() !== pattern) {",
+    "function validatePattern(type, pattern, responseDef) {\n  const textual = [\"fill-in\", \"long-fill-in\", \"performance\", \"other\"].includes(type);\n  pattern = stripResponsePrefixes(pattern, type);\n  if (!textual && pattern.trim() !== pattern) {"
+  ],
+  [
+    "    if (raw.trim() !== raw) {",
+    "    if (!textual && raw.trim() !== raw) {"
+  ],
+  [
+    "  if (!responseDef.delimiter && pattern.includes(\",\")) {",
+    "  if (!textual && !responseDef.delimiter && pattern.includes(\",\")) {"
+  ],
+  [
+    "        const record = stripResponsePrefixes(node);",
+    "        const record = node;"
+  ],
+  [
+    "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n    let nodes = [];",
+    "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n    // Pear: reuse the typed setter validator for textual patterns, including prefixes.\n    if ([\"fill-in\", \"long-fill-in\", \"performance\", \"other\"].includes(interaction_type)) {\n      try { validatePattern(interaction_type, String(value), response_type); }\n      catch (error) { this.context.throwSCORMError(CMIElement, error.errorCode || scorm2004_errors.TYPE_MISMATCH, CMIElement); }\n      return;\n    }\n    let nodes = [];"
+  ],
+  [
+    "  if (type !== \"numeric\" && (responseDef.unique || responseDef.duplicate === false)) {",
+    "  if (responseDef.unique) {"
+  ]
+];
+
+const responseDelimiterUpdates = [
+  [
+    "  const rawNodes = responseDef.delimiter ? splitDelimited(pattern, responseDef.delimiter) : [pattern];",
+    "  const rawNodes = responseDef.delimiter ? textual ? pattern.split(responseDef.delimiter) : splitDelimited(pattern, responseDef.delimiter) : [pattern];"
+  ],
+  [
+    "  const nodes = responseDef.delimiter ? splitDelimited(pattern, responseDef.delimiter) : [pattern];",
+    "  const nodes = responseDef.delimiter ? textual ? pattern.split(responseDef.delimiter) : splitDelimited(pattern, responseDef.delimiter) : [pattern];"
+  ]
+];
+
+if (![original, loggingOnly, selection, limits, patched, localized, collections, responsesPrevious, responses].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
 let output = source;
 if (digest(source) === original) for (const statement of ['console.debug(`Activity delivered: ${activity.id} - ${activity.title}`);', 'console.debug("Sequencing state restored successfully");', 'console.error(`Failed to restore sequencing state: ${error}`);']) {
   if (output.split(statement).length !== 2) throw Error('SCORM direct-log patch no longer matches');
   output = output.replace(statement, '/* Pear: omit direct upstream sequencing logs. */');
 }
 const replaceOnce = (before, after) => {if (output.split(before).length !== 2) throw Error('SCORM selection correction no longer matches'); output = output.replace(before, after);};
-if (![selection, limits, patched, localized, collections].includes(digest(source))) {
+if (![selection, limits, patched, localized, collections, responsesPrevious, responses].includes(digest(source))) {
 replaceOnce('if (selectCount === null || selectCount > 0) {', 'if (selectCount === null || selectCount >= 0) {');
 replaceOnce(`    const children = [...activity.children];
     if (controls.selectionTiming === SelectionTiming.NEVER) {`, `    const children = [...activity.children];
@@ -110,7 +157,7 @@ replaceOnce(`  static applySelectionAndRandomization(activity, isNewAttempt = fa
     }
     const controls = activity.sequencingControls;`);
 }
-if (![limits, patched, localized, collections].includes(digest(source))) {
+if (![limits, patched, localized, collections, responsesPrevious, responses].includes(digest(source))) {
 replaceOnce("return this._attemptAbsoluteDurationLimit || \"PT0H0M0S\";", "return this._attemptAbsoluteDuration;");
 replaceOnce("this._attemptAbsoluteDurationLimit = duration;", "this._attemptAbsoluteDuration = duration;");
 replaceOnce("return this._activityAbsoluteDurationLimit || \"PT0H0M0S\";", "return this._activityAbsoluteDuration;");
@@ -118,12 +165,16 @@ replaceOnce("this._activityAbsoluteDurationLimit = duration;", "this._activityAb
 replaceOnce("  checkLimitConditions(activity) {\n    if (activity.isSuspended)", "  checkLimitConditions(activity) {\n    if (activity._pearDurationLimitCheck) return activity._pearDurationLimitCheck(activity);\n    if (activity.isSuspended)");
 replaceOnce("  checkLimitConditions(activity) {\n    let result = true;", "  checkLimitConditions(activity) {\n    if (activity._pearDurationLimitCheck) return !activity._pearDurationLimitCheck(activity);\n    let result = true;");
 }
-if (![patched, localized, collections].includes(digest(source))) replaceOnce("    const formatRegex = new RegExp(regexPattern);", "    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.\n    const scalarString = regexPattern.startsWith(\"^[\\\\u0000-\\\\uFFFF]\") || regexPattern.startsWith(\"^[\\\\s\\\\S]{0,\");\n    const formatRegex = new RegExp(scalarString ? regexPattern.replace(\"[\\\\u0000-\\\\uFFFF]\", \"[\\\\s\\\\S]\") : regexPattern, scalarString ? \"u\" : \"\");");
-if (![patched, localized, collections].includes(digest(output))) throw Error('SCORM adapted source checksum mismatch');
-if (![localized, collections].includes(digest(output))) for (const [before, after] of localizedUpdates) replaceOnce(before, after);
-if (![localized, collections].includes(digest(output))) throw Error('SCORM localized-string checksum mismatch');
-if (digest(output) !== collections) for (const [before, after] of collectionUpdates) replaceOnce(before, after);
-if (digest(output) !== collections) throw Error('SCORM interaction-collection checksum mismatch');
+if (![patched, localized, collections, responsesPrevious, responses].includes(digest(source))) replaceOnce("    const formatRegex = new RegExp(regexPattern);", "    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.\n    const scalarString = regexPattern.startsWith(\"^[\\\\u0000-\\\\uFFFF]\") || regexPattern.startsWith(\"^[\\\\s\\\\S]{0,\");\n    const formatRegex = new RegExp(scalarString ? regexPattern.replace(\"[\\\\u0000-\\\\uFFFF]\", \"[\\\\s\\\\S]\") : regexPattern, scalarString ? \"u\" : \"\");");
+if (![patched, localized, collections, responsesPrevious, responses].includes(digest(output))) throw Error('SCORM adapted source checksum mismatch');
+if (![localized, collections, responsesPrevious, responses].includes(digest(output))) for (const [before, after] of localizedUpdates) replaceOnce(before, after);
+if (![localized, collections, responsesPrevious, responses].includes(digest(output))) throw Error('SCORM localized-string checksum mismatch');
+if (![collections, responsesPrevious, responses].includes(digest(output))) for (const [before, after] of collectionUpdates) replaceOnce(before, after);
+if (![collections, responsesPrevious, responses].includes(digest(output))) throw Error('SCORM interaction-collection checksum mismatch');
+if (![responsesPrevious, responses].includes(digest(output))) for (const [before, after] of responseUpdates) replaceOnce(before, after);
+if (![responsesPrevious, responses].includes(digest(output))) throw Error('SCORM textual-response base checksum mismatch');
+if (digest(output) !== responses) for (const [before, after] of responseDelimiterUpdates) replaceOnce(before, after);
+if (digest(output) !== responses) throw Error('SCORM textual-response checksum mismatch');
 writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root), source12 = readFileSync(path12, 'utf8');

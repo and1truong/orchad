@@ -1,11 +1,13 @@
 # SCORM #133 requirement acceptance
 
 This is the current requirement disposition, not a scope reduction or certification.
-Inherited implementation source: #164, 5281269795479540590176c07c7ce5570e4f1286,
-tree 07fc9906a4aa1a87cfcdb41892d867fbbce03c92; ADR-075–097.
-Local: 564 domain / 82 isolated files, 67 dedicated built Chromium journeys,
-build/typecheck/vendor/actual installer PASS. Remote/integrated/main acceptance
-is recorded against exact heads in #133, not inferred from these counts.
+Accepted baseline is main `016a040e76242d14e58d10623fdbc1ed94693bab`,
+tree `949d0d96101e3d0b2506511583608bf6fa7311f1`; push acceptance
+[37722879153](https://github.com/and1truong/orchad/actions/runs/37722879153) PASS.
+The source stack is integrated; earlier #164 local counts are historical evidence.
+[Completion register](SCORM-CONFORMANCE.md) assigns stable IDs to remaining
+code/validation/external gates. ADR-098 adds textual-response corrections and
+original three-edition domain/built-browser vectors; full compliance is OPEN.
 
 | Requirement | Implemented evidence | Outstanding acceptance |
 |---|---|---|
@@ -13,7 +15,7 @@ is recorded against exact heads in #133, not inferred from these counts.
 | Quarantine/review/publish/version/retire/revoke | Package/player/review tests, immutable versions and current authorization | Actual production storage/scanner/deployment policy |
 | Isolated content host, exact channel/capability/attempt scope | Player/browser/adversarial authority tests; ADR-077/080/081/093 | Credentialless production origin, all-egress self-navigation/redirect/worker/popup enforcement on each actual platform |
 | Eight synchronous methods, lifecycle/argument/access/error APIs | scorm-player/scorm2004/scorm-review tests and licensed wrapper browser journeys | Exhaustive edition-specific error precedence, vocabulary/range/encoding combinations; no certification claim |
-| CMI status, scores, location, suspend, preferences, comments, objectives/interactions | Runtime replay and Unicode/interaction tests; ADR-079/095–097 | Identifier URI grammar, remaining correct-response prefix/whitespace/language/error cases |
+| CMI status, scores, location, suspend, preferences, comments, objectives/interactions | Runtime replay and Unicode/interaction tests; ADR-079/095–097 | Identifier URI grammar and full response/language/error matrix; ADR-098 covers named textual prefix/whitespace cases |
 | Durable ACK, retry, reopen/restart, concurrent/stale/reordered writes | Player/learning/sequencing/system-store tests and lost-ACK built journeys | Additional real engines and production durability/load/DR |
 | Commit vs Finish/Terminate, technical attempts vs domain retake | Runtime/sequencing/selection/duration tests; ADR-078/080/084/094 | Exhaustive reference lifecycle/reset/time behavior |
 | Time and calendar | Reported centiseconds, trusted host duration clocks and calendar windows; ADR-088/094 | Year/month/finer-precision duration bindings and standard-aligned calendar conversion; existing 365/30 reported-time policy is not full conformance |
@@ -25,7 +27,7 @@ is recorded against exact heads in #133, not inferred from these counts.
 | Compatibility fixtures | Pinned licensed pipwerks and ADL developer-guide wrappers, synthetic multi-SCO/adversarial packages | Licensed Storyline/Captivate/Rise exports, ADL legacy license/platform resolution, authorized Rustici differential account |
 | Browser/native/device lanes | Built Chromium, actual unpacked Lime, actual Linux Tauri/WebKit in acceptance workflow | Windows WebView2, macOS WKWebView, mobile Safari/Android and native Chrome Side Panel container |
 | Operations/privacy | Diagnostics/log redaction/capacity/rollback/whole-DB backup/offline restore; ADR-082/090/091 | Reviewed production retention/archival/purge, immutable-proof preservation, load/RPO/DR/scanning/deployment |
-| Delivery and register | G05/G10/G14/G18, support matrix/handoff reconciled through ADR-097 | Exact integrated head and main acceptance/ancestry verification; #133 stays open for unfinished requirements |
+| Delivery and register | G05/G10/G14/G18, support matrix/handoff reconciled through ADR-097 | Baseline integrated/main acceptance verified above; successors need their own exact-head evidence; #133 stays open for unfinished requirements |
 
 External blockers require actual authorized accounts/assets/platforms and reviewed
 production policy. Do not buy licenses, upload packages/PII, fabricate exports,

@@ -1,6 +1,6 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–097. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-interactions-v6` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094 and plain Unicode characterstring correction in ADR-095 and localized-string correction in ADR-096 and interaction-collection correction in ADR-097. A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–098. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-responses-v7` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094 and plain Unicode characterstring correction in ADR-095 and localized-string correction in ADR-096 and interaction-collection correction in ADR-097. A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
@@ -46,7 +46,7 @@ Unicode/SPM evidence (ADR-095): exact supplementary suspend-data bounds in all f
 
 Localized-string evidence (ADR-096): scalar 250/4000 text patterns, multiple language subtags, 250-character language values, line terminators and unchanged supplementary/combining text in comments/descriptions and fill-in/long-fill-in records. Browser and server replay share the checksum-locked correction; maximum localized comments and ten fill-in learner records round-trip through durable ACK/resume. Host binding envelopes remain bounded (4257 localized leaves / 8192 interaction response leaves; 512 KiB checkpoint). Exhaustive identifier/interaction/language-registry/error-precedence conformance remains OPEN. Known Unicode-v4 sequencing snapshots remain readable.
 
-Interaction collection evidence (ADR-097): zero-record learner choice/matching/sequencing/performance collections and a one-pattern empty choice correct set retain counts across ACK/retry/resume. Tested 36 choice/sequencing identifiers, 36 matching pairs and 250 full-size performance records; per-record 250-scalar performance and 4000-scalar other answers. Response envelopes allow 128000 scalars within the unchanged 512 KiB checkpoint; typed engine validation remains mandatory. Correct-response prefix/whitespace and URI conformance remain OPEN. Localized-v5 and older known snapshot markers stay accepted.
+Interaction collection evidence (ADR-097): zero-record learner choice/matching/sequencing/performance collections and a one-pattern empty choice correct set retain counts across ACK/retry/resume. Tested 36 choice/sequencing identifiers, 36 matching pairs and 250 full-size performance records; per-record 250-scalar performance and 4000-scalar other answers. Response envelopes allow 128000 scalars within the unchanged 512 KiB checkpoint; typed engine validation remains mandatory. ADR-098 adds named textual-response prefix/whitespace checks; exhaustive response and URI conformance remain OPEN. Localized-v5 and older known snapshot markers stay accepted.
 
 Integrated #165 review regression evidence: active reopen checks current leaf
 and ancestor calendar windows even when no duration clock is installed, while
@@ -54,3 +54,14 @@ calendar-only legacy snapshots remain readable. Inclusive boundaries and denied
 early/expired delivery preserve launch/proof state in all three 2004 editions.
 Edition 2/3 shared-data error 401 precedes malformed-Unicode validation. These
 shared host/facade corrections do not change pinned ESM bytes or schema.
+
+Textual correct-response evidence (ADR-098): fill-in/long-fill-in/performance
+whitespace, unbracketed commas, newlines and leading typed boolean properties
+preserve their original values across browser API, server replay, exact receipt
+retry and preloaded resume. Fill-in permits repeated localized records and ten
+250-scalar answers. Only bracketed separators split textual records; a bare
+comma cannot split a performance answer or evade a fill-in scalar limit.
+Invalid boolean values/repeated leading properties return
+406 without altering record/count; missing ID/type stays 408. Known snapshots
+through interactions-v6 remain readable. No complete edition/response/reference
+conformance is inferred; see SCORM-CONFORMANCE.md.
