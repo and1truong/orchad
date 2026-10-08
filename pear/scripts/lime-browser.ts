@@ -169,6 +169,10 @@ try {
   await panel.getByRole("button",{name:"Disconnect",exact:true}).click();
   assert.equal((await appResult()).ok,false);assert.equal(gateway.requestCount,beforeRevoke);
   await writeFile("artifacts/lime-app-request-report.json",JSON.stringify({passed:true,lane:"Actual unpacked Lime extension-page UI/MAIN Pear bridge/isolated relay/MV3 worker/HTTP/SQLite",gateway:"Scripted Mango; inference quality NOT VERIFIED",checks:["frozen Pear API installs without replacing backend","untrusted verbatim proposal; denial starts zero model calls","approved proposal still requires separate mutation approval","only final text resolves page Promise; tool traces stay private","model history keeps app provenance","denied tool and consent revoke have zero backend effects"],nativeSidePanelContainer:"NOT VERIFIED"},null,2));
+  // Disconnect clears the gateway credential. Explicitly re-enter it for the
+  // existing later journeys instead of retaining authority across revocation.
+  await expect(panel.getByLabel("Gateway token")).toHaveValue("");
+  await panel.getByLabel("Gateway token").fill("lime-fixture-token");
   // Keep the existing reload-invalidation journey bound to a real page adapter.
   await panel.getByRole("button",{name:"Pin target",exact:true}).click();
   await panel.getByText("Document: learning:demo:learner-a",{exact:false}).waitFor();
