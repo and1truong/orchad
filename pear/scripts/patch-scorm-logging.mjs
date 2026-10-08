@@ -175,6 +175,27 @@ const initializationUpdates = [
   ]
 ];
 
+const atomic = 'f35f205f11e2102a9db770794233b5e7981698edc6bd887d4ce5576b9350bf14';
+const atomicityUpdates = [
+  [
+    "    let foundFirstIndex = false;\n    const invalidErrorMessage = `The data model element passed to ${methodName} (${CMIElement}) is not a valid SCORM data model element.`;\n    const invalidErrorCode = this.getUndefinedDataModelErrorCode();\n    for (let idx = 0; idx < structure.length; idx++) {",
+    "    let foundFirstIndex = false;\n    const invalidErrorMessage = `The data model element passed to ${methodName} (${CMIElement}) is not a valid SCORM data model element.`;\n    const invalidErrorCode = this.getUndefinedDataModelErrorCode();\n    const collections = [];\n    try {\n    for (let idx = 0; idx < structure.length; idx++) {"
+  ],
+  [
+    "        const traverseResult = this.traverseToNextLevel(",
+    "        const collection = refObject[attribute];\n        if (scorm2004 && collection instanceof CMIArray) collections.push([collection, collection.childArray.length]);\n        const traverseResult = this.traverseToNextLevel("
+  ],
+  [
+    "    if (returnValue === global_constants.SCORM_FALSE) {\n      this.context.apiLog(",
+    "    } finally {\n      // Pear: failed writes must not leave appended collection records behind.\n      if (returnValue !== global_constants.SCORM_TRUE) {\n        for (const [collection, length] of collections.toReversed()) collection.childArray.length = length;\n      }\n    }\n    if (returnValue === global_constants.SCORM_FALSE) {\n      this.context.apiLog("
+  ]
+];
+
+if (digest(source) === atomic) for (const [before, after] of atomicityUpdates.toReversed()) {
+  if (source.split(after).length !== 2) throw Error('SCORM collection atomicity reverse patch no longer matches');
+  source = source.replace(after, () => before);
+}
+
 if (digest(source) === initialized) for (const [before, after] of initializationUpdates.toReversed()) {
   if (source.split(after).length !== 2) throw Error('SCORM initialization reverse patch no longer matches');
   source = source.replace(after, () => before);
@@ -260,6 +281,8 @@ for (const [before, after] of timestampUpdates) replaceOnce(before, after);
 if (digest(output) !== timestamps) throw Error('SCORM timestamp checksum mismatch');
 for (const [before, after] of initializationUpdates) replaceOnce(before, after);
 if (digest(output) !== initialized) throw Error('SCORM initialization checksum mismatch');
+for (const [before, after] of atomicityUpdates) replaceOnce(before, after);
+if (digest(output) !== atomic) throw Error('SCORM collection atomicity checksum mismatch');
 writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root), source12 = readFileSync(path12, 'utf8');

@@ -51,3 +51,5 @@ URI binding correction (ADR-102) preserves exact valid characters/percent bytes 
 Timestamp correction (ADR-104) keeps known v9 markers and validates historical interaction and learner/LMS-comment timestamps through engine setters before accepting a fresh checkpoint. Invalid historical state fails closed without revision/receipt/proof changes. No automatic rewrite, reset or deletion is performed. Explicit operator recovery policy remains required for incompatible historical CMI.
 
 Preloaded collection correction (ADR-105) uses checksum-locked initialization-v11, retains known v10 snapshots and initializes existing nested records before content operations. LMS-owned comments/count remain unchanged after denied writes; trusted preload remains available. No schema migration, stored-data rewrite or production change.
+
+Collection append correction (ADR-106) uses checksum-locked atomicity-v12 and known v11 snapshot compatibility. Invalid writes cannot accumulate empty collection records. Existing historical records remain unchanged; no automatic purge, schema migration or production enablement.
