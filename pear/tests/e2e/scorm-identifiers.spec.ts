@@ -6,9 +6,10 @@ import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 import {interopPackage} from '../scorm-interop-fixture.ts';
 import {validIdentifiers, invalidIdentifiers} from '../scorm-identifier-vectors.ts';
 import {validURNs, invalidURNs} from '../scorm-urn-vectors.ts';
+import {validSchemeReferences, invalidSchemeReferences} from '../scorm-uri-scheme-vectors.ts';
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': built URI bindings and full-capacity choice survive lost ACK and close/resume', async ({page}) => {
-  const valid = [...validIdentifiers, ...validURNs], invalid = [...invalidIdentifiers, ...invalidURNs], fullIndex = valid.length;
+  const valid = [...validIdentifiers, ...validURNs, ...validSchemeReferences], invalid = [...invalidIdentifiers, ...invalidURNs, ...invalidSchemeReferences], fullIndex = valid.length;
   const script = `const valid=${JSON.stringify(valid)},invalid=${JSON.stringify(invalid)},api=parent.API_1484_11;
     for(const [i,value] of valid.entries()){const base='cmi.interactions.'+i;
       if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.id')!==value)throw Error('ID resume');
