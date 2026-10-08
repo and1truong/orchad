@@ -92,6 +92,49 @@ test('localized fill-in and long-fill-in enforce scalar bounds per learner respo
     }
   }
 });
+
+for(const edition of ['2004-2','2004-3','2004-4'] as const) test(`${edition}: empty learner collections and a no-choice correct set persist without bypassing dependencies or scalar vocabularies`,async()=>{
+  const f=await scormLearningFixture(undefined,multiFilePackage(edition,sequencingManifest(edition)));
+  try {
+    const binding=f.enroll(),launch=f.launch(binding),b=f.player.bootstrap(launch.token);let state:any;
+    const api=createSCORM2004API({edition,state:b.state,checkpoint(s){state=s;}});assert.equal(api.Initialize(''),'true');
+    assert.equal(api.SetValue('cmi.interactions.0.learner_response',''),'false');assert.equal(api.GetLastError(),'408');
+    for(const [i,type] of ['choice','matching','sequencing','performance'].entries()) {
+      assert.equal(api.SetValue(`cmi.interactions.${i}.id`,'urn:pear:'+type),'true');assert.equal(api.SetValue(`cmi.interactions.${i}.type`,type),'true');
+      assert.equal(api.SetValue(`cmi.interactions.${i}.learner_response`,''),'true');assert.equal(api.GetValue(`cmi.interactions.${i}.learner_response`),'');assert.equal(api.GetLastError(),'0');
+    }
+    assert.equal(api.SetValue('cmi.interactions.0.correct_responses.0.pattern',''),'true');assert.equal(api.GetValue('cmi.interactions.0.correct_responses._count'),'1');
+    assert.equal(api.SetValue('cmi.interactions.0.correct_responses.1.pattern',''),'false');assert.equal(api.GetLastError(),'351');assert.equal(api.GetValue('cmi.interactions.0.correct_responses._count'),'1');
+    for(const [i,type] of ['numeric','true-false','likert'].entries()) {
+      const key=`cmi.interactions.${i+4}`;assert.equal(api.SetValue(key+'.id','urn:pear:'+type),'true');assert.equal(api.SetValue(key+'.type',type),'true');
+      assert.equal(api.SetValue(key+'.learner_response',''),'false');assert.equal(api.GetLastError(),'406');
+    }
+    assert.equal(api.Commit(''),'true');const request={sequence:1,revision:0,state,finished:false},receipt=f.player.checkpoint(launch.token,request);assert.deepEqual(f.player.checkpoint(launch.token,request),receipt);
+    f.player.close(f.service.principal('learner-a'),launch.launchId,'session-learner-a');const next=f.launch(binding),resumed=f.player.bootstrap(next.token);
+    assert.equal(resumed.state.interactions[0].correct_responses[0].pattern,'');const again=createSCORM2004API({edition,state:resumed.state});assert.equal(again.Initialize(''),'true');assert.equal(again.GetValue('cmi.interactions.0.correct_responses._count'),'1');
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n,0);
+  }finally{f.db.close();}
+});
+
+for(const edition of ['2004-2','2004-3','2004-4'] as const) test(`${edition}: full-size interaction records survive ACK/resume with scalar performance and other answers`,async()=>{
+  const f=await scormLearningFixture(undefined,multiFilePackage(edition,sequencingManifest(edition)));
+  try {
+    const binding=f.enroll(),launch=f.launch(binding),b=f.player.bootstrap(launch.token);let state:any;
+    const api=createSCORM2004API({edition,state:b.state,checkpoint(s){state=s;}});assert.equal(api.Initialize(''),'true');
+    const id=(n:number)=>('step-'+n+'-').padEnd(250,'a');
+    const values=[['choice',Array.from({length:36},(_,i)=>id(i)).join('[,]')],['matching',Array.from({length:36},(_,i)=>id(i)+'[.]'+id(35-i)).join('[,]')],['sequencing',Array(36).fill(id(0)).join('[,]')],['performance',Array.from({length:250},(_,i)=>id(i)+'[.]'+'🙂'.repeat(250)).join('[,]')],['other','🙂'.repeat(4000)]];
+    for(const [i,[type,value]] of values.entries()) {const key=`cmi.interactions.${i}`;assert.equal(api.SetValue(key+'.id','urn:pear:'+type),'true');assert.equal(api.SetValue(key+'.type',type),'true');assert.equal(api.SetValue(key+'.learner_response',value),'true',type+' '+api.GetLastError());assert.equal(api.GetValue(key+'.learner_response'),value);}
+    assert.equal(api.SetValue('cmi.interactions.3.learner_response',values[3][1]+'[,]'+id(0)+'[.]x'),'false');assert.equal(api.GetLastError(),'351');
+    assert.equal(api.SetValue('cmi.interactions.3.learner_response',id(0)+'[.]'+'🙂'.repeat(251)),'false');assert.equal(api.GetLastError(),'406');
+    assert.equal(api.SetValue('cmi.interactions.4.learner_response','🙂'.repeat(4001)),'false');assert.equal(api.GetLastError(),'406');
+    assert.equal(api.Commit(''),'true');const request={sequence:1,revision:0,state,finished:false},receipt=f.player.checkpoint(launch.token,request);assert.deepEqual(f.player.checkpoint(launch.token,request),receipt);
+    assert.throws(()=>f.player.checkpoint(launch.token,{...request,sequence:2,revision:1,state:{...state,interactions:{...state.interactions,3:{...state.interactions[3],learner_response:id(0)+'[.]'+'🙂'.repeat(251)}}}}),/data model/);
+    assert.equal(f.player.status(f.service.principal('learner-a'),launch.launchId,'session-learner-a').revision,1);
+    f.player.close(f.service.principal('learner-a'),launch.launchId,'session-learner-a');const next=f.launch(binding),resumed=f.player.bootstrap(next.token);
+    for(const [i,[,value]] of values.entries()) assert.equal(resumed.state.interactions[i].learner_response,value);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n,0);
+  }finally{f.db.close();}
+});
 for(const global of [false,true]) test(`fourth-edition ${global?'system':'local'} shared store supports 64000 supplementary characters and refuses malformed/oversized writes atomically`,async()=>{
   const original=sharedDataManifest().replace('targetID="urn:pear:private-writer" readSharedData="false" writeSharedData="true"','targetID="urn:pear:private-writer" readSharedData="false" writeSharedData="false"');
   const manifest=global?original.replace('runtime:sharedDataGlobalToSystem="false"',''):original;

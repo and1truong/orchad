@@ -53,3 +53,5 @@ overhead in bounded host quotas and accepts known Unicode-v4 snapshots. See
 ADR-096 for exact checksums and scoped regressions. Full conformance and
 production/reference/platform gates remain open; reconcile #49 separately
 through ADR-096 without changing SCORM-owned branches.
+
+Interaction-collection successor (ADR-097) restores zero-record learner collections, preserves empty choice correct-set counts through both host replay and JSON load, and supports maximum-size typed interaction records with scalar performance/other text. Behavior adaptation pear-interactions-v6 accepts known localized-v5 snapshots. Host response envelope capacity is 128000 scalars within the existing 512 KiB checkpoint; typed record limits and launch/proof authority remain unchanged. Full URI/correct-response/error conformance and external/platform/production gates remain open. Reconcile #49 separately through ADR-097.

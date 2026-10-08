@@ -7,7 +7,7 @@ export function sequencingManifest(edition: SCORM2004Edition = '2004-4') {
   return multiFileManifest(edition).replace('<p:manifest ', '<p:manifest xmlns:a="http://www.adlnet.org/xsd/adlseq_v1p3" xmlns:s="http://www.imsglobal.org/xsd/imsss" ').replace('<p:organization identifier="org">', '<p:organization identifier="org" a:objectivesGlobalToSystem="false">').replace('<p:title>Original multi &amp; file package</p:title>', '<p:title>Original multi &amp; file package</p:title><s:sequencing><s:controlMode flow="true" choice="true" forwardOnly="true"/>' + rollup + '</s:sequencing>').replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing>' + objective + '</s:sequencing>').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><s:sequencing>' + gate + '</s:sequencing>');
 }
 import {zip} from './scorm-fixture.ts';
-export function sequencingPackage(edition: SCORM2004Edition, manifest = sequencingManifest(edition), unicode = false) {
+export function sequencingPackage(edition: SCORM2004Edition, manifest = sequencingManifest(edition), unicode = false, interactionRecords = false) {
   const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save sequencing progress</button><button id="fail">Fail sequencing attempt</button><button id="continue">Continue sequencing SCO</button><button id="end">End sequencing session</button><script src="../assets/player.js"></script></body></html>';
   const sharedScript = manifest.includes('<runtime:data>') ? `
     const sharedStatus=document.createElement('p');document.body.append(sharedStatus);
@@ -23,6 +23,11 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
     const rememberUnicode=()=>{const value='🙂'.repeat(${edition === '2004-2' ? 4000 : 64000});const rejected=api.SetValue('cmi.suspend_data',value+'x')==='false';status.textContent='Unicode SetValue: '+(rejected && api.SetValue('cmi.suspend_data',value)==='true'?'accepted':'failed');};
     for(const id of ['save','continue','end'])document.getElementById(id).addEventListener('click',rememberUnicode,true);
   ` : '';
+  const interactionScript = interactionRecords ? `
+    const records=document.createElement('p');document.body.append(records);records.textContent='Performance records: '+(api.GetValue('cmi.interactions.1.learner_response').split('[,]').filter(Boolean).length)+'; correct sets: '+api.GetValue('cmi.interactions.0.correct_responses._count');
+    const rememberRecords=()=>{api.SetValue('cmi.interactions.0.id','urn:pear:choice');api.SetValue('cmi.interactions.0.type','choice');api.SetValue('cmi.interactions.0.learner_response','');if(api.GetValue('cmi.interactions.0.correct_responses._count')==='0')api.SetValue('cmi.interactions.0.correct_responses.0.pattern','');api.SetValue('cmi.interactions.1.id','urn:pear:performance');api.SetValue('cmi.interactions.1.type','performance');const value=Array.from({length:250},(_,i)=>('step-'+i+'-').padEnd(250,'a')+'[.]'+'🙂'.repeat(250)).join('[,]');records.textContent='Performance SetValue: '+api.SetValue('cmi.interactions.1.learner_response',value);};
+    for(const id of ['save','continue','end'])document.getElementById(id).addEventListener('click',rememberRecords,true);
+  ` : '';
   return zip([
     {name: 'imsmanifest.xml', data: Buffer.from(manifest), method: 8},
     {name: 'lessons/intro.html', data: Buffer.from(html('Original sequencing introduction')), method: 8},
@@ -33,7 +38,7 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
       document.getElementById('save').onclick=()=>{update();api.SetValue('cmi.progress_measure','0.2');api.SetValue('cmi.completion_status','incomplete');document.getElementById('result').textContent='Sequencing Commit: '+api.Commit('');};
       const finish=(nav)=>{update();api.SetValue('cmi.progress_measure',location.pathname.endsWith('intro.html')?'0.5':'1');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','passed');api.SetValue('cmi.score.scaled','0.9');api.SetValue('adl.nav.request',nav);document.getElementById('result').textContent='Sequencing Terminate: '+api.Terminate('');};
       document.getElementById('fail').onclick=()=>{update();api.SetValue('cmi.exit','normal');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','failed');api.SetValue('cmi.score.scaled','0.4');api.SetValue('adl.nav.request','exit');document.getElementById('result').textContent='Failed attempt Terminate: '+api.Terminate('');};
-      document.getElementById('continue').onclick=()=>finish('continue');document.getElementById('end').onclick=()=>finish('exitAll');` + sharedScript + unicodeScript), method: 8},
+      document.getElementById('continue').onclick=()=>finish('continue');document.getElementById('end').onclick=()=>finish('exitAll');` + sharedScript + unicodeScript + interactionScript), method: 8},
     {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
   ]);
 }
