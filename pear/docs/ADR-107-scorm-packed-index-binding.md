@@ -16,7 +16,7 @@ the browser facade and trusted replay; no facade-only index filter is added.
 
 Exact ESM SHA-256:
 
-- 2004: `3fec364f6ea8cf9d4e5fbb226ced0646219fd456e5ae9f1bb1df0a739d826745`
+- 2004: `0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9`
 - 1.2: `4d205a6b1c73d9af2b1f09b4f9a12b713cea07468b50bc3947f3c86370ce3e99`
 
 Installation upgrades the known pristine/Unicode 1.2 sources and all known

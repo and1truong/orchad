@@ -2,10 +2,11 @@
 // selection/duration/Unicode corrections documented in ADR-092/094/095/096/097. Preserve copyright/license.
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {reviewedSCORMSource, unreviewedSCORMSource} from './scorm-review-corrections.mjs';
 const root = new URL('../node_modules/scorm-again/', import.meta.url), metadata = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 if (metadata.version !== '3.4.5') throw Error('Review the SCORM integration adaptation before changing engine version');
 const path = new URL('dist/esm/scorm2004.js', root), digest = value => createHash('sha256').update(value).digest('hex');
-let source = readFileSync(path, 'utf8');
+let source = unreviewedSCORMSource(readFileSync(path, 'utf8'));
 const original = '93e463ed4ba87bd59a2fe228c94c879faf4aa7469a687166ffab8fac4a4d1f69', loggingOnly = '6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936', selection = '206daee49525dbf352bf9d6920f6d1ccc03ad9e8834db57a8d7d5ee2efb93cc0', limits = 'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e', patched = '8c6468541bf6f07353307758f5a828e7e9e04da0619c859500c9b108015db5da';
 
 const localized = '445f18f920d5424b335c666594e532fb9a3238b84cc76f522d5185e41aabbd08';
@@ -302,10 +303,10 @@ for (const [before, after] of atomicityUpdates) replaceOnce(before, after);
 if (digest(output) !== atomic) throw Error('SCORM collection atomicity checksum mismatch');
 for (const [before, after] of indexUpdates) replaceOnce(before, after);
 if (digest(output) !== indexed) throw Error('SCORM packed-index checksum mismatch');
-writeFileSync(path, output);
+writeFileSync(path, reviewedSCORMSource(output));
 
 const path12 = new URL('dist/esm/scorm12.js', root);
-let source12 = readFileSync(path12, 'utf8');
+let source12 = unreviewedSCORMSource(readFileSync(path12, 'utf8'));
 const indexed12 = '4d205a6b1c73d9af2b1f09b4f9a12b713cea07468b50bc3947f3c86370ce3e99';
 if (digest(source12) === indexed12) for (const [before, after] of indexUpdates.toReversed()) {
   if (source12.split(after).length !== 2) throw Error('SCORM 1.2 packed-index reverse patch no longer matches');
@@ -318,13 +319,13 @@ if (digest(source12) !== patched12) {
   if (source12.split(before).length !== 2) throw Error('SCORM 1.2 Unicode patch no longer matches');
   const output12 = source12.replace(before, after);
   if (digest(output12) !== patched12) throw Error('SCORM 1.2 Unicode checksum mismatch');
-  writeFileSync(path12, output12);
+  writeFileSync(path12, reviewedSCORMSource(output12));
 }
 
-let output12 = digest(source12) === patched12 ? source12 : readFileSync(path12, 'utf8');
+let output12 = digest(source12) === patched12 ? source12 : unreviewedSCORMSource(readFileSync(path12, 'utf8'));
 for (const [before, after] of indexUpdates) {
   if (output12.split(before).length !== 2) throw Error('SCORM 1.2 packed-index correction no longer matches');
   output12 = output12.replace(before, () => after);
 }
 if (digest(output12) !== indexed12) throw Error('SCORM 1.2 packed-index checksum mismatch');
-writeFileSync(path12, output12);
+writeFileSync(path12, reviewedSCORMSource(output12));
