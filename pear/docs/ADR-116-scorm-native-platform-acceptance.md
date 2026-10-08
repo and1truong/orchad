@@ -43,3 +43,11 @@ Windows resource icon was missing, before playback could run (job 113470724312,
 run 37823636259). Add only icons/icon.ico generated from the existing tracked
 64×64 icons/icon.png with the installed Tauri CLI (`tauri icon`); no replacement
 artwork or platform bypass. Actual Windows build/runtime evidence remains required.
+
+Run 37823636259 completed the actual Linux and macOS lanes on initial head
+35a1121d: runtime 16/16, Pear/MCP 13/13, each SCORM profile 11/11. Their complete
+logs include the real WebView user agents and runner images (Linux job
+113470724545; macOS job 113470724658). Windows failed the missing resource, so the
+whole run was not PASS. The four-profile Linux execution took about eleven
+minutes after setup; enlarge its former one-profile 15-minute job budget to 25
+minutes for dependency/build overhead. New-head acceptance is still required.
