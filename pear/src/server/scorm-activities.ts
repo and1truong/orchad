@@ -7,13 +7,13 @@ export function scorm12Activities(manifest: SCORMManifest) {
   function walk(a: SCORMActivity, ancestors: SCORMActivity[]) {
     if (a.resourceId) {
       const resource = manifest.resources.find(r => r.id === a.resourceId);
-      if (!resource || resource.kind !== 'sco' || a.children.length) reject('INVALID_ARGUMENT', 'Playback requires SCO leaves and organization folders');
+      if (!resource || !resource.href || a.children.length) reject('INVALID_ARGUMENT', 'Playback requires launchable leaves and organization folders');
       result.push({activity: a, resource, ancestors});
     } else if (!a.children.length) reject('INVALID_ARGUMENT', 'Empty activity folder');
     for (const child of a.children) walk(child, [...ancestors, a]);
   }
   for (const a of manifest.activities) walk(a, []);
-  if (!result.length) reject('INVALID_ARGUMENT', 'Organization has no launchable SCO');
+  if (!result.length) reject('INVALID_ARGUMENT', 'Organization has no launchable activity');
   // Parse every expression before presenting the package as playable, including locked branches.
   const states = activityStates(manifest, []);
   for (const {activity, ancestors} of result) for (const a of [...ancestors, activity]) if (a.prerequisites) prerequisite(a.prerequisites, states);
@@ -28,7 +28,7 @@ export function activityStates(manifest: SCORMManifest, rows: {sco_id: string; r
     else {
       const row = byId.get(a.id);
       // Prerequisite completion uses accepted SCO communication completion, not an in-flight write.
-      status = row?.finished ? (manifest.standard === '1.2' ? JSON.parse(row.runtime_state).core?.lesson_status : JSON.parse(row.runtime_state).completion_status) ?? 'not attempted' : 'not attempted';
+      status = row?.finished && manifest.resources.find(r => r.id === a.resourceId)?.kind === 'asset' ? 'browsed' : row?.finished ? (manifest.standard === '1.2' ? JSON.parse(row.runtime_state).core?.lesson_status : JSON.parse(row.runtime_state).completion_status) ?? 'not attempted' : 'not attempted';
     }
     states.set(a.id, status); return status;
   }
@@ -86,14 +86,14 @@ export function activityAvailable(profile: ReturnType<typeof scorm12Activities>[
 /** Trusted activity traversal; never flatten folders or discard 2004 rules. */
 export function playbackActivities(manifest: SCORMManifest) {
   if (manifest.standard === '1.2') return scorm12Activities(manifest);
-  if (manifest.runtimeFeatures?.some(f => !['dataFromLMS', 'timeLimitAction', 'completionThreshold', 'sequencing', 'sequencingCollection'].includes(f))) reject('INVALID_ARGUMENT', 'Unsupported SCORM 2004 sequencing or runtime extensions');
+  if (manifest.runtimeFeatures?.some(f => !['dataFromLMS', 'timeLimitAction', 'completionThreshold', 'sequencing', 'sequencingCollection', 'adlSequencing', 'presentation', 'data'].includes(f))) reject('INVALID_ARGUMENT', 'Unsupported SCORM 2004 sequencing or runtime extensions');
   const result: ReturnType<typeof scorm12Activities> = [];
   const walk = (activity: SCORMActivity, ancestors: SCORMActivity[]) => {
     const resource = manifest.resources.find(r => r.id === activity.resourceId);
-    if (activity.resourceId) {if (!resource || resource.kind !== 'sco' || activity.children.length) reject('INVALID_ARGUMENT', 'Sequenced playback requires SCO leaves'); result.push({activity, resource, ancestors});}
+    if (activity.resourceId) {if (!resource || !resource.href || activity.children.length) reject('INVALID_ARGUMENT', 'Sequenced playback requires launchable leaves'); result.push({activity, resource, ancestors});}
     else if (!activity.children.length) reject('INVALID_ARGUMENT', 'Empty sequencing activity');
     for (const a of activity.children) walk(a, [...ancestors, activity]);
   };
-  manifest.activities.forEach(a => walk(a, [])); if (!result.length) reject('INVALID_ARGUMENT', 'Organization has no launchable SCO');
+  manifest.activities.forEach(a => walk(a, [])); if (!result.length) reject('INVALID_ARGUMENT', 'Organization has no launchable activity');
   return result;
 }

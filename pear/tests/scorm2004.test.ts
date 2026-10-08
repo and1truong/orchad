@@ -39,7 +39,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
     for (const [key, value] of Object.entries({'cmi.interactions.0.id': 'q', 'cmi.interactions.0.type': 'choice', 'cmi.interactions.0.learner_response': 'answer', 'cmi.interactions.0.result': 'correct', 'cmi.objectives.0.id': 'o', 'cmi.objectives.0.success_status': 'passed', 'cmi.comments_from_learner.0.comment': 'Original comment', 'cmi.comments_from_learner.0.location': 'page', 'cmi.comments_from_learner.0.timestamp': '2026-10-07T12:00:00Z'})) assert.equal(api.SetValue(key, value), 'true', key);
     const limit = edition === '2004-2' ? 4000 : 64000;
     assert.equal(api.SetValue('cmi.suspend_data', 'x'.repeat(limit)), 'true'); assert.equal(api.SetValue('cmi.suspend_data', 'x'.repeat(limit + 1)), 'false');
-    assert.equal(api.SetValue('adl.data.0.store', 'x'), 'false'); assert.equal(api.GetLastError(), '401');
+    assert.equal(api.SetValue('adl.data.0.store', 'x'), 'false'); assert.equal(api.GetLastError(), edition === '2004-4' ? '351' : '401');
     assert.equal(api.SetValue('adl.nav.request', 'continue'), 'false');
     assert.equal(api.Terminate(''), 'false'); assert.equal(api.GetLastError(), '111');
     available = true; assert.equal(api.Terminate(''), 'true');

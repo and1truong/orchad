@@ -1,6 +1,6 @@
 export const SCORM_STANDARDS = ['1.2', '2004-2', '2004-3', '2004-4'] as const;
 export type SCORMStandard = typeof SCORM_STANDARDS[number];
-export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5'} as const;
+export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-interactions-v6'} as const;
 export interface SCORMResource {
   id: string;
   kind: 'sco' | 'asset';
@@ -11,12 +11,16 @@ export interface SCORMResource {
 export interface SCORMActivity {
   id: string;
   title: string;
+  isVisible?: boolean;
   resourceId?: string;
   parameters?: string;
   prerequisites?: string;
   launchData?: string;
   masteryScore?: string;
   completionThreshold?: string;
+  completionMeasure?: {completedByMeasure: boolean; minProgressMeasure: number; progressWeight: number};
+  hideLmsUi?: string[];
+  sharedDataMaps?: {targetID: string; readSharedData: boolean; writeSharedData: boolean}[];
   sequencing?: Record<string, any>;
   maxTimeAllowed?: string;
   timeLimitAction?: string;
@@ -32,6 +36,7 @@ export interface SCORMManifest {
   runtimeFeatures?: string[];
   sequencing?: Record<string, any>;
   objectivesGlobalToSystem?: boolean;
+  sharedDataGlobalToSystem?: boolean;
 }
 export function scormStandard(value: unknown): SCORMStandard {
   if (!SCORM_STANDARDS.includes(value as SCORMStandard)) throw new Error('Unsupported SCORM edition');

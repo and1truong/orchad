@@ -1,3 +1,4 @@
+import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
 import type {SCORMStandard} from './scorm-engine.ts';
@@ -23,8 +24,9 @@ export function scorm2004EngineValue(key: string, value: string) {
   return value;
 }
 export function scorm2004FieldError(edition: SCORM2004Edition, key: string, value: string): string | null {
-  if (key.startsWith('adl.data.') || edition !== '2004-4' && (key.startsWith('adl.nav.request_valid.jump') || key === 'adl.nav.request' && value.endsWith('jump'))) return '401';
-  if (key === 'cmi.suspend_data' && value.length > (edition === '2004-2' ? 4000 : 64000)) return '406';
+  if (edition !== '2004-4' && (key.startsWith('adl.data.') || key.startsWith('adl.nav.request_valid.jump') || key === 'adl.nav.request' && value.endsWith('jump'))) return '401';
+  if ((scorm2004Writable.test(key) || /^adl\.data\.\d+\.store$/.test(key)) && !Number.isFinite(scormCharacters(value))) return '406';
+  if (key === 'cmi.suspend_data' && scormCharacters(value) > (edition === '2004-2' ? 4000 : 64000)) return '406';
   if (key === 'cmi.session_time' || /^cmi.interactions.\d+.latency$/.test(key)) {
     try {scorm2004Seconds(value);} catch {return '406';}
   }
@@ -32,9 +34,10 @@ export function scorm2004FieldError(edition: SCORM2004Edition, key: string, valu
 }
 
 /** Exactly the eight IEEE synchronous methods; engine helpers never reach the SCO. */
-export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string) => unknown}) {
+export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string, sharedData?: Record<string, string>) => unknown}) {
   const runtime = options.sequencingTree ? sequencingRuntime(options.sequencingTree, options.sequencingSnapshot) : new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   if (options.state) runtime.loadFromJSON(options.state);
+  let sharedWrites: Record<string, string> = Object.create(null);
   let initialized = false, finished = false, error: string | null = null, navigation = options.navigation ?? '_none_';
   const bad = (code: string) => {error = code; return 'false';};
   const inactive = (before: string, after: string) => !initialized ? before : finished ? after : null;
@@ -51,7 +54,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
     GetValue(key: string) {
       const code = inactive('122', '123'); if (code) {bad(code); return '';}
       if (typeof key !== 'string') {bad('201'); return '';}
-      if (key.startsWith('adl.data.') || options.edition !== '2004-4' && key.startsWith('adl.nav.request_valid.jump')) {bad('401'); return '';}
+      if (options.edition !== '2004-4' && (key.startsWith('adl.data.') || key.startsWith('adl.nav.request_valid.jump'))) {bad('401'); return '';}
       // ADL navigation is read/write (REQ_47.1); this engine treats the request
       // as write-only. Expose the validated local request without processing it.
       if (key === 'adl.nav.request') {error = null; runtime.lastErrorCode = '0'; return navigation;}
@@ -60,16 +63,26 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
     SetValue(key: string, value: string) {
       const code = inactive('132', '133'); if (code) return bad(code);
       if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
-      const fieldError = scorm2004FieldError(options.edition, key, value); if (fieldError) return bad(fieldError);
+      const fieldError = scorm2004FieldError(options.edition, key, value);
+      if (fieldError === '401') return bad(fieldError);
       // Navigation involving another activity is enabled only with trusted sequencing.
       if (key === 'adl.nav.request' && !options.sequencingTree && !scorm2004ExitRequests.includes(value)) return bad('406');
-      error = null; const result = runtime.SetValue(key, scorm2004EngineValue(key, value)); if (result === 'true' && key === 'adl.nav.request') navigation = value; return result;
+      const shared = /^adl\.data\.(\d+)\.(id|store)$/.exec(key);
+      if (shared?.[2] === 'id') return bad('404');
+      if (shared && (!Number.isSafeInteger(Number(shared[1])) || Number(shared[1]) >= Number(runtime.GetValue('adl.data._count')))) return bad('351');
+      if (shared?.[2] === 'store' && runtime.getSequencingState()?.currentActivity?.sharedDataMaps[Number(shared[1])]?.writeSharedData === false) return bad('404');
+      if (fieldError) return bad(fieldError);
+      error = null; const result = runtime.SetValue(key, scorm2004EngineValue(key, value));
+      if (result === 'true' && key === 'adl.nav.request') navigation = value;
+      if (result === 'true' && shared?.[2] === 'store') sharedWrites[runtime.GetValue(`adl.data.${Number(shared[1])}.id`)] = value;
+      return result;
     },
     Commit(argument: string) {
       const code = inactive('142', '143'); if (code) return bad(code);
       if (argument !== '') return bad('201');
       error = null; const result = runtime.Commit(argument);
-      if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation) === false) return bad('391');
+      if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');
+      if (result === 'true') sharedWrites = Object.create(null);
       return result;
     },
     Terminate(argument: string) {
@@ -78,8 +91,8 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       error = null;
       if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');
       // Queue acceptance precedes termination so an unavailable durable queue is retryable.
-      if (options.checkpoint?.(snapshot(), true, navigation) === false) return bad('111');
-      const result = runtime.Terminate(argument); if (result === 'true') finished = true; return result;
+      if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');
+      const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },
     GetLastError() {return error ?? runtime.GetLastError();},
     GetErrorString(code: string) {return runtime.GetErrorString(code);},

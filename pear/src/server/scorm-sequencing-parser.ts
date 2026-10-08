@@ -1,7 +1,10 @@
 import type {Element} from '@xmldom/xmldom';
 import type {SCORMStandard} from '../shared/scorm-engine.ts';
 import {reject} from './errors.ts';
+import {durationKeys, durationSeconds} from '../shared/scorm-duration.ts';
 const SN = 'http://www.imsglobal.org/xsd/imsss';
+const ADL = 'http://www.adlnet.org/xsd/adlseq_v1p3';
+const NAV = 'http://www.adlnet.org/xsd/adlnav_v1p3';
 const fail = (): never => reject('INVALID_ARGUMENT', 'Unsupported or malformed SCORM sequencing definition');
 function children(el: Element) {const out: Element[] = []; for (let n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 1) out.push(n as Element); return out;}
 function attrs(el: Element, names: string[]) {
@@ -9,7 +12,70 @@ function attrs(el: Element, names: string[]) {
 }
 function bool(el: Element, name: string) {const v = el.getAttribute(name); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
 function number(el: Element, name: string, min: number, max: number) {const v = el.getAttribute(name); if (v === null) return undefined; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v) || Number(v) < min || Number(v) > max) fail(); return Number(v);}
+// Delivery windows require an explicit timezone so every host enforces the
+// same instant. Validate Gregorian dates before Date can normalize them.
+function calendarLimit(el: Element, name: string) {
+  const value = el.getAttribute(name); if (value === null) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!m) fail();
+  const [year, month, day, hour, minute, second] = m!.slice(1, 7).map(Number);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (!year || month < 1 || month > 12 || day < 1 || day > days[month - 1] || hour > 24 || minute > 59 || second > 59 || hour === 24 && (minute || second || Number(m![7] ?? 0))) fail();
+  const zoneHours = Number(m![10] ?? 0), zoneMinutes = Number(m![11] ?? 0);
+  if (zoneHours > 14 || zoneMinutes > 59 || zoneHours === 14 && zoneMinutes) fail();
+  const date = new Date(0); date.setUTCFullYear(year, month - 1, day); date.setUTCHours(hour, minute, second, Number((m![7] ?? '').padEnd(3, '0')));
+  const offset = (zoneHours * 60 + zoneMinutes) * (m![9] === '-' ? -1 : 1);
+  date.setTime(date.getTime() - offset * 60000);
+  return date.toISOString();
+}
 function flags(el: Element, names: string[]) {attrs(el, names); return Object.fromEntries(names.filter(n => el.hasAttribute(n)).map(n => [n, bool(el, n)]));}
+
+export function parsePresentation(item: Element, edition: SCORMStandard): string[] | undefined {
+  const nodes = children(item).filter(n => n.namespaceURI === NAV && n.localName === 'presentation');
+  if (!nodes.length) return undefined; if (nodes.length !== 1 || edition === '1.2') fail();
+  attrs(nodes[0], []); const interfaces = children(nodes[0]);
+  if (interfaces.length > 1 || interfaces.some(n => n.namespaceURI !== NAV || n.localName !== 'navigationInterface')) fail();
+  if (!interfaces.length) return [];
+  attrs(interfaces[0], []); const tokens = children(interfaces[0]); if (tokens.length > 64) fail();
+  const allowed = ['continue', 'previous', 'exit', 'abandon', ...(edition === '2004-2' ? [] : ['exitAll', 'abandonAll', 'suspendAll'])];
+  return [...new Set(tokens.map(n => {
+    if (n.namespaceURI !== NAV || n.localName !== 'hideLMSUI' || children(n).length) fail(); attrs(n, []);
+    const value = n.textContent?.trim() ?? ''; if (!allowed.includes(value)) fail(); return value;
+  }))];
+}
+
+export function parseSharedData(item: Element, edition: SCORMStandard) {
+  const cp = 'http://www.adlnet.org/xsd/adlcp_v1p3';
+  const nodes = children(item).filter(n => n.namespaceURI === cp && n.localName === 'data');
+  if (!nodes.length) return undefined; if (nodes.length !== 1 || edition !== '2004-4') fail();
+  attrs(nodes[0], []); const maps = children(nodes[0]), ids = new Set<string>();
+  if (!maps.length || maps.length > 64) fail();
+  return maps.map(n => {
+    if (n.namespaceURI !== cp || n.localName !== 'map' || children(n).length) fail(); attrs(n, ['targetID', 'readSharedData', 'writeSharedData']);
+    const targetID = n.getAttribute('targetID');
+    if (!targetID || targetID.length > 4000 || /\s|[\u0000-\u001f\u007f]/.test(targetID) || ids.has(targetID)) fail(); ids.add(targetID!);
+    return {targetID: targetID!, readSharedData: bool(n, 'readSharedData') ?? true, writeSharedData: bool(n, 'writeSharedData') ?? false};
+  });
+}
+
+function adlObjectives(el: Element, edition: SCORMStandard) {
+  if (edition !== '2004-4') fail(); attrs(el, []); const list = children(el), ids = new Set<string>();
+  if (!list.length || list.length > 1024) fail();
+  return list.map(n => {
+    if (n.namespaceURI !== ADL || n.localName !== 'objective') fail(); attrs(n, ['objectiveID']);
+    const id = n.getAttribute('objectiveID'); if (!id || !id.trim() || id.length > 4000 || ids.has(id)) fail(); ids.add(id!);
+    const mappings = children(n), targets = new Set<string>(); if (!mappings.length || mappings.length > 1024) fail();
+    return {id, maps: mappings.map(m => {
+      if (m.namespaceURI !== ADL || m.localName !== 'mapInfo' || children(m).length) fail();
+      const read = ['readRawScore', 'readMinScore', 'readMaxScore', 'readCompletionStatus', 'readProgressMeasure'];
+      const write = ['writeRawScore', 'writeMinScore', 'writeMaxScore', 'writeCompletionStatus', 'writeProgressMeasure'];
+      attrs(m, ['targetObjectiveID', ...read, ...write]); const target = m.getAttribute('targetObjectiveID');
+      if (!target || !target.trim() || target.length > 4000 || targets.has(target)) fail(); targets.add(target!);
+      return {targetObjectiveID: target, ...Object.fromEntries(read.map(k => [k, bool(m, k) ?? true])), ...Object.fromEntries(write.map(k => [k, bool(m, k) ?? false]))};
+    })};
+  });
+}
 const conditions = ['satisfied', 'objectiveStatusKnown', 'objectiveMeasureKnown', 'objectiveMeasureGreaterThan', 'objectiveMeasureLessThan', 'completed', 'activityProgressKnown', 'attempted', 'attemptLimitExceeded', 'always'];
 const preActions = ['skip', 'disabled', 'hiddenFromChoice', 'stopForwardTraversal'];
 function rule(el: Element, kind: string) {
@@ -38,9 +104,9 @@ function objective(el: Element, edition: SCORMStandard) {
       if (out.minNormalizedMeasure !== undefined || children(n).length) fail(); attrs(n, []);
       const value = n.textContent?.trim() ?? ''; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) || Number(value) < -1 || Number(value) > 1) fail(); out.minNormalizedMeasure = Number(value);
     } else if (n.localName === 'mapInfo') {
-      const base = ['readSatisfiedStatus', 'readNormalizedMeasure', 'writeSatisfiedStatus', 'writeNormalizedMeasure'];
-      const fourth = ['readCompletionStatus', 'writeCompletionStatus', 'readProgressMeasure', 'writeProgressMeasure'];
-      const names = edition === '2004-4' ? [...base, ...fourth] : base;
+      // Fourth-edition score/completion/progress maps belong to adlseq:mapInfo,
+      // not imsss:mapInfo. Keep the IMS namespace vocabulary schema-accurate.
+      const names = ['readSatisfiedStatus', 'readNormalizedMeasure', 'writeSatisfiedStatus', 'writeNormalizedMeasure'];
       attrs(n, ['targetObjectiveID', ...names]); if (children(n).length) fail();
       const target = n.getAttribute('targetObjectiveID'); if (!target || target.length > 4000 || out.mapInfo.some((m: any) => m.targetObjectiveID === target)) fail();
       out.mapInfo.push({targetObjectiveID: target, ...Object.fromEntries(names.filter(k => n.hasAttribute(k)).map(k => [k, bool(n, k)]))});
@@ -99,21 +165,47 @@ export function parseSequencingCollections(manifest: Element, edition: SCORMStan
     if (definition.namespaceURI !== SN || definition.localName !== 'sequencing') fail();
     attrs(definition, ['ID']); const id = definition.getAttribute('ID');
     if (!id || id.length > 4000 || !ncName.test(id) || result.has(id)) fail();
-    sequencingDefinition(children(definition), edition); result.set(id!, definition);
+    sequencingDefinition(children(definition), edition, false); result.set(id!, definition);
   }
   return result;
 }
 
-function sequencingDefinition(nodes: Element[], edition: SCORMStandard) {
+function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveObjectives = true) {
   const out: Record<string, any> = {}, seen = new Set<string>();
+  let extensions: ReturnType<typeof adlObjectives> | undefined;
   for (const n of nodes) {
-    if (n.namespaceURI !== SN || seen.has(n.localName!)) fail(); seen.add(n.localName!);
+    const key = `${n.namespaceURI}:${n.localName}`;
+    if (![SN, ADL].includes(n.namespaceURI ?? '') || seen.has(key)) fail(); seen.add(key);
+    if (n.namespaceURI === ADL) {
+      if (n.localName === 'objectives') {extensions = adlObjectives(n, edition); continue;}
+      if (children(n).length) fail();
+      if (n.localName === 'constrainedChoiceConsiderations') out.sequencingControls = {...out.sequencingControls, constrainChoice: false, preventActivation: false, ...flags(n, ['constrainChoice', 'preventActivation'])};
+      else if (n.localName === 'rollupConsiderations') {
+        const names = ['requiredForSatisfied', 'requiredForNotSatisfied', 'requiredForCompleted', 'requiredForIncomplete']; attrs(n, [...names, 'measureSatisfactionIfActive']);
+        out.rollupConsiderations = {measureSatisfactionIfActive: bool(n, 'measureSatisfactionIfActive') ?? true};
+        for (const name of names) {const value = n.getAttribute(name) ?? 'always'; if (!['always', 'ifAttempted', 'ifNotSkipped', 'ifNotSuspended'].includes(value)) fail(); out.rollupConsiderations[name] = value;}
+      } else fail();
+      continue;
+    }
     switch (n.localName) {
       case 'controlMode': out.sequencingControls = {...out.sequencingControls, choice: true, choiceExit: true, flow: false, forwardOnly: false, useCurrentAttemptObjectiveInfo: true, useCurrentAttemptProgressInfo: true, ...flags(n, ['choice', 'choiceExit', 'flow', 'forwardOnly', 'useCurrentAttemptObjectiveInfo', 'useCurrentAttemptProgressInfo'])}; break;
-      case 'constrainedChoiceConsiderations': out.sequencingControls = {...out.sequencingControls, ...flags(n, ['constrainChoice', 'preventActivation'])}; break;
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
+      case 'randomizationControls': {
+        attrs(n, ['randomizationTiming', 'selectCount', 'reorderChildren', 'selectionTiming']);
+        const selectionTiming = n.getAttribute('selectionTiming') ?? 'never', randomizationTiming = n.getAttribute('randomizationTiming') ?? 'never';
+        if (![selectionTiming, randomizationTiming].every(v => ['never', 'once', 'onEachNewAttempt'].includes(v))) fail();
+        if (n.hasAttribute('selectCount') && !/^[+-]?\d+$/.test(n.getAttribute('selectCount')!)) fail();
+        const selectCount = number(n, 'selectCount', 0, 2048); if (selectCount !== undefined && !Number.isInteger(selectCount)) fail();
+        out.sequencingControls = {...out.sequencingControls, selectionTiming, randomizationTiming, selectCount: selectCount ?? null, randomizeChildren: bool(n, 'reorderChildren') ?? false};
+        break;
+      }
       case 'limitConditions': {
-        attrs(n, ['attemptLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;} break;
+        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
+        for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(n.getAttribute(key)!) + 'S';} catch {fail();}}
+        const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');
+        if (begin !== undefined) out.beginTimeLimit = begin; if (end !== undefined) out.endTimeLimit = end;
+        if (begin !== undefined && end !== undefined && Date.parse(begin) > Date.parse(end)) fail();
+        break;
       }
       case 'sequencingRules': {
         attrs(n, []); out.sequencingRules = {};
@@ -131,6 +223,14 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard) {
       default: fail();
     }
     if (!['sequencingRules', 'objectives', 'rollupRules'].includes(n.localName!) && children(n).length) fail();
+  }
+  for (const extension of resolveObjectives ? extensions ?? [] : []) {
+    const objective = [...(out.objectives ?? []), ...(out.primaryObjective ? [out.primaryObjective] : [])].find(o => o.objectiveID === extension.id);
+    if (!objective) fail();
+    for (const map of extension.maps) {
+      const existing = objective.mapInfo.find((m: any) => m.targetObjectiveID === map.targetObjectiveID);
+      if (existing) Object.assign(existing, map); else objective.mapInfo.push(map);
+    }
   }
   return out;
 }

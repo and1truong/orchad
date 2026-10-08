@@ -3,7 +3,7 @@ import yauzl from 'yauzl';
 import {DOMParser, type Element} from '@xmldom/xmldom';
 import type {SCORMActivity, SCORMManifest, SCORMResource, SCORMStandard} from '../shared/scorm-engine.ts';
 import {crc32} from './scorm-archive.ts';
-import {parseSequencing, parseSequencingCollections} from './scorm-sequencing-parser.ts';
+import {parseSequencing, parseSequencingCollections, parsePresentation, parseSharedData} from './scorm-sequencing-parser.ts';
 import {reject} from './errors.ts';
 
 export const packageLimits = {archive: 32 * 1024 * 1024, expanded: 64 * 1024 * 1024, file: 16 * 1024 * 1024, files: 2048, manifest: 1024 * 1024};
@@ -105,10 +105,16 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   while (stack.length) {
     const {node, depth} = stack.pop()!;
     if (++count > 12000 || depth > 32) invalid('manifest node/depth quota');
+    if (node.namespaceURI === CP12 && ['data', 'map'].includes(node.localName ?? '')) invalid('shared data requires fourth-edition ADL namespace');
+    if (node.getAttributeNS(CP2004, 'sharedDataGlobalToSystem') !== null && (node.localName !== 'organization' || node.namespaceURI !== ns)) invalid('misplaced shared data scope');
     if ([CP12, CP2004].includes(node.namespaceURI ?? '') && ['prerequisites', 'maxtimeallowed', 'timelimitaction', 'datafromlms', 'masteryscore', 'dataFromLMS', 'timeLimitAction', 'completionThreshold', 'data'].includes(node.localName ?? '')) {
       const parent = node.parentNode as Element;
       if (parent?.localName !== 'item' || parent.namespaceURI !== ns) invalid('misplaced runtime extension');
       features.add(node.localName!);
+    }
+    if (node.namespaceURI === CP2004 && node.localName === 'map') {
+      const parent = node.parentNode as Element;
+      if (parent.namespaceURI !== CP2004 || parent.localName !== 'data') invalid('misplaced shared data mapping');
     }
     if (node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && ['sequencing', 'sequencingCollection'].includes(node.localName!)) {
       const parent = node.parentNode as Element;
@@ -116,7 +122,16 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
       if (node.localName === 'sequencingCollection' && parent !== root!) invalid('misplaced sequencing collection');
       features.add(node.localName!);
     }
-    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlseq_v1p3' || node.namespaceURI === 'http://www.adlnet.org/xsd/adlnav_v1p3') features.add('unsupportedNavigationExtension');
+    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlseq_v1p3') {
+      let owner = node.parentNode as Element | null;
+      while (owner && !(owner.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && owner.localName === 'sequencing')) owner = owner.parentNode as Element | null;
+      if (!owner) invalid('misplaced ADL sequencing extension'); features.add('adlSequencing');
+    }
+    if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlnav_v1p3') {
+      const parent = node.parentNode as Element;
+      if (!(node.localName === 'presentation' && parent?.namespaceURI === ns && parent.localName === 'item' || node.localName === 'navigationInterface' && parent?.namespaceURI === node.namespaceURI && parent.localName === 'presentation' || node.localName === 'hideLMSUI' && parent?.namespaceURI === node.namespaceURI && parent.localName === 'navigationInterface')) invalid('misplaced or unknown ADL presentation extension');
+      features.add('presentation');
+    }
     for (const n of elements(node)) stack.push({node: n, depth: depth + 1});
   }
   const metadata = one(root!, 'metadata', ns!), schema = one(metadata, 'schema', ns!).textContent?.trim(), edition = one(metadata, 'schemaversion', ns!).textContent?.trim();
@@ -142,7 +157,25 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     resources.push({id: rid, kind: type as 'sco' | 'asset', href: entry ? entry.path + entry.suffix : '', files: declared, dependencies: elements(el, 'dependency', ns!).map(d => d.getAttribute('identifierref') ?? '')});
   }
   const resourceIds = new Set(resources.map(r => r.id));
-  if (!resources.some(r => r.kind === 'sco') || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('SCO or resource dependency missing');
+  if (!resources.some(r => r.href) || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('Launchable resource or resource dependency missing');
+  const objectiveScope = (organization: Element) => {
+    const qualified = organization.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacy = organization.getAttribute('objectivesGlobalToSystem');
+    if (qualified !== null && legacy !== null && qualified !== legacy) invalid('conflicting objective scope');
+    const value = qualified ?? legacy ?? 'true';
+    if (!['true', 'false', '1', '0'].includes(value)) invalid('invalid objective scope');
+    return value;
+  };
+  // Validate extension syntax/references in every organization, not just the
+  // selected execution tree. A hidden/unselected branch cannot hide malformed
+  // or unsupported ADL semantics behind the selected profile's feature flags.
+  for (const el of [...Array.from(root!.getElementsByTagNameNS(ns!, 'organization')), ...Array.from(root!.getElementsByTagNameNS(ns!, 'item'))]) {
+    if (el.localName === 'organization') objectiveScope(el);
+    const scope = el.getAttributeNS(CP2004, 'sharedDataGlobalToSystem');
+    if (scope !== null && (standard !== '2004-4' || el.localName !== 'organization' || !['true', 'false', '1', '0'].includes(scope))) invalid('invalid shared data scope');
+    if (parseSharedData(el, standard) && (!resourceIds.has(el.getAttribute('identifierref') ?? '') || resources.find(r => r.id === el.getAttribute('identifierref'))?.kind !== 'sco')) invalid('shared data requires a SCO activity');
+    parseSequencing(el, standard, collections);
+    if (parsePresentation(el, standard) && !resourceIds.has(el.getAttribute('identifierref') ?? '')) invalid('presentation requires a resource activity');
+  }
   const organizations = one(root!, 'organizations', ns!), orgs = elements(organizations, 'organization', ns!);
   const org = orgs.find(o => o.getAttribute('identifier') === organizations.getAttribute('default')) ?? (orgs.length === 1 ? orgs[0] : undefined);
   if (!org) invalid('default organization unavailable');
@@ -150,7 +183,6 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   const activity = (el: Element): SCORMActivity => {
     const visibility = el.getAttribute('isvisible');
     if (visibility !== null && !['true', 'false', '1', '0'].includes(visibility)) invalid('invalid activity visibility');
-    if (visibility === 'false' || visibility === '0') features.add('unsupportedActivityVisibility');
     const aid = id(el), resourceId = el.getAttribute('identifierref') || undefined, parameters = el.getAttribute('parameters') || undefined;
     if (resourceId && !resourceIds.has(resourceId)) invalid('activity references unknown resource');
     if (parameters && (parameters.length > 2048 || /[\u0000-\u001f]/.test(parameters))) invalid('activity parameters quota');
@@ -158,6 +190,9 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     if (pre.length > 1 || pre.some(p => p.getAttribute('type') && p.getAttribute('type') !== 'aicc_script')) invalid('unsupported prerequisite type');
     const prerequisites = pre[0]?.textContent?.trim();
     const extensions: Partial<SCORMActivity> = {};
+    const presentation = parsePresentation(el, standard);
+    const sharedData = parseSharedData(el, standard); if (sharedData) extensions.sharedDataMaps = sharedData;
+    if (presentation) {if (!resourceId) invalid('presentation requires a resource activity'); extensions.hideLmsUi = presentation;}
     if (standard === '1.2') {
       for (const [tag, key] of [['datafromlms', 'launchData'], ['masteryscore', 'masteryScore'], ['maxtimeallowed', 'maxTimeAllowed'], ['timelimitaction', 'timeLimitAction']] as const) {
         const nodes = elements(el, tag, cp); if (nodes.length > 1) invalid('duplicate runtime extension');
@@ -180,22 +215,19 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
           const enabled = n.getAttribute('completedByMeasure') ?? 'false', minimum = n.getAttribute('minProgressMeasure') ?? '1', weight = n.getAttribute('progressWeight') ?? '1';
           if (!['true', 'false', '1', '0'].includes(enabled) || !numeric(minimum) || !numeric(weight)) invalid('invalid completion threshold attributes');
           if (['true', '1'].includes(enabled)) extensions.completionThreshold = minimum;
-          if (weight !== '1' && Number(weight) !== 1) features.add('weightedCompletion');
+          extensions.completionMeasure = {completedByMeasure: ['true', '1'].includes(enabled), minProgressMeasure: Number(minimum), progressWeight: Number(weight)};
         } else if (text) {if (!numeric(text)) invalid('invalid completion threshold'); extensions.completionThreshold = text;}
       }
     }
-    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard, collections)} : {}), children: elements(el, 'item', ns!).map(activity)};
+    return {id: aid, title: label(el, ns!), ...(visibility !== null ? {isVisible: visibility !== 'false' && visibility !== '0'} : {}), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard, collections)} : {}), children: elements(el, 'item', ns!).map(activity)};
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');
-  const qualifiedGlobal = org.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacyGlobal = org.getAttribute('objectivesGlobalToSystem');
-  if (qualifiedGlobal && legacyGlobal && qualifiedGlobal !== legacyGlobal) invalid('conflicting objective scope');
-  const global = qualifiedGlobal || legacyGlobal || 'true';
-  if (!['true', 'false', '1', '0'].includes(global)) invalid('invalid objective scope');
+  const global = objectiveScope(org);
   // XML ID uniqueness spans the document, including unselected organizations.
   const documentIds = new Set([root!, ...Array.from(root!.getElementsByTagNameNS(ns!, '*'))].map(n => n.getAttribute('identifier')).filter(Boolean));
   if ([...collections.keys()].some(id => documentIds.has(id))) invalid('duplicate sequencing identifier');
-  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global)} : {}), runtimeFeatures: [...features].sort()};
+  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global), ...(standard === '2004-4' ? {sharedDataGlobalToSystem: !['false', '0'].includes(org.getAttributeNS(CP2004, 'sharedDataGlobalToSystem') ?? 'true')} : {})} : {}), runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {

@@ -44,7 +44,7 @@ test('support packets omit private state, authored strings, credentials and cros
 test('real sequenced launch/CMI rejection and trusted-state recovery produce no direct content/learner logs under the pinned logging adaptation', async () => {
   const f = await scormLearningFixture(undefined, sequencingPackage('2004-4')), methods = ['debug', 'log', 'info', 'warn', 'error'] as const, original = Object.fromEntries(methods.map(method => [method, console[method]])), output: unknown[][] = [];
   try {
-    const source = readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js', import.meta.url)); assert.equal(createHash('sha256').update(source).digest('hex'), '6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936');
+    const source = readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js', import.meta.url)); assert.equal(createHash('sha256').update(source).digest('hex'), '0294d815f75b820fdb34e8dde0a84297e49f42bba45a10f826ff298423f92d6d');
     for (const method of methods) console[method] = (...args: unknown[]) => {output.push(args);};
     const launch = f.launch(f.enroll(), 'intro'), b = f.player.bootstrap(launch.token);
     assert.throws(() => f.player.checkpoint(launch.token, {sequence: 1, revision: 0, state: {...b.state, learner_name: 'private-learner-log-sentinel'}, finished: false}), /Server-owned CMI value changed/);
@@ -52,10 +52,15 @@ test('real sequenced launch/CMI rejection and trusted-state recovery produce no 
   } finally {for (const method of methods) console[method] = original[method]; f.db.close();}
 });
 
-test('nondefault manifest visibility is an explicit unsupported profile rather than silently shown as ordinary content', async () => {
+test('manifest visibility is retained for presentation, defaults independently for children and rejects invalid booleans', async () => {
   for (const standard of ['1.2', '2004-4'] as const) {
     const bytes = multiFilePackage(standard, multiFileManifest(standard).replace('identifier="intro"', 'identifier="intro" isvisible="false"'));
-    const parsed = await inspectSCORMPackage(bytes); assert.ok(parsed.manifest.runtimeFeatures?.includes('unsupportedActivityVisibility')); assert.throws(() => playbackActivities(parsed.manifest), /Unsupported/);
+    const parsed = await inspectSCORMPackage(bytes); const profiles = playbackActivities(parsed.manifest);
+    assert.equal(profiles.find(p => p.activity.id === 'intro')!.activity.isVisible, false);
+    assert.equal(profiles.find(p => p.activity.id === 'practice')!.activity.isVisible, undefined);
+    const folderXML = multiFileManifest(standard).replace('<p:item identifier="intro"', '<p:item identifier="folder" isvisible="false"><p:title>Hidden folder</p:title><p:item identifier="intro"').replace('</p:organization>', '</p:item></p:organization>');
+    const nested = playbackActivities((await inspectSCORMPackage(multiFilePackage(standard, folderXML))).manifest);
+    assert.ok(nested.every(p => p.activity.isVisible === undefined && p.ancestors[0].isVisible === false));
     await assert.rejects(() => inspectSCORMPackage(multiFilePackage(standard, multiFileManifest(standard).replace('identifier="intro"', 'identifier="intro" isvisible="bogus"'))), /visibility/);
   }
 });

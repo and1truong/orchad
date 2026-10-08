@@ -1,7 +1,7 @@
+import {scormCharacters, scorm12Writable as writable} from '../shared/scorm-characterstring.ts';
 import Scorm12API from 'scorm-again/scorm12';
 import {reject} from './errors.ts';
 
-const writable = /^(?:cmi\.(?:suspend_data|comments)|cmi\.core\.(?:lesson_location|lesson_status|exit|session_time|score\.(?:raw|min|max))|cmi\.student_preference\.(?:audio|language|speed|text)|cmi\.objectives\.\d{1,3}\.(?:id|status|score\.(?:raw|min|max))|cmi\.interactions\.\d{1,3}\.(?:id|time|type|weighting|student_response|result|latency|objectives\.\d{1,3}\.id|correct_responses\.\d{1,3}\.pattern))$/;
 const readonly = /^(?:cmi\.(?:launch_data|comments_from_lms)|cmi\.core\.(?:student_id|student_name|credit|entry|lesson_mode|total_time)|cmi\.student_data\.(?:mastery_score|max_time_allowed|time_limit_action))$/;
 function leaves(value: unknown, prefix = 'cmi', depth = 0, out: Record<string, string> = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 8) reject('INVALID_ARGUMENT', 'Bounded CMI object required');
@@ -9,7 +9,7 @@ function leaves(value: unknown, prefix = 'cmi', depth = 0, out: Record<string, s
     if (!/^[a-z_]+$|^\d{1,3}$/.test(key) || ['__proto__', 'constructor', 'prototype'].includes(key)) reject('INVALID_ARGUMENT', 'Unknown CMI field');
     const path = prefix + '.' + key;
     if (typeof item === 'string') {
-      if (item.length > 4096 || Object.keys(out).length >= 2048) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
+      if (scormCharacters(item) > 4096 || Object.keys(out).length >= 2048) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
       out[path] = item;
     } else leaves(item, path, depth + 1, out);
   }

@@ -11,6 +11,38 @@ import {SCORMPlayerService} from '../src/server/scorm-player-service.ts';
 import {SCORMLearningBindings} from '../src/server/scorm-learning-bindings.ts';
 import {publishBindingAward, awardDefinition, ownAward, courseChange, groupDefinition} from './award-binding-fixture.ts';
 
+test('1.2 default launch advances hidden required SCOs and resumes unfinished state without widening prerequisites', async () => {
+  const xml = multiFileManifest().replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"').replace('<p:title>Practice</p:title>', '<p:title>Practice</p:title><runtime:prerequisites type="aicc_script">intro</runtime:prerequisites>');
+  const f = await scormLearningFixture(undefined, multiFilePackage('1.2', xml));
+  try {
+    const binding = f.enroll(); assert.ok(f.player.context(f.service.principal('learner-a'), binding).activities.every(a => !a.visible));
+    assert.throws(() => f.launch(binding, 'practice'), /prerequisites/);
+    const first = f.launch(binding); assert.equal(first.scoId, 'intro');
+    assert.equal(f.checkpoint(first).result.officialLearningChanged, false);
+    const second = f.launch(binding); assert.equal(second.scoId, 'practice');
+    f.checkpoint(second, 'incomplete', '90', false, 'hidden-bookmark');
+    const resumed = f.launch(binding); assert.equal(resumed.scoId, 'practice');
+    assert.equal(f.player.bootstrap(resumed.token).state.core.lesson_location, 'hidden-bookmark');
+    assert.equal(f.checkpoint(resumed).result.officialLearningChanged, true);
+  } finally {f.db.close();}
+});
+
+test('1.2 default replay selects a later hidden terminal SCO whose score or success still fails the bound policy', async () => {
+  const xml = multiFileManifest().replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="false"');
+  const f = await scormLearningFixture(undefined, multiFilePackage('1.2', xml));
+  try {
+    const binding = f.enroll(), first = f.launch(binding); f.checkpoint(first);
+    const savedIntro = f.db.prepare("SELECT * FROM scorm_sco_attempts WHERE sco_id='intro'").get();
+    const second = f.launch(binding); assert.equal(second.scoId, 'practice');
+    assert.equal(f.checkpoint(second, 'passed', '70').result.officialLearningChanged, false);
+    const retry = f.launch(binding); assert.equal(retry.scoId, 'practice');
+    assert.equal(f.checkpoint(retry, 'completed', '90').result.officialLearningChanged, false);
+    const passed = f.launch(binding); assert.equal(passed.scoId, 'practice');
+    assert.equal(f.checkpoint(passed, 'passed', '90').result.officialLearningChanged, true);
+    assert.deepEqual(f.db.prepare("SELECT * FROM scorm_sco_attempts WHERE sco_id='intro'").get(), savedIntro);
+  } finally {f.db.close();}
+});
+
 test('AICC prerequisites parse bounded logical, status, set and threshold expressions without executing source', () => {
   const states = new Map([['a', 'passed'], ['b', 'failed'], ['block', 'completed']]);
   for (const expression of ['a & ~b', '(b | a) & block', 'a="passed" & b<>"passed"', '2*{a,b,block}', '{a,block}', 'a | b & block']) assert.equal(prerequisite(expression, states), true, expression);
@@ -193,7 +225,7 @@ test('populated v45 upgrade preserves accepted practice CMI and registration, wi
   const dir = mkdtempSync(join(tmpdir(), 'pear-scorm-v45-')), path = join(dir, 'pear.sqlite'), f = await scormLearningFixture(path);
   const launch = f.launch(undefined, 'intro'); f.checkpoint(launch, 'passed', '90', false);
   const state = f.db.prepare('SELECT runtime_state,revision,reported_seconds FROM scorm_sco_attempts').get(), registrations = f.db.prepare('SELECT * FROM scorm_registrations').all();
-  f.db.exec('DROP TRIGGER scorm_engine_resource_no_delete; DROP TRIGGER scorm_engine_resource_finalized_insert; DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; ALTER TABLE scorm_sco_attempts DROP COLUMN finished; ALTER TABLE scorm_engine_launches DROP COLUMN sco_attempt_number; DELETE FROM schema_version WHERE version>=46'); f.db.close();
+  f.db.exec('DROP TRIGGER scorm_engine_resource_no_delete; DROP TRIGGER scorm_engine_resource_finalized_insert; DROP TABLE scorm_system_objectives; DROP TABLE scorm_system_data; DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; ALTER TABLE scorm_sco_attempts DROP COLUMN finished; ALTER TABLE scorm_engine_launches DROP COLUMN sco_attempt_number; DELETE FROM schema_version WHERE version>=46'); f.db.close();
   const reopened = fixture(path);
   try {
     assert.deepEqual(reopened.db.prepare('SELECT runtime_state,revision,reported_seconds FROM scorm_sco_attempts').get(), state);

@@ -150,10 +150,7 @@ try {
   assert.ok(enrollment);
   const directLesson=await page.evaluate(async(args:any)=>{const ctx=await window.agentBridgeV1!.getContext();return window.agentBridgeV1!.invoke({requestId:crypto.randomUUID(),documentId:ctx.documentId,toolName:"learning_get_lesson",arguments:args,expectedRevision:null,idempotencyKey:null});},{enrollmentId:enrollment.id,lessonId:"practice"});
   assert.equal(directLesson.ok,true,JSON.stringify(directLesson));assert.equal(directLesson.data.title,"Luyện nhớ chủ động");
-  await panel.getByRole("button",{name:"Pin target",exact:true}).click();
-  await panel.getByLabel("Learning workflow",{exact:true}).selectOption("practice");
-  await panel.getByLabel("Allow read: learning_get_lesson",{exact:true}).check();
-  await panel.getByRole("button",{name:"Consent to pinned target + model",exact:true}).click();
+  await bind("practice",["learning_get_lesson"]);
   scriptedTool.name="learning_get_lesson";scriptedTool.arguments=JSON.stringify({enrollmentId:enrollment.id,lessonId:"practice"});
   await panel.getByLabel("Message",{exact:true}).fill("Offer optional practice from this original permitted lesson.");
   const practiceRequestStart=gateway.requests.length;

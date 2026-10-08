@@ -1,9 +1,23 @@
 import Scorm2004API from 'scorm-again/scorm2004';
+import {installDurationClock} from './scorm-duration.ts';
 /** Host-only engine construction. Serialized state is always from the trusted database. */
 export function sequencingRuntime(tree: Record<string, any>, snapshot?: string) {
   const runtime = new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false,
     sequencing: {activityTree: tree as any, autoRollupOnCMIChange: false, autoProgressOnCompletion: false, validateNavigationRequests: true, enableEventSystem: false, logLevel: 'error'}});
   if (!runtime.getSequencingService()) throw Error('SCORM sequencing engine unavailable');
+  // Upstream's Map-to-object snapshots lose the legal ID __proto__. Keep the
+  // public engine tracking Map intact and serialize its keys as own properties.
+  const serialize = runtime.serializeSequencingState.bind(runtime);
+  runtime.serializeSequencingState = () => {
+    const state = JSON.parse(serialize()), process = runtime.getSequencingService()!.getOverallSequencingProcess();
+    if (process) {
+      const objectives = Object.fromEntries([...process.getGlobalObjectiveMap()].map(([id, data]) => [id, {...data}]));
+      state.globalObjectiveMap = objectives;
+      if (state.sequencing) state.sequencing.globalObjectiveMap = objectives;
+      if (state.suspensionState) state.suspensionState.globalObjectives = objectives;
+    }
+    return JSON.stringify(state);
+  };
   if (snapshot && !runtime.deserializeSequencingState(snapshot)) throw Error('Invalid trusted sequencing snapshot');
   if (snapshot) {
     // Upstream restores currentActivity through a setter that reactivates its path.
@@ -16,6 +30,7 @@ export function sequencingRuntime(tree: Record<string, any>, snapshot?: string) 
     };
     restore(runtime.getSequencingState()?.rootActivity);
   }
+  installDurationClock(runtime, tree, snapshot);
   return runtime;
 }
 export function navigationTarget(request: string) {
