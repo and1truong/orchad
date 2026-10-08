@@ -1,0 +1,41 @@
+name: pear-keycloak
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/pear-keycloak.yml'
+      - 'pear/scripts/keycloak-browser.ts'
+      - 'pear/tests/fixtures/keycloak/**'
+      - 'pear/src/server/identity.ts'
+      - 'pear/src/server/invitations.ts'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pear-keycloak.yml'
+      - 'pear/scripts/keycloak-browser.ts'
+      - 'pear/tests/fixtures/keycloak/**'
+      - 'pear/src/server/identity.ts'
+      - 'pear/src/server/invitations.ts'
+jobs:
+  keycloak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 24, cache: npm, cache-dependency-path: pear/package-lock.json}
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: pear
+        run: |
+          npm ci
+          npm run build
+          npm run typecheck:host
+          npx playwright install --with-deps chromium
+          npm run test:keycloak
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pear-keycloak-evidence
+          retention-days: 7
+          path: pear/artifacts/keycloak-*
