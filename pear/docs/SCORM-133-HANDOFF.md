@@ -27,12 +27,20 @@ lifecycle13,build,four built journeys passed. No new runtime patch; full current
 CI/native/review remain required. Historical slice adaptation pear-uri-scheme-binding-v23.
 
 #195 fragment successor v24 completed local722/105,focused13,build and three
-built identifier journeys; exact current-head CI remains pending. Latest branch
+built identifier journeys; exact current-head CI remains pending. PR #198
 codex/pear-scorm-result-capacity-133 adds ADR-126/v25 shared interaction result
 real capacity and missing-ID408 rollback. All twelve original regressions failed
 before correction; local focused26,full725/105,build,three built wide-real
 journeys passed. Exact-head full CI/native/review remain required. Current
 adaptation pear-result-binding-v25;1.2 bytes stay unchanged.
+
+Latest branch codex/pear-native-side-panel-journey-133 stacks on #198.
+ADR-127 extends actual Side Panel journeys across all four profiles with
+consent/read/revoke/rebind, identical lost-ACK retry/close-resume/finish and
+unchanged native document. Local host typecheck/discovery are required; actual
+CI pending. #192 stdout drain review fixed at70452253 and real-merged through
+the stack; local five cleanup checks passed. #194 adds collection count/state
+assertions in built runtime, persisted checkpoint and resume after review.
 
 Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
 external gates. Legacy ADL license/platform, authorized commercial exports and

@@ -102,3 +102,9 @@ ADR-124 adds original simultaneous-invalid API error/state/queue preservation ve
 ADR-125 adds original raw-fragment delimiter/encoded-data vectors to shared/facade/preload/replay and existing built identifier retry/resume journeys. Exact-head acceptance and remaining full component/authority/IP/equivalence gates remain required.
 
 ADR-126 extends original result real-capacity/dependency/finite-envelope vectors through shared engine/facade/preload/replay and existing built wide-real ACK/retry/resume journeys. Exact-head full CI/native/review and remaining full conformance/external/production gates remain required.
+
+ADR-127 extends the actual Side Panel check in all four SCORM profiles to
+consented metadata read/private-state exclusion, read-consent revocation, exact
+lost-ACK retry/close-resume/finish, account-change denial before gateway and
+fresh pin/Disconnect. Exact native container and unchanged documentId required;
+new-head full CI pending. Local managed extension policy is unchanged.
