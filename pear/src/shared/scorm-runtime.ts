@@ -1,6 +1,6 @@
 import {scormCharacters, scorm12Writable} from './scorm-characterstring.ts';
 import Scorm12API from 'scorm-again/scorm12';
-import {scormModelPath} from './scorm-engine.ts';
+import {scormModelPath, scormSupportCode} from './scorm-engine.ts';
 
 /** Only the standard synchronous API is exposed to content, never engine helpers. */
 export function createSCORM12API(options: {state?: Record<string, any>; checkpoint?: (state: Record<string, any>, finished: boolean) => unknown} = {}) {
@@ -61,9 +61,10 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       return value;
     },
     LMSGetLastError() {return localError ?? runtime.LMSGetLastError();},
-    LMSGetErrorString(code: string) {return runtime.LMSGetErrorString(code);},
+    LMSGetErrorString(code: string) {const requested = scormSupportCode(code, '1.2'); return requested === null ? '' : runtime.LMSGetErrorString(requested);},
     LMSGetDiagnostic(code: string) {
-      const requested = code === '' ? localError ?? runtime.LMSGetLastError() : code;
+      const requested = scormSupportCode(code === '' ? localError ?? runtime.LMSGetLastError() : code, '1.2');
+      if (requested === null) return '';
       return localError && requested === localError ? 'SCORM API communication session or data model rejected the operation (' + localError + ')' : runtime.LMSGetDiagnostic(requested);
     },
   });
