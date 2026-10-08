@@ -15,7 +15,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) {
     const api: any = old ? createSCORM12API({state}) : createSCORM2004API({edition, state});
     const init = old ? 'LMSInitialize' : 'Initialize', get = old ? 'LMSGetValue' : 'GetValue', error = old ? 'LMSGetLastError' : 'GetLastError';
     assert.equal(api[init](''), 'true');
-    for (const key of forbidden) {assert.equal(api[get](key), '', key); assert.equal(api[error](), '401', key);}
+    for (const key of forbidden) {assert.equal(api[get](key), '', key); assert.equal(api[error](), old && (key === 'cmi' || key.startsWith('cmi.')) ? '201' : '401', key);}
     assert.equal(api[get](identity), 'trusted'); assert.equal(api[error](), '0');
     assert.equal(api[get]('cmi.objectives._count'), '0'); assert.equal(api[error](), '0');
     assert.equal(typeof api[get](old ? 'cmi.core._children' : 'cmi._version'), 'string'); assert.equal(api[error](), '0');
@@ -26,7 +26,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) {
     const api: any = old ? createSCORM12API({state, checkpoint}) : createSCORM2004API({edition, state, checkpoint});
     const init = old ? 'LMSInitialize' : 'Initialize', set = old ? 'LMSSetValue' : 'SetValue', get = old ? 'LMSGetValue' : 'GetValue', commit = old ? 'LMSCommit' : 'Commit', error = old ? 'LMSGetLastError' : 'GetLastError';
     api[init](''); api[set](location, 'original'); api[commit](''); const before = structuredClone(saved);
-    for (const key of forbidden) {assert.equal(api[set](key, 'forged'), 'false', key); assert.equal(api[error](), '401', key);}
+    for (const key of forbidden) {assert.equal(api[set](key, 'forged'), 'false', key); assert.equal(api[error](), old && (key === 'cmi' || key.startsWith('cmi.')) ? '201' : '401', key);}
     assert.equal(api[get](identity), 'trusted'); assert.equal(api[commit](''), 'true'); assert.deepEqual(saved, before);
     assert.equal(api[set](old ? 'cmi.core.session_time' : 'cmi.session_time', old ? '00:00:01' : 'PT1S'), 'true');
     assert.equal(api[set]('cmi.objectives.0.id', 'urn:pear:valid'), 'true'); assert.equal(api[set]('cmi.objectives.0.score.raw', '50'), 'true');

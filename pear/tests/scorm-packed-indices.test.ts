@@ -67,9 +67,9 @@ test('1.2: malformed indices cannot alias readable objectives or write-only inte
   engine.LMSSetValue('cmi.interactions.0.id', 'urn:pear:q'); engine.LMSSetValue('cmi.interactions.0.type', 'choice');
   const before = structuredClone(engine.renderCMIToJSONObject().cmi);
   for (const index of invalidIndices) for (const [key, value] of [[`cmi.objectives.${index}.score.raw`, '75'], [`cmi.interactions.${index}.type`, 'true-false']]) {
-    assert.equal(engine.LMSSetValue(key, value), 'false', key); assert.equal(engine.LMSGetLastError(), '401', key);
+    assert.equal(engine.LMSSetValue(key, value), 'false', key); assert.equal(engine.LMSGetLastError(), '201', key);
     assert.deepEqual(engine.renderCMIToJSONObject().cmi, before, key);
-    if (key.startsWith('cmi.objectives')) {assert.equal(engine.LMSGetValue(key), ''); assert.equal(engine.LMSGetLastError(), '401');}
+    if (key.startsWith('cmi.objectives')) {assert.equal(engine.LMSGetValue(key), ''); assert.equal(engine.LMSGetLastError(), '201');}
   }
   assert.equal(engine.LMSSetValue('cmi.objectives.1.id', 'urn:pear:next'), 'true'); assert.equal(engine.LMSGetValue('cmi.objectives._count'), '2');
 });
@@ -77,7 +77,7 @@ test('1.2: malformed indices cannot alias readable objectives or write-only inte
 test('1.2: public facade preserves only valid objectives through malformed-index refusal and checkpoint/resume', () => {
   let saved: any;
   const api = createSCORM12API({checkpoint(value) {saved = value;}}); api.LMSInitialize(''); api.LMSSetValue('cmi.objectives.0.id', 'urn:pear:o'); api.LMSSetValue('cmi.objectives.0.score.raw', '50');
-  for (const index of invalidIndices) {assert.equal(api.LMSSetValue('cmi.objectives.' + index + '.score.raw', '75'), 'false'); assert.equal(api.LMSGetLastError(), '401');}
+  for (const index of invalidIndices) {assert.equal(api.LMSSetValue('cmi.objectives.' + index + '.score.raw', '75'), 'false'); assert.equal(api.LMSGetLastError(), '201');}
   assert.equal(api.LMSCommit(''), 'true'); assert.equal(saved.objectives[0].score.raw, '50'); assert.deepEqual(Object.keys(saved.objectives), ['0']);
   const resumed = createSCORM12API({state: saved}); resumed.LMSInitialize(''); assert.equal(resumed.LMSGetValue('cmi.objectives.0.score.raw'), '50'); assert.equal(resumed.LMSGetValue('cmi.objectives._count'), '1');
 });

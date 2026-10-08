@@ -16,7 +16,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const navUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const navigationUpdates = ')+'const navigationUpdates = '.length,reviewScript.indexOf(';\nconst realOriginal',reviewScript.indexOf('const navigationUpdates = '))));
   const realUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const realUpdates = ')+'const realUpdates = '.length,reviewScript.indexOf(';\nconst derivedOriginal',reviewScript.indexOf('const realUpdates = '))));
   const derivedUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const derivedUpdates = ')+'const derivedUpdates = '.length,reviewScript.indexOf(';\nconst languageOriginal',reviewScript.indexOf('const derivedUpdates = '))));
-  const languageUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const languageUpdates = ')+'const languageUpdates = '.length,reviewScript.indexOf(';\nexport function',reviewScript.indexOf('const languageUpdates = '))));
+  const languageUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const languageUpdates = ')+'const languageUpdates = '.length,reviewScript.indexOf(';\nconst model12Original',reviewScript.indexOf('const languageUpdates = '))));
   let languagePredecessor=corrected2004;for(const [before,after] of languageUpdates.toReversed()){assert.equal(languagePredecessor.split(after).length,2);languagePredecessor=languagePredecessor.replace(after,()=>before);}
   assert.equal(hash(languagePredecessor),'dbc20732465b9b4ffce672ac11a5d5dee48384d4f0beabf562c00215cf051281');
   let derivedPredecessor=languagePredecessor;for(const [before,after] of derivedUpdates.toReversed()){assert.equal(derivedPredecessor.split(after).length,2);derivedPredecessor=derivedPredecessor.replace(after,()=>before);}
@@ -25,6 +25,9 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   assert.equal(hash(predecessorReviewed2004),'a8d9018516119e5180c5cccd9931bb8b56335f3c282c0367cfe116e73d420007');
   let previousReviewed2004=predecessorReviewed2004;for(const [before,after] of navUpdates.toReversed()){assert.equal(previousReviewed2004.split(after).length,2);previousReviewed2004=previousReviewed2004.replace(after,()=>before);}
   assert.equal(hash(previousReviewed2004),'0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9');
+  const model12Updates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const model12Updates = ')+'const model12Updates = '.length,reviewScript.indexOf(';\nexport function',reviewScript.indexOf('const model12Updates = '))));
+  let model12Predecessor=corrected12;for(const [before,after] of model12Updates.toReversed()){assert.equal(model12Predecessor.split(after).length,2);model12Predecessor=model12Predecessor.replace(after,()=>before);}
+  assert.equal(hash(model12Predecessor),'220469e4b8764960e49fe797f899a00fcdbc10d341cf01e534241bf4b0947a32');
   const beginning='    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.',ending='scalarString ? "u" : "");';
   const previous=(s:string)=>{const start=s.indexOf(beginning),end=s.indexOf(ending,start)+ending.length;assert.ok(start>=0&&end>start);return s.slice(0,start)+'    const formatRegex = new RegExp(regexPattern);'+s.slice(end);};
   const installer=readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url),'utf8');
@@ -97,7 +100,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),corrected2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);
     }
-    for(const input12 of [...new Set([old12,unicode12,indexed12,atomic12,current12].flatMap(value=>[value,reviewedSCORMSource(value)]))]) {writeFileSync(join(entries,'scorm12.js'),input12);const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);}
+    for(const input12 of [...new Set([old12,unicode12,indexed12,atomic12,current12,model12Predecessor].flatMap(value=>[value,reviewedSCORMSource(value)]))]) {writeFileSync(join(entries,'scorm12.js'),input12);const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);}
     for(let n=0;n<2;n++){const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),corrected2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);}
     writeFileSync(join(entries,'scorm12.js'),current12+'\n// unexpected');assert.notEqual(spawnSync(process.execPath,[script]).status,0);
     writeFileSync(join(entries,'scorm12.js'),current12);writeFileSync(join(entries,'scorm2004.js'),current2004+'\n// unexpected');assert.notEqual(spawnSync(process.execPath,[script]).status,0);
