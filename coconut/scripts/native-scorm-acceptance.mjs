@@ -94,4 +94,5 @@ try {
  check('old native MCP pairing cannot read the SCORM source after identity change',old?.ok===false);
  await close(); check('native SCORM fixture shuts down cleanly',exitCode===0&&fixtureExit===0);
  console.log(`[${lane}] ${checks.length}/${checks.length} checks passed`);
-} catch(error) {console.error('['+lane+'] FAILED: '+error.message);console.error(stderr.slice(-2000));console.error(fixtureError.slice(-1000));await close();process.exitCode=1;}
+} catch(error) {console.error('['+lane+'] FAILED: '+error.message);
+ const diagnostic=await state().catch(()=>null);if(diagnostic)console.error(JSON.stringify({edition:diagnostic.edition,driverErrors:diagnostic.driverErrors,contentRequests:diagnostic.contentRequests,probes:diagnostic.probes.length,checkpoints:diagnostic.checkpoints,droppedACK:diagnostic.droppedACK,exactRetry:diagnostic.exactRetry,proofs:diagnostic.proofs}));console.error(stderr.slice(-2000));console.error(fixtureError.slice(-1000));await close();process.exitCode=1;}

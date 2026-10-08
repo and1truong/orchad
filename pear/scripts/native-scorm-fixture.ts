@@ -11,7 +11,7 @@ if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsup
 const nonce = process.env.PEAR_NATIVE_NONCE;
 if (!nonce || !/^[-a-zA-Z0-9]{20,64}$/.test(nonce)) throw Error('Explicit native fixture nonce required');
 const dir = mkdtempSync(join(tmpdir(), 'pear-native-scorm-')), prefix = '/native-scorm/' + nonce, origin = 'http://127.0.0.1:4310';
-let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '', droppedReceipt = '', droppedCount = 0, droppedRevision = 0; const probes: any[] = [], calls: string[] = [], driverErrors: string[] = [];
+let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '', droppedReceipt = '', droppedCount = 0, droppedRevision = 0; const probes: any[] = [], calls: string[] = [], driverErrors: string[] = [], contentRequests: {kind: string; status: number}[] = [];
 const script = `
 (async()=>{
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
@@ -26,6 +26,11 @@ const script = `
 })();`;
 const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(edition as '1.2' | '2004-2' | '2004-3' | '2004-4', 'pipwerks', script)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
+// Synthetic diagnostics record route classes/status, never launch capabilities.
+content!.addHook('onResponse', async (req, reply) => {
+  const kind = req.url.startsWith('/launch/') ? req.url.endsWith('/checkpoint') ? 'checkpoint' : req.url.includes('/files/') ? 'resource' : 'launch' : req.url === '/runtime.js' ? 'runtime' : req.url.startsWith(prefix) ? req.url.endsWith('/probe') ? 'probe' : 'fixture-command' : 'other';
+  contentRequests.push({kind, status: reply.statusCode});
+});
 // Lose one successful response after the real player transaction has committed.
 content!.addHook('onSend', async (req, reply, payload) => {
   if (!req.url.endsWith('/checkpoint') || reply.statusCode !== 200) return payload;
@@ -58,7 +63,7 @@ const consent=Array.from(panel.querySelectorAll('input')).find(i=>i.type==='chec
 const intro=()=>Array.from(panel.querySelectorAll('button')).find(b=>b.textContent.includes('Introduction')&&!b.disabled);(await wait(intro)).click();
 let resumed=false,retried=false;setInterval(async()=>{const state=await(await fetch('${prefix}/state')).json();if(state.action==='retry'&&!retried){retried=true;(await wait(()=>button('Retry engine checkpoint'))).click();}if(state.action==='resume'&&!resumed){resumed=true;(await wait(()=>button('Close SCO and choose another'))).click();(await wait(intro)).click();}},200);
 }catch(error){await fetch('${prefix}/driver-error',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:error.name,message:error.message})});}})();`));
-app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, binding, probes, calls, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
+app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, binding, contentRequests, probes, calls, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
 app.post(prefix + '/command', async (req, reply) => {const next = (req.body as any)?.action; if (!['retry', 'resume', 'finish'].includes(next)) return reply.code(400).send(); action = next; return {ok: true};});
 app.post(prefix + '/driver-error', async req => {driverErrors.push(String((req.body as any)?.message).slice(0, 200)); return {ok: true};});
 await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host: '127.0.0.1', port: 4315}); await app.listen({host: '127.0.0.1', port: 4310});
