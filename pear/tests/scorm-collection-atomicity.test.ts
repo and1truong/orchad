@@ -19,6 +19,20 @@ const rejected = [
   ['cmi.objectives.0.unknown', 'x', '401'],
 ] as const;
 
+test('shared 2004 rollback preserves errors and state without Array.prototype.toReversed', () => {
+  const engine = new Scorm2004API({logLevel: 'NONE'}); engine.Initialize('');
+  const before = structuredClone(engine.renderCMIToJSONObject().cmi);
+  const descriptor = Object.getOwnPropertyDescriptor(Array.prototype, 'toReversed')!;
+  try {
+    Object.defineProperty(Array.prototype, 'toReversed', {value: undefined});
+    for (const [key, value, error] of rejected) {
+      assert.equal(engine.SetValue(key, value), 'false'); assert.equal(engine.GetLastError(), error, key);
+      assert.deepEqual(engine.renderCMIToJSONObject().cmi, before, key);
+    }
+    assert.equal(engine.SetValue('cmi.interactions.0.id', 'urn:pear:q'), 'true');
+  } finally {Object.defineProperty(Array.prototype, 'toReversed', descriptor);}
+});
+
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
   test(edition + ': rejected first collection writes preserve the entire CMI state and exact error', () => {
     for (const [key, value, error] of rejected) {
