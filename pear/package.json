@@ -30,7 +30,8 @@
     "database:recovery": "node --import tsx scripts/database-recovery.ts",
     "postinstall": "node scripts/patch-scorm-logging.mjs",
     "predev": "node scripts/patch-scorm-logging.mjs",
-    "prestart": "node scripts/patch-scorm-logging.mjs"
+    "prestart": "node scripts/patch-scorm-logging.mjs",
+    "test:scorm:side-panel": "PEAR_SCORM_HOST_LANE=1 playwright test -c playwright.scorm.config.ts scorm-side-panel.host.spec.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",

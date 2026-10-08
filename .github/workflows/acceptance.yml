@@ -190,7 +190,7 @@ jobs:
       - name: PDF certificate text verification dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y poppler-utils xvfb
       - working-directory: packages/bridge-contract
         run: npm ci
       - working-directory: pear
@@ -215,6 +215,7 @@ jobs:
           PEAR_E2E_PRODUCTION=1 npm run test:browser-host
           npm run test:lime
           npm run test:scorm:lime
+          xvfb-run -a npm run test:scorm:side-panel
       - uses: actions/upload-artifact@v4
         if: always()
         with:
