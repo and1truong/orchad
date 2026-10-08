@@ -55,6 +55,9 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
     },
     LMSGetLastError() {return localError ?? runtime.LMSGetLastError();},
     LMSGetErrorString(code: string) {return runtime.LMSGetErrorString(code);},
-    LMSGetDiagnostic(code: string) {return localError ? 'SCORM API communication session is inactive or argument is invalid' : runtime.LMSGetDiagnostic(code);},
+    LMSGetDiagnostic(code: string) {
+      const requested = code === '' ? localError ?? runtime.LMSGetLastError() : code;
+      return localError && requested === localError ? 'SCORM API communication session or data model rejected the operation (' + localError + ')' : runtime.LMSGetDiagnostic(requested);
+    },
   });
 }
