@@ -17,6 +17,9 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
   ` : '';
   const unicodeScript = unicode ? `
     const status=document.createElement('p');document.body.append(status);status.textContent='Unicode suspend characters: '+Array.from(api.GetValue('cmi.suspend_data')).length;
+    const localized=document.createElement('p');document.body.append(localized);localized.textContent='Localized comment characters: '+Array.from(api.GetValue('cmi.comments_from_learner.0.comment').replace(/^\\{lang=[^}]+\\}/,'')).length;
+    const rememberLocalized=()=>{const value='{lang=vi-VN-x-demo}'+'🙂'.repeat(3997)+'e\\u0301\\n';let accepted=api.SetValue('cmi.comments_from_learner.0.comment',value)==='true';accepted=api.SetValue('cmi.interactions.0.id','urn:pear:localized')==='true' && accepted;accepted=api.SetValue('cmi.interactions.0.type','long-fill-in')==='true' && accepted;accepted=api.SetValue('cmi.interactions.0.learner_response',value)==='true' && accepted;localized.textContent='Localized writes: '+(accepted?'accepted':'failed');};
+    for(const id of ['save','continue','end'])document.getElementById(id).addEventListener('click',rememberLocalized,true);
     const rememberUnicode=()=>{const value='🙂'.repeat(${edition === '2004-2' ? 4000 : 64000});const rejected=api.SetValue('cmi.suspend_data',value+'x')==='false';status.textContent='Unicode SetValue: '+(rejected && api.SetValue('cmi.suspend_data',value)==='true'?'accepted':'failed');};
     for(const id of ['save','continue','end'])document.getElementById(id).addEventListener('click',rememberUnicode,true);
   ` : '';

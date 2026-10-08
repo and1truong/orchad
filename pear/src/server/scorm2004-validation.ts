@@ -7,12 +7,16 @@ import {reject} from './errors.ts';
 
 const readonly = /^(?:cmi\.(?:learner_id|learner_name|credit|mode|entry|total_time|launch_data|scaled_passing_score|completion_threshold|max_time_allowed|time_limit_action)|cmi\.comments_from_lms\.\d{1,3}\.(?:comment|location|timestamp))$/;
 const container = /^(?:cmi|cmi\.(?:score|learner_preference|comments_from_learner|comments_from_lms|objectives|interactions)|cmi\.(?:comments_from_learner|comments_from_lms|objectives|interactions)\.\d{1,3}|cmi\.objectives\.\d{1,3}\.score|cmi\.interactions\.\d{1,3}\.(?:objectives|correct_responses)|cmi\.interactions\.\d{1,3}\.(?:objectives|correct_responses)\.\d{1,3})$/;
+const localizedField = /^cmi\.(?:comments_from_(?:learner|lms)\.\d+\.comment|(?:objectives|interactions)\.\d+\.description)$/;
+const interactionResponse = /^cmi\.interactions\.\d+\.(?:learner_response|correct_responses\.\d+\.pattern)$/;
 function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || !container.test(prefix)) reject('INVALID_ARGUMENT', 'Unknown or invalid CMI container');
   for (const [key, value] of Object.entries(input)) {
     const path = prefix + '.' + key;
     if (typeof value === 'string') {
-      if (Object.keys(out).length >= 2048 || scormCharacters(value) > (path === 'cmi.suspend_data' ? 64000 : 4096)) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
+      // Envelope quotas count binding delimiters too; engine replay validates each typed record.
+      const limit = path === 'cmi.suspend_data' ? 64000 : interactionResponse.test(path) ? 8192 : localizedField.test(path) ? 4257 : 4096;
+      if (Object.keys(out).length >= 2048 || scormCharacters(value) > limit) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
       out[path] = value;
     } else leaves(value, path, out);
   }

@@ -98,6 +98,7 @@ test('unknown behavior adaptation snapshots are refused; legacy pinned-engine sn
     const launch = f.launch(f.enroll()), row = f.db.prepare('SELECT * FROM scorm_engine_attempts').get()!, envelope = JSON.parse(String(row.sequencing_state)), scope = {attemptId: String(row.id), sha256: f.pkg.sha256};
     const manifest = (await inspectSCORMPackage(multiFilePackage('2004-4', selectionManifest()))).manifest;
     envelope.engine.adaptation = 'unknown-engine-patch'; assert.throws(() => trustedSequencing(manifest, JSON.stringify(envelope), scope), /identity changed/);
+    for(const adaptation of ['pear-selection-v2','pear-limits-v3','pear-unicode-v4','pear-localized-v5']) {envelope.engine.adaptation=adaptation;assert.ok(trustedSequencing(manifest,JSON.stringify(envelope),scope));}
     delete envelope.engine.adaptation; assert.ok(trustedSequencing(manifest, JSON.stringify(envelope), scope)); assert.ok(launch.token);
   } finally {f.db.close();}
 });

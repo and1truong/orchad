@@ -12,13 +12,18 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const current2004=readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js',import.meta.url),'utf8'),current12=readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm12.js',import.meta.url),'utf8');
   const beginning='    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.',ending='scalarString ? "u" : "");';
   const previous=(s:string)=>{const start=s.indexOf(beginning),end=s.indexOf(ending,start)+ending.length;assert.ok(start>=0&&end>start);return s.slice(0,start)+'    const formatRegex = new RegExp(regexPattern);'+s.slice(end);};
-  const old2004=previous(current2004),old12=previous(current12);assert.equal(hash(old2004),'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e');assert.equal(hash(old12),'52ffa12e5167e3a37b2f64eefa61cd599ea90c30cf4d164b667baddf83d497a6');
+  const installer=readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url),'utf8');
+  const updates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const localizedUpdates = ')+'const localizedUpdates = '.length,installer.indexOf(';',installer.indexOf('const localizedUpdates = '))));
+  assert.equal(updates.length,5);let unicode2004=current2004;
+  for(const [before,after] of updates.toReversed()){assert.equal(unicode2004.split(after).length,2);unicode2004=unicode2004.replace(after,before);}
+  assert.equal(hash(unicode2004),'8c6468541bf6f07353307758f5a828e7e9e04da0619c859500c9b108015db5da');
+  const old2004=previous(unicode2004),old12=previous(current12);assert.equal(hash(old2004),'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e');assert.equal(hash(old12),'52ffa12e5167e3a37b2f64eefa61cd599ea90c30cf4d164b667baddf83d497a6');
   const actualScript=readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url),'utf8'),pairs:[string,string][]=[];
   // Reconstruct pinned historical inputs, then prove their exact known hashes.
   // Execute only the trusted replacement declarations with a capture callback.
-  runInNewContext(actualScript.slice(actualScript.indexOf('if (![selection, limits, patched]'),actualScript.indexOf('if (digest(output) !== patched)')), {source:'',digest:()=>'',selection:'selection',limits:'limits',patched:'patched',replaceOnce:(a:string,b:string)=>pairs.push([a,b])});
+  runInNewContext(actualScript.slice(actualScript.indexOf('if (![selection, limits, patched, localized]'),actualScript.indexOf('if (![patched, localized].includes(digest(output))) throw')), {source:'',digest:()=>'',selection:'selection',limits:'limits',patched:'patched',localized:'localized',replaceOnce:(a:string,b:string)=>pairs.push([a,b])});
   assert.equal(pairs.length,11);
-  let loggingOnly=current2004;
+  let loggingOnly=unicode2004;
   for(const [before,after] of pairs.toReversed()){assert.equal(loggingOnly.split(after).length,2);loggingOnly=loggingOnly.replace(after,before);}
   assert.equal(hash(loggingOnly),'6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936');
   let pristine=loggingOnly;
@@ -29,7 +34,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   try {
     const directory=join(root,'node_modules/scorm-again'),entries=join(directory,'dist/esm');mkdirSync(entries,{recursive:true});mkdirSync(join(root,'scripts'));
     const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));
-    for(const input of [pristine,loggingOnly,selected,old2004,current2004]){
+    for(const input of [pristine,loggingOnly,selected,old2004,unicode2004,current2004]){
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);
     }

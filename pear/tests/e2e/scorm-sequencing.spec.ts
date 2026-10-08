@@ -42,6 +42,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profil
     await player.getByRole('button', {name: profile === 'hidden' ? 'Play or resume enrolled SCORM package' : /Introduction/}).click();
     await expect(sco.getByText('Sequencing entry: resume; bookmark: sequencing-page', {exact: true})).toBeVisible();
     if (profile === 'unicode') await expect(sco.getByText('Unicode suspend characters: '+(edition === '2004-2' ? 4000 : 64000), {exact:true})).toBeVisible();
+    if (profile === 'unicode') await expect(sco.getByText('Localized comment characters: 4000', {exact:true})).toBeVisible();
     let dropped = false;
     await page.route('**/launch/*/checkpoint', async route => {if (!dropped && route.request().postDataJSON().finished) {dropped = true; await route.fetch(); await route.abort();} else await route.continue();});
     await sco.getByRole('button', {name: 'Continue sequencing SCO', exact: true}).click();
@@ -54,6 +55,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profil
     expect(f.db.prepare("SELECT reported_seconds FROM scorm_sco_attempts WHERE sco_id='intro'").get()!.reported_seconds).toBe(40);
     await sco.getByRole('button', {name: 'End sequencing session', exact: true}).click(); await expect(player.getByRole('status')).toContainText('completion accepted');
     if (profile === 'unicode') expect(JSON.parse(String(f.db.prepare("SELECT runtime_state FROM scorm_sco_attempts WHERE sco_id='intro'").get()!.runtime_state)).suspend_data).toBe('🙂'.repeat(edition === '2004-2' ? 4000 : 64000));
+    if (profile === 'unicode') {const state=JSON.parse(String(f.db.prepare("SELECT runtime_state FROM scorm_sco_attempts WHERE sco_id='intro'").get()!.runtime_state));expect(state.comments_from_learner[0].comment).toBe('{lang=vi-VN-x-demo}'+'🙂'.repeat(3997)+'e\u0301\n');expect(state.interactions[0].learner_response).toBe(state.comments_from_learner[0].comment);}
     if (profile === 'duration') {const clock = JSON.parse(JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state)).snapshot).pearDurationClock.rows.intro; expect(clock.absolute).toBeGreaterThan(0); expect(clock.experienced).toBeGreaterThan(0); expect(clock.experienced).toBeLessThanOrEqual(clock.absolute); expect(clock.attempt).toBe(1); expect(clock.absolute).toBeLessThan(60000);}
     if (profile === 'system-objectives') {const objective = f.db.prepare('SELECT * FROM scorm_system_objectives').get()!; expect(objective.revision).toBe(1); expect(JSON.parse(String(objective.state)).normalizedMeasure).toBe(0.9);}
     const proof = JSON.parse(String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence)); expect(proof.rollup.completion).toBe('completed'); expect(proof.rollup.success).toBe('passed'); if (profile === 'weighted') expect(proof.rollup.completionMeasure).toBe(0.625); if (profile === 'system-shared') {const store = f.db.prepare('SELECT * FROM scorm_system_data').get()!; expect(store.store).toBe('authored-shared-notes'); expect(store.learner).toBe('learner-a'); expect(store.revision).toBe(2);}

@@ -44,3 +44,12 @@ Additional prompt for the separate #49 owner: Continue your remaining #49 capabi
 Duration review correction: a finished checkpoint pauses experienced exposure before persisting trusted sequencing, including successor delivery and same-SCO retry. Lost receipt responses and delayed close/relaunch cannot charge an unexposed activity; absolute time continues under its separate policy. Added domain regressions and three-edition built-browser verification. Fetch the live #158 head and acceptance before integration.
 
 Unicode successor (ADR-095) counts scalar characters in CMI/store quota checks, refuses lone surrogates, enforces the host 1.2 suspend-data capacity in its facade and checksum-locks both plain-string ESM corrections. The new pear-unicode-v4 adapter preserves known limits-v3 snapshots. The profile covers supplementary suspend-data/location/shared-store boundaries, not exhaustive localized-string/identifier/interaction conformance. Continue #49 separately; reconcile references through ADR-095 without editing this SCORM stack.
+
+Localized-string successor (ADR-096), based on #159 after main synchronization,
+preserves Unicode/newlines and multiple language subtags in comments,
+descriptions and fill-in/long-fill-in records. `pear-localized-v5` uses the same
+corrected engine patterns in browser and server replay, includes binding
+overhead in bounded host quotas and accepts known Unicode-v4 snapshots. See
+ADR-096 for exact checksums and scoped regressions. Full conformance and
+production/reference/platform gates remain open; reconcile #49 separately
+through ADR-096 without changing SCORM-owned branches.
