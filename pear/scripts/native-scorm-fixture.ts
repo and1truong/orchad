@@ -25,7 +25,11 @@ const script = `
   const sink='http://127.0.0.1:4316',violations=[];
   document.addEventListener('securitypolicyviolation',event=>violations.push(event.effectiveDirective));
   for(const [key,run] of Object.entries({xhr:()=>{const request=new XMLHttpRequest();request.open('GET',sink+'/xhr');request.send();},websocket:()=>new WebSocket('ws://127.0.0.1:4316/websocket'),beacon:()=>navigator.sendBeacon(sink+'/beacon','synthetic')}))try{run();}catch{}
-  for(const [tag,path] of [['img','image'],['video','media'],['iframe','frame']]){const element=document.createElement(tag);element.src=sink+'/'+path;document.body.append(element);if(tag==='video')element.load();}
+  for(const [tag,path] of [['img','image'],['iframe','frame']]){const element=document.createElement(tag);element.src=sink+'/'+path;document.body.append(element);}
+  const media=document.createElement('audio'),source=document.createElement('source');source.src=sink+'/media.mp3';source.type='audio/mpeg';media.preload='auto';media.append(source);document.body.append(media);media.load();
+  evidence.mediaPlayback=false;evidence.mediaError=null;
+  const playback=media.play().then(()=>{evidence.mediaPlayback=true;},error=>{evidence.mediaError=error.name;});
+  await Promise.race([playback,new Promise(resolve=>setTimeout(resolve,300))]);
   const style=document.createElement('style');style.textContent='body{background-image:url('+sink+'/css)}';document.head.append(style);
   const form=document.createElement('form');form.action=sink+'/form';form.method='POST';document.body.append(form);evidence.formAttempted=true;try{form.submit();}catch{}
   evidence.popupDenied=window.open(sink+'/popup')===null;
