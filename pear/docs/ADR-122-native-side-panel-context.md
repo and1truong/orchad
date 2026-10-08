@@ -25,3 +25,13 @@ This first context/mount check is bounded platform evidence. Actual container
 consent/rebind/revoke/player flow remains OPEN and will follow after current
 CI establishes the native context and its automation target type. Existing
 SCORM/native/runtime and production/external gates remain required.
+
+
+Initial head 1d894640 / run 37837858029 failed native macOS job
+113519415372 and Windows job 113519415458 before runtime execution: Pear's
+main typecheck included the Chrome host file without Chrome declarations.
+Local main typecheck reproduced both TS2304 errors. The existing split now
+excludes this file from main and explicitly includes it in typecheck:host;
+the new host test is still compiled with Chrome declarations. Corrected
+Pear build/main typecheck and host typecheck completed successfully.
+Actual current-head browser/native/container acceptance remains pending.
