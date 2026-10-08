@@ -58,3 +58,11 @@ waiting for its first content probe/checkpoint. This is a failed playback gate,
 not platform PASS. Fixture failure diagnostics now record only route classes/
 status and progress counters, without launch tokens or authored/private state,
 to locate the actual WebView2 failure; no assertion/timeout bypass.
+
+Pear CI on 7d830eea/e5247941 passed its complete domain suite but failed the
+old native-fixture browser preflight: it requested close/resume before retrying
+the deliberately lost ACK. Extend that existing preflight to all four profiles
+and the required identical retry; retain its initial-entry, zero-proof/calls,
+resume/bookmark, completion/quiz and driver-error assertions. Remove only the
+new redundant four-profile driver file in favor of the existing suite. The
+production durability guard is unchanged. First CI failures remain recorded.
