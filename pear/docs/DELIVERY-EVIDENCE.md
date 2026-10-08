@@ -1,6 +1,6 @@
 # Pear delivery evidence
 
-## Current accepted implementation
+## Historical Pear delivery source
 
 Integrated runtime source `05d0bf4087e25250b0f9be19cfdc7c3be1b64907` passed all eight jobs in [acceptance 37566694622](https://github.com/and1truong/orchad/actions/runs/37566694622). Clean CI includes the actual Lime extension and native Tauri Pear/external Coconut MCP lanes; it is not model-quality, standards or production parity evidence.
 
@@ -24,3 +24,12 @@ The final documentation head must also pass the full acceptance workflow before 
 Historical #64 native runtime TIMEOUT (head `34b9a410d2ed583f9f34bb6458875d36b0e9833f`, run [37454726356](https://github.com/and1truong/orchad/actions/runs/37454726356)) remains FAIL. Seven jobs, Rust build and predicate tests passed at that head. Later native fixes are retained in the stack and actual native acceptance passes on the integrated source above; a successful descendant never relabels the failed historical head. The contiguous stack delivery is accepted at the integrated tip, not as 73 independently deployable releases.
 
 Local full Chrome unpacked-extension launch was NOT RUN successfully: the runtime denies the AF_UNIX process-singleton socket. The local Rust/WebKit native toolchain was unavailable. Real Lime/native/MCP acceptance therefore comes from exact-head clean CI, not a stub or a local capability claim. Manual native Chrome Side Panel, professional accessibility/linguistic audit, actual model-quality evaluation, standards conformance and real commercial/identity/channel/production dependencies remain open in [DELIVERY-STATUS.md](DELIVERY-STATUS.md). The full-parity goal and epic remain open.
+
+
+## SCORM integrated successor
+
+#132 and #134–#141 landed in main; exact baseline tree 159d24bd1178633d82f15cc7ee34bcf89538bf7e passed main acceptance 37675973833 (8/8). #147–#163 successor heads each passed their latest acceptance; all inline review findings were fixed/resolved. #147 and #148 merged to main as 048665255e0f88453da053f963064c6dfcbb31da and 26cdf3a412cb539cfe3ef294f9bf81fc7f2f5a2a.
+
+#164 source 5281269795479540590176c07c7ce5570e4f1286 / tree 07fc9906a4aa1a87cfcdb41892d867fbbce03c92 passed local 564 domain tests across 82 isolated files, 67 dedicated built Chromium journeys and build/typecheck/vendor/installer checks. Remote run 37717241369 is tracked in the live #133 ledger; no pending run is PASS.
+
+GitHub refuses retargeting #149 because it belongs to native stack #161. A normal integration PR preserves every reviewed source commit and the accepted main merge ancestry; its tree differs from #164 only in reconciled delivery documentation. Merge only after exact-head acceptance and verify main tree/ancestry/CI before recording delivery complete. Runtime source is unchanged by this reconciliation. Full conformance, commercial/reference accounts, additional platforms and production remain open; see SCORM-ACCEPTANCE.md.

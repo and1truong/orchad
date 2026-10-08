@@ -1,6 +1,6 @@
 # Epic #133 — continuation handoff
 
-The user selected `codex/pear-authorized-award-course-opening-49` as the base. The pinned predecessor is #132 at `16ec824d3ae0eb030ce854cbc1a33b7929dd8a98`. Another session owns #49: do not edit/reset/force-push/restack its checkout/branches or merge/retarget its PRs.
+Current ownership (2026-10-08): user confirms no other session is working. This session owns SCORM integration and #49 register reconciliation. Earlier separate-owner prompts below are historical. Source tip #164 is 5281269795479540590176c07c7ce5570e4f1286 / tree 07fc9906a4aa1a87cfcdb41892d867fbbce03c92. All predecessor acceptance through #163 passed; #164 and integrated/main acceptance must be checked live. SCORM-ACCEPTANCE.md maps remaining requirements without claiming full conformance or production readiness.
 
 Owned SCORM stack: #134 foundation → #135 packages → #136 player → #137 learning bindings → #138 2004 runtime → #139 trusted sequencing → #140 licensed wrapper/browser/Lime isolation → #141 operations/integrated acceptance `codex/pear-scorm-operations-133`. Fetch the live tip before continuing. S1–S8 are now merged. Current accepted main is `f7d30b45f968dbaf52199cb35021d7aee6cc5600`, exact tree `159d24bd1178633d82f15cc7ee34bcf89538bf7e`, identical to final S8 head `e519308abc7441d07c7c2e8c82196af72963c698`. Main push acceptance [37675973833](https://github.com/and1truong/orchad/actions/runs/37675973833) passed all eight jobs, including Pear, actual unpacked Lime/SCORM and native. Continue successor stacks from this integrated main; no predecessor landing wait remains. Local ancestry uses a synthetic initial checkout: never git-push it. Publish GitHub trees/commits with real remote parents and expected-head leases, then verify exact tree equality.
 
@@ -51,7 +51,8 @@ descriptions and fill-in/long-fill-in records. `pear-localized-v5` uses the same
 corrected engine patterns in browser and server replay, includes binding
 overhead in bounded host quotas and accepts known Unicode-v4 snapshots. See
 ADR-096 for exact checksums and scoped regressions. Full conformance and
-production/reference/platform gates remain open; reconcile #49 separately
-through ADR-096 without changing SCORM-owned branches.
+production/reference/platform gates remain open; the current owner reconciles #49 through ADR-097 in the integrated delivery.
 
 Interaction-collection successor (ADR-097) restores zero-record learner collections, preserves empty choice correct-set counts through both host replay and JSON load, and supports maximum-size typed interaction records with scalar performance/other text. Behavior adaptation pear-interactions-v6 accepts known localized-v5 snapshots. Host response envelope capacity is 128000 scalars within the existing 512 KiB checkpoint; typed record limits and launch/proof authority remain unchanged. Full URI/correct-response/error conformance and external/platform/production gates remain open. Reconcile #49 separately through ADR-097.
+
+Current integration supersedes separate-session restrictions and old missing-semantics notes. Do not repair the abandoned broken checkout; use this owned clean repository. Preserve protected seeds, bound identities, normal-enrollment system stores, immutable proofs/history, quiz/cycle contracts and production-disabled guards.
