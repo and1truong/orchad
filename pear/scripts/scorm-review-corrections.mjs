@@ -166,6 +166,22 @@ const fragmentUpdates = [
     "  CMILongIdentifier: \"^(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\","
   ]
 ];
+const resultOriginal = "87e419e81c4f875d0388b8f5c4cad3036302bd2dc6b11acdec1d2f389783613f";
+const resultPatched = "d28dc6ff0d7f4f2637302a285c600a686078fb64e80518ce541404449c017430";
+const resultUpdates = [
+  [
+    "  CMIResult: \"^(correct|incorrect|unanticipated|neutral|-?([0-9]{1,4})(\\\\.[0-9]{1,18})?)$\",",
+    "  CMIResult: \"^(correct|incorrect|unanticipated|neutral|-?([0-9]+)(\\\\.[0-9]{1,18})?)(?![\\\\s\\\\S])\","
+  ],
+  [
+    "    if (regexPattern === scorm2004_regex.CMIDecimal && (value.length > 4096 || !Number.isFinite(Number(value)))) throw new errorClass(CMIElement, errorCode);",
+    "    if ((regexPattern === scorm2004_regex.CMIDecimal || regexPattern === scorm2004_regex.CMIResult && !Number.isNaN(Number(value))) && (value.length > 4096 || !Number.isFinite(Number(value)))) throw new errorClass(CMIElement, errorCode);"
+  ],
+  [
+    "  set result(result) {\n    if (check2004ValidFormat",
+    "  set result(result) {\n    if (this.initialized && this._id === \"\") {\n      throw new Scorm2004ValidationError(this._cmi_element + \".result\", scorm2004_errors.DEPENDENCY_NOT_ESTABLISHED);\n    }\n    if (check2004ValidFormat"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -212,9 +228,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, fragmentUpdates);
     if (hash(source) !== fragmentPatched) throw Error('SCORM URI fragment checksum mismatch');
   }
+  if (hash(source) === resultOriginal) {
+    source = replace(source, resultUpdates);
+    if (hash(source) !== resultPatched) throw Error('SCORM result binding checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === resultPatched) {
+    source = replace(source, resultUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== resultOriginal) throw Error('SCORM result binding reverse checksum mismatch');
+  }
   if (hash(source) === fragmentPatched) {
     source = replace(source, fragmentUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== fragmentOriginal) throw Error('SCORM URI fragment reverse checksum mismatch');

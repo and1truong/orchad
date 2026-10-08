@@ -24,7 +24,15 @@ incorporated by real merge; current-head CI/review remain required.
 Successor codex/pear-scorm-api-precedence-133 adds ADR-124 original simultaneous
 invalid/session/access/type/range/dependency/no-coercion vectors. Local722/105,
 lifecycle13,build,four built journeys passed. No new runtime patch; full current
-CI/native/review remain required. Current adaptation pear-uri-scheme-binding-v23.
+CI/native/review remain required. Historical slice adaptation pear-uri-scheme-binding-v23.
+
+#195 fragment successor v24 completed local722/105,focused13,build and three
+built identifier journeys; exact current-head CI remains pending. Latest branch
+codex/pear-scorm-result-capacity-133 adds ADR-126/v25 shared interaction result
+real capacity and missing-ID408 rollback. All twelve original regressions failed
+before correction; local focused26,full725/105,build,three built wide-real
+journeys passed. Exact-head full CI/native/review remain required. Current
+adaptation pear-result-binding-v25;1.2 bytes stay unchanged.
 
 Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
 external gates. Legacy ADL license/platform, authorized commercial exports and
