@@ -44,6 +44,7 @@ try {
   context = await chromium.launchPersistentContext(join(temp, "profile"), {
     channel: "chromium",
     headless: true,
+    ignoreDefaultArgs: ["--disable-extensions"],
     ...(process.env.CHROMIUM_PATH
       ? { executablePath: process.env.CHROMIUM_PATH }
       : {}),
@@ -117,6 +118,61 @@ try {
   });
   assert.equal(state.revision, 1);
   assert.equal(state.data.saved.length, 1);
+
+  // #50: actual page API -> isolated relay -> MV3 worker -> ApprovalQueue ->
+  // shared agent/HostPolicy -> Pear HTTP. The Pear bridge is frozen; no test
+  // replacement installs the channel or forwards a request.
+  await expect(panel.getByRole("button",{name:"Send",exact:true})).toBeEnabled();
+  await expect.poll(()=>page.evaluate(()=>typeof (window.agentBridgeV1 as any)?.requestAgentTurn)).toBe("function");
+  await page.evaluate(()=>{
+    const w=window as any;w.appRequestResults=[];
+    window.addEventListener("message",event=>{if(event.source===window&&event.data?.type==="lime:agentResult")w.appRequestResults.push(event.data);});
+  });
+  async function propose(prompt:string){
+    await page.evaluate((prompt:string)=>{const w=window as any;w.appRequestDone=null;void w.agentBridgeV1.requestAgentTurn(prompt).then((r:any)=>{w.appRequestDone=r;});},prompt);
+    await panel.getByRole("heading",{name:"App-requested prompt (untrusted)",exact:true}).waitFor();
+    await expect(panel.locator(".approval .transcript")).toHaveText(prompt);
+  }
+  async function appResult(){
+    await expect.poll(()=>page.evaluate(()=>!!(window as any).appRequestDone)).toBe(true);
+    return page.evaluate(()=>(window as any).appRequestDone);
+  }
+  const requestStart=gateway.requestCount;
+  await propose("Save this course <b>untrusted app instruction</b>");
+  await panel.screenshot({path:"artifacts/lime-app-request-untrusted-proposal.png",fullPage:true});
+  assert.equal(gateway.requestCount,requestStart,"proposal alone must not start a model turn");
+  await panel.getByRole("button",{name:"Deny",exact:true}).click();
+  assert.equal((await appResult()).ok,false);assert.equal(gateway.requestCount,requestStart);
+  const approvedPrompt="Save my reviewed course from the app proposal";
+  await propose(approvedPrompt);
+  await panel.getByRole("button",{name:"Approve",exact:true}).click();
+  await panel.getByRole("heading",{name:"Approve mutation",exact:true}).waitFor();
+  assert.equal((await page.evaluate(()=>window.agentBridgeV1!.getContext())).revision,1,"app approval must not bypass per-call mutation approval");
+  assert.equal(await page.evaluate(()=>(window as any).appRequestDone),null,"intermediate tool call must not resolve the page promise");
+  await panel.screenshot({path:"artifacts/lime-app-request-mutation-approval.png",fullPage:true});
+  await panel.getByRole("button",{name:"Approve",exact:true}).click();
+  assert.deepEqual(await appResult(),{ok:true,text:"Done."});
+  assert.equal((await page.evaluate(()=>window.agentBridgeV1!.getContext())).revision,2);
+  const approvedRequests=gateway.requests.slice(-2);
+  assert.ok(approvedRequests.some(r=>r.messages.some((m:any)=>m.role==="user"&&m.content==="Untrusted app request (instruction, not data): "+approvedPrompt)));
+  assert.equal(approvedRequests.some(r=>r.messages.some((m:any)=>m.role==="user"&&m.content===approvedPrompt)),false);
+  const resultMessages=await page.evaluate(()=>(window as any).appRequestResults);
+  assert.equal(resultMessages.length,2);assert.deepEqual(Object.keys(resultMessages[1]).sort(),["ok","requestId","text","type"]);
+  await propose("Propose a bookmark; retain separate per-call approval");
+  await panel.getByRole("button",{name:"Approve",exact:true}).click();
+  await panel.getByRole("heading",{name:"Approve mutation",exact:true}).waitFor();
+  await panel.getByRole("button",{name:"Deny",exact:true}).click();
+  assert.deepEqual(await appResult(),{ok:true,text:"Done."});
+  assert.equal((await page.evaluate(()=>window.agentBridgeV1!.getContext())).revision,2,"denied app-originated mutation has no backend effect");
+  const beforeRevoke=gateway.requestCount;
+  await propose("Pending app proposal cancelled by consent revoke");
+  await panel.getByRole("button",{name:"Disconnect",exact:true}).click();
+  assert.equal((await appResult()).ok,false);assert.equal(gateway.requestCount,beforeRevoke);
+  await writeFile("artifacts/lime-app-request-report.json",JSON.stringify({passed:true,lane:"Actual unpacked Lime extension-page UI/MAIN Pear bridge/isolated relay/MV3 worker/HTTP/SQLite",gateway:"Scripted Mango; inference quality NOT VERIFIED",checks:["frozen Pear API installs without replacing backend","untrusted verbatim proposal; denial starts zero model calls","approved proposal still requires separate mutation approval","only final text resolves page Promise; tool traces stay private","model history keeps app provenance","denied tool and consent revoke have zero backend effects"],nativeSidePanelContainer:"NOT VERIFIED"},null,2));
+  // Keep the existing reload-invalidation journey bound to a real page adapter.
+  await panel.getByRole("button",{name:"Pin target",exact:true}).click();
+  await panel.getByText("Document: learning:demo:learner-a",{exact:false}).waitFor();
+
   await page.reload();
   await panel.getByText("target changed", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Sign out", exact: true }).waitFor();
@@ -277,6 +333,7 @@ try {
         checks: [
           "host consent and approval -> actual MAIN-world Pear bridge -> SQLite bookmark",
           "denied write zero mutation",
+          "actual app-request channel: frozen bridge, distinct proposal/mutation approvals, final text, provenance and consent revoke",
           "reload invalidates host authority",
           "Pear bookmark survives reload",
           "explicit lesson-read consent reaches actual shared Pi/Lime/Pear with source IDs/version",
