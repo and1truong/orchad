@@ -34,13 +34,22 @@ before correction; local focused26,full725/105,build,three built wide-real
 journeys passed. Exact-head full CI/native/review remain required. Current
 adaptation pear-result-binding-v25;1.2 bytes stay unchanged.
 
-Latest branch codex/pear-native-side-panel-journey-133 stacks on #198.
+PR #199 codex/pear-native-side-panel-journey-133 stacks on #198.
 ADR-127 extends actual Side Panel journeys across all four profiles with
 consent/read/revoke/rebind, identical lost-ACK retry/close-resume/finish and
 unchanged native document. Local host typecheck/discovery are required; actual
 CI pending. #192 stdout drain review fixed at70452253 and real-merged through
 the stack; local five cleanup checks passed. #194 adds collection count/state
 assertions in built runtime, persisted checkpoint and resume after review.
+
+Latest branch codex/pear-scorm-numeric-response-binding-133 stacks on #199.
+ADR-128/v26 binds numeric learner responses and numeric/performance correct
+bounds through the existing shared finite/capacity validator, exact strings
+and bracketed numeric ranges. Before12 expanded regressions failed; focused37
+full728/105, build and all three built journeys passed with complete exit0. Current adaptation
+pear-numeric-response-binding-v26. Parent #192 polling/order/hidden-reply fixes
+completed local Coconut62/build; current full native CI required, with prior
+macOS consent timeout and Windows forced cleanup failures preserved.
 
 Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
 external gates. Legacy ADL license/platform, authorized commercial exports and
