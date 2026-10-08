@@ -26,13 +26,51 @@ function replace(source, pairs) {
   }
   return source;
 }
+const navigationOriginal = "0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9";
+const navigationPatched = "a8d9018516119e5180c5cccd9931bb8b56335f3c282c0367cfe116e73d420007";
+const navigationUpdates = [
+  [
+    "    const adlNavRequestRegex = \"^adl\\\\.nav\\\\.request_valid\\\\.(choice|jump)\\\\.{target=([a-zA-Z0-9-_]+)}$\";",
+    "    const adlNavRequestRegex = \"^adl\\\\.nav\\\\.request_valid\\\\.(choice|jump)\\\\.\\\\{target=([^{}]+)\\\\}(?![\\\\s\\\\S])\";"
+  ],
+  [
+    "    if (CMIElement === \"cmi.completion_status\") {\n      return this._cmiHandler.evaluateCompletionStatus();",
+    "    if (/^adl\\.nav\\.request_valid\\.(?:choice|jump)(?:\\.|$)/.test(CMIElement)) {\n      this.throwSCORMError(CMIElement, scorm2004_errors.GENERAL_GET_FAILURE);\n      return global_constants.SCORM_FALSE;\n    }\n    if (CMIElement === \"cmi.completion_status\") {\n      return this._cmiHandler.evaluateCompletionStatus();"
+  ],
+  [
+    "  lmsSetValue(CMIElement, value) {\n    const oldValue = this._peekCMIValue(CMIElement);",
+    "  lmsSetValue(CMIElement, value) {\n    if (/^adl\\.nav\\.request_valid\\.(?:choice|jump)(?:\\.|$)/.test(CMIElement)) {\n      this.throwSCORMError(CMIElement, scorm2004_errors.READ_ONLY_ELEMENT);\n      return global_constants.SCORM_FALSE;\n    }\n    const oldValue = this._peekCMIValue(CMIElement);"
+  ],
+  [
+    "    if (stringMatches(CMIElement, adlNavRequestRegex)) {\n      const matches = CMIElement.match(adlNavRequestRegex);",
+    "    if (stringMatches(CMIElement, adlNavRequestRegex)) {\n      this.lastErrorCode = \"0\";\n      const matches = CMIElement.match(adlNavRequestRegex);"
+  ],
+  [
+    "  NAVEvent: \"^(_?(start|resumeAll|previous|continue|exit|exitAll|abandon|abandonAll|suspendAll|retry|retryAll)|_none_|(\\\\{target=(?<choice_target>\\\\S{0,}[a-zA-Z0-9-_]+)})?choice|(\\\\{target=(?<jump_target>\\\\S{0,}[a-zA-Z0-9-_]+)})?jump)$\",",
+    "  NAVEvent: \"^(_?(start|resumeAll|previous|continue|exit|exitAll|abandon|abandonAll|suspendAll|retry|retryAll)|_none_|(\\\\{target=(?<choice_target>[^{}]+)\\\\})?choice|(\\\\{target=(?<jump_target>[^{}]+)\\\\})?jump)(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  NAVTarget: \"^{target=\\\\S{0,}[a-zA-Z0-9-_]+}$\",",
+    "  NAVTarget: \"^\\\\{target=[^{}]+\\\\}(?![\\\\s\\\\S])\","
+  ]
+];
 export function reviewedSCORMSource(source) {
-  const expected = pins[hash(source)]; if (!expected) return source;
-  const output = replace(source, corrections);
-  if (hash(output) !== expected) throw Error('SCORM reviewed checksum mismatch');
-  return output;
+  const expected = pins[hash(source)];
+  if (expected) {
+    source = replace(source, corrections);
+    if (hash(source) !== expected) throw Error('SCORM reviewed checksum mismatch');
+  }
+  if (hash(source) === navigationOriginal) {
+    source = replace(source, navigationUpdates);
+    if (hash(source) !== navigationPatched) throw Error('SCORM navigation checksum mismatch');
+  }
+  return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === navigationPatched) {
+    source = replace(source, navigationUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== navigationOriginal) throw Error('SCORM navigation reverse checksum mismatch');
+  }
   const original = Object.keys(pins).find(key => pins[key] === hash(source)); if (!original) return source;
   const output = replace(source, corrections.toReversed().map(([before, after]) => [after, before]));
   if (hash(output) !== original) throw Error('SCORM review reverse checksum mismatch');

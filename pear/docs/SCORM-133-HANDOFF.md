@@ -113,3 +113,14 @@ Current exact-head CI supersedes historical statuses only after completion.
 first run 37813555426 failed the recurring-assignment browser status assertion
 (161/162 dev); only the failed Pear job is being retried. Target-selector binding
 for authored dotted/non-ASCII IDs remains independent sequencing work.
+
+ADR-112 is stacked on #181 head d816a92f without waiting for merge.
+pear-navigation-targets-v16 binds authored target strings intact, full-input
+request/validity delimiters, false/301 malformed reads and false/404 readonly
+writes. Exact 2004 bytes change; 1.2 bytes stay intact and v15 snapshot markers
+remain supported. Initial three browser attempts exposed the separate Unicode
+request suffix bug; corrected build and all seven target/model built journeys
+passed, including actual choice delivery, lost ACK and close/resume. Full domain
+completed 673/673 across 97 files; final compatibility vectors passed 3/3.
+CI/ready belongs only to the successor's complete exact-head run. Full prediction
+semantics and the remaining register requirements are still OPEN/BLOCKED.

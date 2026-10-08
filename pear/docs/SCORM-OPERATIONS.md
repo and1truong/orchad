@@ -63,3 +63,5 @@ Score-default correction (ADR-109) applies only to fresh/reset 1.2 score objects
 API refusal correction (ADR-110) retains exact v15 engine entries and stored snapshots. A local checkpoint exception returns false before successful termination; the SCO can retry the unchanged state/deltas. Local acceptance is not durable ACK, and existing bounded queue/receipt recovery remains authoritative. No schema/data rewrite or production change.
 
 API model-access correction (ADR-111) retains exact v15 ESM/stored snapshots and filters only content API paths/results. Internal trusted loading is unchanged; host field/identity replay remains authoritative and forged backing fields roll back before revision/receipt/proof. No migration, historical rewrite or production enablement.
+
+Navigation target binding (ADR-112) changes only checksum-locked 2004 lexical/access behavior. Known v15 snapshots remain compatible; 1.2 bytes and existing attempt/receipt/host replay authority are unchanged. Full deployment/platform/operational gates remain unresolved.
