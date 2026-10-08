@@ -1,3 +1,4 @@
+import {CURRENT_SCHEMA_VERSION} from "../src/server/database.ts";
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync, rmSync} from 'node:fs';
@@ -34,7 +35,7 @@ test('populated schema 47 upgrades resource guards without changing pinned state
     f.db.exec('DROP TRIGGER scorm_engine_resource_no_delete; DROP TRIGGER scorm_engine_resource_finalized_insert; DELETE FROM schema_version WHERE version=48'); f.db.close();
     const db = openDatabase(path, false);
     try {
-      assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, 50);
+      assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, CURRENT_SCHEMA_VERSION);
       assert.deepEqual(db.prepare('SELECT * FROM scorm_engine_resources ORDER BY path').all(), resources); assert.deepEqual(db.prepare('SELECT * FROM scorm_sco_attempts').all(), states);
       assert.throws(() => db.exec('DELETE FROM scorm_engine_resources'), /immutable/); assert.equal(db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
     } finally {db.close();}

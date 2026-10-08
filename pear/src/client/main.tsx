@@ -1,3 +1,4 @@
+import {Invitations} from "./invitations.tsx";
 import {SCORMLearningPlayer} from './scorm-learning.tsx';
 import {CourseFreshRestart} from "./course-restart.tsx";
 import {AssignedQuizReview,AssignedQuizCoordinator} from "./assigned-quiz.tsx";
@@ -86,6 +87,7 @@ const labels = {
 const personal = (s: Session) =>
   `learning:${s.principal.tenant}:${s.principal.id}`;
 function App() {
+  const invitationId=new URL(window.location.href).searchParams.get("invitation");
   const [portal,setPortal]=useState<{branding:PortalBranding;version:number}>({branding:structuredClone(defaultPortal),version:0});
   useEffect(()=>{document.documentElement.lang=getUILocale();},[]);
   const [authOptions,setAuthOptions]=useState<{oidcEnabled:boolean;developmentEnabled:boolean}|null>(null);
@@ -369,8 +371,9 @@ function App() {
         <p className="eyebrow">{translateUI("A little progress, every day")}</p>
         <h1>{translateUI("Your next")}<br />{translateUI("learning chapter.")}</h1>
         <p className="muted">{translateUI("Self-authored courses. Real progress. An assistant through Lime when you choose.")}</p>
+        {invitationId&&<p>{translateUI("Accept your invitation by signing in with the reviewed organization identity.")}</p>}
         {authOptions?.oidcEnabled&&<button disabled={busy} onClick={()=>void run(async()=>{
-          const result=await request<{url:string}>("/api/auth/start",null,{});
+          const result=await request<{url:string}>("/api/auth/start",null,invitationId?{invitationId}:{});
           window.location.assign(result.url);
         })}>{translateUI("Continue with organization SSO")}</button>}
         {(authOptions===null||authOptions.developmentEnabled)&&<form
@@ -418,6 +421,10 @@ function App() {
     <div className="shell">
       <a className="skip-link" href="#learning-main">{translateUI("Skip to learning content")}</a>
       <aside>
+        {invitationId&&authOptions?.oidcEnabled&&<section aria-label={translateUI("Accept invitation")}>
+          <p>{translateUI("Accept your invitation by signing in with the reviewed organization identity.")}</p>
+          <button disabled={busy} onClick={()=>void run(async()=>{const result=await request<{url:string}>("/api/auth/start",session,{invitationId});window.location.assign(result.url);})}>{translateUI("Accept invitation with organization SSO")}</button>
+        </section>}
         <div className="brand" aria-label={translateUI("Organization learning portal")} style={{color:portalPalettes[portal.branding.palette],overflowWrap:"anywhere",maxWidth:"100%"}}><span>◒ {portal.branding.name}</span>{portal.branding.tagline&&<p className="muted">{portal.branding.tagline}</p>}</div>
         <p className="eyebrow">{translateUI("Learning workspace")}</p>
         <label>{translateUI("Assistant workspace")}<select
@@ -1191,6 +1198,7 @@ function App() {
         )}
         {view==="admin"&&role==="admin"&&<ProviderConnections key={"provider-review:"+session.sessionEpoch} busy={busy} tick={tick} op={op} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<PortalSettings key={"portal:"+session.sessionEpoch} value={portal.branding} version={portal.version} busy={busy} mutate={mutate} run={run} isCurrent={()=>sessionRef.current===session&&docRef.current===doc} onSaved={branding=>setPortal(previous=>({...previous,branding}))}/>}
+        {view==="admin"&&role==="admin"&&<Invitations key={"invitations:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<IdentityLinks key={session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&role==="admin"&&<ProvisioningClients key={"provisioning:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
         {view==="admin"&&canEdit&&<PackageLearning author key={"package-admin:"+session.sessionEpoch} session={session} busy={busy} run={run} tick={tick} isCurrent={()=>sessionRef.current===session&&docRef.current===doc}/>}
