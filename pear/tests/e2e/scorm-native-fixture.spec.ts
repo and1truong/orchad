@@ -14,18 +14,21 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     const command = async (action: string) => {expect((await fetch(prefix + '/command', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action})})).ok).toBe(true);};
     await page.goto(prefix + '/bootstrap/learner-a');
     await expect.poll(async () => {const s = await state(); return s.probes.length > 0 && s.droppedACK;}).toBe(true);
-    const first = await state(); expect(first.driverErrors).toEqual([]); expect(first.proofs).toBe(0); expect(first.calls).toEqual([]); expect(first.probes[0].entry).toBe('ab-initio');
-    for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives']) expect(first.probes[0][key], key + ': ' + JSON.stringify(first.probes[0].egressViolations)).toBe(true);
+    const first = await state(); expect(first.driverErrors).toEqual([]); expect(first.proofs).toBe(0); expect(first.calls).toEqual([]); expect(first.pearCanaryCalls).toEqual([]); expect(first.probes[0].entry).toBe('ab-initio');
+    for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives', 'redirectDenied']) expect(first.probes[0][key], key + ': ' + JSON.stringify(first.probes[0].egressViolations)).toBe(true);
     await expect(page.frameLocator('iframe[title="Isolated SCORM engine player"]').getByRole('status')).toContainText('has not been acknowledged');
     await command('retry');
     await expect.poll(async () => {const s = await state(); return s.exactRetry && s.checkpoints >= 2;}).toBe(true);
     await command('resume');
     await expect.poll(async () => (await state()).probes.length).toBe(2);
     const resumed = await state(); expect(resumed.driverErrors).toEqual([]); expect(resumed.probes[1].entry).toBe('resume'); expect(resumed.probes[1].bookmark).toBe('licensed-page');
-    for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives']) expect(resumed.probes[1][key], key).toBe(true);
-    expect(resumed.calls).toEqual([]);
+    for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives', 'redirectDenied']) expect(resumed.probes[1][key], key).toBe(true);
+    expect(resumed.calls).toEqual([]); expect(resumed.pearCanaryCalls).toEqual([]);
     await command('finish'); await expect.poll(async () => (await state()).proofs).toBe(1);
     const finished = await state(); expect(finished.certificates).toBe(0); expect(finished.calls).toEqual([]); expect(finished.edition).toBe(edition);
+    await command('navigate'); await expect.poll(async () => (await state()).navigationAttempts).toEqual(['player-script-pear']);
+    await expect.poll(async () => (await state()).navigationViolations).toContain('frame-src');
+    const denied=await state(); expect(denied.pearCanaryCalls).toEqual([]); expect(denied.calls).toEqual([]); expect(denied.proofs).toBe(1); expect(denied.certificates).toBe(0);
   } finally {
     await page.close(); if (child.connected) child.send({kind: 'close'});
     const timeout = setTimeout(() => child.kill('SIGKILL'), 5000);

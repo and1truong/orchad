@@ -11,7 +11,7 @@ if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsup
 const nonce = process.env.PEAR_NATIVE_NONCE;
 if (!nonce || !/^[-a-zA-Z0-9]{20,64}$/.test(nonce)) throw Error('Explicit native fixture nonce required');
 const dir = mkdtempSync(join(tmpdir(), 'pear-native-scorm-')), prefix = '/native-scorm/' + nonce, origin = 'http://127.0.0.1:4310';
-let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '', droppedReceipt = '', droppedCount = 0, droppedRevision = 0; const probes: any[] = [], calls: string[] = [], driverErrors: string[] = [], contentRequests: {kind: string; status: number}[] = [];
+let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '', droppedReceipt = '', droppedCount = 0, droppedRevision = 0; const probes: any[] = [], calls: string[] = [], navigationAttempts: string[] = [], pearCanaryCalls: string[] = [], navigationViolations: string[] = [], driverErrors: string[] = [], contentRequests: {kind: string; status: number}[] = [];
 const script = `
 (async()=>{
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
@@ -39,9 +39,16 @@ const script = `
   // Sandbox disallows forms before CSP dispatch, so form-action need not emit an event.
   evidence.egressDirectives=['connect-src','img-src','media-src','frame-src','worker-src'].every(directive=>violations.includes(directive));
   evidence.egressViolations=[...new Set(violations)];
+  evidence.redirectDenied=(await fetch('${prefix}/redirect')).status===403;
   document.getElementById('save').onclick();
   await fetch('${prefix}/probe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(evidence)});
-  const timer=setInterval(async()=>{const command=await(await fetch('${prefix}/command')).json();if(command.action==='finish'){clearInterval(timer);document.getElementById('finish').onclick();}},200);
+  let finished=false,navigated=false;
+  const timer=setInterval(async()=>{const command=await(await fetch('${prefix}/command')).json();if(command.action==='finish'&&!finished){finished=true;document.getElementById('finish').onclick();}if(command.action==='navigate'&&finished&&!navigated){navigated=true;clearInterval(timer);
+    await fetch('${prefix}/navigation-attempt',{method:'POST'});
+    // The SCO can read this same-origin nonce; it is not an authority boundary.
+    const injected=parent.document.createElement('script');injected.nonce=parent.document.querySelector('script[nonce]').nonce;
+    injected.textContent='location.href='+JSON.stringify('${origin}${prefix}/pear-canary');parent.document.body.append(injected);
+  }},200);
 })();`;
 const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(edition as '1.2' | '2004-2' | '2004-3' | '2004-4', 'pipwerks', script)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
@@ -64,6 +71,10 @@ content!.addHook('onSend', async (req, reply, payload) => {
   return payload;
 });
 const sink = Fastify({logger: false}); sink.addHook('onRequest', async req => {calls.push(req.url);}); sink.all('/*', async () => 'Synthetic native isolation sink');
+content!.get(prefix + '/redirect', async (_req, reply) => reply.redirect(origin + prefix + '/pear-canary'));
+content!.post(prefix + '/navigation-attempt', async () => {navigationAttempts.push('player-script-pear'); return {ok: true};});
+app.get(prefix + '/pear-canary', async () => {pearCanaryCalls.push('pear-canary'); return 'Synthetic Pear navigation sink';});
+app.post(prefix + '/navigation-violation', async req => {if ((req.body as any)?.directive === 'frame-src') navigationViolations.push('frame-src'); return {ok: true};});
 content!.get(prefix + '/command', async () => ({action}));
 content!.post(prefix + '/probe', async req => {probes.push(req.body); return {ok: true};});
 app.get(prefix + '/bootstrap/:user', async (req, reply) => {
@@ -74,6 +85,7 @@ app.get(prefix + '/bootstrap/:user', async (req, reply) => {
 });
 app.get(prefix + '/view', async (_req, reply) => reply.type('text/html').send(readFileSync('dist/index.html', 'utf8').replace('</head>', '<script defer src="' + prefix + '/driver.js"></script></head>')));
 app.get(prefix + '/driver.js', async (_req, reply) => reply.type('text/javascript').send(`
+document.addEventListener('securitypolicyviolation',event=>{if(event.effectiveDirective==='frame-src')void fetch('${prefix}/navigation-violation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({directive:event.effectiveDirective})});});
 (async()=>{const wait=async(fn)=>{const until=Date.now()+60000;for(;;){const result=fn();if(result)return result;if(Date.now()>until)throw Error('Native driver timeout');await new Promise(r=>setTimeout(r,100));}};
 const button=label=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent===label&&!b.disabled);
 try{await wait(()=>button('Sign out'));(await wait(()=>button('My learning'))).click();(await wait(()=>button('Continue learning'))).click();
@@ -82,8 +94,8 @@ const consent=Array.from(panel.querySelectorAll('input')).find(i=>i.type==='chec
 const intro=()=>Array.from(panel.querySelectorAll('button')).find(b=>b.textContent.includes('Introduction')&&!b.disabled);(await wait(intro)).click();
 let resumed=false,retried=false;setInterval(async()=>{const state=await(await fetch('${prefix}/state')).json();if(state.action==='retry'&&!retried){retried=true;(await wait(()=>button('Retry engine checkpoint'))).click();}if(state.action==='resume'&&!resumed){resumed=true;(await wait(()=>button('Close SCO and choose another'))).click();(await wait(intro)).click();}},200);
 }catch(error){await fetch('${prefix}/driver-error',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:error.name,message:error.message})});}})();`));
-app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, binding, contentRequests, probes, calls, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
-app.post(prefix + '/command', async (req, reply) => {const next = (req.body as any)?.action; if (!['retry', 'resume', 'finish'].includes(next)) return reply.code(400).send(); action = next; return {ok: true};});
+app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
+app.post(prefix + '/command', async (req, reply) => {const next = (req.body as any)?.action; if (!['retry', 'resume', 'finish', 'navigate'].includes(next)) return reply.code(400).send(); action = next; return {ok: true};});
 app.post(prefix + '/driver-error', async req => {driverErrors.push(String((req.body as any)?.message).slice(0, 200)); return {ok: true};});
 await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host: '127.0.0.1', port: 4315}); await app.listen({host: '127.0.0.1', port: 4310});
 console.log('PEAR_NATIVE_FIXTURE_READY');

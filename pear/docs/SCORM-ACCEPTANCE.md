@@ -125,3 +125,5 @@ and extends all three built URI/full-capacity journeys with reordered duplicate
 refusal, retained pattern/count, same-index authored order and lost-ACK/resume.
 Local740/107,focused34,build,three built journeys completed with exit0; full
 new-head CI/native/review and remaining response/equivalence gates are required.
+
+ADR-131 retains two original actual-request navigation/redirect counterexamples. Final build and six built Chromium journeys completed with exit0, including four real fault-driver profiles and combined inline playback. New native controller requires13 checks per SCORM profile with attempted/frame-src/403/zero-canary evidence, unchanged proofs and clean exit. Fresh full domain740/107 completed with exit0; exact-head CI/native/review remain required; full strict-egress remains OPEN.

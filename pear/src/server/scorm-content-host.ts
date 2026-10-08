@@ -26,6 +26,18 @@ export function createSCORMContentHost(options: {pearOrigin: string; contentOrig
     if (req.headers.host !== origins.contentHost) return reply.code(403).send({error: 'Unrecognized content host'});
     if (req.headers.cookie || req.headers.authorization) return reply.code(403).send({error: 'Content host does not accept application credentials'});
   });
+  app.addHook('onSend', async (_req, reply, payload) => {
+    const location = reply.getHeader('Location');
+    if (reply.statusCode >= 300 && reply.statusCode < 400 && location !== undefined) {
+      let allowed = false;
+      try {const target = new URL(String(location), origins.contentOrigin); allowed = target.origin === origins.contentOrigin && !target.username && !target.password;} catch {}
+      if (!allowed) {
+        reply.code(403).removeHeader('Location').type('application/json');
+        return JSON.stringify({error: 'Cross-origin content redirect denied'});
+      }
+    }
+    return payload;
+  });
   app.get('/health', async () => ({service: 'pear-scorm-content', runtimeEnabled: !!options.player}));
   if (options.player && options.runtimeBundle) {
     const player = options.player;

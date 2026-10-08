@@ -227,3 +227,5 @@ remains recorded. #182 head f0f0de3d / run 37817524964 completed SUCCESS 8/8,
 domain 673 and 175/175 dev/built browser. Successor CI must finish before ready.
 Independent clause-level work and real external/deployment gates remain open;
 no epic closure or production enablement.
+
+Active branch codex/pear-scorm-navigation-probes-133 stacks on #202. ADR-131 closes the demonstrated arbitrary Pear player self-navigation and off-origin HTTP redirect response paths; preserve failure logs and inline support. Final build/six built browser journeys and scratch redirect regression pass; fresh domain740/107 completed with exit0; new-head CI/review remain pending. #200 old head c47b6daa CI37849982707 failed all four actual Side Panel journeys at context.pages(): Chrome SIDE_PANEL/report/document correlation succeeded, but automation had no panel page. Fix at owner #199 via public CDP reconnect to the already verified existing panel; no navigation/tab fallback, same document ID must match. Actual execution still requires the extension-capable CI lane.
