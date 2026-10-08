@@ -15,7 +15,8 @@ Keep the installed engine and checksum-locked adaptation. Reuse the typed setter
 validator for fill-in, long-fill-in, performance and other patterns at the API
 boundary. Validate leading interaction-wide boolean properties once, retain
 per-record language bindings for typed scalar/SPM validation, preserve raw values
-without trim/normalization, and enforce record uniqueness only where the response
+without trim/normalization, split textual records only on the reserved bracketed
+separator (bare commas remain text), and enforce record uniqueness only where the response
 definition requires it. Fill-in case/order properties support either order;
 long-fill-in has case and performance has order. Invalid boolean values and
 duplicate leading properties are rejected with 406. A failed replacement or
@@ -30,10 +31,14 @@ execute them; exhaustive earlier-edition reference reconciliation remains OPEN.
 ## Pin, history and authority
 
 Adaptation `pear-responses-v7`, exact adapted ESM SHA-256:
-`8080f3641f2d758d3589ef6c7796a8703c4aae99d14a7069546070e7e2f942ad`.
+`5312ce9cf54a83580a5e839c03cf6338a3b1d30d18fb0ab81f955b2ec603cb6b`.
 Original pinned package bytes and all known intermediate adaptations are accepted
 only through the existing exact-hash upgrade path. Actual installer tests cover
-pristine through interactions-v6, repeat installation, and unknown bytes/version.
+pristine through interactions-v6 and the initial response patch, repeat
+installation, and unknown bytes/version. Review #166 found the legacy splitter
+still split bare commas when no bracketed separator was present. Original vectors
+now cover a single performance answer containing a comma and 250/251-scalar
+fill-in answers with a comma; the latter cannot evade the per-record SPM.
 Both browser bundle and trusted server replay use the same ESM entry. Existing
 sequencing snapshots through interactions-v6 remain readable; unknown markers
 remain rejected. No migration or package/proof/version rebinding.

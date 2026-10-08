@@ -59,7 +59,9 @@ Textual correct-response evidence (ADR-098): fill-in/long-fill-in/performance
 whitespace, unbracketed commas, newlines and leading typed boolean properties
 preserve their original values across browser API, server replay, exact receipt
 retry and preloaded resume. Fill-in permits repeated localized records and ten
-250-scalar answers. Invalid boolean values/repeated leading properties return
+250-scalar answers. Only bracketed separators split textual records; a bare
+comma cannot split a performance answer or evade a fill-in scalar limit.
+Invalid boolean values/repeated leading properties return
 406 without altering record/count; missing ID/type stays 408. Known snapshots
 through interactions-v6 remain readable. No complete edition/response/reference
 conformance is inferred; see SCORM-CONFORMANCE.md.

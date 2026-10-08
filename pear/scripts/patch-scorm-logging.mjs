@@ -67,7 +67,7 @@ const collectionUpdates = [
   ]
 ];
 
-const responses = "8080f3641f2d758d3589ef6c7796a8703c4aae99d14a7069546070e7e2f942ad";
+const responsesPrevious = "8080f3641f2d758d3589ef6c7796a8703c4aae99d14a7069546070e7e2f942ad", responses = "5312ce9cf54a83580a5e839c03cf6338a3b1d30d18fb0ab81f955b2ec603cb6b";
 const responseUpdates = [
   [
     "  CMIFeedback: \"^.*$\",",
@@ -103,14 +103,25 @@ const responseUpdates = [
   ]
 ];
 
-if (![original, loggingOnly, selection, limits, patched, localized, collections, responses].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
+const responseDelimiterUpdates = [
+  [
+    "  const rawNodes = responseDef.delimiter ? splitDelimited(pattern, responseDef.delimiter) : [pattern];",
+    "  const rawNodes = responseDef.delimiter ? textual ? pattern.split(responseDef.delimiter) : splitDelimited(pattern, responseDef.delimiter) : [pattern];"
+  ],
+  [
+    "  const nodes = responseDef.delimiter ? splitDelimited(pattern, responseDef.delimiter) : [pattern];",
+    "  const nodes = responseDef.delimiter ? textual ? pattern.split(responseDef.delimiter) : splitDelimited(pattern, responseDef.delimiter) : [pattern];"
+  ]
+];
+
+if (![original, loggingOnly, selection, limits, patched, localized, collections, responsesPrevious, responses].includes(digest(source))) throw Error('Unexpected pinned SCORM source; refusing an unreviewed patch');
 let output = source;
 if (digest(source) === original) for (const statement of ['console.debug(`Activity delivered: ${activity.id} - ${activity.title}`);', 'console.debug("Sequencing state restored successfully");', 'console.error(`Failed to restore sequencing state: ${error}`);']) {
   if (output.split(statement).length !== 2) throw Error('SCORM direct-log patch no longer matches');
   output = output.replace(statement, '/* Pear: omit direct upstream sequencing logs. */');
 }
 const replaceOnce = (before, after) => {if (output.split(before).length !== 2) throw Error('SCORM selection correction no longer matches'); output = output.replace(before, after);};
-if (![selection, limits, patched, localized, collections, responses].includes(digest(source))) {
+if (![selection, limits, patched, localized, collections, responsesPrevious, responses].includes(digest(source))) {
 replaceOnce('if (selectCount === null || selectCount > 0) {', 'if (selectCount === null || selectCount >= 0) {');
 replaceOnce(`    const children = [...activity.children];
     if (controls.selectionTiming === SelectionTiming.NEVER) {`, `    const children = [...activity.children];
@@ -146,7 +157,7 @@ replaceOnce(`  static applySelectionAndRandomization(activity, isNewAttempt = fa
     }
     const controls = activity.sequencingControls;`);
 }
-if (![limits, patched, localized, collections, responses].includes(digest(source))) {
+if (![limits, patched, localized, collections, responsesPrevious, responses].includes(digest(source))) {
 replaceOnce("return this._attemptAbsoluteDurationLimit || \"PT0H0M0S\";", "return this._attemptAbsoluteDuration;");
 replaceOnce("this._attemptAbsoluteDurationLimit = duration;", "this._attemptAbsoluteDuration = duration;");
 replaceOnce("return this._activityAbsoluteDurationLimit || \"PT0H0M0S\";", "return this._activityAbsoluteDuration;");
@@ -154,13 +165,15 @@ replaceOnce("this._activityAbsoluteDurationLimit = duration;", "this._activityAb
 replaceOnce("  checkLimitConditions(activity) {\n    if (activity.isSuspended)", "  checkLimitConditions(activity) {\n    if (activity._pearDurationLimitCheck) return activity._pearDurationLimitCheck(activity);\n    if (activity.isSuspended)");
 replaceOnce("  checkLimitConditions(activity) {\n    let result = true;", "  checkLimitConditions(activity) {\n    if (activity._pearDurationLimitCheck) return !activity._pearDurationLimitCheck(activity);\n    let result = true;");
 }
-if (![patched, localized, collections, responses].includes(digest(source))) replaceOnce("    const formatRegex = new RegExp(regexPattern);", "    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.\n    const scalarString = regexPattern.startsWith(\"^[\\\\u0000-\\\\uFFFF]\") || regexPattern.startsWith(\"^[\\\\s\\\\S]{0,\");\n    const formatRegex = new RegExp(scalarString ? regexPattern.replace(\"[\\\\u0000-\\\\uFFFF]\", \"[\\\\s\\\\S]\") : regexPattern, scalarString ? \"u\" : \"\");");
-if (![patched, localized, collections, responses].includes(digest(output))) throw Error('SCORM adapted source checksum mismatch');
-if (![localized, collections, responses].includes(digest(output))) for (const [before, after] of localizedUpdates) replaceOnce(before, after);
-if (![localized, collections, responses].includes(digest(output))) throw Error('SCORM localized-string checksum mismatch');
-if (![collections, responses].includes(digest(output))) for (const [before, after] of collectionUpdates) replaceOnce(before, after);
-if (![collections, responses].includes(digest(output))) throw Error('SCORM interaction-collection checksum mismatch');
-if (digest(output) !== responses) for (const [before, after] of responseUpdates) replaceOnce(before, after);
+if (![patched, localized, collections, responsesPrevious, responses].includes(digest(source))) replaceOnce("    const formatRegex = new RegExp(regexPattern);", "    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.\n    const scalarString = regexPattern.startsWith(\"^[\\\\u0000-\\\\uFFFF]\") || regexPattern.startsWith(\"^[\\\\s\\\\S]{0,\");\n    const formatRegex = new RegExp(scalarString ? regexPattern.replace(\"[\\\\u0000-\\\\uFFFF]\", \"[\\\\s\\\\S]\") : regexPattern, scalarString ? \"u\" : \"\");");
+if (![patched, localized, collections, responsesPrevious, responses].includes(digest(output))) throw Error('SCORM adapted source checksum mismatch');
+if (![localized, collections, responsesPrevious, responses].includes(digest(output))) for (const [before, after] of localizedUpdates) replaceOnce(before, after);
+if (![localized, collections, responsesPrevious, responses].includes(digest(output))) throw Error('SCORM localized-string checksum mismatch');
+if (![collections, responsesPrevious, responses].includes(digest(output))) for (const [before, after] of collectionUpdates) replaceOnce(before, after);
+if (![collections, responsesPrevious, responses].includes(digest(output))) throw Error('SCORM interaction-collection checksum mismatch');
+if (![responsesPrevious, responses].includes(digest(output))) for (const [before, after] of responseUpdates) replaceOnce(before, after);
+if (![responsesPrevious, responses].includes(digest(output))) throw Error('SCORM textual-response base checksum mismatch');
+if (digest(output) !== responses) for (const [before, after] of responseDelimiterUpdates) replaceOnce(before, after);
 if (digest(output) !== responses) throw Error('SCORM textual-response checksum mismatch');
 writeFileSync(path, output);
 
