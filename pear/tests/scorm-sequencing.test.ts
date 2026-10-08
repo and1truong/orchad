@@ -477,7 +477,10 @@ test('forbidden runtime navigation and client snapshots cannot grant progress; a
     assert.throws(() => f.player.checkpoint(launch.token, request), /sequence audit failed/); assert.equal(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state, before);
     f.db.exec('DROP TRIGGER reject_sequence'); f.player.checkpoint(launch.token, request);
     const replacement = f.launch(binding, 'intro'); assert.throws(() => f.player.checkpoint(launch.token, request), /closed/);
-    assert.equal(f.player.bootstrap(replacement.token).state.location, '');
+    const replacementState = f.player.bootstrap(replacement.token).state;
+    for (const field of ['location', 'suspend_data']) assert.equal(Object.hasOwn(replacementState, field), false);
+    const restored = createSCORM2004API({edition: '2004-4', state: replacementState}); assert.equal(restored.Initialize(''), 'true');
+    for (const field of ['location', 'suspend_data']) {assert.equal(restored.GetValue('cmi.' + field), ''); assert.equal(restored.GetLastError(), '403');}
     const next = sequenceCheckpoint(f, replacement, {'cmi.session_time': 'PT5S'}, false); f.player.checkpoint(replacement.token, next);
     assert.equal(f.player.status(f.service.principal('learner-a'), replacement.launchId, 'session-learner-a').reported_seconds, 25);
     assert.throws(() => f.player.checkpoint(replacement.token, {...next, sequence: 3}), /revision|session/);

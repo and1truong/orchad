@@ -286,6 +286,30 @@ const learnerResponsePresenceUpdates = [
     "if (Object.prototype.hasOwnProperty.call(json, key) && (json[key] || json[key] === \"\" && key === \"learner_response\" && /^cmi\\.interactions\\.\\d+$/.test(CMIElement) && [\"choice\", \"matching\", \"sequencing\", \"performance\", \"fill-in\", \"long-fill-in\", \"other\"].includes(json.type) || json[key] === \"\" && /^cmi\\."
   ]
 ];
+const contentPresenceOriginal = "acc64c8c88268bbfaf8429cd0c4805ed2c0c4110888514e0dca8369b60480019";
+const contentPresencePatched = "5020b23897cbf8bca9c4e6ae71633cc6df6389dd70d6f593318bd4ab19f2c6e7";
+const contentPresenceUpdates = [
+  [
+    "class CMIContent extends BaseCMI {\n  _location = \"\";\n  _launch_data = \"\";\n  _suspend_data = \"\";",
+    "class CMIContent extends BaseCMI {\n  _location;\n  _launch_data = \"\";\n  _suspend_data;"
+  ],
+  [
+    "    this._initialized = false;\n    this._location = \"\";\n    this._suspend_data = \"\";",
+    "    this._initialized = false;\n    this._location = void 0;\n    this._suspend_data = void 0;"
+  ],
+  [
+    "  get location() {\n    return this.content.location;\n  }",
+    "  get location() {\n    if (this.initialized && !this.jsonString && this.content.location === void 0) {\n      throw new Scorm2004ValidationError(this._cmi_element + \".location\", scorm2004_errors.VALUE_NOT_INITIALIZED);\n    }\n    return this.content.location;\n  }"
+  ],
+  [
+    "  get suspend_data() {\n    return this.content.suspend_data;\n  }",
+    "  get suspend_data() {\n    if (this.initialized && !this.jsonString && this.content.suspend_data === void 0) {\n      throw new Scorm2004ValidationError(this._cmi_element + \".suspend_data\", scorm2004_errors.VALUE_NOT_INITIALIZED);\n    }\n    return this.content.suspend_data;\n  }"
+  ],
+  [
+    "|location|comments_from_(?:learner|lms)",
+    "|(?:location|suspend_data)|comments_from_(?:learner|lms)"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -360,9 +384,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, learnerResponsePresenceUpdates);
     if (hash(source) !== learnerResponsePresencePatched) throw Error("SCORM learner response presence checksum mismatch");
   }
+  if (hash(source) === contentPresenceOriginal) {
+    source = replace(source, contentPresenceUpdates);
+    if (hash(source) !== contentPresencePatched) throw Error("SCORM content presence checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === contentPresencePatched) {
+    source = replace(source, contentPresenceUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== contentPresenceOriginal) throw Error("SCORM content presence reverse checksum mismatch");
+  }
   if (hash(source) === learnerResponsePresencePatched) {
     source = replace(source, learnerResponsePresenceUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== learnerResponsePresenceOriginal) throw Error("SCORM learner response presence reverse checksum mismatch");

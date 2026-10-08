@@ -44,7 +44,7 @@ test('support packets omit private state, authored strings, credentials and cros
 test('real sequenced launch/CMI rejection and trusted-state recovery produce no direct content/learner logs under the pinned logging adaptation', async () => {
   const f = await scormLearningFixture(undefined, sequencingPackage('2004-4')), methods = ['debug', 'log', 'info', 'warn', 'error'] as const, original = Object.fromEntries(methods.map(method => [method, console[method]])), output: unknown[][] = [];
   try {
-    const source = readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js', import.meta.url)); assert.equal(createHash('sha256').update(source).digest('hex'), 'acc64c8c88268bbfaf8429cd0c4805ed2c0c4110888514e0dca8369b60480019');
+    const source = readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js', import.meta.url)); assert.equal(createHash('sha256').update(source).digest('hex'), '5020b23897cbf8bca9c4e6ae71633cc6df6389dd70d6f593318bd4ab19f2c6e7');
     for (const method of methods) console[method] = (...args: unknown[]) => {output.push(args);};
     const launch = f.launch(f.enroll(), 'intro'), b = f.player.bootstrap(launch.token);
     assert.throws(() => f.player.checkpoint(launch.token, {sequence: 1, revision: 0, state: {...b.state, learner_name: 'private-learner-log-sentinel'}, finished: false}), /Server-owned CMI value changed/);
