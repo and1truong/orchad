@@ -1,32 +1,37 @@
 # Active continuation — 2026-10-08
 
-Continue the owned stack without waiting for merge (AGENTS.md). PRs #172, #174,
-#175 and #177–185 have completed exact-head acceptance and are ready for review;
-current hashes/logs and retained first failures are in their PR descriptions.
-#186–189 remain draft pending completed new-head CI and review. Do not infer
-PASS from queued/running checks. Latest branch: codex/pear-scorm-urn-binding-133,
-stacked on #189; shared engine adaptation pear-urn-binding-v22. The URN
-successor has 718/718 local domain across 105 files, 13 focused, build and
-three built identifier journeys; exact-head CI/review remains required.
+Continue stacked PRs without waiting for merge (AGENTS.md). #172,#174,#175,
+#177–191 are ready after completed exact-head acceptance/review; latest heads,
+full logs and retained first failures are in PR descriptions. #186–190 actual
+Linux/macOS/Windows runtime16/Pear-MCP13/four SCORM11 passed. #191 head2fc52af0,
+run37839013479 completed10/10 jobs,718 domain,192 dev/192 built journeys and
+all three actual OS runtime16/Pear-MCP13/four SCORM12 with dynamic denial,
+exit0 and no forced kills. Mango's three paid live tests remain skipped.
 
-#186 owns native platform repairs: actual Windows icon, measured Linux job
-budget, existing four-profile preflight ACK retry and supported Tauri native IPC
-subframe denial. Parent fixes propagate by real merges to #187–189. Historical
-7eb4838f now has actual Linux/macOS/Windows runtime 16/16, Pear/MCP 13/13 and
-each SCORM 11/11; exact current-head acceptance remains required. Owner e594815c
-Windows first attempt failed only its 2004-3 clean-exit assertion; retain that
-failure and investigate/recheck it, without accepting timeout/forced exit.
-#187 binds support arguments; #188 corrects 1.2 CMI error binding; #189 binds
-shared timeinterval grammar. Local v21 validation: 712/712 domain/104 files,
-14 focused, build, four session-time and four fixture preflight journeys;
-Coconut 59/59. Actual native CI is required and Chromium is supplemental.
+#192 owner33897329 failed Side Panel optional MessageSender.documentId
+correlation after actual SIDE_PANEL and UI mount were observed; reporter now
+uses a unique URL getContexts ID and independently matches background query.
+Current b9c42239 includes fixed-phase/IPC shutdown diagnostics. Earlier Windows
+2004-2 shutdown failed (native0, fixture forced); local stress did not reproduce
+it. Keep the failure and five-second/exit0 conditions; current native CI required.
+Local system Chromium managed ExtensionInstallBlocklist[*] remains untouched;
+actual container runs in the existing extension-capable CI lane.
+
+#193 URI-scheme v23 extends shared/facade/preload/replay/installer and existing
+built identifier journeys. Local718/105,focused13,build,three built journeys
+passed; initial operations v22-pin failure retained. Parent #192 correction is
+incorporated by real merge; current-head CI/review remain required.
+Successor codex/pear-scorm-api-precedence-133 adds ADR-124 original simultaneous
+invalid/session/access/type/range/dependency/no-coercion vectors. Local722/105,
+lifecycle13,build,four built journeys passed. No new runtime patch; full current
+CI/native/review remain required. Current adaptation pear-uri-scheme-binding-v23.
 
 Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
 external gates. Legacy ADL license/platform, authorized commercial exports and
 Rustici account, real Safari/Android runners/devices, reviewed production
-origin/scanner/storage/retention/load/RPO/DR remain unresolved. Native Side Panel
-container and full all-egress enforcement remain OPEN. Keep #133 open and
-production disabled. Preserve working changes and all historical failure logs.
+origin/scanner/storage/retention/load/RPO/DR remain unresolved. Full native Side
+Panel consent/rebind/revoke/player journey and all-egress enforcement remain
+OPEN. Keep #133 open and production disabled. Preserve historical failure logs.
 
 ## Historical continuation records
 

@@ -4,6 +4,7 @@ import {resolve} from 'node:path';
 import {createApp} from '../../src/server/app.ts';
 import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 import {interopPackage} from '../scorm-interop-fixture.ts';
+import {scorm12PrecedenceWrites, scorm2004PrecedenceWrites} from '../scorm-api-precedence-vectors.ts';
 
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(edition + ': built API refusals stay synchronous and retry after a throwing queue', async ({page}) => {
   const script = `{const old=${JSON.stringify(edition === '1.2')},api=old?parent.API:parent.API_1484_11,
@@ -13,6 +14,13 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(editi
     const button=document.createElement('button');button.textContent='Verify API refusals';document.body.append(button);
     button.onclick=()=>{
       const before=read(key);
+      const writes=${JSON.stringify(edition === '1.2' ? scorm12PrecedenceWrites : scorm2004PrecedenceWrites)};
+      for(const [name,value,expected]of writes)if(write(name,value)!=='false'||error()!==expected)throw Error('access/type/dependency '+name);
+      let coercions=0;const poison={toString(){coercions++;throw Error('authored coercion');},valueOf(){coercions++;throw Error('authored coercion');}};
+      for(const value of [undefined,null,0,poison,Symbol('authored')]){
+        if(read(value)!==''||error()!=='201'||write(key,value)!=='false'||error()!=='201')throw Error('typed argument');
+      }
+      if(coercions||read(key)!==before)throw Error('authored coercion/state');
       if(read('')!==''||error()!==(old?'201':'301'))throw Error('empty get');
       if(write('','replacement')!=='false'||error()!==(old?'201':'351'))throw Error('empty set');
       if(read(key)!==before)throw Error('bookmark changed');
