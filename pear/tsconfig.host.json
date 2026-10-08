@@ -22,7 +22,8 @@
     "tests/host.test.ts",
     "tests/e2e/host.spec.ts",
     "scripts/lime-browser.ts",
-    "tests/e2e/scorm-lime.host.spec.ts"
+    "tests/e2e/scorm-lime.host.spec.ts",
+    "scripts/keycloak-browser.ts"
   ],
   "exclude": []
 }
