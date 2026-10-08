@@ -51,3 +51,10 @@ logs include the real WebView user agents and runner images (Linux job
 whole run was not PASS. The four-profile Linux execution took about eleven
 minutes after setup; enlarge its former one-profile 15-minute job budget to 25
 minutes for dependency/build overhead. New-head acceptance is still required.
+
+Second Windows attempt (7d830eea, run 37824748788/job 113474582293) built
+and completed real runtime 16/16 and Pear/MCP 13/13, then SCORM 1.2 timed out
+waiting for its first content probe/checkpoint. This is a failed playback gate,
+not platform PASS. Fixture failure diagnostics now record only route classes/
+status and progress counters, without launch tokens or authored/private state,
+to locate the actual WebView2 failure; no assertion/timeout bypass.
