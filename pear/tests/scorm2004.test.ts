@@ -85,7 +85,10 @@ test('SCORM 2004 completion threshold CAM mapping and exit/time binding reject u
     assert.equal(b.state.launch_data, ' original launch '); assert.equal(b.state.completion_threshold, '0.8');
     f.player.checkpoint(launch.token, snapshot(f, launch, {'cmi.progress_measure': '.7', 'cmi.success_status': 'passed', 'cmi.score.scaled': '.9', 'cmi.completion_status': 'completed'}, true));
     assert.equal(f.db.prepare('SELECT count(*) AS n FROM scorm_completion_proofs').get()?.n, 0);
-    const next = f.launch(binding); assert.equal(f.player.checkpoint(next.token, snapshot(f, next, {'cmi.progress_measure': '.9'}, true)).officialLearningChanged, true);
+    const next = f.launch(binding), fresh = f.player.bootstrap(next.token);
+    assert.equal(fresh.revision, 0); assert.equal(fresh.state.total_time, 'PT0S');
+    assert.equal(fresh.state.progress_measure, undefined); assert.equal(fresh.state.success_status, undefined);
+    assert.equal(f.player.checkpoint(next.token, snapshot(f, next, {'cmi.progress_measure': '.9', 'cmi.success_status': 'passed', 'cmi.score.scaled': '.9'}, true)).officialLearningChanged, true);
     await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-3', xml.replace('2004 4th Edition', '2004 3rd Edition'))), /4th edition/);
   } finally {f.db.close();}
   assert.equal(scorm2004Seconds('P1DT2H3M4.05S'), 93784.05);

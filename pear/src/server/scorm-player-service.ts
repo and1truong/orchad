@@ -90,7 +90,10 @@ export class SCORMPlayerService {
       const id = randomUUID(), token = randomBytes(32).toString('base64url'), now = Date.now();
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND closed=0').run(registered.attemptId);
       const previousSco = rows.find(r => r.sco_id === profile.activity.id), engineAttempt = engine?.getSequencingState()?.currentActivity?.attemptCount ?? 1;
-      const scoAttempt = engine ? Math.max(1, engineAttempt, previousSco?.sco_attempt_number ?? 1) : 1;
+      // A finished, non-suspended 2004 session starts another SCO attempt; keep
+      // its old CMI/receipts as history rather than returning them to new content.
+      const freshAttempt = !engine && manifest.standard !== '1.2' && previousSco?.finished && JSON.parse(previousSco.runtime_state).exit !== 'suspend';
+      const scoAttempt = engine ? Math.max(1, engineAttempt, previousSco?.sco_attempt_number ?? 1) : (previousSco?.sco_attempt_number ?? 1) + (freshAttempt ? 1 : 0);
       this.db.prepare('INSERT OR IGNORE INTO scorm_sco_attempts(attempt_id,tenant,sco_id,sco_attempt_number) VALUES(?,?,?,?)').run(registered.attemptId, p.tenant, profile.activity.id, scoAttempt);
       const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=?').get(registered.attemptId, profile.activity.id, scoAttempt) as any, previous = JSON.parse(sco.runtime_state), account = p as any;
       this.db.prepare('UPDATE scorm_sco_attempts SET finished=0 WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=?').run(registered.attemptId, profile.activity.id, scoAttempt);
