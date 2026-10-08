@@ -35,3 +35,18 @@ excludes this file from main and explicitly includes it in typecheck:host;
 the new host test is still compiled with Chrome declarations. Corrected
 Pear build/main typecheck and host typecheck completed successfully.
 Actual current-head browser/native/container acceptance remains pending.
+
+Run37839011787 on33897329 completed718 domain and192 dev/192 built journeys,
+but Side Panel correlation failed: Chrome returned a real SIDE_PANEL document
+and the UI reporter mounted, while MessageSender.documentId was undefined.
+The fixture reporter now queries its unique document URL using getContexts,
+requires SIDE_PANEL and sends that API-provided ID; the worker's independent
+query must match. Evidence attaches before correlation assertions and includes
+the actual CDP target type. No panel URL is opened as a tab or fallback.
+The same run failed Windows2004-2 fixture shutdown (native0, fixture forced),
+while Linux/macOS completed all four profiles12/12. Keep that failure recorded;
+local TCP stress did not reproduce it, so its cause is not inferred or waived.
+Synthetic shutdown diagnostics now record only IPC-send status/error codes and
+fixed cleanup phase names, distinguishing message delivery, connection/sink/app
+closure and DB/directory cleanup. Five-second and exit-0 assertions are retained.
+Reference: https://developer.chrome.com/docs/extensions/reference/api/runtime.

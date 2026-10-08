@@ -11,7 +11,7 @@ test('actual Chrome Side Panel opens by user gesture and mounts the Lime UI', as
     // Only this temporary copy has a nonce-free, local test reporter and opener.
     await writeFile(join(extension, 'opener.html'), '<!doctype html><button id="open">Open actual Side Panel</button><script src="opener.js"></script>');
     await writeFile(join(extension, 'opener.js'), `chrome.windows.getCurrent().then(window=>{document.querySelector('#open').onclick=()=>chrome.sidePanel.open({windowId:window.id}).then(()=>document.body.dataset.opened='true',error=>document.body.dataset.error=error.message);});`);
-    await writeFile(join(extension, 'reporter.js'), `const timer=setInterval(()=>{if(document.querySelector('[aria-label="Target picker"]')){clearInterval(timer);chrome.runtime.sendMessage({pearSidePanelFixture:true,href:location.href,title:document.title});}},50);`);
+    await writeFile(join(extension, 'reporter.js'), `const timer=setInterval(async()=>{if(document.querySelector('[aria-label="Target picker"]')){clearInterval(timer);const contexts=await chrome.runtime.getContexts({documentUrls:[location.href]});if(contexts.length===1&&contexts[0].contextType==='SIDE_PANEL')chrome.runtime.sendMessage({pearSidePanelFixture:true,href:location.href,title:document.title,documentId:contexts[0].documentId,contextType:contexts[0].contextType});}},50);`);
     const html = await readFile(join(extension, 'sidepanel.html'), 'utf8');
     await writeFile(join(extension, 'sidepanel.html'), html.replace('</body>', '<script src="reporter.js"></script></body>'));
     const workerSource = await readFile(join(extension, 'worker.js'), 'utf8');
@@ -28,8 +28,11 @@ test('actual Chrome Side Panel opens by user gesture and mounts the Lime UI', as
       return {contexts, reports: (globalThis as any).pearSidePanelReports};
     })).toMatchObject({contexts: [{contextType: 'SIDE_PANEL', documentUrl: panelURL}], reports: [{href: panelURL}]});
     const evidence = await worker.evaluate(async () => ({contexts: await chrome.runtime.getContexts({contextTypes: ['SIDE_PANEL']}), reports: (globalThis as any).pearSidePanelReports}));
-    expect(evidence.contexts[0].documentId).toBe(evidence.reports[0].documentId);
     const session = await context.newCDPSession(opener), targets = (await session.send('Target.getTargets')).targetInfos.map(target => ({type: target.type, url: target.url}));
     await testInfo.attach('actual-side-panel-context', {body: JSON.stringify({browser: await opener.evaluate(() => navigator.userAgent), ...evidence, targets}, null, 2), contentType: 'application/json'});
+    console.log(JSON.stringify({sidePanelContexts: evidence.contexts.length, mountedReports: evidence.reports.length, panelTargetTypes: targets.filter(target => target.url === panelURL).map(target => target.type)}));
+    expect(evidence.contexts).toHaveLength(1); expect(evidence.reports).toHaveLength(1);
+    expect(evidence.reports[0].contextType).toBe('SIDE_PANEL');
+    expect(evidence.contexts[0].documentId).toBe(evidence.reports[0].documentId);
   } finally {await context?.close(); await rm(directory, {recursive: true, force: true});}
 });
