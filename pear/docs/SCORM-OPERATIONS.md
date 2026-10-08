@@ -53,3 +53,5 @@ Timestamp correction (ADR-104) keeps known v9 markers and validates historical i
 Preloaded collection correction (ADR-105) uses checksum-locked initialization-v11, retains known v10 snapshots and initializes existing nested records before content operations. LMS-owned comments/count remain unchanged after denied writes; trusted preload remains available. No schema migration, stored-data rewrite or production change.
 
 Collection append correction (ADR-106) uses checksum-locked atomicity-v12 and known v11 snapshot compatibility. Invalid writes cannot accumulate empty collection records. Existing historical records remain unchanged; no automatic purge, schema migration or production enablement.
+
+Packed-index correction (ADR-107) checksum-locks both engine entries and preserves known v12 snapshots. Historical malformed keys remain subject to trusted replay/refusal and explicit operator recovery; no silent canonicalization, migration, deletion or production change.
