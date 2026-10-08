@@ -1,6 +1,6 @@
 # SCORM support and acceptance matrix
 
-Version: epic #133 / ADR-075–098. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-responses-v7` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094 and plain Unicode characterstring correction in ADR-095 and localized-string correction in ADR-096 and interaction-collection correction in ADR-097. A passing fixture is not standards certification or Rustici parity.
+Version: epic #133 / ADR-075–099. Engine: **scorm-again 3.4.5**, pinned MIT package. Supported execution currently means reviewed synthetic loopback fixtures; production execution is disabled. Pear applies checksum-locked adaptation `pear-responses-v7` to the exact ESM entry: ADR-082 direct-log removal plus selection corrections in ADR-092 and duration integration in ADR-094 and plain Unicode characterstring correction in ADR-095 and localized-string correction in ADR-096 and interaction-collection correction in ADR-097. A passing fixture is not standards certification or Rustici parity.
 
 | Capability | 1.2 | 2004 2nd | 2004 3rd | 2004 4th | Evidence / boundary |
 |---|---|---|---|---|---|
@@ -65,3 +65,10 @@ Invalid boolean values/repeated leading properties return
 406 without altering record/count; missing ID/type stays 408. Known snapshots
 through interactions-v6 remain readable. No complete edition/response/reference
 conformance is inferred; see SCORM-CONFORMANCE.md.
+
+Session-time evidence (ADR-099): all four editions replace the current launch's
+contribution with the last reported value, including downward/zero corrections.
+Earlier sessions and the launch's initial total_time stay fixed. Integer
+centisecond accounting, overflow rollback, immutable receipt retry and actual DB
+reopen are tested; built-browser ACK/close/resume verifies the API/server path.
+Calendar conversion and exhaustive time semantics remain OPEN.

@@ -8,6 +8,9 @@ The source stack is integrated; earlier #164 local counts are historical evidenc
 [Completion register](SCORM-CONFORMANCE.md) assigns stable IDs to remaining
 code/validation/external gates. ADR-098 adds textual-response corrections and
 original three-edition domain/built-browser vectors; full compliance is OPEN.
+ADR-099 corrects last-value session-time accounting in four editions, including
+downward/zero corrections, immutable prior-session total, centisecond precision,
+exact retry, rollback, DB reopen and built-browser close/resume.
 
 | Requirement | Implemented evidence | Outstanding acceptance |
 |---|---|---|
@@ -18,7 +21,7 @@ original three-edition domain/built-browser vectors; full compliance is OPEN.
 | CMI status, scores, location, suspend, preferences, comments, objectives/interactions | Runtime replay and Unicode/interaction tests; ADR-079/095–097 | Identifier URI grammar and full response/language/error matrix; ADR-098 covers named textual prefix/whitespace cases |
 | Durable ACK, retry, reopen/restart, concurrent/stale/reordered writes | Player/learning/sequencing/system-store tests and lost-ACK built journeys | Additional real engines and production durability/load/DR |
 | Commit vs Finish/Terminate, technical attempts vs domain retake | Runtime/sequencing/selection/duration tests; ADR-078/080/084/094 | Exhaustive reference lifecycle/reset/time behavior |
-| Time and calendar | Reported centiseconds, trusted host duration clocks and calendar windows; ADR-088/094 | Year/month/finer-precision duration bindings and standard-aligned calendar conversion; existing 365/30 reported-time policy is not full conformance |
+| Time and calendar | Reported centiseconds and last-value session replacement, trusted host duration clocks and calendar windows; ADR-088/094/099 | Year/month/finer-precision duration bindings and standard-aligned calendar conversion; existing 365/30 reported-time policy is not full conformance |
 | SCORM 1.2 multi-SCO/AICC prerequisites | Learning/player/assets tests and 1.2 built workflow | Full recognized 1.2 prerequisite/data-model reference coverage |
 | 2004 flow/choice/rules/rollup/local maps/retry/limits/selection/assets | Sequencing/selection/assets/duration tests; ADR-080/083–088/092–094 | Exhaustive branching/rule/error/delivery/reference suite |
 | Fourth-edition shared data and system objective maps | Authorized delta stores and migration/reopen/backup tests; ADR-089–091 | Full licensed reference/platform/production validation; unofficial isolation is explicit Pear policy |

@@ -249,12 +249,15 @@ export class SCORMPlayerService {
       saveSystemData(this.db, c.registration, manifest, c.launch.sco_id, a.sharedData);
       if (engine) saveSystemObjectives(this.db, c.registration, manifest, engine, objectivesBefore);
       const seconds = manifest.standard === '1.2' ? scormSeconds(state.core.session_time) : scorm2004Seconds(state.session_time);
-      if (seconds < c.launch.session_seconds) reject('INVALID_ARGUMENT', 'Session time cannot decrease within a launch');
+      // The last reported session_time replaces this launch's contribution,
+      // including corrections downward; receipt sequence/CAS still own ordering.
+      const reportedCentiseconds = Math.round(c.sco.reported_seconds * 100) - Math.round(c.launch.session_seconds * 100) + Math.round(seconds * 100);
+      if (!Number.isSafeInteger(reportedCentiseconds) || reportedCentiseconds < 0) reject('INVALID_ARGUMENT', 'Accumulated SCORM time quota exceeded');
       const revision = c.sco.revision + 1, now = new Date().toISOString();
       // Navigation may already have delivered the next technical attempt, but
       // it has no live communication session until launch exposes it.
       if (engine && a.finished) pauseDuration(engine);
-      this.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?,revision=?,reported_seconds=reported_seconds+?,finished=? WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=? AND tenant=?').run(JSON.stringify(state), revision, seconds - c.launch.session_seconds, a.finished ? 1 : 0, c.attempt.id, c.launch.sco_id, c.launch.sco_attempt_number, c.launch.tenant);
+      this.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?,revision=?,reported_seconds=?,finished=? WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=? AND tenant=?').run(JSON.stringify(state), revision, reportedCentiseconds / 100, a.finished ? 1 : 0, c.attempt.id, c.launch.sco_id, c.launch.sco_attempt_number, c.launch.tenant);
       if (engine) this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(engine, manifest, {attemptId: c.attempt.id, sha256: c.registration.sha256}), c.attempt.id, c.launch.tenant);
       this.db.prepare('UPDATE scorm_engine_launches SET sequence=?,session_seconds=?,finished=? WHERE id=?').run(a.sequence, seconds, a.finished ? 1 : 0, c.launch.id);
       this.db.prepare('UPDATE scorm_engine_attempts SET revision=revision+1 WHERE id=?').run(c.attempt.id);

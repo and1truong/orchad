@@ -5,6 +5,8 @@ Main baseline `016a040e76242d14e58d10623fdbc1ed94693bab`, exact tree
 #165 has landed. Start new work from live main in an isolated checkout, preserving
 other worktrees/branches. The completion register is SCORM-CONFORMANCE.md;
 ADR-098 fixes shared textual-response grammar with known-snapshot compatibility.
+ADR-099 fixes last-value session-time replacement with centisecond accounting,
+previous-session preservation and four-edition durable/browser evidence.
 Full conformance/platform/reference/production gates remain open. Production
 stays disabled. No commercial upload/license purchase is authorized by coding.
 
