@@ -14,8 +14,8 @@ The already tested 2004 ESM bytes remain unchanged.
 
 Exact ESM SHA-256:
 
-- 1.2: `9e73552ee1a4f79998eb4817b62f3c72a8a920b2b1b9434f7bc2e96867d23dd0`
-- 2004: `3fec364f6ea8cf9d4e5fbb226ced0646219fd456e5ae9f1bb1df0a739d826745`
+- 1.2: `220469e4b8764960e49fe797f899a00fcdbc10d341cf01e534241bf4b0947a32`
+- 2004: `0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9`
 
 Known atomicity-v14 and earlier sources/snapshot markers remain compatible.
 Installer verifies both exact outputs, historical upgrades, idempotency and

@@ -15,7 +15,7 @@ there is no full-state clone or separate browser/replay implementation. SCORM
 1.2 engine bytes remain unchanged.
 
 Exact adapted 2004 ESM SHA-256:
-`f35f205f11e2102a9db770794233b5e7981698edc6bd887d4ce5576b9350bf14`.
+`fae6c4ca9514341b623479f41154175df0e27d68c4384cdda363916f7daef61f`.
 Known initialization-v11 and earlier installer inputs/snapshot markers remain
 compatible; idempotency and unknown-byte/version refusal are verified. No
 migration, automatic removal of historical empty records or production change.
@@ -39,3 +39,5 @@ https://lms.technology/for/scorm/2004/4th_edition/standards/SCORM_2004_4ED_v1_1_
 Exact-head acceptance and CI are recorded in the PR/epic ledger. Required
 licensed corpus/accounts, real platforms and deployment operations remain
 OPEN/BLOCKED; this correction does not close epic #133.
+
+Browser-range review correction: rollback iterates backward by index and no longer requires Array.prototype.toReversed at runtime. A pre-fix missing-method regression fails; corrected domain and built edition fixtures remove that method during refused writes and verify exact errors/count/state/retry. Installer-only Node 24 reversals are unchanged. Historical and corrected exact ESM sources remain recognized; this is feature-absence evidence, not actual Firefox/platform certification. Corrected-head CI supersedes earlier head 84262aab evidence.

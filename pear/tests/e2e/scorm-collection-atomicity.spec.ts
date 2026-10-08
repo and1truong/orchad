@@ -7,7 +7,9 @@ import {interopPackage} from '../scorm-interop-fixture.ts';
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': built rejected collection writes survive lost ACK and close/resume', async ({page}) => {
   const script = `const api=parent.API_1484_11,prior=api.GetValue('cmi.comments_from_learner._count');
-    for(const [key,value,error] of [
+    const reverse=Object.getOwnPropertyDescriptor(parent.Array.prototype,'toReversed');
+    Object.defineProperty(parent.Array.prototype,'toReversed',{value:undefined,configurable:true});
+    try{for(const [key,value,error] of [
       ['cmi.comments_from_learner.'+prior+'.timestamp','2026-02-29','406'],
       ['cmi.comments_from_learner.'+prior+'.unknown','x','401'],
       ['cmi.interactions.0.timestamp','2026','408'],
@@ -17,6 +19,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     ]){if(api.SetValue(key,value)!=='false'||api.GetLastError()!==error)throw Error('rejected write '+key);
       if(api.GetValue('cmi.comments_from_learner._count')!==prior||api.GetValue('cmi.interactions._count')!=='0'||api.GetValue('cmi.objectives._count')!=='0')throw Error('failed write changed count');
     }
+    }finally{if(reverse)Object.defineProperty(parent.Array.prototype,'toReversed',reverse);else delete parent.Array.prototype.toReversed;}
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue('cmi.comments_from_learner.0.comment')!=='Original own comment')throw Error('own comment resume');
     if(api.SetValue('cmi.comments_from_learner.0.comment','Original own comment')!=='true')throw Error('own comment write');
     document.getElementById('entry').textContent='Collection atomicity verified';`;

@@ -14,8 +14,8 @@ its already tested v13 bytes.
 
 Exact ESM SHA-256:
 
-- 1.2: `e34cb1536920b0597008b53dc97f13abddc71bb07911a0cd4daa55f127c551be`
-- 2004: `3fec364f6ea8cf9d4e5fbb226ced0646219fd456e5ae9f1bb1df0a739d826745`
+- 1.2: `92c02b812c6e7e3e8a0cd161d23e1aeb3319f4c124523e6df6d7ccff65e73d82`
+- 2004: `0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9`
 
 Installer accepts the known pristine/Unicode/indexed/atomic 1.2 sources and
 known 2004 adaptations, with exact output checksums, idempotency and unexpected
@@ -38,3 +38,5 @@ method/field/default/dependency/SPM and edition-specific reference acceptance
 remain OPEN. This correction does not make existing-leaf writes or sequencing
 side effects transactional, repair historic records, certify the profile, or
 close epic #133.
+
+Inherited browser-range review correction applies the backward index loop to this 1.2 sibling too. A named pre-fix missing-method test fails; domain/built fixtures remove Array.prototype.toReversed during invalid writes and verify exact typed errors, unchanged records and successful retry. Exact reviewed 1.2 ESM hash is locked; original published v14 input remains recognized. No actual Firefox/mobile/platform certification is implied.
