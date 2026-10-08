@@ -33,3 +33,11 @@ test('older replies cannot overwrite a newer snapshot; hidden sidebar stops issu
   ui.document.visibilityState = 'hidden'; ui.tick(); assert.equal(ui.requests.length, 2);
   ui.cleanup(); assert.equal(ui.cleared(), true);
 });
+test('reply after hiding cannot apply a target until a fresh visible poll completes', async () => {
+  const ui = polling(); ui.tick(); ui.document.visibilityState = 'hidden';
+  ui.requests[0].resolve({targets: [{targetId: 'hidden'}]}); await flush();
+  assert.deepEqual(ui.snapshots, []);
+  ui.document.visibilityState = 'visible'; ui.tick();
+  ui.requests[1].resolve({targets: [{targetId: 'visible'}]}); await flush();
+  assert.deepEqual(ui.snapshots, [{targets: [{targetId: 'visible'}]}]);
+});
