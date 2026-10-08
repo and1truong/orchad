@@ -51,7 +51,7 @@ pear-numeric-response-binding-v26. Parent #192 polling/order/hidden-reply fixes
 completed local Coconut62/build; current full native CI required, with prior
 macOS consent timeout and Windows forced cleanup failures preserved.
 
-Latest branch codex/pear-scorm-empty-location-binding-133 stacks on #200.
+PR #201 codex/pear-scorm-empty-location-binding-133 stacks on #200.
 ADR-129/v27 fixes shared empty location refusal and dropped explicit empty
 comment/location records in JSON restoration/server replay. Baseline six fail;
 corrected focused50/full734 across106 files/build/three built journeys completed
@@ -59,6 +59,13 @@ with exit0. First replay/default and fixture-save failures retained. Full new
 CI/native/review and durable initialized/unset field semantics remain required.
 Windows current #192/#193/#195 and macOS #194 logs completed runtime16/Pear13/
 four SCORM12 with clean exit0/no forced kills; full stack CI still pending.
+
+Latest branch codex/pear-scorm-choice-set-binding-133 stacks on #201.
+ADR-130/v28 fixes shared order-insignificant choice-set uniqueness in every
+append/replacement/load path. Before six fail; corrected focused34/full740
+across107 files/build/three built URI/choice journeys completed with exit0.
+Exact-head CI/native/review remain required; identifier equivalence/full
+response conformance stay OPEN.
 
 Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
 external gates. Legacy ADL license/platform, authorized commercial exports and

@@ -24,6 +24,11 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.learner_response')!==full)throw Error('full choice resume');
     if(api.SetValue(base+'.id','urn:pear:full-choice')!=='true'||api.SetValue(base+'.type','choice')!=='true')throw Error('choice dependency');
     for(const suffix of ['.learner_response','.correct_responses.0.pattern'])if(api.SetValue(base+suffix,full)!=='true')throw Error('full choice');
+    const second=base+'.correct_responses.1.pattern',third=base+'.correct_responses.2.pattern';
+    if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(second)!=='b[,]a')throw Error('choice set order resume');
+    if(api.SetValue(second,'a[,]b')!=='true')throw Error('distinct choice set');
+    for(const key of [third,base+'.correct_responses.0.pattern'])if(api.SetValue(key,'b[,]a')!=='false'||api.GetLastError()!=='351'||api.GetValue(base+'.correct_responses._count')!=='2'||api.GetValue(base+'.correct_responses.0.pattern')!==full||api.GetValue(second)!=='a[,]b')throw Error('choice set duplicate rollback');
+    if(api.SetValue(second,'b[,]a')!=='true'||api.GetValue(second)!=='b[,]a')throw Error('same-index authored order');
     document.getElementById('entry').textContent='URI bindings verified';`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); f.enroll();
   const origin = 'http://127.0.0.1:4346', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4347', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
@@ -53,6 +58,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
     for (const [i, value] of valid.entries()) expect(stored.interactions[i].id).toBe(value);
     expect(stored.interactions[fullIndex].learner_response.length).toBe(144105); expect(stored.interactions[fullIndex].correct_responses[0].pattern).toBe(stored.interactions[fullIndex].learner_response);
+    expect(stored.interactions[fullIndex].correct_responses[1].pattern).toBe('b[,]a'); expect(Object.keys(stored.interactions[fullIndex].correct_responses)).toHaveLength(2);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('URI bindings verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);

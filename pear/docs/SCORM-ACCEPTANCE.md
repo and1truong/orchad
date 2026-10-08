@@ -119,3 +119,9 @@ comment journeys with empty save, persisted count/value and lost-ACK/resume.
 Local734/106,focused50,build,three built journeys completed; new-head full CI
 and all native/review gates remain required. Durable initialized/unset presence
 and full field matrix remain OPEN.
+
+ADR-130 adds six original choice-set append/replacement/preload/replay cases
+and extends all three built URI/full-capacity journeys with reordered duplicate
+refusal, retained pattern/count, same-index authored order and lost-ACK/resume.
+Local740/107,focused34,build,three built journeys completed with exit0; full
+new-head CI/native/review and remaining response/equivalence gates are required.

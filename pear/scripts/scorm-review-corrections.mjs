@@ -218,6 +218,18 @@ const emptyLocationUpdates = [
     "^cmi\\.(?:interactions\\.\\d+\\.correct_responses\\.\\d+\\.pattern|location|comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location))$"
   ]
 ];
+const choiceSetOriginal = "400811138e860165b56b9444bf5dbeeb65c5fc46c5cf37a88ac34ade7b2c4571";
+const choiceSetPatched = "23fc451fff5e7e78919c772419866cb62f7c1174f470ff7940a61eebfc458158";
+const choiceSetUpdates = [
+  [
+    "  checkDuplicateChoiceResponse(CMIElement, interaction, value) {\n    const interaction_count = interaction.correct_responses._count;\n    if (interaction.type === \"choice\") {\n      for (let i = 0; i < interaction_count && this.context.getLastErrorCode() === \"0\"; i++) {\n        const response = interaction.correct_responses.childArray[i];\n        if (response?.pattern === value) {\n          this.context.throwSCORMError(CMIElement, scorm2004_errors.GENERAL_SET_FAILURE, `${value}`);\n        }\n      }\n    }\n  }\n",
+    "  checkDuplicateChoiceResponse(CMIElement, interaction, value) {\n    if (interaction.type !== \"choice\") return false;\n    const currentIndex = Number(CMIElement.split(\".\")[4]);\n    const nodes = splitDelimited(String(value), \"[,]\");\n    const selected = new Set(nodes);\n    if (selected.size !== nodes.length) return false; // The typed setter reports duplicate members as 406.\n    for (let i = 0; i < interaction.correct_responses._count; i++) {\n      const response = interaction.correct_responses.childArray[i];\n      if (i === currentIndex || !response) continue;\n      const previous = splitDelimited(response.pattern, \"[,]\");\n      if (previous.length === nodes.length && previous.every((identifier) => selected.has(identifier))) {\n        this.context.throwSCORMError(CMIElement, scorm2004_errors.GENERAL_SET_FAILURE, CMIElement);\n        return true;\n      }\n    }\n    return false;\n  }\n"
+  ],
+  [
+    "  setCMIValue(CMIElement, value) {\n    if (stringMatches(CMIElement, \"cmi\\\\.objectives\\\\.\\\\d+\")) {",
+    "  setCMIValue(CMIElement, value) {\n    const choicePattern = /^cmi\\.interactions\\.(\\d+)\\.correct_responses\\.\\d+\\.pattern$/.exec(CMIElement);\n    const interaction = choicePattern && this.cmi.interactions.childArray[Number(choicePattern[1])];\n    if (interaction && this._responseValidator.checkDuplicateChoiceResponse(CMIElement, interaction, value)) {\n      if (this.isNotInitialized()) throw new Scorm2004ValidationError(CMIElement, scorm2004_errors.GENERAL_SET_FAILURE);\n      return global_constants.SCORM_FALSE;\n    }\n    if (stringMatches(CMIElement, \"cmi\\\\.objectives\\\\.\\\\d+\")) {"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -276,9 +288,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, emptyLocationUpdates);
     if (hash(source) !== emptyLocationPatched) throw Error("SCORM empty location checksum mismatch");
   }
+  if (hash(source) === choiceSetOriginal) {
+    source = replace(source, choiceSetUpdates);
+    if (hash(source) !== choiceSetPatched) throw Error("SCORM choice set checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === choiceSetPatched) {
+    source = replace(source, choiceSetUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== choiceSetOriginal) throw Error("SCORM choice set reverse checksum mismatch");
+  }
   if (hash(source) === emptyLocationPatched) {
     source = replace(source, emptyLocationUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== emptyLocationOriginal) throw Error("SCORM empty location reverse checksum mismatch");
