@@ -59,3 +59,5 @@ Packed-index correction (ADR-107) checksum-locks both engine entries and preserv
 SCORM 1.2 append correction (ADR-108) upgrades only known exact ESM inputs to atomicity-v14; prior v13 snapshot markers remain compatible. Existing empty records/history are preserved. No automatic repair, schema migration, purge or production enablement.
 
 Score-default correction (ADR-109) applies only to fresh/reset 1.2 score objects. Trusted historical maxima, including engine-defaulted 100 values whose provenance cannot be inferred, are preserved byte-for-byte through load. No automatic rewrite, migration, reset of stored attempts or production enablement. Known v14 snapshots remain compatible.
+
+API refusal correction (ADR-110) retains exact v15 engine entries and stored snapshots. A local checkpoint exception returns false before successful termination; the SCO can retry the unchanged state/deltas. Local acceptance is not durable ACK, and existing bounded queue/receipt recovery remains authoritative. No schema/data rewrite or production change.

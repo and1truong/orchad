@@ -24,12 +24,12 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
     },
     LMSGetValue(key: string) {
       if (!active()) {bad('301'); return '';}
-      if (typeof key !== 'string') {bad('201'); return '';}
+      if (typeof key !== 'string' || key === '') {bad('201'); return '';}
       localError = null; return runtime.LMSGetValue(key);
     },
     LMSSetValue(key: string, value: string) {
       if (!active()) return bad('301');
-      if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
+      if (typeof key !== 'string' || key === '' || typeof value !== 'string') return bad('201');
       if (scorm12Writable.test(key) && !Number.isFinite(scormCharacters(value)) || key === 'cmi.suspend_data' && scormCharacters(value) > 4096) return bad('405');
       if (key === 'cmi.core.lesson_status' && value === 'not attempted') return bad('405');
       localError = null; return runtime.LMSSetValue(key, value);
@@ -39,7 +39,8 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       if (argument !== '') return bad('201');
       localError = null;
       const value = runtime.LMSCommit(argument);
-      if (value === 'true' && options.checkpoint?.(snapshot(), false) === false) return bad('101');
+      try {if (value === 'true' && options.checkpoint?.(snapshot(), false) === false) return bad('101');}
+      catch {return bad('101');}
       return value;
     },
     LMSFinish(argument: string) {
@@ -47,7 +48,8 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       if (argument !== '') return bad('201');
       localError = null;
       const state = snapshot();
-      if (options.checkpoint?.(state, true) === false) return bad('101');
+      try {if (options.checkpoint?.(state, true) === false) return bad('101');}
+      catch {return bad('101');}
       runtime.settings = {...runtime.settings, mastery_override: state.core?.lesson_status !== 'incomplete'};
       const value = runtime.LMSFinish(argument);
       if (value === 'true') finished = true;

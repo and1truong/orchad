@@ -81,7 +81,8 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const code = inactive('142', '143'); if (code) return bad(code);
       if (argument !== '') return bad('201');
       error = null; const result = runtime.Commit(argument);
-      if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');
+      try {if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');}
+      catch {return bad('391');}
       if (result === 'true') sharedWrites = Object.create(null);
       return result;
     },
@@ -91,7 +92,8 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       error = null;
       if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');
       // Queue acceptance precedes termination so an unavailable durable queue is retryable.
-      if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');
+      try {if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');}
+      catch {return bad('111');}
       const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },
     GetLastError() {return error ?? runtime.GetLastError();},
