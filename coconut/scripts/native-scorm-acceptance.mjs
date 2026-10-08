@@ -16,8 +16,8 @@ const edition=process.env.PEAR_NATIVE_SCORM_EDITION??"2004-4";
 const nonce=randomUUID(),lane="native-scorm:"+edition,checks=[];
 const check=(name,cond)=>{checks.push(name);console.log(`  ${cond?"PASS":"FAIL"} ${name}`);if(!cond)throw Error("Acceptance failed: "+name);};
 const fixture=spawn(process.execPath,["--import","tsx","scripts/native-scorm-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe","ipc"]});
-let fixtureOutput="",fixtureError="",fixtureExit=null;
-fixture.stdout.on("data",d=>fixtureOutput+=d);fixture.stderr.on("data",d=>fixtureError+=d);fixture.on("exit",c=>fixtureExit=c);
+let fixtureOutput="",fixtureError="",fixtureExit=null,fixtureClosed=false;
+fixture.stdout.on("data",d=>fixtureOutput+=d);fixture.stderr.on("data",d=>fixtureError+=d);fixture.on("exit",c=>fixtureExit=c);fixture.on("close",()=>fixtureClosed=true);
 await new Promise((resolve,reject)=>{
  const until=Date.now()+30000;
  const tick=()=>{if(fixtureOutput.includes("PEAR_NATIVE_FIXTURE_READY"))return resolve();
@@ -53,7 +53,7 @@ const close=async()=>{
  try{await smoke("quit",{},3000);shutdown.quitAcknowledged=true;}catch{}
  if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.nativeForced=true;child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
  if(fixture.connected){shutdown.fixtureCloseSent=true;fixture.send({kind:"close"},error=>{shutdown.fixtureIPCError=error?.code??null;});}
- if(fixtureExit===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.fixtureForced=true;fixture.kill("SIGKILL");resolve();},5000);fixture.once("exit",()=>{clearTimeout(t);resolve();});});
+ if(!fixtureClosed)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.fixtureForced=true;fixture.kill("SIGKILL");resolve();},5000);fixture.once("close",()=>{clearTimeout(t);resolve();});});
 };
 try {
  await waitMarker(/^COCONUT_SMOKE:boot:main/,20000);
