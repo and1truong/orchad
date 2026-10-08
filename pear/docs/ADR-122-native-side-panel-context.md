@@ -50,3 +50,15 @@ Synthetic shutdown diagnostics now record only IPC-send status/error codes and
 fixed cleanup phase names, distinguishing message delivery, connection/sink/app
 closure and DB/directory cleanup. Five-second and exit-0 assertions are retained.
 Reference: https://developer.chrome.com/docs/extensions/reference/api/runtime.
+
+Exact b9c42239 CI37842311311 completed718 domain,192 dev/192 built, existing
+host/Lime/SCORM checks and the actual Side Panel mount check. Its CDP target
+is page, so the next journey can drive the existing native container directly.
+All three native OS lanes completed runtime16/Pear13/four SCORM12, including
+clean exit0 without forced kills. This does not erase the prior Windows failure.
+
+Review found the new shutdown diagnostics could snapshot stdout at child exit,
+before buffered data finished. The controller now waits for child close under
+the existing five-second bound before collecting phases. The existing real
+fixture checks also wait for close and assert all SCORM cleanup phases.
+New-head CI remains required; no shutdown timeout or acceptance gate is relaxed.

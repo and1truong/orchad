@@ -10,7 +10,7 @@ for (const edition of ['pear', '1.2', '2004-2', '2004-3', '2004-4']) test('real 
   const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/' + (scorm ? 'native-scorm-fixture.ts' : 'native-fixture.ts')], {cwd: process.cwd(), env: {...process.env, PEAR_NATIVE_NONCE: nonce, PEAR_NATIVE_SCORM_EDITION: edition}, stdio: ['ignore', 'pipe', 'pipe', 'ipc']});
   let output = '', errors = '', exited = false;
   child.stdout!.on('data', value => output += value); child.stderr!.on('data', value => errors += value);
-  const exit = new Promise<number | null>((resolve, reject) => {child.once('error', reject); child.once('exit', code => {exited = true; resolve(code);});});
+  const exit = new Promise<number | null>((resolve, reject) => {child.once('error', reject); child.once('exit', () => {exited = true;}); child.once('close', resolve);});
   let pending: ReturnType<typeof connect> | undefined;
   try {
     const deadline = Date.now() + 30000;
@@ -27,5 +27,6 @@ for (const edition of ['pear', '1.2', '2004-2', '2004-3', '2004-4']) test('real 
     const deadlineExit = Date.now() + 5000;
     while (!exited && Date.now() < deadlineExit) await sleep(50);
     assert.ok(exited, 'IPC close did not finish'); assert.equal(await exit, 0, errors);
+    if (scorm) assert.deepEqual(output.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g), ['received', 'connections-closed', 'sink-closed', 'app-closed', 'cleanup-complete'].map(phase => 'PEAR_NATIVE_FIXTURE_CLOSE:' + phase));
   } finally {pending?.destroy(); if (!exited) {child.kill('SIGKILL'); await exit;}}
 });
