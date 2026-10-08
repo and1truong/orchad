@@ -108,3 +108,7 @@ consented metadata read/private-state exclusion, read-consent revocation, exact
 lost-ACK retry/close-resume/finish, account-change denial before gateway and
 fresh pin/Disconnect. Exact native container and unchanged documentId required;
 new-head full CI pending. Local managed extension policy is unchanged.
+
+ADR-128 extends existing three built wide-real journeys to numeric learner/
+correct and performance bound overflow/range refusal, stored exact strings
+and lost-ACK retry/close-resume. Full new-head acceptance remains required.

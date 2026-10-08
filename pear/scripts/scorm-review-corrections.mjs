@@ -182,6 +182,26 @@ const resultUpdates = [
     "  set result(result) {\n    if (this.initialized && this._id === \"\") {\n      throw new Scorm2004ValidationError(this._cmi_element + \".result\", scorm2004_errors.DEPENDENCY_NOT_ESTABLISHED);\n    }\n    if (check2004ValidFormat"
   ]
 ];
+const responseNumericOriginal = "d28dc6ff0d7f4f2637302a285c600a686078fb64e80518ce541404449c017430";
+const responseNumericPatched = "16ea129cb6cbf6e50774afe6c852afd3dfb861e52220286d368bbec535ac9d14";
+const responseNumericUpdates = [
+  [
+    "      const response_type = LearnerResponses[this.type];",
+    "      const response_type = LearnerResponses[this.type];\n      if (this.type === \"numeric\") check2004ValidFormat(this._cmi_element + \".learner_response\", learner_response, scorm2004_regex.CMIDecimal);"
+  ],
+  [
+    "  const nodes = splitDelimited(pattern, responseDef.delimiter);\n  // Pear: bare commas",
+    "  if (type === \"numeric\" && !pattern.includes(\"[:]\")) throw new Scorm2004ValidationError(\"cmi.interactions.n.correct_responses.n.pattern\", scorm2004_errors.TYPE_MISMATCH);\n  const nodes = splitDelimited(pattern, responseDef.delimiter);\n  // Pear: bare commas"
+  ],
+  [
+    "  const checkSingle = (value) => {\n    if (!fmt1.test(value)) {",
+    "  const checkSingle = (value) => {\n    if (type === \"numeric\") check2004ValidFormat(\"cmi.interactions.n.correct_responses.n.pattern\", value, scorm2004_regex.CMIDecimal);\n    if (!fmt1.test(value)) {"
+  ],
+  [
+    "        if (fmt2 && part2 !== void 0 && !fmt2.test(part2)) {",
+    "        if (part2?.includes(\"[:]\")) for (const endpoint of splitDelimited(part2, \"[:]\")) check2004ValidFormat(\"cmi.interactions.n.correct_responses.n.pattern\", endpoint, scorm2004_regex.CMIDecimal, true);\n        if (fmt2 && part2 !== void 0 && !fmt2.test(part2)) {"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -232,9 +252,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, resultUpdates);
     if (hash(source) !== resultPatched) throw Error('SCORM result binding checksum mismatch');
   }
+  if (hash(source) === responseNumericOriginal) {
+    source = replace(source, responseNumericUpdates);
+    if (hash(source) !== responseNumericPatched) throw Error("SCORM numeric response checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === responseNumericPatched) {
+    source = replace(source, responseNumericUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== responseNumericOriginal) throw Error("SCORM numeric response reverse checksum mismatch");
+  }
   if (hash(source) === resultPatched) {
     source = replace(source, resultUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== resultOriginal) throw Error('SCORM result binding reverse checksum mismatch');
