@@ -44,13 +44,15 @@ const waitFor=async(fn,ms,step=250)=>{const t=Date.now()+ms;for(;;){const v=awai
 
 
 let client=null;
+const shutdown={quitAcknowledged:false,nativeForced:false,fixtureForced:false,nativeSignal:null,fixtureSignal:null};
+child.on('exit',(_code,signal)=>shutdown.nativeSignal=signal);fixture.on('exit',(_code,signal)=>shutdown.fixtureSignal=signal);
 const state=async()=>{const r=await fetch(TRUSTED+"/native-fixture/"+nonce+"/state");if(!r.ok)throw Error("Fixture state unavailable");return r.json();};
 const close=async()=>{
  if(client)await client.close().catch(()=>{});
- try{await smoke("quit",{},3000);}catch{}
- if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
+ try{await smoke("quit",{},3000);shutdown.quitAcknowledged=true;}catch{}
+ if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.nativeForced=true;child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
  if(fixture.connected)fixture.send({kind:"close"});
- if(fixtureExit===null)await new Promise(resolve=>{const t=setTimeout(()=>{fixture.kill("SIGKILL");resolve();},5000);fixture.once("exit",()=>{clearTimeout(t);resolve();});});
+ if(fixtureExit===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.fixtureForced=true;fixture.kill("SIGKILL");resolve();},5000);fixture.once("exit",()=>{clearTimeout(t);resolve();});});
 };
 try{
  await waitMarker(/^COCONUT_SMOKE:boot:main/,20000);
@@ -110,6 +112,6 @@ try{
  check("old MCP pairing cannot read after native identity switch",old?.ok===false);
  const ledger=await state();
  check("native flow never fabricates scores, completion or certificates",ledger.enrollments.length===1&&ledger.enrollments[0].learner==="learner-a"&&ledger.attempts===0&&ledger.certificates===0);
- await close();check("native Pear fixture shuts down cleanly",exitCode===0&&fixtureExit===0);
+ await close();console.log(JSON.stringify({shutdown,nativeExit:exitCode,fixtureExit}));check("native Pear fixture shuts down cleanly",exitCode===0&&fixtureExit===0&&!shutdown.nativeForced&&!shutdown.fixtureForced);
  console.log(`[${lane}] ${checks.length}/${checks.length} checks passed`);
 }catch(e){console.error("["+lane+"] FAILED: "+e.message);console.error(stderr.slice(-2000));console.error(fixtureError.slice(-1000));await close();process.exitCode=1;}
