@@ -15,12 +15,15 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     await page.goto(prefix + '/bootstrap/learner-a');
     await expect.poll(async () => {const s = await state(); return s.probes.length > 0 && s.droppedACK;}).toBe(true);
     const first = await state(); expect(first.driverErrors).toEqual([]); expect(first.proofs).toBe(0); expect(first.calls).toEqual([]); expect(first.probes[0].entry).toBe('ab-initio');
+    for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives']) expect(first.probes[0][key], key + ': ' + JSON.stringify(first.probes[0].egressViolations)).toBe(true);
     await expect(page.frameLocator('iframe[title="Isolated SCORM engine player"]').getByRole('status')).toContainText('has not been acknowledged');
     await command('retry');
     await expect.poll(async () => {const s = await state(); return s.exactRetry && s.checkpoints >= 2;}).toBe(true);
     await command('resume');
     await expect.poll(async () => (await state()).probes.length).toBe(2);
     const resumed = await state(); expect(resumed.driverErrors).toEqual([]); expect(resumed.probes[1].entry).toBe('resume'); expect(resumed.probes[1].bookmark).toBe('licensed-page');
+    for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives']) expect(resumed.probes[1][key], key).toBe(true);
+    expect(resumed.calls).toEqual([]);
     await command('finish'); await expect.poll(async () => (await state()).proofs).toBe(1);
     const finished = await state(); expect(finished.certificates).toBe(0); expect(finished.calls).toEqual([]); expect(finished.edition).toBe(edition);
   } finally {
