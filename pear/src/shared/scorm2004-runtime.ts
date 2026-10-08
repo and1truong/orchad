@@ -1,7 +1,7 @@
 import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
-import {scormModelPath, type SCORMStandard} from './scorm-engine.ts';
+import {scormModelPath, scormSupportCode, type SCORMStandard} from './scorm-engine.ts';
 
 export type SCORM2004Edition = Exclude<SCORMStandard, '1.2'>;
 export const scorm2004CheckpointBytes = 512 * 1024;
@@ -101,12 +101,12 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },
     GetLastError() {return error ?? runtime.GetLastError();},
-    GetErrorString(code: string) {return /^\d+$/.test(code) ? runtime.GetErrorString(code) : '';},
+    GetErrorString(code: string) {const requested = scormSupportCode(code, options.edition); return requested === null ? '' : runtime.GetErrorString(requested);},
     GetDiagnostic(code: string) {
-      const requested = code === '' ? error ?? runtime.GetLastError() : code;
+      const requested = scormSupportCode(code === '' ? error ?? runtime.GetLastError() : code, options.edition);
       // Pear implements error-code diagnostics only. Unknown names must not
       // reach the upstream inherited-property lookup (e.g. __proto__).
-      if (!/^\d+$/.test(requested)) return '';
+      if (requested === null) return '';
       return error && requested === error ? 'SCORM 2004 session, edition profile, argument or checkpoint queue rejected the operation (' + error + ')' : runtime.GetDiagnostic(requested);
     },
   });
