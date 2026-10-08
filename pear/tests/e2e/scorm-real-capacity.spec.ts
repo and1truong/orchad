@@ -9,7 +9,9 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
   const prefix = '';
   const script = `{const api=parent.API_1484_11,get=k=>api.${prefix}GetValue(k),set=(k,v)=>api.${prefix}SetValue(k,v),error=()=>api.${prefix}GetLastError();
     const value='12345678901.125';
-    for(const key of ['cmi.score.raw','cmi.score.max','cmi.learner_preference.audio_level','cmi.learner_preference.delivery_speed']){
+    if(get('cmi.interactions._count')==='0'&&(set('cmi.interactions.0.result','correct')!=='false'||error()!=='408'||get('cmi.interactions._count')!=='0'))throw Error('result missing-ID rollback');
+    if(set('cmi.interactions.0.id','urn:pear:result')!=='true')throw Error('result dependency');
+    for(const key of ['cmi.score.raw','cmi.score.max','cmi.learner_preference.audio_level','cmi.learner_preference.delivery_speed','cmi.interactions.0.result']){
       if(set(key,value)!=='true'||error()!=='0'||get(key)!==value)throw Error('wide finite real '+key);
       for(const bad of ['9'.repeat(309),value+'junk','0'.repeat(4097)])if(set(key,bad)!=='false'||error()!=='406'||get(key)!==value)throw Error('invalid real changed state '+key);
     }
@@ -41,7 +43,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    expect(stored.score.raw).toBe('12345678901.125'); expect(stored.learner_preference.audio_level).toBe('12345678901.125');
+    expect(stored.score.raw).toBe('12345678901.125'); expect(stored.learner_preference.audio_level).toBe('12345678901.125'); expect(stored.interactions[0].result).toBe('12345678901.125');
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Wide finite reals verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
