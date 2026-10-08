@@ -53,7 +53,7 @@ const close=async()=>{
  try{await smoke("quit",{},3000);shutdown.quitAcknowledged=true;}catch{}
  if(exitCode===null)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.nativeForced=true;child.kill("SIGKILL");resolve();},5000);child.once("exit",()=>{clearTimeout(t);resolve();});});
  if(fixture.connected){shutdown.fixtureCloseSent=true;fixture.send({kind:"close"},error=>{shutdown.fixtureIPCError=error?.code??null;});}
- if(!fixtureClosed)await new Promise(resolve=>{const t=setTimeout(()=>{shutdown.fixtureForced=true;fixture.kill("SIGKILL");resolve();},5000);fixture.once("close",()=>{clearTimeout(t);resolve();});});
+ if(!fixtureClosed)await new Promise(resolve=>{let drain;const t=setTimeout(()=>{shutdown.fixtureForced=true;fixture.kill("SIGKILL");drain=setTimeout(resolve,1000);},5000);fixture.once("close",()=>{clearTimeout(t);clearTimeout(drain);resolve();});});
 };
 try {
  await waitMarker(/^COCONUT_SMOKE:boot:main/,20000);
