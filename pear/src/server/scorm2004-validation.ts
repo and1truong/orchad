@@ -38,7 +38,7 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
     if (readonly.test(key)) {if (value !== protectedValues[key]) reject('FORBIDDEN', 'Server-owned CMI value changed'); continue;}
     if (!writable.test(key)) reject('INVALID_ARGUMENT', 'Unsupported SCORM 2004 data model field');
     const response = /^cmi\.interactions\.(\d+)\.(learner_response|correct_responses\.\d+\.pattern)$/.exec(key);
-    const emptyRecord = /^cmi\.comments_from_learner\.\d+\.(?:comment|location)$/.test(key) || response && (response[2] !== 'learner_response' || ['choice','matching','sequencing','performance'].includes(runtime.GetValue(`cmi.interactions.${response[1]}.type`)));
+    const emptyRecord = /^cmi\.(?:comments_from_learner\.\d+\.(?:comment|location)|(?:objectives|interactions)\.\d+\.description)$/.test(key) || response && (response[2] !== 'learner_response' || ['choice','matching','sequencing','performance'].includes(runtime.GetValue(`cmi.interactions.${response[1]}.type`)));
     // Unset scalar defaults stay unset; an explicit empty collection/pattern must be replayed.
     if (value === baseline[key] || value === '' && baseline[key] === undefined && !emptyRecord) continue;
     if (scorm2004FieldError(edition, key, value)) reject('INVALID_ARGUMENT', 'Invalid SCORM 2004 data model field: ' + key);

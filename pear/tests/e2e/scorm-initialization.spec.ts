@@ -17,6 +17,14 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     if(api.GetValue('cmi.comments_from_lms._count')!=='1')throw Error('LMS count changed');
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue('cmi.comments_from_learner.0.comment')!=='Original own comment')throw Error('own comment resume');
     if(api.GetValue('cmi.entry')==='resume')for(const key of ['cmi.location','cmi.comments_from_learner.0.location','cmi.comments_from_learner.1.comment'])if(api.GetValue(key)!==''||api.GetLastError()!=='0')throw Error('cleared location/comment resume '+key);
+    for(const family of ['objectives','interactions']) {
+      if(api.GetValue('cmi.entry')==='resume')for(const row of [0,1])if(api.GetValue('cmi.'+family+'.'+row+'.description')!==''||api.GetLastError()!==(row===0?'0':'403'))throw Error('description presence resume '+family);
+      for(const row of [0,1])if(api.SetValue('cmi.'+family+'.'+row+'.id','urn:pear:description:'+row)!=='true')throw Error('description ID');
+      if(api.SetValue('cmi.'+family+'.0.description','')!=='true'||api.GetValue('cmi.'+family+'.0.description')!==''||api.GetLastError()!=='0')throw Error('blank description');
+      if(api.GetValue('cmi.'+family+'.1.description')!==''||api.GetLastError()!=='403')throw Error('unset description');
+      if(api.SetValue('cmi.'+family+'.1.description','\\ud800')!=='false'||api.GetLastError()!=='406'||api.GetValue('cmi.'+family+'.1.description')!==''||api.GetLastError()!=='403')throw Error('invalid description rollback');
+      if(api.SetValue('cmi.'+family+'.2.description','')!=='false'||api.GetLastError()!=='408'||api.GetValue('cmi.'+family+'._count')!=='2')throw Error('description missing ID');
+    }
     if(api.SetValue('cmi.comments_from_learner.0.comment','Original own comment')!=='true')throw Error('own comment write');
     for(const key of ['cmi.location','cmi.comments_from_learner.0.location']) {
       if(api.SetValue(key,'Original location')!=='true'||api.SetValue(key,'')!=='true'||api.GetValue(key)!==''||api.GetLastError()!=='0')throw Error('empty location '+key);
@@ -58,6 +66,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(stored.comments_from_lms).toEqual({0: lmsComment}); expect(stored.comments_from_learner[0].comment).toBe('Original own comment');
     expect(stored.location).toBe(''); expect(stored.comments_from_learner[0].location).toBe(''); expect(stored.comments_from_learner[1].comment).toBe(''); expect(Object.keys(stored.comments_from_learner)).toHaveLength(2);
     for (const [row, field] of [[0, 'timestamp'], [1, 'location'], [1, 'timestamp']] as const) expect(Object.hasOwn(stored.comments_from_learner[row], field)).toBe(false);
+    for (const family of ['objectives', 'interactions']) {expect(stored[family][0].description).toBe(''); expect(Object.hasOwn(stored[family][1], 'description')).toBe(false); expect(Object.keys(stored[family])).toHaveLength(2);}
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Read-only comments verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
