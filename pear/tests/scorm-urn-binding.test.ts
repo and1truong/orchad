@@ -7,7 +7,8 @@ import {multiFilePackage} from './scorm-package-fixture.ts';
 import {singleSCOManifest} from './scorm-player-fixture.ts';
 import {validURNs, invalidURNs} from './scorm-urn-vectors.ts';
 import {validSchemeReferences, invalidSchemeReferences} from './scorm-uri-scheme-vectors.ts';
-const valid=[...validURNs,...validSchemeReferences],invalid=[...invalidURNs,...invalidSchemeReferences];
+import {validFragmentReferences, invalidFragmentReferences} from './scorm-uri-fragment-vectors.ts';
+const valid=[...validURNs,...validSchemeReferences,...validFragmentReferences],invalid=[...invalidURNs,...invalidSchemeReferences,...invalidFragmentReferences];
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
   test(edition + ': shared URN/scheme/relative-path binding retains exact case/escapes and refuses invalid typed records', () => {
     for (const facade of [false, true]) {
