@@ -28,6 +28,11 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const action
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profile of (edition === '2004-4' ? ['choice', 'flow-only', 'collections', 'hidden', 'weighted', 'adl', 'calendar', 'duration', 'unicode', 'interaction-records', 'shared', 'system-shared', 'system-objectives'] : ['choice', 'flow-only', 'collections', 'hidden', 'adl', 'calendar', 'duration', 'unicode', 'interaction-records', 'system-objectives'])) test(edition + ' ' + profile + ': built sequencing player recovers lost ACK and delivers next SCO only through authenticated server navigation', async ({page}) => {
   const f = await scormLearningFixture(undefined, sequencingPackage(edition, profile === 'system-objectives' ? sequencingManifest(edition).replace('a:objectivesGlobalToSystem="false"', '') : profile === 'system-shared' ? systemSharedDataManifest() : profile === 'shared' ? sharedDataManifest() : profile === 'calendar' ? calendarManifest(edition) : profile === 'duration' ? sequencingManifest(edition).replaceAll('<p:title>Introduction</p:title><s:sequencing>', '<p:title>Introduction</p:title><s:sequencing><s:limitConditions attemptAbsoluteDurationLimit="PT60S" attemptExperiencedDurationLimit="PT60S" activityAbsoluteDurationLimit="PT60S" activityExperiencedDurationLimit="PT60S"/>') : profile === 'adl' ? adlManifest(edition) : profile === 'weighted' ? weightedManifest() : profile === 'hidden' ? sequencingManifest(edition).replace('identifier="intro"', 'identifier="intro" isvisible="false"').replace('identifier="practice"', 'identifier="practice" isvisible="0"') : profile === 'collections' ? collectionManifest(edition) : profile === 'choice' ? sequencingManifest(edition) : sequencingManifest(edition).replace('choice="true"', 'choice="false"'), profile === 'unicode', profile === 'interaction-records')); f.enroll();
   const origin = 'http://127.0.0.1:4344', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4345', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
+  let releaseScript: (() => void) | undefined;
+  if (edition === '2004-3' && profile === 'collections') {
+    const ready = new Promise<void>(resolve => {releaseScript = resolve;});
+    await page.route('**/assets/player.js', async route => {await ready; await route.continue();});
+  }
   try {
     await content!.listen({port: 4345, host: '127.0.0.1'}); await app.listen({port: 4344, host: '127.0.0.1'});
     await page.goto(origin); await page.getByLabel('Account', {exact: true}).fill('learner-a'); await page.getByLabel('Password', {exact: true}).fill('learner-a-dev'); await page.getByRole('button', {name: 'Sign in', exact: true}).click();
@@ -37,6 +42,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profil
     await player.getByLabel('I consent to SCORM progress tracking for this enrollment.', {exact: true}).check();
     if (profile === 'hidden') await expect(player.getByRole('navigation', {name: 'SCORM activities'}).getByRole('button')).toHaveCount(0); else await expect(player.getByRole('button', {name: /Practice.*locked/})).toBeDisabled();
     await player.getByRole('button', {name: profile === 'hidden' ? 'Play or resume enrolled SCORM package' : /Introduction/}).click();
+    if (releaseScript) {await expect(sco.getByRole('button', {name: 'Save sequencing progress', exact: true})).toBeDisabled(); releaseScript();}
     await sco.getByRole('button', {name: 'Save sequencing progress', exact: true}).click(); await expect(player.getByRole('status')).toContainText('saved by the server');
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click();
     await player.getByRole('button', {name: profile === 'hidden' ? 'Play or resume enrolled SCORM package' : /Introduction/}).click();
@@ -60,7 +66,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profil
     if (profile === 'duration') {const clock = JSON.parse(JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state)).snapshot).pearDurationClock.rows.intro; expect(clock.absolute).toBeGreaterThan(0); expect(clock.experienced).toBeGreaterThan(0); expect(clock.experienced).toBeLessThanOrEqual(clock.absolute); expect(clock.attempt).toBe(1); expect(clock.absolute).toBeLessThan(60000);}
     if (profile === 'system-objectives') {const objective = f.db.prepare('SELECT * FROM scorm_system_objectives').get()!; expect(objective.revision).toBe(1); expect(JSON.parse(String(objective.state)).normalizedMeasure).toBe(0.9);}
     const proof = JSON.parse(String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence)); expect(proof.rollup.completion).toBe('completed'); expect(proof.rollup.success).toBe('passed'); if (profile === 'weighted') expect(proof.rollup.completionMeasure).toBe(0.625); if (profile === 'system-shared') {const store = f.db.prepare('SELECT * FROM scorm_system_data').get()!; expect(store.store).toBe('authored-shared-notes'); expect(store.learner).toBe('learner-a'); expect(store.revision).toBe(2);}
-  } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
+  } finally {releaseScript?.(); await page.unrouteAll({behavior: 'wait'}); await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
 });
 
 test('unbound practice follows authenticated next-SCO delivery without granting official learning', async ({page}) => {

@@ -127,3 +127,5 @@ Local740/107,focused34,build,three built journeys completed with exit0; full
 new-head CI/native/review and remaining response/equivalence gates are required.
 
 ADR-131 retains two original actual-request navigation/redirect counterexamples. Final build and six built Chromium journeys completed with exit0, including four real fault-driver profiles and combined inline playback. New native controller requires13 checks per SCORM profile with attempted/frame-src/403/zero-canary evidence, unchanged proofs and clean exit. Fresh full domain740/107 completed with exit0; exact-head CI/native/review remain required; full strict-egress remains OPEN.
+
+ADR-132 controlled script-delivery regression fails before original fixture handler readiness is corrected. Fresh domain740/107/build pass. Full local43 completes32PASS/11FAIL; targeted12 completes10PASS/2FAIL, final unchanged three-case check3PASS. Passing evidence across attempts is not a clean full acceptance run. New-head full CI is mandatory, original failures retained, no assertions/timeouts relaxed.
