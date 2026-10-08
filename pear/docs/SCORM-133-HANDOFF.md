@@ -1,4 +1,31 @@
-# Current continuation — 2026-10-08
+# Active continuation — 2026-10-08
+
+Continue the owned stack without waiting for merge (AGENTS.md). PRs #172, #174,
+#175 and #177–185 have completed exact-head acceptance and are ready for review;
+current hashes/logs and retained first failures are in their PR descriptions.
+#186–189 remain draft pending completed new-head CI and review. Do not infer
+PASS from queued/running checks. Latest branch: codex/pear-scorm-timeinterval-binding-133,
+stacked on #188; shared engine adaptation pear-timeinterval-binding-v21.
+
+#186 owns native platform repairs: actual Windows icon, measured Linux job
+budget, existing four-profile preflight ACK retry and supported Tauri native IPC
+subframe denial. Parent fixes propagate by real merges to #187–189. Historical
+Linux/macOS four-profile native PASS is not repaired-head Windows PASS.
+#187 binds support arguments; #188 corrects 1.2 CMI error binding; #189 binds
+shared timeinterval grammar. Local v21 validation: 712/712 domain/104 files,
+14 focused, build, four session-time and four fixture preflight journeys;
+Coconut 59/59. Actual native CI is required and Chromium is supplemental.
+
+Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
+external gates. Legacy ADL license/platform, authorized commercial exports and
+Rustici account, real Safari/Android runners/devices, reviewed production
+origin/scanner/storage/retention/load/RPO/DR remain unresolved. Native Side Panel
+container and full all-egress enforcement remain OPEN. Keep #133 open and
+production disabled. Preserve working changes and all historical failure logs.
+
+## Historical continuation records
+
+### Earlier continuation — 2026-10-08
 
 Main baseline `0888beee461e1656f1c717cefb205923f7705a6d`, exact tree
 `095549250484b8a8484d8c46a79e76eb8bd01f93`, push acceptance 37738101010 PASS.
