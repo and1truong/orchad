@@ -3,7 +3,7 @@ import yauzl from 'yauzl';
 import {DOMParser, type Element} from '@xmldom/xmldom';
 import type {SCORMActivity, SCORMManifest, SCORMResource, SCORMStandard} from '../shared/scorm-engine.ts';
 import {crc32} from './scorm-archive.ts';
-import {parseSequencing} from './scorm-sequencing-parser.ts';
+import {parseSequencing, parseSequencingCollections} from './scorm-sequencing-parser.ts';
 import {reject} from './errors.ts';
 
 export const packageLimits = {archive: 32 * 1024 * 1024, expanded: 64 * 1024 * 1024, file: 16 * 1024 * 1024, files: 2048, manifest: 1024 * 1024};
@@ -112,7 +112,8 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
     }
     if (node.namespaceURI === 'http://www.imsglobal.org/xsd/imsss' && ['sequencing', 'sequencingCollection'].includes(node.localName!)) {
       const parent = node.parentNode as Element;
-      if (node.localName === 'sequencing' && (!['item', 'organization'].includes(parent?.localName ?? '') || parent.namespaceURI !== ns)) invalid('misplaced sequencing definition');
+      if (node.localName === 'sequencing' && !(['item', 'organization'].includes(parent?.localName ?? '') && parent.namespaceURI === ns || parent?.localName === 'sequencingCollection' && parent.namespaceURI === node.namespaceURI)) invalid('misplaced sequencing definition');
+      if (node.localName === 'sequencingCollection' && parent !== root!) invalid('misplaced sequencing collection');
       features.add(node.localName!);
     }
     if (node.namespaceURI === 'http://www.adlnet.org/xsd/adlseq_v1p3' || node.namespaceURI === 'http://www.adlnet.org/xsd/adlnav_v1p3') features.add('unsupportedNavigationExtension');
@@ -123,6 +124,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   const editions: Record<string, SCORMStandard> = {'1.2': '1.2', '2004 2nd Edition': '2004-2', '2004 3rd Edition': '2004-3', '2004 4th Edition': '2004-4'};
   const standard = editions[edition ?? ''];
   if (!standard || (standard === '1.2' ? ns !== IMS12 : ns !== IMS2004)) invalid('exact supported SCORM edition required');
+  const collections = parseSequencingCollections(root!, standard);
   const cp = standard === '1.2' ? CP12 : CP2004;
   const ids = new Set<string>();
   const id = (el: Element) => {const value = el.getAttribute('identifier') ?? ''; if (!value || value.length > 256 || ids.has(value)) invalid('missing/duplicate/oversized identifier'); ids.add(value); return value;};
@@ -182,7 +184,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
         } else if (text) {if (!numeric(text)) invalid('invalid completion threshold'); extensions.completionThreshold = text;}
       }
     }
-    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard)} : {}), children: elements(el, 'item', ns!).map(activity)};
+    return {id: aid, title: label(el, ns!), ...(resourceId ? {resourceId} : {}), ...(parameters ? {parameters} : {}), ...(prerequisites ? {prerequisites} : {}), ...extensions, ...(standard !== '1.2' ? {sequencing: parseSequencing(el, standard, collections)} : {}), children: elements(el, 'item', ns!).map(activity)};
   };
   const activities = elements(org, 'item', ns!).map(activity);
   if (!activities.length) invalid('organization activity tree required');
@@ -190,7 +192,10 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   if (qualifiedGlobal && legacyGlobal && qualifiedGlobal !== legacyGlobal) invalid('conflicting objective scope');
   const global = qualifiedGlobal || legacyGlobal || 'true';
   if (!['true', 'false', '1', '0'].includes(global)) invalid('invalid objective scope');
-  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard), objectivesGlobalToSystem: !['false', '0'].includes(global)} : {}), runtimeFeatures: [...features].sort()};
+  // XML ID uniqueness spans the document, including unselected organizations.
+  const documentIds = new Set([root!, ...Array.from(root!.getElementsByTagNameNS(ns!, '*'))].map(n => n.getAttribute('identifier')).filter(Boolean));
+  if ([...collections.keys()].some(id => documentIds.has(id))) invalid('duplicate sequencing identifier');
+  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global)} : {}), runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {

@@ -252,3 +252,12 @@ ADR-072 closes the internal course-ID-only proof defect: pinned course version, 
 
 ## #132 authorized exact award course opening candidate
 ADR-073 adds live pinned/current audience checks before returning existing enrollment or receipt, exact newest active same-cycle version, conflict/mismatch human diagnostics and visible course pins. Three domain and one EN/VI browser regressions authored; exact-head CI PENDING. Multiple explicit nested pins, completed-course requalification and award-cycle child version migration remain OPEN; no implicit reset or copied progress.
+
+
+## G05/G10/G14/G18 SCORM engine expansion (#133)
+
+S1–S8 (#134–#141) are merged into main `f7d30b45f968dbaf52199cb35021d7aee6cc5600`, tree `159d24bd1178633d82f15cc7ee34bcf89538bf7e`; [main acceptance 37675973833](https://github.com/and1truong/orchad/actions/runs/37675973833) passed all eight jobs. Integrated pre-merge evidence at the same tree includes 445 domain tests, 90 dev + 90 built journeys, actual unpacked Lime SCORM 1/1 and real Linux Tauri/WebKit SCORM 9/9. See ADR-075–082 and SCORM-SUPPORT-MATRIX.md.
+
+G05 now includes immutable multi-file ZIP import/review/publish and isolated reviewed-fixture playback for 1.2/2004 editions 2–4. G10 includes transactional accepted per-SCO evidence, durable resume/time/navigation and exact course/module/standalone/nested-award/version/cycle bindings. G14 integrates published completion/pass policy with existing quiz and certificate rules; practice/preview stays unofficial and credentials remain synthetic. G18 includes edition-aware runtime adapters and a tested sequencing profile; the legacy inline profile and xAPI behavior are separate. The successor CAM slice adds manifest-local collections/IDRef with whole-group overrides (ADR-083). This entry supplements historical rows; it does not close their gaps.
+
+OPEN: missing semantics in #133 checklist B; exhaustive standards/reference/commercial interoperability; actual additional OS/mobile and native Side Panel; production credentialless isolation, strict egress, scanning/storage/privacy/archival/retention and load/recovery acceptance. Full SCORM/LRS/cmi5, provider/partner, issuer/accreditation and unrelated #49 parity gates remain open.

@@ -22,3 +22,12 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
     {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
   ]);
 }
+
+export function collectionManifest(edition: SCORM2004Edition = '2004-4') {
+  const definitions: string[] = [];
+  const xml = sequencingManifest(edition).replace(/<s:sequencing>([\s\S]*?)<\/s:sequencing>/g, (_, body) => {
+    const id = 'shared-' + definitions.length; definitions.push(`<s:sequencing ID="${id}">${body}</s:sequencing>`);
+    return `<s:sequencing IDRef="${id}"/>`;
+  });
+  return xml.replace('</p:manifest>', `<s:sequencingCollection>${definitions.join('')}</s:sequencingCollection></p:manifest>`);
+}

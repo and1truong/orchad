@@ -86,7 +86,7 @@ export function activityAvailable(profile: ReturnType<typeof scorm12Activities>[
 /** Trusted activity traversal; never flatten folders or discard 2004 rules. */
 export function playbackActivities(manifest: SCORMManifest) {
   if (manifest.standard === '1.2') return scorm12Activities(manifest);
-  if (manifest.runtimeFeatures?.some(f => !['dataFromLMS', 'timeLimitAction', 'completionThreshold', 'sequencing'].includes(f))) reject('INVALID_ARGUMENT', 'Unsupported SCORM 2004 sequencing or runtime extensions');
+  if (manifest.runtimeFeatures?.some(f => !['dataFromLMS', 'timeLimitAction', 'completionThreshold', 'sequencing', 'sequencingCollection'].includes(f))) reject('INVALID_ARGUMENT', 'Unsupported SCORM 2004 sequencing or runtime extensions');
   const result: ReturnType<typeof scorm12Activities> = [];
   const walk = (activity: SCORMActivity, ancestors: SCORMActivity[]) => {
     const resource = manifest.resources.find(r => r.id === activity.resourceId);

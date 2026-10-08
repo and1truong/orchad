@@ -5,7 +5,72 @@ import {multiFileManifest, multiFilePackage} from './scorm-package-fixture.ts';
 import {createSCORM2004API, type SCORM2004Edition} from '../src/shared/scorm2004-runtime.ts';
 import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
-import {sequencingManifest} from './scorm-sequencing-fixture.ts';
+import {sequencingManifest, collectionManifest} from './scorm-sequencing-fixture.ts';
+
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': manifest-local collections retain objective gates, durable delivery and official rollup', async () => {
+  const f = await scormLearningFixture(undefined, multiFilePackage(edition, collectionManifest(edition)));
+  try {
+    const binding = f.enroll(); assert.throws(() => f.launch(binding, 'practice'), /prerequisites|denies/);
+    const first = f.launch(binding, 'intro');
+    const request = sequenceCheckpoint(f, first, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'cmi.session_time': 'PT10S', 'adl.nav.request': 'continue'});
+    assert.equal(f.player.checkpoint(first.token, request).officialLearningChanged, false);
+    assert.equal(f.player.status(f.service.principal('learner-a'), first.launchId, 'session-learner-a').nextScoId, 'practice');
+    const second = f.launch(binding, 'practice');
+    assert.equal(f.player.checkpoint(second.token, sequenceCheckpoint(f, second, {'cmi.completion_status': 'completed', 'cmi.success_status': 'passed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'exitAll'})).officialLearningChanged, true);
+    assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 1);
+  } finally {f.db.close();}
+});
+
+test('collection overrides replace whole XML groups and retain independent groups without aliasing', async () => {
+  const xml = collectionManifest().replace('<s:sequencing IDRef="shared-0"/>', '<s:sequencing IDRef="shared-0"><s:controlMode choice="false"/></s:sequencing>');
+  const pkg = await inspectSCORMPackage(multiFilePackage('2004-4', xml));
+  const tree: Record<string, any> = sequencingTree(pkg.manifest);
+  assert.deepEqual(tree.sequencingControls, {choice: false, choiceExit: true, flow: false, forwardOnly: false, useCurrentAttemptObjectiveInfo: true, useCurrentAttemptProgressInfo: true});
+  assert.equal(tree.rollupRules.rules.length, 2);
+  // A controlMode replacement must reset omitted flow/forwardOnly to defaults.
+  const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+  const engine = sequencingRuntime(tree);
+  assert.equal(engine.getSequencingState()!.rootActivity.sequencingControls.flow, false);
+  assert.equal(engine.getSequencingState()!.rootActivity.sequencingControls.forwardOnly, false);
+  const objectiveXML = collectionManifest().replace('<s:sequencing IDRef="shared-1"/>', '<s:sequencing IDRef="shared-1"><s:objectives><s:primaryObjective objectiveID="replacement"/></s:objectives></s:sequencing>');
+  const replaced = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', objectiveXML))).manifest);
+  assert.equal(replaced.children[0].primaryObjective.objectiveID, 'replacement');
+  assert.deepEqual(replaced.children[0].primaryObjective.mapInfo, []);
+  assert.equal(replaced.children[1].objectives[0].mapInfo[0].targetObjectiveID, 'shared-mastery');
+});
+
+test('collections reject dangling, chained, duplicate, misplaced and malformed definitions, including unused ones', async () => {
+  const original = collectionManifest();
+  const cases = [
+    original.replace('IDRef="shared-0"', 'IDRef="missing"'), original.replace('IDRef="shared-0"', 'IDRef=""'),
+    original.replace('ID="shared-0"', 'ID="shared-0" IDRef="shared-1"'),
+    original.replace('ID="shared-1"', 'ID="shared-0"'), original.replace('ID="shared-0"', 'ID="org"'),
+    original.replace('</p:organizations>', '<p:organization identifier="shared-0"><p:title>Unselected</p:title></p:organization></p:organizations>'),
+    original.replace('</p:organizations>', '<p:organization identifier="unselected"><p:title>Unselected</p:title><p:item identifier="shared-1"><p:title>Collision</p:title></p:item></p:organization></p:organizations>'),
+    original.replace('ID="shared-0"', 'ID="bad identifier"'), original.replace('ID="shared-0"', ''),
+    original.replace('IDRef="shared-0"', 'ID="inline-id"'),
+    original.replace('<s:sequencingCollection>', '<s:sequencingCollection bogus="true">'),
+    original.replace('</s:sequencingCollection>', '<s:sequencing ID="unused"><s:controlMode bogus="true"/></s:sequencing></s:sequencingCollection>'),
+    original.replace('</p:manifest>', '<s:sequencingCollection><s:sequencing ID="other"/></s:sequencingCollection></p:manifest>'),
+    original.replace('<s:sequencingCollection>', '<p:item identifier="misplaced"><s:sequencingCollection>').replace('</s:sequencingCollection>', '</s:sequencingCollection></p:item>'),
+  ];
+  for (const xml of cases) await assert.rejects(inspectSCORMPackage(multiFilePackage('2004-4', xml)), /Unsupported|misplaced|duplicate/);
+  const unicode = original.replaceAll('shared-0', 'tập-hợp');
+  assert.ok((sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', unicode))).manifest) as Record<string, any>).sequencingControls.flow);
+});
+
+test('an empty inline limitConditions replaces a collected attempt limit with the no-limit default', async () => {
+  const xml = collectionManifest().replace('<s:sequencing ID="shared-1">', '<s:sequencing ID="shared-1"><s:limitConditions attemptLimit="1"/>').replace('<s:sequencing IDRef="shared-1"/>', '<s:sequencing IDRef="shared-1"><s:limitConditions/></s:sequencing>');
+  const tree = sequencingTree((await inspectSCORMPackage(multiFilePackage('2004-4', xml))).manifest);
+  assert.equal(tree.children[0].attemptLimit, undefined);
+  const {sequencingRuntime} = await import('../src/shared/scorm-sequencing-runtime.ts');
+  const engine = sequencingRuntime(tree);
+  assert.equal(engine.getSequencingState()!.rootActivity.children[0].attemptLimit, null);
+  assert.equal(engine.processNavigationRequest('start'), true);
+  engine.Initialize(''); assert.equal(engine.SetValue('adl.nav.request', 'exit'), 'true'); engine.Terminate('');
+  assert.equal(engine.processNavigationRequest('choice', 'intro'), true);
+  assert.equal(engine.getSequencingState()!.currentActivity.attemptCount, 2);
+});
 export function sequenceCheckpoint(f: Awaited<ReturnType<typeof scormLearningFixture>>, launch: ReturnType<typeof f.launch>, values: Record<string, string>, finished = true) {
   const b = f.player.bootstrap(launch.token); let state: any, navigation = '_none_';
   const api = createSCORM2004API({edition: b.standard as SCORM2004Edition, state: b.state, sequencingTree: b.sequencingTree, sequencingSnapshot: b.sequencingSnapshot, checkpoint(s, _finished, nav) {state = s; navigation = nav;}});

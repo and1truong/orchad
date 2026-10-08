@@ -70,18 +70,51 @@ function rollup(el: Element) {
   return {controls, rules};
 }
 /** Translate only explicitly supported definitions. Unknown semantics fail before launch. */
-export function parseSequencing(parent: Element, edition: SCORMStandard): Record<string, any> | undefined {
+export function parseSequencing(parent: Element, edition: SCORMStandard, collections: ReadonlyMap<string, Element> = new Map()): Record<string, any> | undefined {
   const nodes = children(parent).filter(n => n.namespaceURI === SN && n.localName === 'sequencing');
   if (!nodes.length) return undefined; if (nodes.length !== 1 || edition === '1.2') fail();
-  const el = nodes[0]; attrs(el, []); const out: Record<string, any> = {}, seen = new Set<string>();
-  for (const n of children(el)) {
+  const el = nodes[0]; attrs(el, ['IDRef']);
+  const reference = el.getAttribute('IDRef');
+  const referenced = reference === null ? undefined : collections.get(reference);
+  if (reference !== null && !referenced) fail();
+  // IMS SS XML Binding 3.2: replace an entire top-level XML group, not
+  // individual settings. Compiling before translation also avoids the engine's
+  // collection helper merging controls that the inline group must reset.
+  const inline = children(el), keys = new Set(inline.map(n => `${n.namespaceURI}:${n.localName}`));
+  const merged = [...(referenced ? children(referenced).filter(n => !keys.has(`${n.namespaceURI}:${n.localName}`)) : []), ...inline];
+  return sequencingDefinition(merged, edition);
+}
+
+/** Collections are manifest-local, non-chainable and validated even if unused. */
+export function parseSequencingCollections(manifest: Element, edition: SCORMStandard) {
+  const nodes = children(manifest).filter(n => n.namespaceURI === SN && n.localName === 'sequencingCollection');
+  const result = new Map<string, Element>();
+  if (!nodes.length) return result;
+  if (nodes.length !== 1 || edition === '1.2') fail();
+  attrs(nodes[0], []); const definitions = children(nodes[0]);
+  if (!definitions.length || definitions.length > 1024) fail();
+  // xs:ID is an XML 1.0 NCName. Keep Unicode identifiers intact.
+  const start = 'A-Z_a-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}';
+  const ncName = new RegExp(`^[${start}][${start}0-9.\\-\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$`, 'u');
+  for (const definition of definitions) {
+    if (definition.namespaceURI !== SN || definition.localName !== 'sequencing') fail();
+    attrs(definition, ['ID']); const id = definition.getAttribute('ID');
+    if (!id || id.length > 4000 || !ncName.test(id) || result.has(id)) fail();
+    sequencingDefinition(children(definition), edition); result.set(id!, definition);
+  }
+  return result;
+}
+
+function sequencingDefinition(nodes: Element[], edition: SCORMStandard) {
+  const out: Record<string, any> = {}, seen = new Set<string>();
+  for (const n of nodes) {
     if (n.namespaceURI !== SN || seen.has(n.localName!)) fail(); seen.add(n.localName!);
     switch (n.localName) {
-      case 'controlMode': out.sequencingControls = {...out.sequencingControls, ...flags(n, ['choice', 'choiceExit', 'flow', 'forwardOnly', 'useCurrentAttemptObjectiveInfo', 'useCurrentAttemptProgressInfo'])}; break;
+      case 'controlMode': out.sequencingControls = {...out.sequencingControls, choice: true, choiceExit: true, flow: false, forwardOnly: false, useCurrentAttemptObjectiveInfo: true, useCurrentAttemptProgressInfo: true, ...flags(n, ['choice', 'choiceExit', 'flow', 'forwardOnly', 'useCurrentAttemptObjectiveInfo', 'useCurrentAttemptProgressInfo'])}; break;
       case 'constrainedChoiceConsiderations': out.sequencingControls = {...out.sequencingControls, ...flags(n, ['constrainChoice', 'preventActivation'])}; break;
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
       case 'limitConditions': {
-        attrs(n, ['attemptLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit === undefined || !Number.isInteger(limit)) fail(); out.attemptLimit = limit; break;
+        attrs(n, ['attemptLimit']); const limit = number(n, 'attemptLimit', 1, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;} break;
       }
       case 'sequencingRules': {
         attrs(n, []); out.sequencingRules = {};
