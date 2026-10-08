@@ -38,3 +38,12 @@ so the cause cannot be assigned to event timing or sandbox semantics. Add
 only those boolean/directive/count diagnostics; no authored state, URLs,
 capabilities or credentials. Denial and zero-sink assertions remain unchanged.
 Current-head actual native validation is required; this failure is retained.
+
+
+Diagnostic head e157e87c / macOS job 113519415935 records popup and
+service-worker denial, zero sink requests, and connect/img/frame/worker CSP
+events; media-src was absent. A video with an unspecified extension/MIME did
+not establish an actual media load. Use an explicit audio/mpeg source at
+media.mp3 and call load/play; record playback/error status without accepting a
+timeout as denial. The media-src CSP requirement and zero-sink guard remain.
+This corrects the stimulus; actual macOS validation still must complete.
