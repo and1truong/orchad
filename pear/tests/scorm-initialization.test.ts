@@ -8,6 +8,17 @@ import {multiFilePackage} from './scorm-package-fixture.ts';
 
 export const lmsComment = {comment: 'Trusted original comment', location: 'Original LMS location', timestamp: '2000-02-29T12:30:59.25Z'};
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
+  test(edition + ': unknown LMS comment leaves retain undefined-element error without appending absent rows', () => {
+    for (const state of [{}, {comments_from_lms: {0: lmsComment}}]) {
+      const api = createSCORM2004API({edition, state}); api.Initialize('');
+      const count = api.GetValue('cmi.comments_from_lms._count');
+      for (const index of count === '1' ? ['0', '1'] : ['0']) for (const leaf of ['unknown', 'comment.extra', 'timestamp\n']) {
+        assert.equal(api.SetValue('cmi.comments_from_lms.' + index + '.' + leaf, 'forged'), 'false'); assert.equal(api.GetLastError(), '401');
+        assert.equal(api.GetValue('cmi.comments_from_lms._count'), count);
+      }
+      if (count === '1') assert.equal(api.GetValue('cmi.comments_from_lms.0.comment'), lmsComment.comment);
+    }
+  });
   test(edition + ': preloaded LMS comments initialize read-only, including invalid-value precedence and absent records', () => {
     let writes = 0;
     const api = createSCORM2004API({edition, state: {comments_from_lms: {0: lmsComment}}, checkpoint() {writes++;}});

@@ -13,6 +13,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
       for(const bad of [value,'forged','','2026-02-29'])if(api.SetValue(key,bad)!=='false'||api.GetLastError()!=='404'||api.GetValue(key)!==value)throw Error('read-only comment '+field);
       if(api.SetValue('cmi.comments_from_lms.1.'+field,value)!=='false'||api.GetLastError()!=='404')throw Error('new LMS comment');
     }
+    for(const row of [0,1])for(const leaf of ['unknown','comment.extra','timestamp\\n'])if(api.SetValue('cmi.comments_from_lms.'+row+'.'+leaf,'forged')!=='false'||api.GetLastError()!=='401')throw Error('undefined LMS comment leaf');
     if(api.GetValue('cmi.comments_from_lms._count')!=='1')throw Error('LMS count changed');
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue('cmi.comments_from_learner.0.comment')!=='Original own comment')throw Error('own comment resume');
     if(api.SetValue('cmi.comments_from_learner.0.comment','Original own comment')!=='true')throw Error('own comment write');

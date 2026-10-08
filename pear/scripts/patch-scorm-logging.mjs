@@ -2,10 +2,11 @@
 // selection/duration/Unicode corrections documented in ADR-092/094/095/096/097. Preserve copyright/license.
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
+import {reviewedSCORMSource, unreviewedSCORMSource} from './scorm-review-corrections.mjs';
 const root = new URL('../node_modules/scorm-again/', import.meta.url), metadata = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 if (metadata.version !== '3.4.5') throw Error('Review the SCORM integration adaptation before changing engine version');
 const path = new URL('dist/esm/scorm2004.js', root), digest = value => createHash('sha256').update(value).digest('hex');
-let source = readFileSync(path, 'utf8');
+let source = unreviewedSCORMSource(readFileSync(path, 'utf8'));
 const original = '93e463ed4ba87bd59a2fe228c94c879faf4aa7469a687166ffab8fac4a4d1f69', loggingOnly = '6a8cc4f52e6c2acbe79e5403d2f0a21602ffcb9fe54ab07e202ca2f223369936', selection = '206daee49525dbf352bf9d6920f6d1ccc03ad9e8834db57a8d7d5ee2efb93cc0', limits = 'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e', patched = '8c6468541bf6f07353307758f5a828e7e9e04da0619c859500c9b108015db5da';
 
 const localized = '445f18f920d5424b335c666594e532fb9a3238b84cc76f522d5185e41aabbd08';
@@ -260,9 +261,9 @@ for (const [before, after] of timestampUpdates) replaceOnce(before, after);
 if (digest(output) !== timestamps) throw Error('SCORM timestamp checksum mismatch');
 for (const [before, after] of initializationUpdates) replaceOnce(before, after);
 if (digest(output) !== initialized) throw Error('SCORM initialization checksum mismatch');
-writeFileSync(path, output);
+writeFileSync(path, reviewedSCORMSource(output));
 
-const path12 = new URL('dist/esm/scorm12.js', root), source12 = readFileSync(path12, 'utf8');
+const path12 = new URL('dist/esm/scorm12.js', root), source12 = unreviewedSCORMSource(readFileSync(path12, 'utf8'));
 const original12 = '52ffa12e5167e3a37b2f64eefa61cd599ea90c30cf4d164b667baddf83d497a6', patched12 = '2f8591ab1f08bd696ff11dc72b1e92c197d12512978ef870a39507ed9567e366';
 if (![original12, patched12].includes(digest(source12))) throw Error('Unexpected pinned SCORM 1.2 source');
 if (digest(source12) !== patched12) {
@@ -270,5 +271,5 @@ if (digest(source12) !== patched12) {
   if (source12.split(before).length !== 2) throw Error('SCORM 1.2 Unicode patch no longer matches');
   const output12 = source12.replace(before, after);
   if (digest(output12) !== patched12) throw Error('SCORM 1.2 Unicode checksum mismatch');
-  writeFileSync(path12, output12);
+  writeFileSync(path12, reviewedSCORMSource(output12));
 }
