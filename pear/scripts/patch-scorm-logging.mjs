@@ -306,6 +306,26 @@ writeFileSync(path, output);
 
 const path12 = new URL('dist/esm/scorm12.js', root);
 let source12 = readFileSync(path12, 'utf8');
+const atomic12 = 'e34cb1536920b0597008b53dc97f13abddc71bb07911a0cd4daa55f127c551be';
+const atomicity12Updates = [
+  [
+    "    let foundFirstIndex = false;\n    const invalidErrorMessage = `The data model element passed to ${methodName} (${CMIElement}) is not a valid SCORM data model element.`;\n    const invalidErrorCode = this.getUndefinedDataModelErrorCode();\n    for (let idx = 0; idx < structure.length; idx++) {",
+    "    let foundFirstIndex = false;\n    const invalidErrorMessage = `The data model element passed to ${methodName} (${CMIElement}) is not a valid SCORM data model element.`;\n    const invalidErrorCode = this.getUndefinedDataModelErrorCode();\n    const collections = [];\n    try {\n    for (let idx = 0; idx < structure.length; idx++) {"
+  ],
+  [
+    "        const traverseResult = this.traverseToNextLevel(",
+    "        const collection = refObject[attribute];\n        if (collection instanceof CMIArray) collections.push([collection, collection.childArray.length]);\n        const traverseResult = this.traverseToNextLevel("
+  ],
+  [
+    "    if (returnValue === global_constants.SCORM_FALSE) {\n      this.context.apiLog(",
+    "    } finally {\n      // Pear: failed writes must not leave appended collection records behind.\n      if (returnValue !== global_constants.SCORM_TRUE) {\n        for (const [collection, length] of collections.toReversed()) collection.childArray.length = length;\n      }\n    }\n    if (returnValue === global_constants.SCORM_FALSE) {\n      this.context.apiLog("
+  ]
+];
+
+if (digest(source12) === atomic12) for (const [before, after] of atomicity12Updates.toReversed()) {
+  if (source12.split(after).length !== 2) throw Error('SCORM 1.2 atomicity reverse patch no longer matches');
+  source12 = source12.replace(after, () => before);
+}
 const indexed12 = '4d205a6b1c73d9af2b1f09b4f9a12b713cea07468b50bc3947f3c86370ce3e99';
 if (digest(source12) === indexed12) for (const [before, after] of indexUpdates.toReversed()) {
   if (source12.split(after).length !== 2) throw Error('SCORM 1.2 packed-index reverse patch no longer matches');
@@ -327,4 +347,9 @@ for (const [before, after] of indexUpdates) {
   output12 = output12.replace(before, () => after);
 }
 if (digest(output12) !== indexed12) throw Error('SCORM 1.2 packed-index checksum mismatch');
+for (const [before, after] of atomicity12Updates) {
+  if (output12.split(before).length !== 2) throw Error('SCORM 1.2 atomicity correction no longer matches');
+  output12 = output12.replace(before, () => after);
+}
+if (digest(output12) !== atomic12) throw Error('SCORM 1.2 atomicity checksum mismatch');
 writeFileSync(path12, output12);
