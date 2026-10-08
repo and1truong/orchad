@@ -9,6 +9,9 @@ closes the independent synchronous browser API path.
 
 One shared model-path guard admits cmi/adl paths and public _children/_count/
 _version keywords while rejecting backing fields and non-model engine roots.
+Publicly named implementation flags initialized/jsonString/start_time are also
+refused: eight additional profile checks fail before that guard, including the
+jsonString write that otherwise bypasses write-only element checks.
 Both adapters require GetValue's result to be a string. SetValue first checks
 the existing engine read result's type to refuse live objects/methods before the
 setter can replace them. Write-only scalar reads return an empty string with an

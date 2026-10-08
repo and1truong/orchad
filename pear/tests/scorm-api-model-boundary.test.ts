@@ -9,7 +9,7 @@ import {multiFilePackage} from './scorm-package-fixture.ts';
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) {
   const old = edition === '1.2', identity = old ? 'cmi.core.student_id' : 'cmi.learner_id', location = old ? 'cmi.core.lesson_location' : 'cmi.location';
   const state = old ? {core: {student_id: 'trusted'}} : {learner_id: 'trusted'};
-  const forbidden = ['cmi', 'settings', '_settings.lmsCommitUrl', 'renderCMIToJSONObject', 'cmi.initialize', 'cmi.reset', 'cmi.toJSON', 'cmi.constructor', 'cmi.__proto__', 'cmi._initialized', 'cmi.score', 'cmi.objectives', 'cmi.interactions', old ? 'cmi.core' : 'adl', old ? 'cmi.core.score' : 'adl.nav', old ? 'cmi.core._student_id' : 'cmi.student_data._learner_id', old ? 'cmi.core.score._max' : 'cmi.score._scaled'];
+  const forbidden = ['cmi.initialized', 'cmi.jsonString', 'cmi.start_time', old ? 'cmi.core.initialized' : 'cmi.score.initialized', old ? 'cmi.core.jsonString' : 'cmi.score.jsonString', 'cmi', 'settings', '_settings.lmsCommitUrl', 'renderCMIToJSONObject', 'cmi.initialize', 'cmi.reset', 'cmi.toJSON', 'cmi.constructor', 'cmi.__proto__', 'cmi._initialized', 'cmi.score', 'cmi.objectives', 'cmi.interactions', old ? 'cmi.core' : 'adl', old ? 'cmi.core.score' : 'adl.nav', old ? 'cmi.core._student_id' : 'cmi.student_data._learner_id', old ? 'cmi.core.score._max' : 'cmi.score._scaled'];
 
   test(edition + ': GetValue exposes scalar model elements only; helpers/categories/private backing fields stay unreachable', () => {
     const api: any = old ? createSCORM12API({state}) : createSCORM2004API({edition, state});

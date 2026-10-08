@@ -8,7 +8,7 @@ import {interopPackage} from '../scorm-interop-fixture.ts';
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(edition + ': built standard API cannot expose or overwrite engine internals', async ({page}) => {
   const script = `{const old=${JSON.stringify(edition === '1.2')},api=old?parent.API:parent.API_1484_11,
     read=(k)=>old?api.LMSGetValue(k):api.GetValue(k),write=(k,v)=>old?api.LMSSetValue(k,v):api.SetValue(k,v),error=()=>old?api.LMSGetLastError():api.GetLastError(),
-    key=old?'cmi.core.student_id':'cmi.learner_id',identity=read(key),paths=['cmi','settings','_settings.lmsCommitUrl','renderCMIToJSONObject','cmi.initialize','cmi.reset','cmi.toJSON','cmi.constructor','cmi.__proto__','cmi._initialized','cmi.objectives','cmi.interactions',old?'cmi.core':'adl.nav',old?'cmi.core._student_id':'cmi.score._scaled'];
+    key=old?'cmi.core.student_id':'cmi.learner_id',identity=read(key),paths=['cmi.initialized','cmi.jsonString','cmi.start_time',old?'cmi.core.initialized':'cmi.score.initialized',old?'cmi.core.jsonString':'cmi.score.jsonString','cmi','settings','_settings.lmsCommitUrl','renderCMIToJSONObject','cmi.initialize','cmi.reset','cmi.toJSON','cmi.constructor','cmi.__proto__','cmi._initialized','cmi.objectives','cmi.interactions',old?'cmi.core':'adl.nav',old?'cmi.core._student_id':'cmi.score._scaled'];
     for(const path of paths){
       if(read(path)!==''||error()!=='401')throw Error('internal read '+path);
       if(write(path,'forged')!=='false'||error()!=='401')throw Error('internal write '+path);

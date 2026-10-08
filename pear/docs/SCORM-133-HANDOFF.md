@@ -100,3 +100,16 @@ Packed indices #177/head b3b58a3b acceptance 37804565092 completed SUCCESS 8/8 (
 Review correction: known comment/location/timestamp leaves on absent LMS rows retain 404; undefined leaves return 401 before any append, matching existing rows. Skipped packed indices retain their distinct 351 behavior. Three original regressions and built edition vectors cover values/count preservation. Exact reviewed output is checksum-locked; historical engine inputs remain accepted through reversible known-byte correction. Full corrected-head CI is required; earlier be0b27d5 evidence is historical.
 
 Browser-range review correction: rollback iterates backward by index and no longer requires Array.prototype.toReversed at runtime. A pre-fix missing-method regression fails; corrected domain and built edition fixtures remove that method during refused writes and verify exact errors/count/state/retry. Installer-only Node 24 reversals are unchanged. Historical and corrected exact ESM sources remain recognized; this is feature-absence evidence, not actual Firefox/platform certification. Corrected-head CI supersedes earlier head 84262aab evidence.
+
+Current integrated model-boundary correction retains the real reviewed stack and
+strict operations hash. Fresh full domain acceptance completed 670/670 across
+96 files; build and 23/23 authored built SCORM journeys passed, including denial
+of public internal initialized/jsonString/start_time flags in all four profiles.
+The earlier pin-only domain failure and local Chromium 151 full-system browser
+failures remain recorded; these focused journeys are not full system acceptance.
+Current exact-head CI supersedes historical statuses only after completion.
+#174 head 1f81664c / run 37813277256, #175 head beeab50a / run 37813388176 and
+#179 head b89ee6de / run 37813672486 completed SUCCESS 8/8. #177 head e9d6cf38
+first run 37813555426 failed the recurring-assignment browser status assertion
+(161/162 dev); only the failed Pear job is being retried. Target-selector binding
+for authored dotted/non-ASCII IDs remains independent sequencing work.
