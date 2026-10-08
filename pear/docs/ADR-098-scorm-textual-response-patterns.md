@@ -21,6 +21,12 @@ definition requires it. Fill-in case/order properties support either order;
 long-fill-in has case and performance has order. Invalid boolean values and
 duplicate leading properties are rejected with 406. A failed replacement or
 append leaves existing pattern/count unchanged; missing ID/type still gives 408.
+Properties outside the interaction's defined format remain literal text, as RTE
+4.1.1.6 explains for an out-of-format case_matters property in a comment. Thus
+order_matters in long-fill-in and both booleans in other do not become properties
+and must not be stripped or rejected merely for using these character sequences.
+Original API/replay/browser vectors preserve those literals, including a value
+that would be invalid if used for an applicable boolean property.
 
 Reference: ADL SCORM 2004 4th Edition RTE v1.1, sections 4.1.1.6–7 and
 Table 4.2.9.1a, original document mirrored at
