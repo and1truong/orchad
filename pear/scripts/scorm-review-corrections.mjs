@@ -130,6 +130,18 @@ const time2004Updates = [
     "  CMITimespan: \"^P(?=\\\\d|T\\\\d)(?!.*W)(?!.*T$)(?:(\\\\d+)Y)?(?:(\\\\d+)M)?(?:(\\\\d+)W)?(?:(\\\\d+)D)?(?:T(?:(\\\\d+)H)?(?:(\\\\d+)M)?(?:(\\\\d+(?:\\\\.\\\\d{1,2})?)S)?)?$\","
   ]
 ];
+const urnOriginal = "86189a9e5d9990b064f114ec7a8eecfea9ef05731ac87405e9e280b1e2a7cae1";
+const urnPatched = "2d934ecb704315c2b24f6ecc782624d3ba266feec5f870f542f37bc504eb8601";
+const urnUpdates = [
+  [
+    "  CMIShortIdentifier: \"^(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",",
+    "  CMIShortIdentifier: \"^(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILongIdentifier: \"^(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",",
+    "  CMILongIdentifier: \"^(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\","
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -164,9 +176,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, time2004Updates);
     if (hash(source) !== time2004Patched) throw Error('SCORM timeinterval checksum mismatch');
   }
+  if (hash(source) === urnOriginal) {
+    source = replace(source, urnUpdates);
+    if (hash(source) !== urnPatched) throw Error('SCORM URN checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === urnPatched) {
+    source = replace(source, urnUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== urnOriginal) throw Error('SCORM URN reverse checksum mismatch');
+  }
   if (hash(source) === time2004Patched) {
     source = replace(source, time2004Updates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== time2004Original) throw Error('SCORM timeinterval reverse checksum mismatch');

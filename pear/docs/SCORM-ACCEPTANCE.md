@@ -88,3 +88,5 @@ binds shared timeinterval grammar and refuses malformed 1.2 latency checkpoints.
 Named failure preservation/retry/receipt/resume evidence extends API-02/TIME-01;
 full reference/field precedence, calendar conversion and every external, actual
 platform, all-egress and operations requirement remain OPEN/BLOCKED.
+
+ADR-120 adds conditional shared URN namespace/NSS binding with exact case/percent preservation and invalid typed/load/replay refusal. Non-URN behavior and 1.2 source stay unchanged. Full URI components, namespace-specific decoding/equivalence and all remaining conformance/platform/operations gates stay OPEN.
