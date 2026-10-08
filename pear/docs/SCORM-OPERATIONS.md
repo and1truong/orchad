@@ -65,3 +65,5 @@ API refusal correction (ADR-110) retains exact v15 engine entries and stored sna
 API model-access correction (ADR-111) retains exact v15 ESM/stored snapshots and filters only content API paths/results. Internal trusted loading is unchanged; host field/identity replay remains authoritative and forged backing fields roll back before revision/receipt/proof. No migration, historical rewrite or production enablement.
 
 Navigation target binding (ADR-112) changes only checksum-locked 2004 lexical/access behavior. Known v15 snapshots remain compatible; 1.2 bytes and existing attempt/receipt/host replay authority are unchanged. Full deployment/platform/operational gates remain unresolved.
+
+Real capacity (ADR-113) broadens known 2004 numeric inputs while preserving the 4096-character host scalar envelope and rejecting non-finite Number inputs before local writes or server receipts. Exact strings survive replay/retry; 1.2 bytes/history are unchanged and known v16 snapshot markers remain accepted. No migration, purge or production enablement.

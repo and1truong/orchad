@@ -124,3 +124,16 @@ passed, including actual choice delivery, lost ACK and close/resume. Full domain
 completed 673/673 across 97 files; final compatibility vectors passed 3/3.
 CI/ready belongs only to the successor's complete exact-head run. Full prediction
 semantics and the remaining register requirements are still OPEN/BLOCKED.
+
+ADR-113 is stacked on #182/head f0f0de3d. pear-real-capacity-v17 corrects
+2004 ten-integral-digit and 999 preference caps, retaining finite-input and
+4096-character host scalar boundaries; v16 snapshots and unchanged 1.2 bytes
+remain supported. Full domain completed 682/682 across 98 files, focused25/25
+and build passed. Built real/model/target attempt passed9/10 with one Chromium151
+DOM.describeNode session-closed failure; that unchanged target case reran PASS,
+so ten authored cases have passing evidence with the first failure retained.
+#181 head d816a92f / run37816033977 completed SUCCESS8/8, domain670 and172/172
+dev/built browser; #177 unchanged e9d6cf38 / run37813555426 attempt2 completed
+SUCCESS8/8, domain641 and162/162 dev/built, retaining its first assignment-status
+failure. Exact successor CI must complete before ready; full conformance and
+external/deployment gates remain OPEN/BLOCKED, epic open/production disabled.

@@ -54,6 +54,26 @@ const navigationUpdates = [
     "  NAVTarget: \"^\\\\{target=[^{}]+\\\\}(?![\\\\s\\\\S])\","
   ]
 ];
+const realOriginal = "a8d9018516119e5180c5cccd9931bb8b56335f3c282c0367cfe116e73d420007";
+const realPatched = "2872964c5545baf04c2de580be6ece0dafafe76c83d04efedc7b5d5cec7720df";
+const realUpdates = [
+  [
+    "  CMIDecimal: \"^-?([0-9]{1,10})(\\\\.[0-9]{1,18})?$\",",
+    "  CMIDecimal: \"^-?([0-9]+)(\\\\.[0-9]{1,18})?$\","
+  ],
+  [
+    "    const matches = value.match(formatRegex);",
+    "    // Pear: real precision does not limit integral digits; refuse non-finite engine arithmetic.\n    if (regexPattern === scorm2004_regex.CMIDecimal && (value.length > 4096 || !Number.isFinite(Number(value)))) throw new errorClass(CMIElement, errorCode);\n    const matches = value.match(formatRegex);"
+  ],
+  [
+    "  audio_range: \"0#999.9999999\",",
+    "  audio_range: \"0#*\","
+  ],
+  [
+    "  speed_range: \"0#999.9999999\",",
+    "  speed_range: \"0#*\","
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -64,9 +84,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, navigationUpdates);
     if (hash(source) !== navigationPatched) throw Error('SCORM navigation checksum mismatch');
   }
+  if (hash(source) === realOriginal) {
+    source = replace(source, realUpdates);
+    if (hash(source) !== realPatched) throw Error('SCORM real checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === realPatched) {
+    source = replace(source, realUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== realOriginal) throw Error('SCORM real reverse checksum mismatch');
+  }
   if (hash(source) === navigationPatched) {
     source = replace(source, navigationUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== navigationOriginal) throw Error('SCORM navigation reverse checksum mismatch');
