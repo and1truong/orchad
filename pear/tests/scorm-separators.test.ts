@@ -15,7 +15,8 @@ import {separatorVectors} from './scorm-separator-vectors.ts';
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': only bracketed separators split learner records; rejected replacements cannot alter durable state', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'pear-separators-')), path = join(directory, 'db.sqlite');
-  const f = await scormLearningFixture(path, multiFilePackage(edition, singleSCOManifest(edition)));
+  const manifest = singleSCOManifest(edition).replace('<p:manifest ', '<p:manifest xmlns:s="http://www.imsglobal.org/xsd/imsss" ').replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:controlMode flow="true" choice="true"/></s:sequencing>');
+  const f = await scormLearningFixture(path, multiFilePackage(edition, manifest));
   let reopened: ReturnType<typeof fixture> | undefined;
   try {
     const binding = f.enroll(), launch = f.launch(binding), b = f.player.bootstrap(launch.token); let state: any;
@@ -37,6 +38,24 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
       const forged = structuredClone(state); forged.interactions[i].learner_response = v.invalid;
       assert.throws(() => f.player.checkpoint(launch.token, {...request, state: forged, sequence: 2, revision: 1}), /data model/);
     }
+    // Historical v7 state is validated by loadFromJSON setters before the
+    // baseline-equality fast path. Simulate each formerly admitted raw record.
+    const envelope = JSON.parse(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state as string);
+    envelope.engine.adaptation = 'pear-responses-v7';
+    f.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=?').run(JSON.stringify(envelope));
+    for (const [index, field, invalid] of [[0, 'learner_response', separatorVectors[0].invalid], [4, 'learner_response', 'left.right'], [5, 'pattern', '1:2']] as const) {
+      const legacy = structuredClone(state);
+      if (field === 'pattern') legacy.interactions[index].correct_responses[0].pattern = invalid;
+      else legacy.interactions[index].learner_response = invalid;
+      f.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?').run(JSON.stringify(legacy));
+      for (const candidate of [legacy, {...legacy, interactions: {}}]) {
+        assert.throws(() => f.player.checkpoint(launch.token, {sequence: 2, revision: 1, state: candidate, finished: true}), /Type Mismatch|data model/);
+        assert.equal(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision, 1);
+        assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n, 1);
+        assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
+      }
+    }
+    f.db.prepare('UPDATE scorm_sco_attempts SET runtime_state=?').run(JSON.stringify(state));
     f.db.close(); reopened = fixture(path);
     const player = new SCORMPlayerService(reopened.db, new SCORMLearningBindings(reopened.db, reopened.service));
     assert.deepEqual(player.checkpoint(launch.token, request), receipt);

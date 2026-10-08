@@ -26,7 +26,12 @@ answers containing bare commas/emoji, performance text and literal backslashes,
 choice punctuation/set duplication, bracketed matching and numeric correct ranges.
 Rejected replacements preserve values. Durable commit, exact retry, forged replay
 rejection and actual DB close/resume preserve accepted original strings and create
-no official proof. Built licensed-wrapper API/ACK/close/resume journeys are authored
+no official proof. Historical v7 invalid response seeds are rejected by the
+engine loadFromJSON setters before baseline-equality skips; unchanged or omitted
+incoming response fields cannot create a new receipt, revision or proof. Original
+three-edition trusted-sequencing regressions preserve valid v7 resume and prove
+failure transactionally for over-limit fill-in, malformed matching and numeric
+correct patterns. No accepted history is rewritten. Built licensed-wrapper API/ACK/close/resume journeys are authored
 for all three editions. Local browser installation is unavailable in this checkout;
 actual current-head CI, rather than previous-head evidence, must verify that lane.
 
