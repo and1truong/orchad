@@ -92,8 +92,8 @@ and, after `npm run build`, `PEAR_E2E_PRODUCTION=1 npm run test:e2e -- invitatio
 
 `npm run build && npm run test:keycloak` requires the local Docker socket and a
 Playwright Chromium installation (`CHROMIUM_PATH` may select a compatible system
-browser). The optional `pear-keycloak` workflow runs it automatically for relevant
-identity/invitation changes and can be dispatched manually.
+browser). The optional `pear-keycloak` workflow runs it automatically for Pear/bridge-contract
+changes and can be dispatched manually.
 
 The harness uses official Keycloak 26.8.0 pinned by digest, imports only original
 test identities, publishes loopback ports 4336/4337, and removes its uniquely named

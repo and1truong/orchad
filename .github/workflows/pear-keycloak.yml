@@ -4,24 +4,14 @@ on:
   pull_request:
     paths:
       - '.github/workflows/pear-keycloak.yml'
-      - 'pear/scripts/keycloak-browser.ts'
-      - 'pear/tsconfig*.json'
-      - 'pear/package*.json'
-      - 'pear/src/server/app.ts'
-      - 'pear/tests/fixtures/keycloak/**'
-      - 'pear/src/server/identity.ts'
-      - 'pear/src/server/invitations.ts'
+      - 'pear/**'
+      - 'packages/bridge-contract/**'
   push:
     branches: [main]
     paths:
       - '.github/workflows/pear-keycloak.yml'
-      - 'pear/scripts/keycloak-browser.ts'
-      - 'pear/tsconfig*.json'
-      - 'pear/package*.json'
-      - 'pear/src/server/app.ts'
-      - 'pear/tests/fixtures/keycloak/**'
-      - 'pear/src/server/identity.ts'
-      - 'pear/src/server/invitations.ts'
+      - 'pear/**'
+      - 'packages/bridge-contract/**'
 jobs:
   keycloak:
     runs-on: ubuntu-latest
