@@ -23,6 +23,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
       if(api.SetValue(key,'\\ud800')!=='false'||api.GetLastError()!=='406'||api.GetValue(key)!=='')throw Error('invalid location rollback');
     }
     if(api.SetValue('cmi.comments_from_learner.1.comment','')!=='true'||api.GetValue('cmi.comments_from_learner._count')!=='2')throw Error('empty comment record');
+    for(const key of ['cmi.comments_from_learner.0.timestamp','cmi.comments_from_learner.1.location','cmi.comments_from_learner.1.timestamp'])if(api.GetValue(key)!==''||api.GetLastError()!=='403')throw Error('missing comment field '+key);
     document.getElementById('save').onclick=()=>{
       for(const [key,value] of [['cmi.location',''],['cmi.suspend_data','licensed-state'],['cmi.completion_status','incomplete'],['cmi.exit','suspend']])if(api.SetValue(key,value)!=='true')throw Error('cleared-location save '+key);
       document.getElementById('result').textContent='Licensed save: '+save();
@@ -56,6 +57,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
     expect(stored.comments_from_lms).toEqual({0: lmsComment}); expect(stored.comments_from_learner[0].comment).toBe('Original own comment');
     expect(stored.location).toBe(''); expect(stored.comments_from_learner[0].location).toBe(''); expect(stored.comments_from_learner[1].comment).toBe(''); expect(Object.keys(stored.comments_from_learner)).toHaveLength(2);
+    for (const [row, field] of [[0, 'timestamp'], [1, 'location'], [1, 'timestamp']] as const) expect(Object.hasOwn(stored.comments_from_learner[row], field)).toBe(false);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Read-only comments verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
