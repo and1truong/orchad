@@ -66,3 +66,24 @@ Original browser fixtures:
 ![Learner completion and backend-issued certificate](docs/evidence/human-completion.png)
 
 ![Responsive catalog](docs/evidence/mobile-catalog.png)
+
+
+### Reviewed SSO invitations
+
+With the existing secure OIDC configuration, an administrator can create users
+in People and review one-time exact-subject invitations under Administration.
+An invitation link requires the reviewed SSO identity; it is not a password or
+bearer login. Default expiry is one day; admins explicitly choose 1–30 days.
+Revoke/reissue when the identity, authority or expiry changes. Acceptance preserves
+all learning records and roles.
+
+Optional server-only `PEAR_INVITATION_MAIL` JSON config selects a reviewed HTTPS
+mail relay (`url`, `token`); it receives `recipient`, `url`, `expiresAt` JSON, Bearer
+auth and a stable invitation-ID idempotency header. The relay must deduplicate
+retries. Configure credentials at the trusted server boundary. The human must
+confirm each send; absent configuration sends nothing. HTTP acceptance is not
+mailbox delivery. Bulk/automatic welcome email and password onboarding remain
+open. See [ADR-103](docs/ADR-103-reviewed-sso-invitations.md).
+
+Focused checks: `node --import tsx --test tests/invitations.test.ts tests/identity.test.ts`
+and, after `npm run build`, `PEAR_E2E_PRODUCTION=1 npm run test:e2e -- invitations.spec.ts identity.spec.ts`.
