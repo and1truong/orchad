@@ -13,7 +13,7 @@ for (const edition of SCORM_STANDARDS) test(edition + ': actual Chrome Side Pane
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks')), binding = f.enroll();
   const origin = 'http://127.0.0.1:4346', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4347', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
   const directory = await mkdtemp(join(tmpdir(), 'pear-side-panel-')), extension = join(directory, 'extension');
-  let context: Awaited<ReturnType<typeof chromium.launchPersistentContext>> | undefined, gateway: Awaited<ReturnType<typeof startMockGateway>> | undefined;
+  let attached: Awaited<ReturnType<typeof chromium.connectOverCDP>> | undefined, context: Awaited<ReturnType<typeof chromium.launchPersistentContext>> | undefined, gateway: Awaited<ReturnType<typeof startMockGateway>> | undefined;
   try {
     await cp(resolve('../lime/dist/extension'), extension, {recursive: true});
     const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8')); manifest.host_permissions = [origin + '/*', 'http://127.0.0.1:4348/*'];
@@ -28,7 +28,7 @@ for (const edition of SCORM_STANDARDS) test(edition + ': actual Chrome Side Pane
     await writeFile(join(extension, 'sidepanel.html'), html.replace('</body>', '<script src="reporter.js"></script></body>'));
     const workerSource = await readFile(join(extension, 'worker.js'), 'utf8');
     await writeFile(join(extension, 'worker.js'), workerSource + `\nglobalThis.pearSidePanelReports=[];chrome.runtime.onMessage.addListener((message,sender)=>{if(message?.pearSidePanelFixture===true)globalThis.pearSidePanelReports.push({documentId:sender.documentId,url:sender.url,...message});});`);
-    context = await chromium.launchPersistentContext(join(directory, 'profile'), {channel: 'chromium', headless: false, ...(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}), args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-extensions-except=' + extension, '--load-extension=' + extension]});
+    context = await chromium.launchPersistentContext(join(directory, 'profile'), {channel: 'chromium', headless: false, ...(process.env.CHROMIUM_PATH ? {executablePath: process.env.CHROMIUM_PATH} : {}), args: ['--no-sandbox', '--disable-dev-shm-usage', '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', '--disable-extensions-except=' + extension, '--load-extension=' + extension]});
     const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker', {timeout: 10_000});
     const extensionId = new URL(worker.url()).hostname, panelURL = 'chrome-extension://' + extensionId + '/sidepanel.html';
     const page = await context.newPage(); await page.goto(origin);
@@ -54,8 +54,15 @@ for (const edition of SCORM_STANDARDS) test(edition + ': actual Chrome Side Pane
     expect(evidence.reports[0].contextType).toBe('SIDE_PANEL');
     expect(evidence.contexts[0].documentId).toBe(evidence.reports[0].documentId);
     // Drive the page Chrome created for the verified SIDE_PANEL; never navigate a tab to panelURL.
-    await expect.poll(() => context!.pages().filter(page => page.url() === panelURL).length).toBe(1);
-    const panel = context.pages().find(page => page.url() === panelURL)!;
+    // Reconnect to attach the existing panel target after Chrome's verified mount.
+    const port=(await readFile(join(directory,'profile','DevToolsActivePort'),'utf8')).split('\n')[0];
+    expect(port).toMatch(/^\d+$/); expect(Number(port)).toBeGreaterThan(0); expect(Number(port)).toBeLessThanOrEqual(65535);
+    attached=await chromium.connectOverCDP('http://127.0.0.1:'+port);
+    const attachedContext=attached.contexts()[0]; expect(attachedContext).toBeDefined();
+    await expect.poll(() => attachedContext.pages().filter(page => page.url() === panelURL).length).toBe(1);
+    const panel = attachedContext.pages().find(page => page.url() === panelURL)!;
+    const attachedContexts=await panel.evaluate(()=>chrome.runtime.getContexts({contextTypes:['SIDE_PANEL'],documentUrls:[location.href]}));
+    expect(attachedContexts).toHaveLength(1); expect(attachedContexts[0].documentId).toBe(evidence.contexts[0].documentId);
     const pin = async (document: string) => {
       const option = panel.locator('select[aria-label="Target picker"] option[data-url^="' + origin + '"]'); await option.waitFor({state: 'attached'});
       await panel.getByLabel('Target picker').selectOption((await option.getAttribute('value'))!); await panel.getByRole('button', {name: 'Pin target', exact: true}).click();
@@ -108,5 +115,5 @@ for (const edition of SCORM_STANDARDS) test(edition + ': actual Chrome Side Pane
     const finalContexts = await worker.evaluate(() => chrome.runtime.getContexts({contextTypes: ['SIDE_PANEL']}));
     expect(finalContexts).toHaveLength(1); expect(finalContexts[0].documentId).toBe(evidence.contexts[0].documentId);
     await testInfo.attach('actual-side-panel-journey', {body: JSON.stringify({edition, contextType: finalContexts[0].contextType, sameDocument: true, permittedRead: result.ok, revokedBeforeGateway: gateway.requestCount === beforeRebind, proofs: 1, certificates: 0}), contentType: 'application/json'});
-  } finally {await context?.close(); await gateway?.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close(); await rm(directory, {recursive: true, force: true});}
+  } finally {await attached?.close(); await context?.close(); await gateway?.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close(); await rm(directory, {recursive: true, force: true});}
 });
