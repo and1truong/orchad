@@ -95,7 +95,13 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },
     GetLastError() {return error ?? runtime.GetLastError();},
-    GetErrorString(code: string) {return runtime.GetErrorString(code);},
-    GetDiagnostic(code: string) {return error ? 'SCORM 2004 session, edition profile, argument or checkpoint queue rejected the operation (' + error + ')' : runtime.GetDiagnostic(code);},
+    GetErrorString(code: string) {return /^\d+$/.test(code) ? runtime.GetErrorString(code) : '';},
+    GetDiagnostic(code: string) {
+      const requested = code === '' ? error ?? runtime.GetLastError() : code;
+      // Pear implements error-code diagnostics only. Unknown names must not
+      // reach the upstream inherited-property lookup (e.g. __proto__).
+      if (!/^\d+$/.test(requested)) return '';
+      return error && requested === error ? 'SCORM 2004 session, edition profile, argument or checkpoint queue rejected the operation (' + error + ')' : runtime.GetDiagnostic(requested);
+    },
   });
 }
