@@ -1,7 +1,7 @@
 # SCORM #133 requirement acceptance
 
 This is the current requirement disposition, not a scope reduction or certification.
-Implementation source: #164, 5281269795479540590176c07c7ce5570e4f1286,
+Inherited implementation source: #164, 5281269795479540590176c07c7ce5570e4f1286,
 tree 07fc9906a4aa1a87cfcdb41892d867fbbce03c92; ADR-075–097.
 Local: 564 domain / 82 isolated files, 67 dedicated built Chromium journeys,
 build/typecheck/vendor/actual installer PASS. Remote/integrated/main acceptance
@@ -32,3 +32,13 @@ production policy. Do not buy licenses, upload packages/PII, fabricate exports,
 substitute Chromium viewport for mobile engines or enable production to get green.
 Code conformance gaps remain implementation work; they are not external exceptions.
 The full epic cannot close while either class remains unfulfilled.
+
+Integrated #165 review corrections additionally recheck leaf/ancestor calendar
+windows on active communication-session reopen independently of optional
+duration clocks. Calendar-only legacy snapshots do not need a new clock.
+Three-edition regressions prove inclusive boundaries and denied early/expired
+reopen without launch/proof changes. Earlier-edition shared-data unavailability
+(error 401) takes precedence over malformed Unicode/store validation.
+The actual Lime practice harness waits for completed discovery before selecting
+read permissions/consent, reusing its existing bind helper. No host guard or
+assertion is removed. Current exact-head acceptance remains in the epic ledger.

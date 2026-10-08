@@ -15,6 +15,10 @@ test('characterstring scalar count preserves combining characters and refuses lo
 });
 
 test('malformed Unicode does not override readonly or undefined-element errors',()=>{
+  for(const edition of ['2004-2','2004-3'] as const) {
+    const api=createSCORM2004API({edition});assert.equal(api.Initialize(''),'true');
+    for(const key of ['adl.data.0.id','adl.data.0.store']) for(const value of ['valid','\ud800','\udfff']) {assert.equal(api.SetValue(key,value),'false');assert.equal(api.GetLastError(),'401');}
+  }
   const old=createSCORM12API(),current=createSCORM2004API({edition:'2004-4'});assert.equal(old.LMSInitialize(''),'true');assert.equal(current.Initialize(''),'true');
   for(const value of ['\ud800','\udfff']){
     assert.equal(old.LMSSetValue('cmi.core.student_id',value),'false');assert.equal(old.LMSGetLastError(),'403');

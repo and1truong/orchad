@@ -8,6 +8,23 @@ import {inspectSCORMPackage} from '../src/server/scorm-package-reader.ts';
 import {sequencingTree} from '../src/server/scorm-sequencing.ts';
 const xml = (edition: '2004-2' | '2004-3' | '2004-4', key: string, seconds = 10) => sequencingManifest(edition).replace('<p:title>Introduction</p:title><s:sequencing>', `<p:title>Introduction</p:title><s:sequencing><s:limitConditions ${key}="PT${seconds}S"/>`);
 const snapshot = (f: any) => JSON.parse(JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts ORDER BY attempt_number DESC LIMIT 1').get()!.sequencing_state)).snapshot);
+for(const edition of ['2004-2','2004-3','2004-4'] as const) test(`${edition}: calendar-only active reopen checks both leaf and ancestor windows without requiring a new clock snapshot`,async t=>{
+  const begin=Date.parse('2026-10-08T00:00:00Z'),end=begin+10000;
+  t.mock.timers.enable({apis:['Date'],now:begin});
+  try {for(const parent of [false,true]) {
+    const limits='<s:limitConditions beginTimeLimit="2026-10-08T00:00:00Z" endTimeLimit="2026-10-08T00:00:10Z"/>';
+    const manifest=parent?sequencingManifest(edition).replace('<s:controlMode flow="true" choice="true" forwardOnly="true"/>','<s:controlMode flow="true" choice="true" forwardOnly="true"/>'+limits):sequencingManifest(edition).replace('<p:title>Introduction</p:title><s:sequencing>','<p:title>Introduction</p:title><s:sequencing>'+limits);
+    t.mock.timers.setTime(begin);const f=await scormLearningFixture(undefined,multiFilePackage(edition,manifest));
+    try {
+      const binding=f.enroll(),first=f.launch(binding);f.player.close(f.service.principal('learner-a'),first.launchId,'session-learner-a');
+      assert.equal(snapshot(f).pearDurationClock,undefined);
+      for(const now of [begin,end]) {t.mock.timers.setTime(now);const reopened=f.launch(binding);assert.equal(reopened.scoId,'intro');f.player.close(f.service.principal('learner-a'),reopened.launchId,'session-learner-a');}
+      const launches=f.db.prepare('SELECT count(*) n FROM scorm_engine_launches').get()!.n;
+      for(const now of [end+1,begin-1]) {t.mock.timers.setTime(now);for(const sco of [undefined,'intro']) assert.throws(()=>f.launch(binding,sco),/denies|prerequisite/);assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_launches').get()!.n,launches);}
+      assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n,0);
+    } finally {f.db.close();}
+  }} finally {t.mock.timers.reset();}
+});
 for (const edition of ['2004-2','2004-3','2004-4'] as const) test(`${edition}: absolute vs experienced clocks persist through suspend and cannot use forged reported time`, async t => {
   for (const key of ['attemptAbsoluteDurationLimit','attemptExperiencedDurationLimit']) {
     const f = await scormLearningFixture(undefined, multiFilePackage(edition, xml(edition,key)));

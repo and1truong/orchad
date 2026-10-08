@@ -70,9 +70,13 @@ export function installDurationClock(runtime: Scorm2004API, tree: Record<string,
   sync();
 }
 
-/** Communication-session reopen still has to satisfy current duration limits. */
+/** Reopen checks calendar windows independently of optional duration tracking. */
 export function durationAllowsDelivery(runtime: Scorm2004API) {
   let activity: any = runtime.getSequencingState()?.currentActivity;
-  while (activity) {if (activity._pearDurationLimitCheck?.(activity)) return false; activity = activity.parent;}
+  const now = Date.now();
+  while (activity) {
+    if (activity.sequencingControls.tracked !== false && (activity.beginTimeLimit && now < Date.parse(activity.beginTimeLimit) || activity.endTimeLimit && now > Date.parse(activity.endTimeLimit))) return false;
+    if (activity._pearDurationLimitCheck?.(activity)) return false; activity = activity.parent;
+  }
   return true;
 }

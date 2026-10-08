@@ -24,8 +24,8 @@ export function scorm2004EngineValue(key: string, value: string) {
   return value;
 }
 export function scorm2004FieldError(edition: SCORM2004Edition, key: string, value: string): string | null {
-  if ((scorm2004Writable.test(key) || /^adl\.data\.\d+\.store$/.test(key)) && !Number.isFinite(scormCharacters(value))) return '406';
   if (edition !== '2004-4' && (key.startsWith('adl.data.') || key.startsWith('adl.nav.request_valid.jump') || key === 'adl.nav.request' && value.endsWith('jump'))) return '401';
+  if ((scorm2004Writable.test(key) || /^adl\.data\.\d+\.store$/.test(key)) && !Number.isFinite(scormCharacters(value))) return '406';
   if (key === 'cmi.suspend_data' && scormCharacters(value) > (edition === '2004-2' ? 4000 : 64000)) return '406';
   if (key === 'cmi.session_time' || /^cmi.interactions.\d+.latency$/.test(key)) {
     try {scorm2004Seconds(value);} catch {return '406';}

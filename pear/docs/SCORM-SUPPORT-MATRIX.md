@@ -47,3 +47,10 @@ Unicode/SPM evidence (ADR-095): exact supplementary suspend-data bounds in all f
 Localized-string evidence (ADR-096): scalar 250/4000 text patterns, multiple language subtags, 250-character language values, line terminators and unchanged supplementary/combining text in comments/descriptions and fill-in/long-fill-in records. Browser and server replay share the checksum-locked correction; maximum localized comments and ten fill-in learner records round-trip through durable ACK/resume. Host binding envelopes remain bounded (4257 localized leaves / 8192 interaction response leaves; 512 KiB checkpoint). Exhaustive identifier/interaction/language-registry/error-precedence conformance remains OPEN. Known Unicode-v4 sequencing snapshots remain readable.
 
 Interaction collection evidence (ADR-097): zero-record learner choice/matching/sequencing/performance collections and a one-pattern empty choice correct set retain counts across ACK/retry/resume. Tested 36 choice/sequencing identifiers, 36 matching pairs and 250 full-size performance records; per-record 250-scalar performance and 4000-scalar other answers. Response envelopes allow 128000 scalars within the unchanged 512 KiB checkpoint; typed engine validation remains mandatory. Correct-response prefix/whitespace and URI conformance remain OPEN. Localized-v5 and older known snapshot markers stay accepted.
+
+Integrated #165 review regression evidence: active reopen checks current leaf
+and ancestor calendar windows even when no duration clock is installed, while
+calendar-only legacy snapshots remain readable. Inclusive boundaries and denied
+early/expired delivery preserve launch/proof state in all three 2004 editions.
+Edition 2/3 shared-data error 401 precedes malformed-Unicode validation. These
+shared host/facade corrections do not change pinned ESM bytes or schema.
