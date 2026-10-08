@@ -8,7 +8,7 @@ function App(){const [url,setUrl]=useState(trustedOrigin.trim()+'/'),[state,setS
  // unmounted stops it, so approvals can no longer be granted (writes fail
  // closed). Apply completed snapshots in order; an in-flight newer poll must not
  // starve the UI when native replies take longer than the polling interval.
- useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible'){const seq=++hbSeq.current;request({action:'heartbeat'}).then(s=>{if(seq>hbApplied.current){hbApplied.current=seq;setState(s);}}).catch(e=>log(String(e)));}},1000);return()=>clearInterval(timer);},[]);
+ useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible'){const seq=++hbSeq.current;request({action:'heartbeat'}).then(s=>{if(seq>hbApplied.current&&document.visibilityState==='visible'){hbApplied.current=seq;setState(s);}}).catch(e=>log(String(e)));}},1000);return()=>clearInterval(timer);},[]);
  useEffect(()=>{const un=listen<DStatus>('durable-status',e=>setDStatus(e.payload));request({action:'durable_status'}).then(s=>setDStatus(s)).catch(()=>{});return()=>{un.then(f=>f());};},[]);
  // Consent is pinned to the FULL binding plus the egress it names: any
  // change in targetId/pageInstanceId/documentId/sessionEpoch or in
