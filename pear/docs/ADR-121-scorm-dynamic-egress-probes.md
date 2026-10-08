@@ -29,3 +29,12 @@ form submission plus the zero-request guard. No product permission relaxed.
 Self-navigation, redirects, complete dynamic/nested traversal, real Side
 Panel/Safari/Android and reviewed production enforcement remain OPEN. Strict
 mode is not enabled by these fixtures.
+
+
+Actual macOS run 37835169386, job 113510238758 failed the first-profile
+dynamic-egress assertion after runtime16/Pear13 passed. Initial diagnostics
+recorded authority surfaces but omitted dynamic probe fields and sink count,
+so the cause cannot be assigned to event timing or sandbox semantics. Add
+only those boolean/directive/count diagnostics; no authored state, URLs,
+capabilities or credentials. Denial and zero-sink assertions remain unchanged.
+Current-head actual native validation is required; this failure is retained.
