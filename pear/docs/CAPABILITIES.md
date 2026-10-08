@@ -280,3 +280,20 @@ preserve authority. Reported time remains distinct from trusted host duration
 and official completion proof. Full URI/response/lifecycle/error/time/sequence
 conformance, licensed reference/commercial evidence, additional actual platforms
 and production egress/scanning/retention/load/DR remain OPEN/BLOCKED.
+
+
+## G13 original reviewed SSO invitations (ADR-103)
+
+Additive schema 51 and human-only invitation review/send/revoke/expiry/reissue
+connect provisioned accounts to the existing signed, browser-bound OIDC flow.
+Only the exact admin-reviewed issuer subject can accept; live admin/account
+auth versions, duplicate identity constraints, callback authority and atomic
+audit/session/mapping checks preserve original learning. Optional HTTPS mail
+relay has explicit addressed confirmation, stable retry keys and bounded failure
+handling; no default email provider or automatic recipient delivery is enabled.
+EN/VI mobile-width built-browser and real loopback HTTP/OIDC/mail evidence are
+original profile evidence. Public Go1 expiry guidance is inconsistent, so Pear's
+1–30-day reviewed expiry is not exact-reference acceptance. Bulk/automatic
+welcome notifications, password/cross-portal onboarding, actual authorized IdP
+and mailbox delivery remain OPEN/NOT VERIFIED; G13 and M1/M6 are not closed.
+See ADR-103 and invitations tests.

@@ -1,4 +1,4 @@
-# ADR-103: SCORM 2004 timestamp calendar and lexical binding
+# ADR-104: SCORM 2004 timestamp calendar and lexical binding
 
 Epic #133, from merged #170 / main `1a3a03aaf3b2a4909f9efc35d322a1cf47f68e8d`.
 The pinned engine accepted years after 2038, impossible calendar dates,
