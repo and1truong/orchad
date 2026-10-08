@@ -36,3 +36,10 @@ https://lms.technology/for/scorm/1.2/standards/SCORM_1.2_RunTimeEnv.pdf
 Full internal conformance, actual remaining platform evidence, licensed corpus/
 account and real deployment/operations remain OPEN/BLOCKED. Native Windows failure
 investigation remains at ADR-116's owner. Epic stays open/production disabled.
+
+Full CI on 7eb4838f passed 704/704 domain but exposed one missed inherited
+1.2 browser support-methods expectation: cmi.unknown still expected 401. Bind
+that existing assertion/diagnostic preservation to 201 for 1.2 (2004 remains
+401), and retain outside xyz.score.result 401 plus its current/requested
+diagnostic preservation and successful recovery/resume. Runtime bytes are
+unchanged; the first full-CI failure remains recorded (job 113493867811).
