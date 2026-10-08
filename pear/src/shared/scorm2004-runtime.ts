@@ -1,7 +1,7 @@
 import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
-import type {SCORMStandard} from './scorm-engine.ts';
+import {scormModelPath, type SCORMStandard} from './scorm-engine.ts';
 
 export type SCORM2004Edition = Exclude<SCORMStandard, '1.2'>;
 export const scorm2004CheckpointBytes = 512 * 1024;
@@ -54,15 +54,19 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
     GetValue(key: string) {
       const code = inactive('122', '123'); if (code) {bad(code); return '';}
       if (typeof key !== 'string') {bad('201'); return '';}
+      if (key !== '' && !scormModelPath(key)) {bad('401'); return '';}
       if (options.edition !== '2004-4' && (key.startsWith('adl.data.') || key.startsWith('adl.nav.request_valid.jump'))) {bad('401'); return '';}
       // ADL navigation is read/write (REQ_47.1); this engine treats the request
       // as write-only. Expose the validated local request without processing it.
       if (key === 'adl.nav.request') {error = null; runtime.lastErrorCode = '0'; return navigation;}
-      error = null; return runtime.GetValue(key);
+      error = null; const value = runtime.GetValue(key);
+      if (typeof value !== 'string') {bad('401'); return '';}
+      return value;
     },
     SetValue(key: string, value: string) {
       const code = inactive('132', '133'); if (code) return bad(code);
       if (typeof key !== 'string' || typeof value !== 'string') return bad('201');
+      if (key !== '' && (!scormModelPath(key) || typeof runtime.GetValue(key) !== 'string')) return bad('401');
       const fieldError = scorm2004FieldError(options.edition, key, value);
       if (fieldError === '401') return bad(fieldError);
       // Navigation involving another activity is enabled only with trusted sequencing.
@@ -81,7 +85,8 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const code = inactive('142', '143'); if (code) return bad(code);
       if (argument !== '') return bad('201');
       error = null; const result = runtime.Commit(argument);
-      if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');
+      try {if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');}
+      catch {return bad('391');}
       if (result === 'true') sharedWrites = Object.create(null);
       return result;
     },
@@ -91,7 +96,8 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       error = null;
       if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');
       // Queue acceptance precedes termination so an unavailable durable queue is retryable.
-      if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');
+      try {if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');}
+      catch {return bad('111');}
       const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },
     GetLastError() {return error ?? runtime.GetLastError();},

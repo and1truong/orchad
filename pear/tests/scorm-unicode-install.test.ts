@@ -6,10 +6,22 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {runInNewContext} from 'node:vm';
+import {reviewedSCORMSource, unreviewedSCORMSource} from '../scripts/scorm-review-corrections.mjs';
 
 test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and rejects unexpected engine bytes/version',()=>{
   const root=mkdtempSync(join(tmpdir(),'pear-unicode-install-')),hash=(s:string)=>createHash('sha256').update(s).digest('hex');
-  const current2004=readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js',import.meta.url),'utf8'),current12=readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm12.js',import.meta.url),'utf8');
+  const corrected2004=readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm2004.js',import.meta.url),'utf8'),corrected12=readFileSync(new URL('../node_modules/scorm-again/dist/esm/scorm12.js',import.meta.url),'utf8');
+  const current2004=unreviewedSCORMSource(corrected2004),current12=unreviewedSCORMSource(corrected12);
+  const reviewScript=readFileSync(new URL('../scripts/scorm-review-corrections.mjs',import.meta.url),'utf8');
+  const navUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const navigationUpdates = ')+'const navigationUpdates = '.length,reviewScript.indexOf(';\nconst realOriginal',reviewScript.indexOf('const navigationUpdates = '))));
+  const realUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const realUpdates = ')+'const realUpdates = '.length,reviewScript.indexOf(';\nconst derivedOriginal',reviewScript.indexOf('const realUpdates = '))));
+  const derivedUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const derivedUpdates = ')+'const derivedUpdates = '.length,reviewScript.indexOf(';\nexport function',reviewScript.indexOf('const derivedUpdates = '))));
+  let derivedPredecessor=corrected2004;for(const [before,after] of derivedUpdates.toReversed()){assert.equal(derivedPredecessor.split(after).length,2);derivedPredecessor=derivedPredecessor.replace(after,()=>before);}
+  assert.equal(hash(derivedPredecessor),'2872964c5545baf04c2de580be6ece0dafafe76c83d04efedc7b5d5cec7720df');
+  let predecessorReviewed2004=derivedPredecessor;for(const [before,after] of realUpdates.toReversed()){assert.equal(predecessorReviewed2004.split(after).length,2);predecessorReviewed2004=predecessorReviewed2004.replace(after,()=>before);}
+  assert.equal(hash(predecessorReviewed2004),'a8d9018516119e5180c5cccd9931bb8b56335f3c282c0367cfe116e73d420007');
+  let previousReviewed2004=predecessorReviewed2004;for(const [before,after] of navUpdates.toReversed()){assert.equal(previousReviewed2004.split(after).length,2);previousReviewed2004=previousReviewed2004.replace(after,()=>before);}
+  assert.equal(hash(previousReviewed2004),'0fcfd491141495491caeb8dcc334d68a1dd407fb0c6f15c0747438a7902c1fa9');
   const beginning='    // Pear: plain characterstring limits count Unicode scalar values, not UTF-16 units.',ending='scalarString ? "u" : "");';
   const previous=(s:string)=>{const start=s.indexOf(beginning),end=s.indexOf(ending,start)+ending.length;assert.ok(start>=0&&end>start);return s.slice(0,start)+'    const formatRegex = new RegExp(regexPattern);'+s.slice(end);};
   const installer=readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url),'utf8');
@@ -18,11 +30,34 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const responseUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const responseUpdates = ')+'const responseUpdates = '.length,installer.indexOf(';\n\nconst responseDelimiterUpdates',installer.indexOf('const responseUpdates = '))));
   const delimiterUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const responseDelimiterUpdates = ')+'const responseDelimiterUpdates = '.length,installer.indexOf(';\n\nconst separators',installer.indexOf('const responseDelimiterUpdates = '))));
   const separatorUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const separatorUpdates = ')+'const separatorUpdates = '.length,installer.indexOf(';\n\nconst identifiers',installer.indexOf('const separatorUpdates = '))));
-  const identifierUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const identifierUpdates = ')+'const identifierUpdates = '.length,installer.indexOf(';\n\n// The exact',installer.indexOf('const identifierUpdates = '))));
-  let separators2004=current2004;
+  const identifierUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const identifierUpdates = ')+'const identifierUpdates = '.length,installer.indexOf(';\n\nconst timestamps',installer.indexOf('const identifierUpdates = '))));
+  const timestampUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const timestampUpdates = ')+'const timestampUpdates = '.length,installer.indexOf(';\n\nconst initialized',installer.indexOf('const timestampUpdates = '))));
+  const initializationUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const initializationUpdates = ')+'const initializationUpdates = '.length,installer.indexOf(';\n\nconst atomic',installer.indexOf('const initializationUpdates = '))));
+  const atomicityUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const atomicityUpdates = ')+'const atomicityUpdates = '.length,installer.indexOf(';\n\nconst indexed',installer.indexOf('const atomicityUpdates = '))));
+  const indexUpdates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const indexUpdates = ')+'const indexUpdates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const indexUpdates = '))));
+  const atomicity12Updates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const atomicity12Updates = ')+'const atomicity12Updates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const atomicity12Updates = '))));
+  const score12Updates: [string,string][]=JSON.parse(installer.slice(installer.indexOf('const score12Updates = ')+'const score12Updates = '.length,installer.indexOf(';\n\nif',installer.indexOf('const score12Updates = '))));
+  let atomic12=current12;for(const [before,after] of score12Updates.toReversed()){assert.equal(atomic12.split(after).length,2);atomic12=atomic12.replace(after,()=>before);}
+  assert.equal(hash(atomic12),'e34cb1536920b0597008b53dc97f13abddc71bb07911a0cd4daa55f127c551be');
+  let indexed12=atomic12;for(const [before,after] of atomicity12Updates.toReversed()){assert.equal(indexed12.split(after).length,2);indexed12=indexed12.replace(after,()=>before);}
+  assert.equal(hash(indexed12),'4d205a6b1c73d9af2b1f09b4f9a12b713cea07468b50bc3947f3c86370ce3e99');
+  let atomic2004=current2004,unicode12=indexed12;
+  for(const [before,after] of indexUpdates.toReversed()){assert.equal(atomic2004.split(after).length,2);atomic2004=atomic2004.replace(after,()=>before);assert.equal(unicode12.split(after).length,2);unicode12=unicode12.replace(after,()=>before);}
+  assert.equal(hash(current2004),'3fec364f6ea8cf9d4e5fbb226ced0646219fd456e5ae9f1bb1df0a739d826745'); assert.equal(hash(current12),'9e73552ee1a4f79998eb4817b62f3c72a8a920b2b1b9434f7bc2e96867d23dd0');
+  assert.equal(hash(unicode12),'2f8591ab1f08bd696ff11dc72b1e92c197d12512978ef870a39507ed9567e366');
+  let initialized2004=atomic2004;
+  for(const [before,after] of atomicityUpdates.toReversed()){assert.equal(initialized2004.split(after).length,2);initialized2004=initialized2004.replace(after,()=>before);}
+  assert.equal(hash(atomic2004),'f35f205f11e2102a9db770794233b5e7981698edc6bd887d4ce5576b9350bf14');
+  let timestamps2004=initialized2004;
+  for(const [before,after] of initializationUpdates.toReversed()){assert.equal(timestamps2004.split(after).length,2);timestamps2004=timestamps2004.replace(after,()=>before);}
+  assert.equal(hash(initialized2004),'17b3f713e5ddf6caf3206c77d2ea19e17fef5d4610b2d61d267f523012064871');
+  let identifiers2004=timestamps2004;
+  for(const [before,after] of timestampUpdates.toReversed()){assert.equal(identifiers2004.split(after).length,2);identifiers2004=identifiers2004.replace(after,()=>before);}
+  assert.equal(hash(timestamps2004),'bc9b1872658bcc18d5bd9fcb20f035e2d0d9657f9ea174f847905256af141938');
+  let separators2004=identifiers2004;
   for(const [before,after] of identifierUpdates.toReversed()){assert.equal(separators2004.split(after).length,2);separators2004=separators2004.replace(after,()=>before);}
   assert.equal(hash(separators2004),'92eae7d9b66fc91c85c68e3ad53b3a4b1f9011b89e69698f0619c3187c69ff8c');
-  assert.equal(hash(current2004),'8b30d65901cf1aee04991a23f8c55fc61050556e9d1bf448ea0da34a92fbaff9');
+  assert.equal(hash(identifiers2004),'8b30d65901cf1aee04991a23f8c55fc61050556e9d1bf448ea0da34a92fbaff9');
   let responses2004=separators2004;
   for(const [before,after] of separatorUpdates.toReversed()){assert.equal(responses2004.split(after).length,2);responses2004=responses2004.replace(after,()=>before);}
   assert.equal(hash(responses2004),'5312ce9cf54a83580a5e839c03cf6338a3b1d30d18fb0ab81f955b2ec603cb6b');
@@ -38,7 +73,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   assert.equal(hash(localized2004),'445f18f920d5424b335c666594e532fb9a3238b84cc76f522d5185e41aabbd08');let unicode2004=localized2004;
   for(const [before,after] of updates.toReversed()){assert.equal(unicode2004.split(after).length,2);unicode2004=unicode2004.replace(after,before);}
   assert.equal(hash(unicode2004),'8c6468541bf6f07353307758f5a828e7e9e04da0619c859500c9b108015db5da');
-  const old2004=previous(unicode2004),old12=previous(current12);assert.equal(hash(old2004),'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e');assert.equal(hash(old12),'52ffa12e5167e3a37b2f64eefa61cd599ea90c30cf4d164b667baddf83d497a6');
+  const old2004=previous(unicode2004),old12=previous(unicode12);assert.equal(hash(old2004),'de7a085e997136ad200f52a2221c2fec17e457c0d6a869735f613219b2dae10e');assert.equal(hash(old12),'52ffa12e5167e3a37b2f64eefa61cd599ea90c30cf4d164b667baddf83d497a6');
   const actualScript=readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url),'utf8'),pairs:[string,string][]=[];
   // Reconstruct pinned historical inputs, then prove their exact known hashes.
   // Execute only the trusted replacement declarations with a capture callback.
@@ -54,12 +89,13 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   assert.equal(hash(selected),'206daee49525dbf352bf9d6920f6d1ccc03ad9e8834db57a8d7d5ee2efb93cc0');
   try {
     const directory=join(root,'node_modules/scorm-again'),entries=join(directory,'dist/esm');mkdirSync(entries,{recursive:true});mkdirSync(join(root,'scripts'));
-    const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));
-    for(const input of [pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,current2004]){
+    const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));writeFileSync(join(root,'scripts/scorm-review-corrections.mjs'),readFileSync(new URL('../scripts/scorm-review-corrections.mjs',import.meta.url)));
+    for(const input of [...new Set([pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,timestamps2004,initialized2004,atomic2004,current2004,previousReviewed2004,predecessorReviewed2004,derivedPredecessor].flatMap(value=>[value,reviewedSCORMSource(value)]))]){
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
-      const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);
+      const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),corrected2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);
     }
-    for(let n=0;n<2;n++){const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),current2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),current12);}
+    for(const input12 of [...new Set([old12,unicode12,indexed12,atomic12,current12].flatMap(value=>[value,reviewedSCORMSource(value)]))]) {writeFileSync(join(entries,'scorm12.js'),input12);const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);}
+    for(let n=0;n<2;n++){const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),corrected2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);}
     writeFileSync(join(entries,'scorm12.js'),current12+'\n// unexpected');assert.notEqual(spawnSync(process.execPath,[script]).status,0);
     writeFileSync(join(entries,'scorm12.js'),current12);writeFileSync(join(entries,'scorm2004.js'),current2004+'\n// unexpected');assert.notEqual(spawnSync(process.execPath,[script]).status,0);
     writeFileSync(join(entries,'scorm2004.js'),current2004);writeFileSync(metadata,JSON.stringify({version:'3.4.6'}));assert.notEqual(spawnSync(process.execPath,[script]).status,0);

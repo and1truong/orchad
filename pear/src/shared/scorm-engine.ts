@@ -1,6 +1,12 @@
 export const SCORM_STANDARDS = ['1.2', '2004-2', '2004-3', '2004-4'] as const;
 export type SCORMStandard = typeof SCORM_STANDARDS[number];
-export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-identifiers-v9'} as const;
+export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-derived-read-errors-v18'} as const;
+/** Model keywords are public; backing fields and engine roots are not API elements. */
+export function scormModelPath(key: string) {
+  // Target delimiters contain authored values; the engine binds this whole family.
+  if (/^adl\.nav\.request_valid\.(?:choice|jump)(?:\.|$)/.test(key)) return true;
+  return /^(?:cmi|adl)\./.test(key) && key.split('.').every(part => !['initialized', 'jsonString', 'start_time'].includes(part) && (!part.startsWith('_') || ['_children', '_count', '_version'].includes(part)));
+}
 export interface SCORMResource {
   id: string;
   kind: 'sco' | 'asset';

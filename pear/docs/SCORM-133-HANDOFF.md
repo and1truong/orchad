@@ -80,3 +80,72 @@ Interaction-collection successor (ADR-097) restores zero-record learner collecti
 Current integration supersedes separate-session restrictions and old missing-semantics notes. Do not repair the abandoned broken checkout; use this owned clean repository. Preserve protected seeds, bound identities, normal-enrollment system stores, immutable proofs/history, quiz/cycle contracts and production-disabled guards.
 
 ADR-102 successor starts from live main d222f2f5bfc2de26e0387732cbdba893e7ebeb5f / tree 23e1ca8358abfe6ffc6069eebad0131582ad8fb5 (main acceptance 37753336363 PASS 8/8). Shared URI lexical bindings and full-choice capacity are corrected by pear-identifiers-v9. Known v8 identities remain compatible. Current response capacity is 144105 characters; earlier 128000 figures describe historical v6 behavior. Clause-level component/authority/URN/IP-literal/equivalence conformance and independent code/reference/platform/production gates remain open. Current exact-head evidence belongs in the successor PR/epic ledger; no production enablement or epic closure.
+
+ADR-104 timestamp successor starts from merged #170/main 1a3a03aa and uses pear-timestamps-v10. The shared engine validates exact Gregorian/1970–2038/centisecond/TZD binding on browser, replay and historical loads. Known v9 snapshots remain compatible. This session environment lacked the reported uncommitted timestamp diff/logs and was rebuilt with user authorization. CI/exact-head evidence belongs to the successor PR. Continue DM-03 LMS-comment browser read-only correction next, stacked on this branch unless it has merged; server read-only protection already exists. All unfulfilled independent conformance and external license/account/platform/production requirements remain OPEN/BLOCKED.
+
+ADR-105 preloaded collection successor is stacked on #172/head f2df5229 after integrating main #171 (schema 051). Shared initialization and pre-append LMS-comment refusal resolve the named DM-03 browser/server mismatch without separate facade guards. Timestamp exact-head local integration completed 605/605 domain, build and 4/4 built timestamp/invitation journeys; its full system-browser attempts remain failures pending exact Playwright CI. Successor acceptance/CI belongs to its own head, and the rest of the completion register stays OPEN/BLOCKED.
+
+ADR-106 collection append successor is stacked on #174/head be0b27d5. Shared setter traversal restores only encountered collection lengths on failed writes, including exceptions; successful writes keep their identity. The named pre-fix counterexamples and exact-head validation belong in its PR ledger. Continue full API/DM/sequencing conformance; historical repair, all-egress enforcement, real platform/corpus/account and production operations are unresolved.
+
+Timestamp #172/head f2df5229 acceptance 37800384202 completed SUCCESS 8/8 (Pear dev/built 152/152 each); preloaded collections #174/head be0b27d5 acceptance 37801196876 completed SUCCESS 8/8 (155/155 each). Both are ready for review. Collection atomicity #175/head 84262aab retains its own CI gate. ADR-107 packed-index successor is stacked on #175; both engines now bind complete decimal index tokens. Continue the separate 1.2 append-atomicity finding and remaining register work without waiting for merge. External/platform/production gates remain unresolved.
+
+Collection atomicity #175/head 84262aab acceptance 37802724884 completed SUCCESS 8/8 (Pear dev/built 158/158 each), ready for review. Packed indices #177/head b3b58a3b retains its own CI gate. ADR-108 is stacked on #177 and corrects the 1.2 append sibling while preserving tested 2004 bytes. Continue clause-level API/DM/response/time/sequencing work and actual boundary/operations evidence; external corpus/account/platform inputs remain absent and epic #133/production gates remain open/disabled.
+
+ADR-109 is stacked on #178/head ef7e0fc7, aligning fresh/reset 1.2 core/objective score max with the ADL recommended blank default. Historical/explicit max values remain intact, and tested 2004 bytes are unchanged. Each PR retains its exact-head CI and review gate. Complete clause-level conformance and all external/platform/production acceptance remain open.
+
+Packed indices #177/head b3b58a3b acceptance 37804565092 completed SUCCESS 8/8 (Pear dev/built 162/162 each), ready for review. PR #178/head ef7e0fc7 has Pear dev/built 163/163 each but first native-runtime consent timeout FAILED; retry only the failed native job, inspect complete exact-head results before ready. #179/head 0c093f15 carries score defaults and its own CI gate. ADR-110 is stacked on #179 and adds original four-profile API state/argument/exception recovery vectors without changing ESM bytes. Continue register work; epic stays open and production disabled.
+
+#178 exact unchanged head ef7e0fc7 acceptance 37805926525 completed SUCCESS attempt 2; original Pear 163/163 dev/built passed, failed native consent-timeout job rerun passed. #178 is ready for review; first attempt remains recorded FAILED. #179/head 0c093f15 and #180/head 03ebb5da retain their own CI gates. ADR-111 is stacked on #180 and closes demonstrated API helper/object/private-field access while retaining host identity validation. Continue register and exact-head acceptance work; epic open/production disabled.
+
+Review correction: known comment/location/timestamp leaves on absent LMS rows retain 404; undefined leaves return 401 before any append, matching existing rows. Skipped packed indices retain their distinct 351 behavior. Three original regressions and built edition vectors cover values/count preservation. Exact reviewed output is checksum-locked; historical engine inputs remain accepted through reversible known-byte correction. Full corrected-head CI is required; earlier be0b27d5 evidence is historical.
+
+Browser-range review correction: rollback iterates backward by index and no longer requires Array.prototype.toReversed at runtime. A pre-fix missing-method regression fails; corrected domain and built edition fixtures remove that method during refused writes and verify exact errors/count/state/retry. Installer-only Node 24 reversals are unchanged. Historical and corrected exact ESM sources remain recognized; this is feature-absence evidence, not actual Firefox/platform certification. Corrected-head CI supersedes earlier head 84262aab evidence.
+
+Current integrated model-boundary correction retains the real reviewed stack and
+strict operations hash. Fresh full domain acceptance completed 670/670 across
+96 files; build and 23/23 authored built SCORM journeys passed, including denial
+of public internal initialized/jsonString/start_time flags in all four profiles.
+The earlier pin-only domain failure and local Chromium 151 full-system browser
+failures remain recorded; these focused journeys are not full system acceptance.
+Current exact-head CI supersedes historical statuses only after completion.
+#174 head 1f81664c / run 37813277256, #175 head beeab50a / run 37813388176 and
+#179 head b89ee6de / run 37813672486 completed SUCCESS 8/8. #177 head e9d6cf38
+first run 37813555426 failed the recurring-assignment browser status assertion
+(161/162 dev); only the failed Pear job is being retried. Target-selector binding
+for authored dotted/non-ASCII IDs remains independent sequencing work.
+
+ADR-112 is stacked on #181 head d816a92f without waiting for merge.
+pear-navigation-targets-v16 binds authored target strings intact, full-input
+request/validity delimiters, false/301 malformed reads and false/404 readonly
+writes. Exact 2004 bytes change; 1.2 bytes stay intact and v15 snapshot markers
+remain supported. Initial three browser attempts exposed the separate Unicode
+request suffix bug; corrected build and all seven target/model built journeys
+passed, including actual choice delivery, lost ACK and close/resume. Full domain
+completed 673/673 across 97 files; final compatibility vectors passed 3/3.
+CI/ready belongs only to the successor's complete exact-head run. Full prediction
+semantics and the remaining register requirements are still OPEN/BLOCKED.
+
+ADR-113 is stacked on #182/head f0f0de3d. pear-real-capacity-v17 corrects
+2004 ten-integral-digit and 999 preference caps, retaining finite-input and
+4096-character host scalar boundaries; v16 snapshots and unchanged 1.2 bytes
+remain supported. Full domain completed 682/682 across 98 files, focused25/25
+and build passed. Built real/model/target attempt passed9/10 with one Chromium151
+DOM.describeNode session-closed failure; that unchanged target case reran PASS,
+so ten authored cases have passing evidence with the first failure retained.
+#181 head d816a92f / run37816033977 completed SUCCESS8/8, domain670 and172/172
+dev/built browser; #177 unchanged e9d6cf38 / run37813555426 attempt2 completed
+SUCCESS8/8, domain641 and162/162 dev/built, retaining its first assignment-status
+failure. Exact successor CI must complete before ready; full conformance and
+external/deployment gates remain OPEN/BLOCKED, epic open/production disabled.
+
+ADR-114 is stacked on #183 head a8dbc9d6. pear-derived-read-errors-v18
+resets active GetValue errors before early-return completion/success/navigation
+handlers while retaining failed-read and lifecycle codes. Stored values and 1.2
+bytes are unchanged; known v17 snapshots remain supported. Full domain completed
+685/685 across 99 files; focused 37/37, threshold vectors 3/3 and build passed.
+Built derived/target/real attempt passed 8/9, with one inherited target DOM session
+closed failure on Chromium 151; that unchanged case reran PASS. First failure
+remains recorded. #182 head f0f0de3d / run 37817524964 completed SUCCESS 8/8,
+domain 673 and 175/175 dev/built browser. Successor CI must finish before ready.
+Independent clause-level work and real external/deployment gates remain open;
+no epic closure or production enablement.

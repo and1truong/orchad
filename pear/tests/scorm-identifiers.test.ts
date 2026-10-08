@@ -38,7 +38,11 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
       }
     }
     assert.equal(api.SetValue('cmi.interactions.0.id', 'different'), 'false'); assert.equal(api.GetLastError(), '351');
-    assert.equal(api.SetValue('cmi.interactions.7.learner_response', '%GG'), 'false'); assert.equal(api.GetLastError(), '408');
+    // Rejected identifiers must not create record 6 or advance the next index.
+    assert.equal(api.GetValue('cmi.interactions._count'), '6');
+    assert.equal(api.SetValue('cmi.interactions.7.learner_response', '%GG'), 'false'); assert.equal(api.GetLastError(), '351');
+    assert.equal(api.SetValue('cmi.interactions.6.learner_response', '%GG'), 'false'); assert.equal(api.GetLastError(), '408');
+    assert.equal(api.GetValue('cmi.interactions._count'), '6');
     assert.equal(api.SetValue('cmi.interactions.6.id', 'urn:pear:matching'), 'true');
     assert.equal(api.SetValue('cmi.interactions.6.type', 'matching'), 'true');
     assert.equal(api.SetValue('cmi.interactions.6.correct_responses.0.pattern', 'left\\.[.]right'), 'false'); assert.equal(api.GetLastError(), '406');
