@@ -15,7 +15,7 @@ function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}
     const path = prefix + '.' + key;
     if (typeof value === 'string') {
       // Envelope quotas count binding delimiters too; engine replay validates each typed record.
-      const limit = path === 'cmi.suspend_data' ? 64000 : interactionResponse.test(path) ? 128000 : localizedField.test(path) ? 4257 : 4096;
+      const limit = path === 'cmi.suspend_data' ? 64000 : interactionResponse.test(path) ? 36 * 4000 + 35 * 3 : localizedField.test(path) ? 4257 : 4096;
       if (Object.keys(out).length >= 2048 || scormCharacters(value) > limit) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
       out[path] = value;
     } else leaves(value, path, out);

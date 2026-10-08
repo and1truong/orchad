@@ -52,3 +52,5 @@ reopen without launch/proof changes. Earlier-edition shared-data unavailability
 The actual Lime practice harness waits for completed discovery before selecting
 read permissions/consent, reusing its existing bind helper. No host guard or
 assertion is removed. Current exact-head acceptance remains in the epic ledger.
+
+ADR-102 adds common URI character/percent and identifier-length validation, typed matching replay, and the 144105-character response envelope required by 36 full-size choice identifiers. Original vectors and built pipwerks journeys cover exact state, invalid/forged/legacy rejection, lost ACK/retry and SQLite/browser resume. This does not close DM-02/RESP-02: full component/authority grammar, edition-specific IP literals, RFC 2141 URNs and equivalence/uniqueness remain OPEN. Exact-head validation is recorded in the successor PR/epic ledger.
