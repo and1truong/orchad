@@ -15,6 +15,19 @@ const invalidWrites = [
   ['cmi.interactions.0.unknown', 'x', '401'],
 ] as const;
 
+test('1.2: rollback retains typed errors and state when Array.prototype.toReversed is unavailable', () => {
+  const engine = new Scorm12API({logLevel: 'NONE'}); engine.LMSInitialize('');
+  const before = structuredClone(engine.renderCMIToJSONObject().cmi), descriptor = Object.getOwnPropertyDescriptor(Array.prototype, 'toReversed')!;
+  try {
+    Object.defineProperty(Array.prototype, 'toReversed', {value: undefined});
+    for (const [key, value, error] of invalidWrites) {
+      assert.equal(engine.LMSSetValue(key, value), 'false'); assert.equal(engine.LMSGetLastError(), error);
+      assert.deepEqual(engine.renderCMIToJSONObject().cmi, before);
+    }
+    assert.equal(engine.LMSSetValue('cmi.objectives.0.id', 'urn:pear:retry'), 'true');
+  } finally {Object.defineProperty(Array.prototype, 'toReversed', descriptor);}
+});
+
 test('1.2: failed first collection writes retain exact errors, zero counts and the whole CMI state', () => {
   for (const [key, value, error] of invalidWrites) {
     const engine = new Scorm12API({logLevel: 'NONE'}); assert.equal(engine.LMSInitialize(''), 'true');
