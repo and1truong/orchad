@@ -1,6 +1,6 @@
 export const SCORM_STANDARDS = ['1.2', '2004-2', '2004-3', '2004-4'] as const;
 export type SCORMStandard = typeof SCORM_STANDARDS[number];
-export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-interactions-v6'} as const;
+export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-responses-v7'} as const;
 export interface SCORMResource {
   id: string;
   kind: 'sco' | 'asset';
