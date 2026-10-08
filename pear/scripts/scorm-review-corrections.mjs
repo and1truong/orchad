@@ -86,6 +86,18 @@ const derivedUpdates = [
     "    if (stringMatches(CMIElement, adlNavRequestRegex)) {\n      const matches = CMIElement.match(adlNavRequestRegex);"
   ]
 ];
+const languageOriginal = "dbc20732465b9b4ffce672ac11a5d5dee48384d4f0beabf562c00215cf051281";
+const languagePatched = "1755d776fb21a84a37918169e77ffe6b7c64b6b0f82052d78d08dc018fb566a1";
+const languageUpdates = [
+  [
+    "  CMILang: \"^([a-zA-Z]{1,8}|i|x)(-[a-zA-Z0-9-]{2,8})?$|^$\",",
+    "  CMILang: \"^(?=[\\\\s\\\\S]{0,250}(?![\\\\s\\\\S]))(?:[a-zA-Z]{1,8}(?:-[a-zA-Z0-9]{1,8})*)?(?![\\\\s\\\\S])\","
+  ],
+  [
+    "    if (check2004ValidFormat(this._cmi_element + \".language\", language, scorm2004_regex.CMILang)) {",
+    "    if (check2004ValidFormat(this._cmi_element + \".language\", language, scorm2004_regex.CMILang, true)) {"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -104,9 +116,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, derivedUpdates);
     if (hash(source) !== derivedPatched) throw Error('SCORM derived-read checksum mismatch');
   }
+  if (hash(source) === languageOriginal) {
+    source = replace(source, languageUpdates);
+    if (hash(source) !== languagePatched) throw Error('SCORM preference-language checksum mismatch');
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === languagePatched) {
+    source = replace(source, languageUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== languageOriginal) throw Error('SCORM preference-language reverse checksum mismatch');
+  }
   if (hash(source) === derivedPatched) {
     source = replace(source, derivedUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== derivedOriginal) throw Error('SCORM derived-read reverse checksum mismatch');
