@@ -71,3 +71,17 @@ Windows SCO native invocation is now bounded for diagnostics: an unresolved
 Promise records only API/transport types and remains nativeDenied=false, so
 timeout cannot count as denial or platform PASS. No CSP or native capability
 is relaxed. The four-profile preflight still checks the same durability flow.
+
+Bounded Windows evidence on 98dc59e7 (run 37828878720/job 113488729503)
+shows actual WebView2 153 loads the SCO and has invoke/ipc/postMessage/message
+channel functions, but its subframe native Promise remains pending. It failed
+the isolation assertion; runtime 16/16 and Pear/MCP 13/13 passed.
+
+Use Tauri 2.12.1's supported Builder::invoke_system to deny subframe IPC
+synchronously before creating a closure with the invoke key. Top-frame
+Coconut commands/events use the supported JSON postMessage transport with
+proper callback/error IDs and response mode; Rust ACL, label/origin/action
+authorization remains unchanged. This avoids relying on subframe callback
+routing or relaxing SCO CSP/capabilities. Two original VM tests execute the
+actual included initializer; actual three-platform native CI remains required.
+Reference: https://docs.rs/tauri/2.12.1/tauri/struct.Builder.html#method.invoke_system
