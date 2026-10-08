@@ -5,6 +5,9 @@ on:
     paths:
       - '.github/workflows/pear-keycloak.yml'
       - 'pear/scripts/keycloak-browser.ts'
+      - 'pear/tsconfig*.json'
+      - 'pear/package*.json'
+      - 'pear/src/server/app.ts'
       - 'pear/tests/fixtures/keycloak/**'
       - 'pear/src/server/identity.ts'
       - 'pear/src/server/invitations.ts'
@@ -13,6 +16,9 @@ on:
     paths:
       - '.github/workflows/pear-keycloak.yml'
       - 'pear/scripts/keycloak-browser.ts'
+      - 'pear/tsconfig*.json'
+      - 'pear/package*.json'
+      - 'pear/src/server/app.ts'
       - 'pear/tests/fixtures/keycloak/**'
       - 'pear/src/server/identity.ts'
       - 'pear/src/server/invitations.ts'
@@ -30,7 +36,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          npm run typecheck:host
+          npm run typecheck:keycloak
           npx playwright install --with-deps chromium
           npm run test:keycloak
       - uses: actions/upload-artifact@v4
