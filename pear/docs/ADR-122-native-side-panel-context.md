@@ -83,3 +83,13 @@ Add database-closed to distinguish DB close from directory removal. Even on
 forced kill, drain child close/output for at most one diagnostic second; the
 five-second shutdown deadline still sets fixtureForced and cannot PASS.
 No Windows cleanup cause is inferred or assertion waived; new CI required.
+
+A second actual-component counterexample failed after the sequence fix:
+a target reply applied after hide triggers consent while native UI is inactive,
+then show leaves the unchanged target effect without another revoke response.
+Discard replies while the UI is hidden and wait for a fresh visible snapshot.
+The hidden-UI native gate and one-second polling cadence remain unchanged.
+
+Completed local Coconut62/62 and build after both polling corrections.
+Active integrated-tree five real fixture cleanup checks passed with the added
+database phase. Full current-head native/browser/review remains required.
