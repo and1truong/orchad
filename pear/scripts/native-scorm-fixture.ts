@@ -94,7 +94,7 @@ async function close() {
   console.log('PEAR_NATIVE_FIXTURE_CLOSE:connections-closed');
   await sink.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:sink-closed');
   await app.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:app-closed');
-  f.db.close(); rmSync(dir, {recursive: true, force: true}); console.log('PEAR_NATIVE_FIXTURE_CLOSE:cleanup-complete'); process.exit(0);
+  f.db.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:database-closed'); rmSync(dir, {recursive: true, force: true}); console.log('PEAR_NATIVE_FIXTURE_CLOSE:cleanup-complete'); process.exit(0);
 }
 process.on('SIGTERM', () => void close()); process.on('SIGINT', () => void close());
 
