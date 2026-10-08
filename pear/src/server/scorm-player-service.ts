@@ -213,7 +213,12 @@ export class SCORMPlayerService {
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run('learning:' + c.p.tenant + ':' + c.p.id);
       const officialLearningChanged = a.finished && !!this.bindings?.project(c.p, c.registration, c.attempt.id, this.manifest(c.registration.package_id, c.registration.version, c.p.tenant));
       const nextScoId = engine && a.finished ? deliveredSCO(engine, manifest)?.activity.id ?? null : null;
-      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine ? {nextScoId: nextScoId !== c.launch.sco_id ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
+      const delivered = engine?.getSequencingState()?.currentActivity;
+      // A post-condition retry can deliver this same SCO as a fresh technical
+      // attempt. The old communication session is finished; the shell must
+      // close its capability and launch the newly delivered attempt as usual.
+      const newSameSCOAttempt = delivered?.isActive && delivered.attemptCount > c.launch.sco_attempt_number;
+      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine ? {nextScoId: nextScoId !== c.launch.sco_id || newSameSCOAttempt ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_'} : {})};
       this.db.prepare('INSERT INTO scorm_engine_checkpoints VALUES(?,?,?,?)').run(c.launch.id, a.sequence, payloadHash, JSON.stringify(result));
       if (a.sequence > this.limits.maxCheckpointReceiptsPerLaunch || scormRuntimeStorageBytes(this.db, c.p.tenant) > this.limits.maxRuntimeStorageBytesPerTenant) reject('INVALID_ARGUMENT', 'SCORM runtime storage quota reached; contact a content administrator');
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(c.p.tenant, c.p.id, 'learning:' + c.p.tenant + ':' + c.p.id, 'runtime_scorm_engine_checkpoint', JSON.stringify({launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished}), now);

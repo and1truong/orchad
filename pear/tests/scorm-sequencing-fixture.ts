@@ -8,7 +8,7 @@ export function sequencingManifest(edition: SCORM2004Edition = '2004-4') {
 }
 import {zip} from './scorm-fixture.ts';
 export function sequencingPackage(edition: SCORM2004Edition, manifest = sequencingManifest(edition)) {
-  const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save sequencing progress</button><button id="continue">Continue sequencing SCO</button><button id="end">End sequencing session</button><script src="../assets/player.js"></script></body></html>';
+  const html = (title: string) => '<!doctype html><html><body><h1>' + title + '</h1><p id="entry"></p><p id="result"></p><button id="save">Save sequencing progress</button><button id="fail">Fail sequencing attempt</button><button id="continue">Continue sequencing SCO</button><button id="end">End sequencing session</button><script src="../assets/player.js"></script></body></html>';
   return zip([
     {name: 'imsmanifest.xml', data: Buffer.from(manifest), method: 8},
     {name: 'lessons/intro.html', data: Buffer.from(html('Original sequencing introduction')), method: 8},
@@ -18,6 +18,7 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
       const update=()=>{api.SetValue('cmi.location','sequencing-page');api.SetValue('cmi.exit','suspend');api.SetValue('cmi.session_time','PT20S');};
       document.getElementById('save').onclick=()=>{update();api.SetValue('cmi.completion_status','incomplete');document.getElementById('result').textContent='Sequencing Commit: '+api.Commit('');};
       const finish=(nav)=>{update();api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','passed');api.SetValue('cmi.score.scaled','0.9');api.SetValue('adl.nav.request',nav);document.getElementById('result').textContent='Sequencing Terminate: '+api.Terminate('');};
+      document.getElementById('fail').onclick=()=>{update();api.SetValue('cmi.exit','normal');api.SetValue('cmi.completion_status','completed');api.SetValue('cmi.success_status','failed');api.SetValue('cmi.score.scaled','0.4');api.SetValue('adl.nav.request','exit');document.getElementById('result').textContent='Failed attempt Terminate: '+api.Terminate('');};
       document.getElementById('continue').onclick=()=>finish('continue');document.getElementById('end').onclick=()=>finish('exitAll');`), method: 8},
     {name: 'assets/style.css', data: Buffer.from('body{color:#123}'), method: 8},
   ]);
@@ -30,4 +31,9 @@ export function collectionManifest(edition: SCORM2004Edition = '2004-4') {
     return `<s:sequencing IDRef="${id}"/>`;
   });
   return xml.replace('</p:manifest>', `<s:sequencingCollection>${definitions.join('')}</s:sequencingCollection></p:manifest>`);
+}
+
+export function retryManifest(edition: SCORM2004Edition = '2004-4', action: 'retry' | 'retryAll' = 'retry') {
+  const rule = `<s:sequencingRules><s:postConditionRule><s:ruleConditions><s:ruleCondition condition="satisfied" operator="not"/></s:ruleConditions><s:ruleAction action="${action}"/></s:postConditionRule></s:sequencingRules>`;
+  return sequencingManifest(edition).replace('<s:objectives><s:primaryObjective', rule + '<s:limitConditions attemptLimit="3"/><s:objectives><s:primaryObjective');
 }
