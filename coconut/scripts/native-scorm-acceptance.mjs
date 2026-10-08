@@ -69,6 +69,8 @@ try {
  console.log(JSON.stringify({platform:process.platform,edition,userAgent:first.probes[0].userAgent}));
  const isolated=probe=>['pearCookieDenied','pearStorageDenied','pearBridgeDenied','pearNativeDenied','noOwnBridge','nativeDenied','externalFetchDenied'].every(key=>probe[key]===true);
  check('native untrusted SCO cannot read Pear credentials/storage or invoke app/native authority',isolated(first.probes[0]));
+ const dynamic=probe=>['popupDenied','serviceWorkerDenied','formAttempted','egressDirectives'].every(key=>probe[key]===true);
+ check('actual native dynamic network/media/frame/form/worker probes are denied with CSP evidence',dynamic(first.probes[0])&&first.calls.length===0);
  check('native SCORM reports incomplete progress without official proof or external fixture requests',first.proofs===0&&first.calls.length===0&&first.probes[0].entry==='ab-initio'&&first.droppedACK===true);
  const scope={targetId:target.targetId,pageInstanceId:target.pageInstanceId};
  const pair=await request({action:'pair',name:'Native SCORM fixture',scopes:['read'],targetIds:[target.targetId],readTools:['learning_get_lesson']});
@@ -86,7 +88,7 @@ try {
  check('actual native lost ACK retries identical payload/receipt without another revision/history record',true);
  await command('resume');
  const resumed=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=2&&value.checkpoints>=2?value:false;},60000);
- check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1]));
+ check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1])&&dynamic(resumed.probes[1])&&resumed.calls.length===0);
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);
  check('native Terminate projects exactly one authoritative SCORM proof and preserves quiz requirement',completed.proofs===1&&completed.certificates===0&&completed.calls.length===0);

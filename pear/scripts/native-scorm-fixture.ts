@@ -22,7 +22,19 @@ const script = `
   if(!native)evidence.nativeDenied=true;
   else await Promise.race([Promise.resolve().then(()=>native.invoke('host_request',{request:{action:'heartbeat'}})).catch(()=>{evidence.nativeDenied=true;}),new Promise(resolve=>setTimeout(()=>{evidence.nativeSurface.pending=true;resolve();},5000))]);
   try{await fetch('http://127.0.0.1:4316/external-fetch');}catch{evidence.externalFetchDenied=true;}
-  const image=new Image();image.src='http://127.0.0.1:4316/external-image';document.body.append(image);
+  const sink='http://127.0.0.1:4316',violations=[];
+  document.addEventListener('securitypolicyviolation',event=>violations.push(event.effectiveDirective));
+  for(const [key,run] of Object.entries({xhr:()=>{const request=new XMLHttpRequest();request.open('GET',sink+'/xhr');request.send();},websocket:()=>new WebSocket('ws://127.0.0.1:4316/websocket'),beacon:()=>navigator.sendBeacon(sink+'/beacon','synthetic')}))try{run();}catch{}
+  for(const [tag,path] of [['img','image'],['video','media'],['iframe','frame']]){const element=document.createElement(tag);element.src=sink+'/'+path;document.body.append(element);if(tag==='video')element.load();}
+  const style=document.createElement('style');style.textContent='body{background-image:url('+sink+'/css)}';document.head.append(style);
+  const form=document.createElement('form');form.action=sink+'/form';form.method='POST';document.body.append(form);evidence.formAttempted=true;try{form.submit();}catch{}
+  evidence.popupDenied=window.open(sink+'/popup')===null;
+  try{await navigator.serviceWorker.register('native-worker.js');evidence.serviceWorkerDenied=false;}catch{evidence.serviceWorkerDenied=true;}
+  try{const worker=new Worker(sink+'/worker');worker.terminate();}catch{}
+  await new Promise(resolve=>setTimeout(resolve,300));
+  // Sandbox disallows forms before CSP dispatch, so form-action need not emit an event.
+  evidence.egressDirectives=['connect-src','img-src','media-src','frame-src','worker-src'].every(directive=>violations.includes(directive));
+  evidence.egressViolations=[...new Set(violations)];
   document.getElementById('save').onclick();
   await fetch('${prefix}/probe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(evidence)});
   const timer=setInterval(async()=>{const command=await(await fetch('${prefix}/command')).json();if(command.action==='finish'){clearInterval(timer);document.getElementById('finish').onclick();}},200);
