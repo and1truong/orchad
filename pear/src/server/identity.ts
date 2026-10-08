@@ -1,3 +1,4 @@
+import {InvitationService} from "./invitations.ts";
 import {createHash,createPublicKey,randomBytes,verify} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
 import type {Principal} from "../shared/model.ts";
@@ -60,12 +61,13 @@ export class IdentityService {
    this.db.exec("COMMIT");return result;
   }catch(e){this.db.exec("ROLLBACK");throw e;}
  }
- start(previousToken?:string){
+ start(previousToken?:string, invitationId?:string){
   if(!this.config)reject("FORBIDDEN","OIDC provider is not configured");
+  if(invitationId!==undefined)new InvitationService(this.db,this.config,this.origin).start(invitationId);
   const now=Date.now();this.db.prepare("DELETE FROM identity_transactions WHERE expires<?").run(now);
   if(Number((this.db.prepare("SELECT COUNT(*) AS n FROM identity_transactions").get() as any).n)>=1024)reject("FORBIDDEN","Identity transaction capacity reached");
   const state=randomBytes(32).toString("base64url"),binding=randomBytes(32).toString("base64url"),nonce=randomBytes(32).toString("base64url"),verifier=randomBytes(32).toString("base64url");
-  this.db.prepare("INSERT INTO identity_transactions(state_hash,binding_hash,nonce,verifier,expires,previous_token_hash,provider_hash) VALUES(?,?,?,?,?,?,?)").run(digest(state),digest(binding),nonce,verifier,now+300000,previousToken?digest(previousToken):null,digest(JSON.stringify(this.config)));
+  this.db.prepare("INSERT INTO identity_transactions(state_hash,binding_hash,nonce,verifier,expires,previous_token_hash,provider_hash,invitation_id) VALUES(?,?,?,?,?,?,?,?)").run(digest(state),digest(binding),nonce,verifier,now+300000,previousToken?digest(previousToken):null,digest(JSON.stringify(this.config)),invitationId??null);
   const url=new URL(this.config!.authorizationEndpoint);
   for(const [key,value] of Object.entries({client_id:this.config!.clientId,response_type:"code",scope:"openid",redirect_uri:this.origin+"/api/auth/callback",state,nonce,
     code_challenge:createHash("sha256").update(verifier).digest("base64url"),code_challenge_method:"S256"}))url.searchParams.set(key,value);
@@ -117,6 +119,7 @@ export class IdentityService {
    const claims=await this.token(result.id_token,transaction.nonce);
    this.db.exec("BEGIN IMMEDIATE");
    try{
+    if(transaction.invitation_id)new InvitationService(this.db,this.config,this.origin).redeem(transaction.invitation_id,claims.sub);
     const account=this.db.prepare("SELECT a.* FROM identity_links l JOIN accounts a ON a.id=l.user_id AND a.tenant=l.tenant WHERE l.issuer=? AND l.subject=? AND a.active=1").get(this.config.issuer,claims.sub) as any;
     if(!account)reject("UNAUTHORIZED","Identity has no active reviewed account mapping");
     const token=randomBytes(32).toString("hex"),csrf=randomBytes(32).toString("hex");

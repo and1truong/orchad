@@ -27,6 +27,7 @@ const { app, service, outbox, scormContentApp } = await createApp({
   developmentAuth,
   certificateFont:process.env.PEAR_CERTIFICATE_FONT?readFileSync(process.env.PEAR_CERTIFICATE_FONT):undefined,
   oidc,
+  invitationMail:process.env.PEAR_INVITATION_MAIL?JSON.parse(process.env.PEAR_INVITATION_MAIL):undefined,
   catalogAdapters: process.env.PEAR_CATALOG_ADAPTERS?JSON.parse(process.env.PEAR_CATALOG_ADAPTERS):undefined,
   webhookEndpoints: process.env.PEAR_WEBHOOK_ENDPOINTS?JSON.parse(process.env.PEAR_WEBHOOK_ENDPOINTS):undefined,
   xapiEnabled: process.env.PEAR_XAPI_ENABLED === "true",

@@ -1,3 +1,4 @@
+import {CURRENT_SCHEMA_VERSION} from "../src/server/database.ts";
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {scormLearningFixture} from './scorm-learning-fixture.ts';
@@ -112,10 +113,10 @@ test('schema-49 migration preserves populated schema-48 local working data witho
   const f = await scormLearningFixture(path, multiFilePackage('2004-4', sharedDataManifest())), launch = f.launch(f.enroll());
   f.player.checkpoint(launch.token, sequenceCheckpoint(f, launch, {'adl.data.0.store': 'legacy-local-notes', 'cmi.location': 'legacy-bookmark', 'cmi.session_time': 'PT20S'}, false));
   const attempts = f.db.prepare('SELECT * FROM scorm_engine_attempts').all(), scos = f.db.prepare('SELECT * FROM scorm_sco_attempts').all(), resources = f.db.prepare('SELECT * FROM scorm_engine_resources ORDER BY path').all();
-  f.db.exec('DROP TRIGGER scorm_system_data_identity; DROP TABLE scorm_system_objectives; DROP TABLE scorm_system_data; DELETE FROM schema_version WHERE version>=49'); f.db.close();
+  f.db.exec('ALTER TABLE identity_transactions DROP COLUMN invitation_id; DROP TABLE user_invitations; DROP TRIGGER scorm_system_data_identity; DROP TABLE scorm_system_objectives; DROP TABLE scorm_system_data; DELETE FROM schema_version WHERE version>=49'); f.db.close();
   const db = openDatabase(path);
   try {
-    assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, 50);
+    assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, CURRENT_SCHEMA_VERSION);
     assert.deepEqual(db.prepare('SELECT * FROM scorm_engine_attempts').all(), attempts); assert.deepEqual(db.prepare('SELECT * FROM scorm_sco_attempts').all(), scos); assert.deepEqual(db.prepare('SELECT * FROM scorm_engine_resources ORDER BY path').all(), resources);
     assert.equal(db.prepare('SELECT count(*) n FROM scorm_system_data').get()!.n, 0); assert.equal(db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0); assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally {db.close(); rmSync(dir, {recursive: true, force: true});}

@@ -1,3 +1,4 @@
+import {InvitationService, type InvitationMail} from "./invitations.ts";
 import {SCORMPackageService} from "./scorm-package-service.ts";
 import {registerSCORMEngine} from "./scorm-engine-routes.ts";
 import {SCORMLearningBindings} from './scorm-learning-bindings.ts';
@@ -45,6 +46,7 @@ export async function createApp(opts: {
   secureCookies?: boolean;
   developmentAuth?: boolean;
   oidc?: OIDCConfig;
+  invitationMail?: InvitationMail;
   identityFixture?: boolean;
   scimEnabled?: boolean;
   webhookEndpoints?: WebhookEndpoint[];
@@ -78,6 +80,8 @@ export async function createApp(opts: {
   const providerCatalog=new ProviderCatalogService(opts.db,opts.catalogAdapters);
   const outbox=new OutboxService(opts.db,opts.webhookEndpoints,!!opts.identityFixture);
   const identity=new IdentityService(opts.db,opts.oidc,opts.origin,!!opts.identityFixture);
+  if(opts.invitationMail&&!opts.identityFixture&&!opts.secureCookies)throw Error("Invitation mail requires HTTPS and secure session cookies");
+  const invitations=new InvitationService(opts.db,opts.oidc,opts.origin,opts.invitationMail,!!opts.identityFixture);
   const app = Fastify({
     bodyLimit: Bounds.message,
     logger: false,
@@ -251,12 +255,12 @@ export async function createApp(opts: {
   );
   const identityCookie=opts.secureCookies?"__Host-pear-oidc":"pear-oidc";
   app.get("/api/auth/config",async()=>({oidcEnabled:!!opts.oidc,developmentEnabled:!!opts.developmentAuth}));
-  app.post("/api/auth/start",async(req,reply)=>{
+  app.post("/api/auth/start",{schema:{body:object({invitationId:{type:"string",pattern:"^[a-f0-9-]{36}$"}},[])}},async(req,reply)=>{
     try{
       const now=Date.now(),key="oidc:"+req.ip;
       let budget=loginBudget.get(key);if(!budget||budget.until<now){if(loginBudget.size>=1024)loginBudget.clear();budget={requests:0,failures:0,until:now+60000};loginBudget.set(key,budget);}
       if(++budget.requests>120)return reply.header("Retry-After","60").code(429).send(failure("FORBIDDEN","Identity login rate limit"));
-      const result=identity.start(req.cookies[name]);
+      const result=identity.start(req.cookies[name],(req.body as any)?.invitationId);
       reply.setCookie(identityCookie,result.binding,{httpOnly:true,secure:!!opts.secureCookies,sameSite:"lax",path:"/",maxAge:300});
       return {url:result.url};
     }catch{return reply.code(403).send(failure("FORBIDDEN","Organization sign-in unavailable"));}
@@ -281,6 +285,25 @@ export async function createApp(opts: {
   app.post("/api/identity-links",async(req,reply)=>{
     try{return identity.link(service.principal((req as any).session.principal),req.body);}
     catch(e){if(e instanceof DomainError)return reply.code(({UNAUTHORIZED:401,FORBIDDEN:403,STALE_CONTEXT:409,IDEMPOTENCY_CONFLICT:409,INVALID_ARGUMENT:400} as any)[e.code]??400).send(failure(e.code,e.message));throw e;}
+  });
+  const invitationError=(e:unknown,reply:any)=>{
+    if(e instanceof DomainError)return reply.code(({UNAUTHORIZED:401,FORBIDDEN:403,STALE_CONTEXT:409,IDEMPOTENCY_CONFLICT:409,INVALID_ARGUMENT:400} as any)[e.code]??500).send(failure(e.code,e.message));
+    return reply.code(500).send(failure("INTERNAL","Invitation operation failed"));
+  };
+  app.get("/api/invitations",async(req,reply)=>{
+    try{
+      const q=req.query as any,offset=q.offset===undefined?0:Number(q.offset);
+      if(Object.keys(q).some(k=>k!=="offset")||!Number.isSafeInteger(offset)||offset<0||offset>100000)throw new DomainError("INVALID_ARGUMENT","Invalid invitation page");
+      return invitations.list(service.principal((req as any).session.principal),offset);
+    }catch(e){return invitationError(e,reply);}
+  });
+  app.post("/api/invitations",async(req,reply)=>{
+    try{return invitations.change(service.principal((req as any).session.principal),req.body);}
+    catch(e){return invitationError(e,reply);}
+  });
+  app.post("/api/invitations/:id/send",{schema:{body:object({})}},async(req,reply)=>{
+    try{return await invitations.deliver(service.principal((req as any).session.principal),(req.params as any).id);}
+    catch(e){return invitationError(e,reply);}
   });
   app.get("/api/session", async (req) => {
     const s = (req as any).session;

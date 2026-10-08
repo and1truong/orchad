@@ -1,3 +1,4 @@
+import {CURRENT_SCHEMA_VERSION} from "../src/server/database.ts";
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {scormLearningFixture} from './scorm-learning-fixture.ts';
@@ -132,7 +133,7 @@ test('schema-50 upgrade preserves populated registration-local objective history
   const launch = f.launch(f.enroll(), 'intro'); f.player.checkpoint(launch.token, sequenceCheckpoint(f, launch, {'cmi.completion_status': 'completed', 'cmi.score.scaled': '0.9', 'adl.nav.request': 'continue'}));
   const attempts = f.db.prepare('SELECT * FROM scorm_engine_attempts').all(), rows = f.db.prepare('SELECT * FROM scorm_sco_attempts').all();
   f.db.exec('DROP TABLE scorm_system_objectives; DELETE FROM schema_version WHERE version=50'); f.db.close(); const db = openDatabase(path);
-  try {assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, 50); assert.deepEqual(db.prepare('SELECT * FROM scorm_engine_attempts').all(), attempts); assert.deepEqual(db.prepare('SELECT * FROM scorm_sco_attempts').all(), rows); assert.equal(db.prepare('SELECT count(*) n FROM scorm_system_objectives').get()!.n, 0); assert.equal(db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0); assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);} finally {db.close(); rmSync(dir, {recursive: true, force: true});}
+  try {assert.equal(db.prepare('SELECT max(version) n FROM schema_version').get()!.n, CURRENT_SCHEMA_VERSION); assert.deepEqual(db.prepare('SELECT * FROM scorm_engine_attempts').all(), attempts); assert.deepEqual(db.prepare('SELECT * FROM scorm_sco_attempts').all(), rows); assert.equal(db.prepare('SELECT count(*) n FROM scorm_system_objectives').get()!.n, 0); assert.equal(db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0); assert.equal(db.prepare('PRAGMA foreign_key_check').all().length, 0);} finally {db.close(); rmSync(dir, {recursive: true, force: true});}
 });
 
 test('whole-database backup retains coherent global objectives and offline restore revokes capabilities', async () => {
