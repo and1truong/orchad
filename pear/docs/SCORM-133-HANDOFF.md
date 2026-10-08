@@ -4,13 +4,18 @@ Continue the owned stack without waiting for merge (AGENTS.md). PRs #172, #174,
 #175 and #177–185 have completed exact-head acceptance and are ready for review;
 current hashes/logs and retained first failures are in their PR descriptions.
 #186–189 remain draft pending completed new-head CI and review. Do not infer
-PASS from queued/running checks. Latest branch: codex/pear-scorm-timeinterval-binding-133,
-stacked on #188; shared engine adaptation pear-timeinterval-binding-v21.
+PASS from queued/running checks. Latest branch: codex/pear-scorm-urn-binding-133,
+stacked on #189; shared engine adaptation pear-urn-binding-v22. The URN
+successor has 718/718 local domain across 105 files, 13 focused, build and
+three built identifier journeys; exact-head CI/review remains required.
 
 #186 owns native platform repairs: actual Windows icon, measured Linux job
 budget, existing four-profile preflight ACK retry and supported Tauri native IPC
 subframe denial. Parent fixes propagate by real merges to #187–189. Historical
-Linux/macOS four-profile native PASS is not repaired-head Windows PASS.
+7eb4838f now has actual Linux/macOS/Windows runtime 16/16, Pear/MCP 13/13 and
+each SCORM 11/11; exact current-head acceptance remains required. Owner e594815c
+Windows first attempt failed only its 2004-3 clean-exit assertion; retain that
+failure and investigate/recheck it, without accepting timeout/forced exit.
 #187 binds support arguments; #188 corrects 1.2 CMI error binding; #189 binds
 shared timeinterval grammar. Local v21 validation: 712/712 domain/104 files,
 14 focused, build, four session-time and four fixture preflight journeys;
