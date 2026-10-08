@@ -13,7 +13,7 @@ external input is absent. No profile PASS means certification or full compliance
 | ID | Requirement / reference anchor | Current evidence | Outstanding work / exit criterion |
 |---|---|---|---|
 | API-01 | 1.2 eight LMS methods and communication lifecycle; 2004 RTE 3.1.2–6 | PARTIAL: player/2004/review tests and wrappers | Enumerate each method/state/argument/return combination per edition; fix mismatches |
-| API-02 | 2004 RTE 3.1.7 errors, diagnostics and precedence; 1.2 RTE API errors | PARTIAL: lifecycle and Unicode readonly/undefined/dependency tests | Full supported error table, simultaneous-invalid inputs and preservation; browser/server agreement |
+| API-02 | 2004 RTE 3.1.7 errors, diagnostics and precedence; 1.2 RTE API errors | PARTIAL: ADR-101 support lookups for all defined error codes, unknown parameters and state preservation; lifecycle/Unicode tests | Full supported error table, simultaneous-invalid inputs and preservation; browser/server agreement |
 | DM-01 | 2004 RTE 4.1.1.7 characterstring/localized string/SPM | PARTIAL: ADR-095–097 | Language registry, every field/SPM and cross-field capacity combinations per edition |
 | DM-02 | 2004 RTE 4.1.1.7 long/short URI identifiers | OPEN: upstream grammar not verified | RFC 3986 valid/invalid vectors, escaped delimiters, uniqueness/dependencies, exact storage |
 | DM-03 | 2004 RTE 4.2 data model; 1.2 CMI | PARTIAL: shared facade and server typed replay | Every mandatory field/access/default/vocabulary/range/collection limit; no silent host-envelope incompatibility |
