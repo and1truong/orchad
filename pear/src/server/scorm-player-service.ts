@@ -198,7 +198,7 @@ export class SCORMPlayerService {
     }
     const available = (id: string) => {
       if (!engine) return true;
-      try {const copy = !attempt && hasSelection(manifest) ? sequencingRuntime(beforeSelection(sequencingTree(manifest))) : trustedSequencing(manifest, saveSequencing(engine, manifest, {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}), {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256});
+      try {const copy = !attempt && hasSelection(manifest) ? sequencingRuntime(beforeSelection(sequencingTree(manifest)), undefined, manifest.standard) : trustedSequencing(manifest, saveSequencing(engine, manifest, {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256}), {attemptId: attempt?.id ?? 'context-preview', sha256: pkg.sha256});
         if (!attempt && hasSelection(manifest)) loadSystemObjectives(this.db, {id: 'context-preview', tenant: p.tenant, learner: p.id, mode, binding_key: context?.bindingKey ?? 'standalone'}, manifest, copy); selectSCO(copy, manifest, id); return true;} catch {return false;}
     };
     return {packageId, version, reference: context?.reference ?? null, officialLearning: !!context,

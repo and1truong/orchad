@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {runInNewContext} from 'node:vm';
-import {reviewedSCORMSource, unreviewedSCORMSource} from '../scripts/scorm-review-corrections.mjs';
+import {reviewedSCORMSource, unreviewedSCORMSource, uriAuthorityUpdates} from '../scripts/scorm-review-corrections.mjs';
 
 test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and rejects unexpected engine bytes/version',()=>{
   const root=mkdtempSync(join(tmpdir(),'pear-unicode-install-')),hash=(s:string)=>createHash('sha256').update(s).digest('hex');
@@ -34,8 +34,10 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const urnNulUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const urnNulUpdates = ')+'const urnNulUpdates = '.length,reviewScript.indexOf(';\nconst interactionReadOriginal',reviewScript.indexOf('const urnNulUpdates = '))));
   const interactionReadUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const interactionReadUpdates = ')+'const interactionReadUpdates = '.length,reviewScript.indexOf(';\nconst sequencingResponseOriginal',reviewScript.indexOf('const interactionReadUpdates = '))));
   const sequencingResponseUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const sequencingResponseUpdates = ')+'const sequencingResponseUpdates = '.length,reviewScript.indexOf(';\nconst responseBindingOriginal',reviewScript.indexOf('const sequencingResponseUpdates = '))));
-  const responseBindingUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const responseBindingUpdates = ')+'const responseBindingUpdates = '.length,reviewScript.indexOf(';\nexport function',reviewScript.indexOf('const responseBindingUpdates = '))));
-  let responseBindingPredecessor=corrected2004;for(const [before,after] of responseBindingUpdates.toReversed()){assert.equal(responseBindingPredecessor.split(after).length,2);responseBindingPredecessor=responseBindingPredecessor.replace(after,()=>before);}
+  const responseBindingUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const responseBindingUpdates = ')+'const responseBindingUpdates = '.length,reviewScript.indexOf(';\n// RFC3986',reviewScript.indexOf('const responseBindingUpdates = '))));
+  let uriAuthorityPredecessor=corrected2004;for(const [before,after] of uriAuthorityUpdates.toReversed()){assert.equal(uriAuthorityPredecessor.split(after).length,2);uriAuthorityPredecessor=uriAuthorityPredecessor.replace(after,()=>before);}
+  assert.equal(hash(uriAuthorityPredecessor),'8bdddcc2d2b129e5541e9f18b46e50353cf72978d591ab9ca98d431876d46f10');
+  let responseBindingPredecessor=uriAuthorityPredecessor;for(const [before,after] of responseBindingUpdates.toReversed()){assert.equal(responseBindingPredecessor.split(after).length,2);responseBindingPredecessor=responseBindingPredecessor.replace(after,()=>before);}
   assert.equal(hash(responseBindingPredecessor),'5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276');
   let sequencingResponsePredecessor=responseBindingPredecessor;for(const [before,after] of sequencingResponseUpdates.toReversed()){assert.equal(sequencingResponsePredecessor.split(after).length,2);sequencingResponsePredecessor=sequencingResponsePredecessor.replace(after,()=>before);}
   assert.equal(hash(sequencingResponsePredecessor),'3d677e8ee9457aa0ca29a68ada989301493de6965c3cc2e51431b0198b2f10aa');

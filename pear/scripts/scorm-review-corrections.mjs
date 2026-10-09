@@ -393,6 +393,51 @@ const sequencingResponseUpdates = [
 const responseBindingOriginal = "5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276";
 const responseBindingPatched = "8bdddcc2d2b129e5541e9f18b46e50353cf72978d591ab9ca98d431876d46f10";
 const responseBindingUpdates = [["        this._type = type;", "        this._type = type;\n        this.correct_responses.childArray.forEach(response => {response._interactionType = type;});"]];
+// RFC3986 Appendix A: validate generic components, not WHATWG URL semantics.
+// Keep authored spelling; generic ports have no TCP range/DNS requirement.
+function uriReferencePattern() {
+  const atom = "(?:[A-Za-z0-9._~!$&'()*+,;=\\-]|%[A-Fa-f0-9]{2})";
+  const pchar = `(?:${atom}|[:@])`, h16 = '[A-Fa-f0-9]{1,4}';
+  const octet = '(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9][0-9]|[0-9])';
+  const ipv4 = `${octet}(?:\\.${octet}){3}`, ls32 = `(?:${h16}:${h16}|${ipv4})`;
+  const ipv6 = [`(?:${h16}:){6}${ls32}`, `::(?:${h16}:){5}${ls32}`, `(?:${h16})?::(?:${h16}:){4}${ls32}`];
+  for (let n = 1; n <= 6; n++) {
+    const left = `(?:(?:${h16}:){0,${n}}${h16})?`;
+    const right = n < 4 ? `(?:${h16}:){${4 - n}}${ls32}` : n === 4 ? ls32 : n === 5 ? h16 : '';
+    ipv6.push(`${left}::${right}`);
+  }
+  const future = "[vV][A-Fa-f0-9]+\\.[A-Za-z0-9._~!$&'()*+,;=:\\-]+";
+  const host = `(?:\\[(?:${ipv6.join('|')}|${future})\\]|${atom}*)`;
+  const authority = `(?:(?:${atom}|:)*@)?${host}(?::[0-9]*)?`;
+  const network = `//${authority}(?:/${pchar}*)*`;
+  const absolute = `/(?:${pchar}+(?:/${pchar}*)*)?`;
+  const rootless = `${pchar}+(?:/${pchar}*)*`;
+  const noscheme = `(?:${atom}|@)+(?:/${pchar}*)*`;
+  const suffix = `(?:\\?(?:${pchar}|[/?])*)?(?:#(?:${pchar}|[/?])*)?`;
+  return `(?:[A-Za-z][A-Za-z0-9+.-]*:(?:${network}|${absolute}|${rootless}|)|${network}|${absolute}|${noscheme}|)${suffix}`;
+}
+const uriAuthorityOriginal = "8bdddcc2d2b129e5541e9f18b46e50353cf72978d591ab9ca98d431876d46f10";
+const uriAuthorityPatched = "9ba7375b3f88be0bf54cf02ed4220346f5fbee12de8fa23ac723ba6fe0d0d35c";
+export const uriAuthorityUpdates = [
+  "  CMIShortIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",",
+  "  CMILongIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\","
+].map(before => {
+  const prefix = before.slice(0, before.indexOf(':') + 2);
+  const pattern = JSON.parse(before.slice(prefix.length, -1));
+  const lexical = "(?:[A-Za-z0-9\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\s\\S])";
+  if (!pattern.endsWith(lexical)) throw Error('SCORM URI predecessor no longer matches');
+  const updated = pattern.slice(0, -lexical.length) + uriReferencePattern() + '(?![\\s\\S])';
+  return [before, prefix + 'legacy ? ' + JSON.stringify(pattern) + ' : ' + JSON.stringify(updated) + ','];
+}).concat([
+  [
+    "const SECONDS_PER_SECOND = 1;",
+    "function pearSCORM2004Engine(legacy = false) {\nconst SECONDS_PER_SECOND = 1;"
+  ],
+  [
+    "export { Scorm2004API, Scorm2004API as default };",
+    "return Scorm2004API;\n}\n// Separate closures preserve the historical 2nd-edition binding without mutable\n// module-wide regexes or duplicating the engine implementation in the bundle.\nconst Scorm2004API = pearSCORM2004Engine();\nconst Scorm2004LegacyAPI = pearSCORM2004Engine(true);\nexport { Scorm2004API, Scorm2004LegacyAPI, Scorm2004API as default };"
+  ]
+]);
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -496,9 +541,11 @@ export function reviewedSCORMSource(source) {
     if (hash(source) !== sequencingResponsePatched) throw Error("SCORM sequencing response checksum mismatch");
   }
   if (hash(source) === responseBindingOriginal) {source = replace(source, responseBindingUpdates); if (hash(source) !== responseBindingPatched) throw Error("SCORM response binding checksum mismatch");}
+  if (hash(source) === uriAuthorityOriginal) {source = replace(source, uriAuthorityUpdates); if (hash(source) !== uriAuthorityPatched) throw Error("SCORM URI authority checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === uriAuthorityPatched) {source = replace(source, uriAuthorityUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== uriAuthorityOriginal) throw Error("SCORM URI authority reverse checksum mismatch");}
   if (hash(source) === responseBindingPatched) {source = replace(source, responseBindingUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== responseBindingOriginal) throw Error("SCORM response binding reverse checksum mismatch");}
   if (hash(source) === sequencingResponsePatched) {
     source = replace(source, sequencingResponseUpdates.toReversed().map(([before, after]) => [after, before]));
