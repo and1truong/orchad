@@ -142,6 +142,15 @@ ADR-137 uses the existing transactional SCO ordinal for finished non-sequenced 2
 
 ADR-138 derives resume entry from the trusted suspendedActivity matching the selected SCO, overriding normal/empty exit while retaining revision/time/history/receipts and no proof. Original3FAIL; focused70/full domain776 across113 files/build/built3 complete exit0. Exact-head CI pending. Original time-out+continue probes deliver another SCO across three editions; separate root fix required. Parent Windows-only unchanged retry running; original failure retained. No full lifecycle or production claim.
 
+ADR-138 P1 review correction retains trusted resume while the latest scoped
+launch remains unacknowledged, including repeated exact registration keys and
+a lost browser launch response. A content ACK ends the fallback. Original3FAIL;
+owner v32 fresh full domain779/114 files, build and built3 complete exit0.
+Initial browser3FAIL from incorrect alert scope is retained; corrected tests
+assert the actual error and unchanged CMI/history/receipts/no proof. Original
+head CI776/198 dev/198 built was successful but does not cover this correction.
+New-head full CI/native/Side Panel/review gates remain required.
+
 ADR-139 pear-timeout-exitall-v33 normalizes Terminate navigation and trusted preflight to ExitAll for time-out, preserving authored pending request until termination and historical v32 bytes/envelopes. Original6FAIL; first focused66/69 retained three test-only snapshot-access failures; corrected focused69/full domain782 across114 files/build/final typecheck/built3 complete exit0. Exact-head CI/native/Side Panel/review pending. Logout preflight/full lifecycle/independent reference gates remain OPEN; production disabled.
 
 ADR-140 pear-logout-exitall-v34 extends shared Terminate/preflight ExitAll precedence to logout and terminates the sequencing service, retaining authored request and exact v33 installation/snapshot compatibility. Original6FAIL; focused75/full domain788 across115 files/build/final typecheck/built3 complete exit0. Exact-head CI/native/Side Panel/review pending. Full lifecycle/reference gaps remain OPEN; existing data-free deprecation warning retained; production disabled.
