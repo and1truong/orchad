@@ -8,18 +8,21 @@ import {interopPackage} from '../scorm-interop-fixture.ts';
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': built preference language survive lost ACK and close/resume', async ({page}) => {
   const capacity = 'x' + '-abcdefgh'.repeat(27) + '-abcde';
   const script = `{const api=parent.API_1484_11,key='cmi.learner_preference.language',capacity=${JSON.stringify(capacity)},get=()=>api.GetValue(key),set=v=>api.SetValue(key,v),error=()=>api.GetLastError();
-    for(const value of ['vi-VN-x-demo','en-Latn-US','i-klingon','eng','fre','fra','qaa','qtz','mol','scc','scr','jaw','VI-vn-X-DEMO',capacity]){
+    for(const value of ['vi-VN-x-demo','en-Latn-US','i-klingon','I-MINGO-x-demo','i-lux','eng','fre','fra','qaa','qtz','mol','scc','scr','jaw','VI-vn-X-DEMO',capacity]){
       if(set(value)!=='true'||get()!==value||error()!=='0')throw Error('valid language '+value);
     }
-    for(const bad of ['a','A','abcd','abcdefgh','abcd-US','zz','ZZ','zz-US','zzz','ZZZ-a','en--US','en-','1en-US','en-abcdefghi','en_US',capacity+'a']){
+    for(const bad of ['i-madeup','I-UNKNOWN','i-klignon','i','a','A','abcd','abcdefgh','abcd-US','zz','ZZ','zz-US','zzz','ZZZ-a','en--US','en-','1en-US','en-abcdefghi','en_US',capacity+'a']){
       if(set(bad)!=='false'||error()!=='406'||get()!==capacity||error()!=='0')throw Error('malformed language '+bad);
     }
     if(set('')!=='true'||get()!==''||error()!=='0'||set(capacity)!=='true')throw Error('clear language');
     if(api.SetValue('cmi.objectives.0.id','urn:pear:language-objective')!=='true'||api.SetValue('cmi.interactions.0.id','urn:pear:language-interaction')!=='true'||api.SetValue('cmi.interactions.0.type','fill-in')!=='true')throw Error('language dependencies');
-    for(const field of ['cmi.comments_from_learner.0.comment','cmi.objectives.0.description','cmi.interactions.0.description','cmi.interactions.0.learner_response','cmi.interactions.0.correct_responses.0.pattern']){
+    const localizedFields=['cmi.comments_from_learner.0.comment','cmi.objectives.0.description','cmi.interactions.0.description','cmi.interactions.0.learner_response','cmi.interactions.0.correct_responses.0.pattern'];
+    if(api.GetValue('cmi.entry')==='resume')for(const field of localizedFields)if(api.GetValue(field)!=='{lang=I-MINGO}Original historical IANA text')throw Error('IANA resume '+field);
+    for(const field of localizedFields){
       const good='{lang=scc}Original historical text';if(api.SetValue(field,good)!=='true'||api.GetValue(field)!==good)throw Error('localized language '+field);
-      for(const primary of ['zz','zzz','a','abcdefgh'])if(api.SetValue(field,'{lang='+primary+'}Rejected text')!=='false'||api.GetLastError()!=='406'||api.GetValue(field)!==good)throw Error('localized registry '+field);
+      for(const primary of ['i-madeup','I-UNKNOWN','i-klignon','i','zz','zzz','a','abcdefgh'])if(api.SetValue(field,'{lang='+primary+'}Rejected text')!=='false'||api.GetLastError()!=='406'||api.GetValue(field)!==good)throw Error('localized registry '+field);
     }
+    for(const field of localizedFields)if(api.SetValue(field,'{lang=I-MINGO}Original historical IANA text')!=='true')throw Error('registered IANA '+field);
     document.getElementById('entry').textContent='Preference language preserved';}`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); f.enroll();
   const origin = 'http://127.0.0.1:4696', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4697', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
@@ -47,7 +50,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    expect(stored.learner_preference.language).toBe(capacity); expect(stored.completion_status).toBe('incomplete');
+    expect(stored.learner_preference.language).toBe(capacity); for(const value of [stored.comments_from_learner['0'].comment,stored.objectives['0'].description,stored.interactions['0'].description,stored.interactions['0'].learner_response,stored.interactions['0'].correct_responses['0'].pattern])expect(value).toBe('{lang=I-MINGO}Original historical IANA text'); expect(stored.completion_status).toBe('incomplete');
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Preference language preserved', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);

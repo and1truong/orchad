@@ -6,3 +6,5 @@ export const resultDecimalUpdates: [string, string][];
 export const legacyAbsoluteUpdates: [string, string][];
 
 export const languageRegistryUpdates: [string, string][];
+
+export const ianaLanguageUpdates: [string, string][];

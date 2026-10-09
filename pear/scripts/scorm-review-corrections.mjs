@@ -509,6 +509,11 @@ export const languageRegistryUpdates = [
     "  CMILangString4000: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=(\" + PEAR_ISO_LANGUAGE_PRIMARY + \")((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,4000}(?![\\\\s\\\\S])\","
   ]
 ];
+const ianaLanguageOriginal = languageRegistryPatched;
+const ianaLanguagePatched = "62d0e92379a86ba6cad924e0cc40f28065970b0d0a6f373256ce8fb20333d151";
+// i is reserved for IANA registrations; private x and subsequent subcodes stay exact.
+const ianaPrefix = languageRegistry.ianaPrefixes.map(tag => caseCode(tag.slice(2))).join('|');
+export const ianaLanguageUpdates = [["|[iIxX])\";", JSON.stringify('|[xX]|[iI](?=-(?:' + ianaPrefix + ')(?:-|\\}|(?![\\s\\S]))))').slice(1) + ';']];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -617,9 +622,11 @@ export function reviewedSCORMSource(source) {
   if (hash(source) === resultDecimalOriginal) {source = replace(source, resultDecimalUpdates); if (hash(source) !== resultDecimalPatched) throw Error("SCORM result decimal checksum mismatch");}
   if (hash(source) === legacyAbsoluteOriginal) {source = replace(source, legacyAbsoluteUpdates); if (hash(source) !== legacyAbsolutePatched) throw Error("SCORM legacy absolute checksum mismatch");}
   if (hash(source) === languageRegistryOriginal) {source = replace(source, languageRegistryUpdates); if (hash(source) !== languageRegistryPatched) throw Error("SCORM language registry checksum mismatch");}
+  if (hash(source) === ianaLanguageOriginal) {source = replace(source, ianaLanguageUpdates); if (hash(source) !== ianaLanguagePatched) throw Error("SCORM IANA language checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === ianaLanguagePatched) {source = replace(source, ianaLanguageUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== ianaLanguageOriginal) throw Error("SCORM IANA language reverse checksum mismatch");}
   if (hash(source) === languageRegistryPatched) {source = replace(source, languageRegistryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== languageRegistryOriginal) throw Error("SCORM language registry reverse checksum mismatch");}
   if (hash(source) === legacyAbsolutePatched) {source = replace(source, legacyAbsoluteUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== legacyAbsoluteOriginal) throw Error("SCORM legacy absolute reverse checksum mismatch");}
   if (hash(source) === resultDecimalPatched) {source = replace(source, resultDecimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== resultDecimalOriginal) throw Error("SCORM result decimal reverse checksum mismatch");}
