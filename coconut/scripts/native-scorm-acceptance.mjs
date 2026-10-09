@@ -13,8 +13,9 @@ const coconutRoot=fileURLToPath(new URL("..",import.meta.url));
 const pearRoot=fileURLToPath(new URL("../../pear/",import.meta.url));
 const TRUSTED="http://127.0.0.1:4310",SMOKE_PORT=4319,MCP_PORT=14313;
 const edition=process.env.PEAR_NATIVE_SCORM_EDITION??"2004-4";
-const collectionSPM=process.env.PEAR_NATIVE_SCORM_COLLECTION_SPM==="1";
-const nonce=randomUUID(),lane=(collectionSPM?"native-scorm-collection:":"native-scorm:")+edition,checks=[];
+const commentSPM=process.env.PEAR_NATIVE_SCORM_COMMENT_SPM==="1";
+const collectionSPM=process.env.PEAR_NATIVE_SCORM_COLLECTION_SPM==="1"||commentSPM;
+const nonce=randomUUID(),lane=(commentSPM?"native-scorm-comment-collection:":collectionSPM?"native-scorm-collection:":"native-scorm:")+edition,checks=[];
 const check=(name,cond)=>{checks.push(name);console.log(`  ${cond?"PASS":"FAIL"} ${name}`);if(!cond)throw Error("Acceptance failed: "+name);};
 const fixture=spawn(process.execPath,["--import","tsx","scripts/native-scorm-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe","ipc"]});
 let fixtureOutput="",fixtureError="",fixtureExit=null,fixtureClosed=false;
@@ -137,7 +138,11 @@ try {
   const collection=probe=>probe.collectionSPM?.interactions===250&&probe.collectionSPM.objectives===100&&probe.collectionSPM.nestedObjectives===2500&&probe.collectionSPM.patterns===2500&&probe.collectionSPM.preserved===true;
   const stored=value=>value.collectionSPM===true&&value.collectionStored?.interactions===250&&value.collectionStored.objectives===100&&value.collectionStored.origins===250&&value.collectionStored.preserved===true;
   check('actual native mandatory collection preserves 250 interactions/100 objectives/2500 IDs/2500 patterns through durable resume',collection(first.probes[0])&&collection(resumed.probes[1])&&stored(first)&&stored(resumed));
-  check('actual native mixed-type collection retains 3500 real journal entries and 250 server-derived original bindings',resumed.largestInteractionJournal===3500&&resumed.responseBindingCheckpoints>0&&resumed.responseWriteCheckpoints>0&&resumed.largestCheckpointBytes>544*1024&&resumed.largestCheckpointBytes<2*1024*1024&&resumed.proofs===0&&resumed.certificates===0);
+  check('actual native mixed-type collection retains 3500 real journal entries and 250 server-derived original bindings',resumed.largestInteractionJournal===3500&&resumed.responseBindingCheckpoints>0&&resumed.responseWriteCheckpoints>0&&(commentSPM?resumed.largestCheckpointBytes>2*1024*1024&&resumed.largestCheckpointBytes<resumed.largestCheckpointLimit:resumed.largestCheckpointBytes>544*1024&&resumed.largestCheckpointBytes<2*1024*1024)&&resumed.proofs===0&&resumed.certificates===0);
+ }
+ if(commentSPM){
+  const comments=probe=>probe.learnerCommentSPM?.comments===250&&probe.learnerCommentSPM.charactersPerComment===4000&&probe.learnerCommentSPM.preserved===true;
+  check('actual native full Unicode learner comments remain exact in SQLite and the SCO through lost ACK, retry and human Close/resume',Number.isFinite(resumed.largestCheckpointLimit)&&comments(first.probes[0])&&comments(resumed.probes[1])&&[first,resumed].every(value=>value.commentSPM===true&&value.collectionStored?.comments?.count===250&&value.collectionStored.comments.preserved===true));
  }
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);
