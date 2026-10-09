@@ -4,3 +4,5 @@ export const uriAuthorityUpdates: [string, string][];
 export const decimalUpdates: [string, string][];
 export const resultDecimalUpdates: [string, string][];
 export const legacyAbsoluteUpdates: [string, string][];
+
+export const languageRegistryUpdates: [string, string][];

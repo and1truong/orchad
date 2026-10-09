@@ -40,6 +40,11 @@ const script = `
     evidence.decimalCapacity={resumed:decimalResumed,preserved:Object.entries(decimals).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0'),codes:decimalCodes};
     const patterns=${JSON.stringify(sequencingResponsePatterns)},base='cmi.interactions.1';
     if(evidence.entry!=='resume'){if(api.SetValue(base+'.id','urn:pear:native-ordered')!=='true'||api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native ordered dependency');for(const [n,p] of patterns.entries())for(let write=0;write<(n===0?5000:1);write++)if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='true')throw Error('Native ordered pattern');}
+    const languageValues={'cmi.learner_preference.language':'qtz','cmi.interactions.1.description':'{lang=scc}Native historical language'};
+    const languageResumed=evidence.entry!=='resume'||Object.entries(languageValues).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0');
+    for(const [key,value] of Object.entries(languageValues))if(api.SetValue(key,value)!=='true')throw Error('Native registered language refused');
+    const languageCodes=Object.keys(languageValues).flatMap(key=>['zz','zzz','ZZ-us','a','abcdefgh'].map(primary=>{const value=key==='cmi.learner_preference.language'?primary:'{lang='+primary+'}Rejected text';if(api.SetValue(key,value)!=='false')throw Error('Native unknown ISO language admitted');return api.GetLastError();}));
+    evidence.languageRegistry={resumed:languageResumed,preserved:Object.entries(languageValues).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0'),codes:languageCodes};
     const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');
