@@ -5,6 +5,36 @@ import {scormLearningFixture} from './scorm-learning-fixture.ts';
 import {multiFilePackage} from './scorm-package-fixture.ts';
 import {singleSCOManifest} from './scorm-player-fixture.ts';
 import {sequencingPackage} from './scorm-sequencing-fixture.ts';
+for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': independent interleaved histories retain typed barriers, exact retries and durable origins', async () => {
+  for (const sequenced of [false,true]) for (const finish of [false,true]) {
+    const f=await scormLearningFixture(undefined,sequenced?sequencingPackage(edition):multiFilePackage(edition,singleSCOManifest(edition)));
+    try {
+      const binding=f.enroll(),launch=f.launch(binding),b=f.player.bootstrap(launch.token);let accept=false;const attempts:any[]=[];
+      const api=createSCORM2004API({edition,...b,checkpoint(...args){attempts.push(structuredClone(args));return accept;}});
+      assert.equal(api.Initialize(''),'true');
+      const set=(n:number,key:string,value:string)=>assert.equal(api.SetValue('cmi.interactions.'+n+'.'+key,value),'true');
+      for(let i=0;i<2;i++)for(const [key,value] of [['id','urn:pear:interleaved-'+i],['type','choice'],['learner_response','first'],['correct_responses.0.pattern','first']])set(i,key,value);
+      for(const field of ['learner_response','correct_responses.0.pattern','type'])for(let n=0;n<5000;n++)for(let i=0;i<2;i++)set(i,field,field==='type'?(n%2?'choice':'sequencing'):(n%2?'second':'first'));
+      set(0,'type','sequencing');set(0,'learner_response','a[,]a');
+      assert.equal(api.SetValue('cmi.interactions.0.type','unknown'),'false');assert.equal(api.GetLastError(),'406');
+      for(let i=0;i<2;i++)set(i,'type','numeric');set(0,'id','urn:pear:interleaved-0');
+      assert.equal(api.SetValue('cmi.exit','suspend'),'true');const save=()=>finish?api.Terminate(''):api.Commit('');
+      assert.equal(save(),'false');assert.equal(api.GetLastError(),finish?'111':'391');assert.equal(attempts.length,1,'short typed witness reaches queue');
+      accept=true;assert.equal(save(),'true');assert.deepEqual(attempts[1],attempts[0]);
+      const [state,,navigation,,writes]=attempts[1];assert.equal(writes.length,17);
+      const request={sequence:1,revision:b.revision,state,navigation,finished:finish,interactionWrites:writes};
+      const forged=writes.filter(([key,value]:[string,string])=>!(key==='cmi.interactions.0.type'&&value==='sequencing'));
+      assert.throws(()=>f.player.checkpoint(launch.token,{...request,interactionWrites:forged}),/journal/);
+      assert.equal(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision,b.revision);assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n,0);
+      const receipt=f.player.checkpoint(launch.token,request);assert.deepEqual(f.player.checkpoint(launch.token,request),receipt);
+      assert.deepEqual(receipt.responseBindings,{'cmi.interactions.0.learner_response':'sequencing','cmi.interactions.0.correct_responses.0.pattern':'choice','cmi.interactions.1.learner_response':'choice','cmi.interactions.1.correct_responses.0.pattern':'choice'});
+      f.player.close(f.service.principal('learner-a'),launch.launchId,'session-learner-a');
+      const resumed=createSCORM2004API({edition,...f.player.bootstrap(f.launch(binding).token)});assert.equal(resumed.Initialize(''),'true');
+      for(let i=0;i<2;i++){assert.equal(resumed.GetValue('cmi.interactions.'+i+'.type'),'numeric');assert.equal(resumed.GetValue('cmi.interactions.'+i+'.learner_response'),i?'second':'a[,]a');assert.equal(resumed.GetLastError(),'0');assert.equal(resumed.GetValue('cmi.interactions.'+i+'.correct_responses.0.pattern'),'second');assert.equal(resumed.GetLastError(),'0');}
+      assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n,1);assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n,0);
+    } finally {f.db.close();}
+  }
+});
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const finish of [false,true]) test(edition + ': legal consecutive type history can be checkpointed before the first save ' + (finish?'Terminate':'Commit'), () => {
   let writes: [string,string][] | undefined;
   const api = createSCORM2004API({edition,checkpoint(_state,_finished,_nav,_shared,journal){writes=journal;}});

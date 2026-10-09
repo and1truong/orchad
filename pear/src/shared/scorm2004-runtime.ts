@@ -115,16 +115,17 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const interactionKey = canonicalInteractionPath(key);
       if (result === 'true' && interactionWritePath.test(interactionKey)) {
         if (interactionResponsePath.test(interactionKey)) writtenOrigins[interactionKey] = runtime.GetValue(interactionTypePath(interactionKey));
-        // Consecutive successful writes to the same type or response keep the
-        // last value; an intervening type/response cannot lose its origin.
-        // ponytail: other histories remain bounded4096/2MiB; validated witness compaction if needed.
+        // Writes in another interaction cannot change this record's validation.
+        // Keep its last same-field write, without crossing an own ID/type/response.
+        // ponytail: other histories remain bounded4096/2MiB; broader witnesses if needed.
         if (!journalOverflow) {
-          const entry: InteractionWrite = [interactionKey,value], last = interactionWrites.at(-1);
+          const entry: InteractionWrite = [interactionKey,value], base=interactionTypePath(interactionKey).slice(0,-4);
+          const lastIndex=interactionWrites.findLastIndex(([key])=>key.startsWith(base)),last=interactionWrites[lastIndex];
           const compact = (interactionKey.endsWith('.type') || interactionResponsePath.test(interactionKey)) && last?.[0] === interactionKey;
           const bytes = (write: InteractionWrite) => new TextEncoder().encode(JSON.stringify(write)).byteLength + 1;
           const growth = bytes(entry) - (compact ? bytes(last!) : 0);
           if ((!compact && interactionWrites.length >= interactionWriteLimit) || journalBytes + growth > scorm2004CheckpointBytes) journalOverflow = true;
-          else {if (compact) interactionWrites[interactionWrites.length - 1] = entry; else interactionWrites.push(entry); journalBytes += growth;}
+          else {if (compact) interactionWrites[lastIndex] = entry; else interactionWrites.push(entry); journalBytes += growth;}
         }
       }
       if (result === 'true' && key === 'adl.nav.request') navigation = value;
