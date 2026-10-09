@@ -32,6 +32,10 @@ for (const edition of ['pear', '1.2', '2004-2', '2004-3', '2004-4']) test('real 
       assert.deepEqual(output.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g), phases.map(phase => 'PEAR_NATIVE_FIXTURE_CLOSE:' + phase));
       const times = Array.from(output.matchAll(/PEAR_NATIVE_FIXTURE_CLOSE:([a-z-]+) elapsedMs=(\d+\.\d{3})/g), match => ({phase: match[1], elapsed: Number(match[2])}));
       assert.deepEqual(times.map(t => t.phase), phases);
+      const databaseClose = Array.from(output.matchAll(/PEAR_NATIVE_FIXTURE_CLOSE:database-closed elapsedMs=\d+\.\d{3} databaseCloseMs=(\d+\.\d{3})/g));
+      assert.equal(databaseClose.length, 1);
+      const databaseCloseMs = Number(databaseClose[0][1]);
+      assert.ok(Number.isFinite(databaseCloseMs) && databaseCloseMs >= 0 && databaseCloseMs <= times[4].elapsed - times[3].elapsed + 0.002, 'Direct database close excludes preceding phase write overhead');
       assert.ok(times.every((t, i) => Number.isFinite(t.elapsed) && t.elapsed >= (times[i - 1]?.elapsed ?? 0) && t.elapsed < 5000), 'Complete monotonic cleanup timings within the existing deadline');
     }
   } finally {pending?.destroy(); if (!exited) {child.kill('SIGKILL'); await exit;}}

@@ -163,13 +163,14 @@ let closing = false;
 async function close() {
   if (closing) return; closing = true;
   // Flush phase evidence before a synchronous close/cleanup can block or exit.
-  const started = performance.now(), phase = (name: string) => writeSync(1, 'PEAR_NATIVE_FIXTURE_CLOSE:' + name + ' elapsedMs=' + (performance.now() - started).toFixed(3) + '\n');
+  const started = performance.now(), phase = (name: string, databaseCloseMs?: number) => writeSync(1, 'PEAR_NATIVE_FIXTURE_CLOSE:' + name + ' elapsedMs=' + (performance.now() - started).toFixed(3) + (databaseCloseMs === undefined ? '' : ' databaseCloseMs=' + databaseCloseMs.toFixed(3)) + '\n');
   phase('received');
   sink.server.closeAllConnections(); content!.server.closeAllConnections(); app.server.closeAllConnections();
   phase('connections-closed');
   await sink.close(); phase('sink-closed');
   await app.close(); phase('app-closed');
-  f.db.close(); phase('database-closed'); rmSync(dir, {recursive: true, force: true}); phase('cleanup-complete'); process.exit(0);
+  const databaseCloseStarted = performance.now(); f.db.close(); const databaseCloseMs = performance.now() - databaseCloseStarted;
+  phase('database-closed', databaseCloseMs); rmSync(dir, {recursive: true, force: true}); phase('cleanup-complete'); process.exit(0);
 }
 process.on('SIGTERM', () => void close()); process.on('SIGINT', () => void close());
 
