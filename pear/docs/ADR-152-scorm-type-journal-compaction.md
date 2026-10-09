@@ -79,3 +79,9 @@ being validated at its owner before integration. Windows shutdown cause remains
 unproved. General successful response histories remain OPEN: an independent
 original5000 consecutive learner/pattern-write regression across three editions
 and Commit/Terminate completes0PASS/12FAIL exit1, preserved for a successor.
+
+Integrated owner225 viewport correction b32a9aba without rewriting either
+history: documentation conflicts retain both evidence blocks. Changed built
+binding/provenance6 completes PASS exit0 under CI30second test budget, including
+5000-type compaction plus lost ACK/Retry/Close/resume/current-type correction.
+Parent225 new-head run37890454443 is pending; historical0ba failures remain.
