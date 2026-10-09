@@ -917,3 +917,53 @@ only second-edition raw/facade accepts custom:/custom:#fragment incorrectly.
 RFC2396 AppendixA requires nonempty hier/opaque part; RFC3986 admits path-empty
 for contemporary profiles. Separate subsequent binding, no current URI patch.
 Full matricesOPEN/externalBLOCKED; epicOPEN/productionDISABLED.
+
+ADR165: initial wrong-working-directory edit command failed before mutation; later shell
+exit0 masked that diagnostic, never counted as acceptance. First candidate used
+String.replace replacement text containing literal $&, which substituted the
+matched string and generated checksum-valid malformed JavaScript. Preserve
+malformed engine/correction copies outside source, focused1PASS/2SyntaxErrorFAIL
+exit1 and typecheck exit0/build exit1 logs. Callback replacement preserves literal
+pattern text. Accepted installer and node --check exit0. Corrected focused17PASS/
+1FAIL exit1 was a fixture cardinality error: likert permits only one correct
+pattern, so appending slot1 correctly returned351 before URI validation. Use a
+new valid interaction's empty pattern0 and retain existing-pattern replacement;
+product cardinality remains unchanged. Final focused18PASS/zero fail/cancel/skip
+exit0 (36.0s), including all predecessor/idempotence/syntax installer checks.
+Corrected typecheck/build exit0; final updated-test typecheck follows.
+
+ADR165 full acceptance pending. Parent238 own259/run37917819864 now READY10/latest full logs/fresh head/reviews[];973/237/237/4, all3OS native16/13/13/24/24/25/five clean ACK+exit0 each. EpicOPEN/prodDISABLED.
+
+Final updated-test typecheck exits0. Targeted built URI3 + supplemental native4
+complete7PASS exit0 (47.9s), all previous assertions retained. Fresh full domain
+993PASS/138files, all package test filenames matched (completion order varies),
+every plan/footer/five counts/individual exit0 and aggregate exit0 inspected.
+An initial inspection incorrectly zipped completion-order output against source
+order; it refused acceptance without changing/rerunning tests. Correct filename
+mapping confirms all files present and complete. Fixed-tree full172 browser
+is running; no pending PASS or clean full local/native-platform claim.
+
+Parent239182/run37919418466 now READY: all10completedSUCCESS/latest full logs
+and fresh exact-head/review_threads[] checked. Pear984/237dev/237built/SidePanel4
+plus host3/browserhost2/realLime/SCORMhost1; actual3OS16/13/13/24/24/25 and five
+clean quitACK/native+fixture exit0/no forced each. Parent238 own gates READY.
+Mango51PASS/3 paid-accountSKIP remain unavailable-account evidence, not paid
+service proof. All original failures retained, no Windows cause/repair claim.
+Full local172 still running on fixed source/build/tests.
+
+Exact second-edition RTE/errata retrieval remains unresolved: public viewer
+returned HTML/no selected PDF and public index shell fetch returnedHTTP403;
+Citeseer primary-document mirror fetch alsoHTTP403. No alternate-access bypass
+or exact reference/errata/IP certification claim. RFC2396 AppendixA reg_name
+explicitly admits semicolon along with colon/@; do not invent a host-only or
+semicolon refusal. No authority patch was made on that unconfirmed suspicion.
+
+Final fixed-tree full172 browser171PASS/1FAIL, process exit1 (9.6m). Sole full
+trace and error context inspected: managed ServiceWorker enumeration permission
+denied. All changed built identifiers3 and supplemental native4 pass within
+full; timestamp3 and prior journeys retain assertions. This run's download
+journeys pass; historical download/DOM failures remain preserved/unattributed.
+No unrelated rerun to obtain green counts, no source/build/test/timeout/retry/
+assertion/policy changes during acceptance. No clean full local/supported153/
+actual native owner claim. Final hashes8bd81c/1.2eb7539 verified. Owner-head CI
+and review gates remain pending. EpicOPEN/prodDISABLED.

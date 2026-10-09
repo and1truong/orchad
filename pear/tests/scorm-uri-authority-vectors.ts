@@ -32,5 +32,5 @@ export const invalidAuthorityReferences = [
 ];
 // Historical 2nd-edition/RFC2396 compatibility: registry authorities may contain
 // colon and @ as data. Full legacy structural binding remains a separate gate.
-export const validLegacyAuthorityReferences = ['custom://host:abc/', 'custom://a@b@host/', 'custom://unbracketed::1/', 'custom://registry:alpha@name:part/a'];
-export const invalidLegacyAuthorityReferences = invalidAuthorityReferences.filter(value => /[\[\]]/.test(value)).concat(['http://host%GG/', 'http://host/\n', 'http://host/\u0000', 'path#one#two']);
+export const validLegacyAuthorityReferences = ['custom://host:abc/', 'custom://a@b@host/', 'custom://unbracketed::1/', 'custom://registry:alpha@name:part/a', 'custom:a', 'custom:/', 'custom://', 'custom:?query'];
+export const invalidLegacyAuthorityReferences = invalidAuthorityReferences.filter(value => /[\[\]]/.test(value)).concat(['http://host%GG/', 'http://host/\n', 'http://host/\u0000', 'path#one#two', 'custom:', 'custom:#fragment']);

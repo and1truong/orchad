@@ -463,6 +463,15 @@ const resultDecimalPatched = "0447a677c989ac331f2e883c3e450a04c9366dcf3b5e4b06c5
 export const resultDecimalUpdates = [
   ["  CMIResult: \"^(correct|incorrect|unanticipated|neutral|-?([0-9]+)(\\\\.[0-9]{1,18})?)(?![\\\\s\\\\S])\",", "  CMIResult: \"^(correct|incorrect|unanticipated|neutral|-?([0-9]+)(\\\\.[0-9]+)?)(?![\\\\s\\\\S])\","]
 ];
+// RFC2396 Appendix A lacks RFC3986 path-empty for an absolute scheme.
+const legacyAbsoluteOriginal = resultDecimalPatched;
+const legacyAbsolutePatched = "8bd81c6515c2146928a9e3f665e7cf9544214ee2c8bf566da24bf19de4273a47";
+export const legacyAbsoluteUpdates = uriAuthorityUpdates.slice(0, 2).map(([, before]) => {
+  const match = /legacy \? ("(?:\\.|[^"\\])*") : /.exec(before);
+  if (!match) throw Error('Legacy URI predecessor no longer matches');
+  const pattern = JSON.parse(match[1]);
+  return [before, before.replace(match[1], () => JSON.stringify('^(?![A-Za-z][A-Za-z0-9+.-]*:(?:#|$))' + pattern.slice(1)))];
+});
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -569,9 +578,11 @@ export function reviewedSCORMSource(source) {
   if (hash(source) === uriAuthorityOriginal) {source = replace(source, uriAuthorityUpdates); if (hash(source) !== uriAuthorityPatched) throw Error("SCORM URI authority checksum mismatch");}
   if (hash(source) === decimalOriginal) {source = replace(source, decimalUpdates); if (hash(source) !== decimalPatched) throw Error("SCORM decimal checksum mismatch");}
   if (hash(source) === resultDecimalOriginal) {source = replace(source, resultDecimalUpdates); if (hash(source) !== resultDecimalPatched) throw Error("SCORM result decimal checksum mismatch");}
+  if (hash(source) === legacyAbsoluteOriginal) {source = replace(source, legacyAbsoluteUpdates); if (hash(source) !== legacyAbsolutePatched) throw Error("SCORM legacy absolute checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === legacyAbsolutePatched) {source = replace(source, legacyAbsoluteUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== legacyAbsoluteOriginal) throw Error("SCORM legacy absolute reverse checksum mismatch");}
   if (hash(source) === resultDecimalPatched) {source = replace(source, resultDecimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== resultDecimalOriginal) throw Error("SCORM result decimal reverse checksum mismatch");}
   if (hash(source) === decimalPatched) {source = replace(source, decimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== decimalOriginal) throw Error("SCORM decimal reverse checksum mismatch");}
   if (hash(source) === uriAuthorityPatched) {source = replace(source, uriAuthorityUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== uriAuthorityOriginal) throw Error("SCORM URI authority reverse checksum mismatch");}
