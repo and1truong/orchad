@@ -8,6 +8,7 @@ import {scormLearningFixture} from '../tests/scorm-learning-fixture.ts';
 import {interopPackage} from '../tests/scorm-interop-fixture.ts';
 import {singleSCOManifest} from '../tests/scorm-player-fixture.ts';
 import {sequencingResponsePatterns} from '../tests/scorm-sequencing-response-vectors.ts';
+import {xmlTokenManifest} from '../tests/scorm-sequencing-fixture.ts';
 import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
 if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsupported native SCORM edition');
@@ -88,11 +89,11 @@ const script = `
   }},200);
 })();`;
 const standard = edition as '1.2' | '2004-2' | '2004-3' | '2004-4';
-// Exercise XML boolean and integer lexical bindings in the actual native journey.
-const manifest = standard === '1.2' ? singleSCOManifest(standard) : singleSCOManifest(standard)
+// Exercise XML boolean/integer/token lexical bindings in the actual native journey.
+const manifest = standard === '1.2' ? singleSCOManifest(standard) : xmlTokenManifest(singleSCOManifest(standard)
   .replace('<p:manifest ', '<p:manifest xmlns:s="http://www.imsglobal.org/xsd/imsss" ')
   .replace('identifier="intro"', 'identifier="intro" isvisible=" &#x9;1&#xA; "')
-  .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/><s:limitConditions attemptLimit=" &#x9;+0003&#xA; "/></s:sequencing>');
+  .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/><s:limitConditions attemptLimit=" &#x9;+0003&#xA; "/><s:randomizationControls selectionTiming="never" randomizationTiming="never"/><s:sequencingRules><s:preConditionRule><s:ruleConditions conditionCombination="all"><s:ruleCondition condition="always" operator="not"/></s:ruleConditions><s:ruleAction action="disabled"/></s:preConditionRule></s:sequencingRules></s:sequencing>'));
 const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, manifest)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
 // Synthetic diagnostics record route classes/status, never launch capabilities.

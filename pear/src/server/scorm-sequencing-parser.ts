@@ -93,15 +93,15 @@ function rule(el: Element, kind: string) {
   attrs(el, []); const nodes = children(el), cs = nodes.find(n => n.localName === 'ruleConditions'), action = nodes.find(n => n.localName === 'ruleAction');
   if (nodes.length !== 2 || !cs || !action || nodes.some(n => n.namespaceURI !== SN)) fail();
   attrs(cs!, ['conditionCombination']); attrs(action!, ['action']);
-  const combination = cs!.getAttribute('conditionCombination') ?? 'all', value = action!.getAttribute('action');
+  const combination = xmlAtomicToken(cs!.getAttribute('conditionCombination')) ?? 'all', value = xmlAtomicToken(action!.getAttribute('action'));
   const actions = kind === 'preConditionRule' ? preActions : kind === 'exitConditionRule' ? ['exit'] : ['exitParent', 'exitAll', 'continue', 'previous', 'retry', 'retryAll'];
   if (!['all', 'any'].includes(combination) || !actions.includes(value ?? '')) fail();
   const list = children(cs!); if (!list.length || list.length > 64) fail();
   return {action: value, conditionCombination: combination, conditions: list.map(n => {
     if (n.namespaceURI !== SN || n.localName !== 'ruleCondition' || children(n).length) fail();
     attrs(n, ['condition', 'operator', 'referencedObjective', 'measureThreshold']);
-    const condition = n.getAttribute('condition'), operator = n.getAttribute('operator'), objective = n.getAttribute('referencedObjective'), threshold = number(n, 'measureThreshold', -1, 1);
-    if (!conditions.includes(condition ?? '') || operator && !['noOp', 'not'].includes(operator) || objective && objective.length > 4000) fail();
+    const condition = xmlAtomicToken(n.getAttribute('condition')), operator = xmlAtomicToken(n.getAttribute('operator')), objective = n.getAttribute('referencedObjective'), threshold = number(n, 'measureThreshold', -1, 1);
+    if (!conditions.includes(condition ?? '') || operator !== null && !['noOp', 'not'].includes(operator) || objective && objective.length > 4000) fail();
     return {condition, ...(operator === 'not' ? {operator} : {}), ...(objective ? {referencedObjective: objective} : {}), ...(threshold !== undefined ? {parameters: {threshold}} : {})};
   })};
 }
@@ -130,16 +130,16 @@ function rollup(el: Element) {
   const controls = {...Object.fromEntries(['rollupObjectiveSatisfied', 'rollupProgressCompletion'].filter(k => el.hasAttribute(k)).map(k => [k, bool(el, k)])), ...(el.hasAttribute('objectiveMeasureWeight') ? {objectiveMeasureWeight: number(el, 'objectiveMeasureWeight', 0, 1)} : {})};
   const rules = children(el).map(r => {
     if (r.namespaceURI !== SN || r.localName !== 'rollupRule') fail(); attrs(r, ['childActivitySet', 'minimumCount', 'minimumPercent']);
-    const consideration = r.getAttribute('childActivitySet') ?? 'all', minimumCount = number(r, 'minimumCount', 0, 10000, true), minimumPercent = number(r, 'minimumPercent', 0, 1);
+    const consideration = xmlAtomicToken(r.getAttribute('childActivitySet')) ?? 'all', minimumCount = number(r, 'minimumCount', 0, 10000, true), minimumPercent = number(r, 'minimumPercent', 0, 1);
     if (!['all', 'any', 'none', 'atLeastCount', 'atLeastPercent'].includes(consideration)) fail();
     const ns = children(r), cs = ns.find(n => n.localName === 'rollupConditions'), act = ns.find(n => n.localName === 'rollupAction');
     if (ns.length !== 2 || !cs || !act || ns.some(n => n.namespaceURI !== SN)) fail(); attrs(cs!, ['conditionCombination']); attrs(act!, ['action']);
-    const combination = cs!.getAttribute('conditionCombination') ?? 'all', action = act!.getAttribute('action');
+    const combination = xmlAtomicToken(cs!.getAttribute('conditionCombination')) ?? 'all', action = xmlAtomicToken(act!.getAttribute('action'));
     if (!['all', 'any'].includes(combination) || !['satisfied', 'notSatisfied', 'completed', 'incomplete'].includes(action ?? '')) fail();
     const list = children(cs!); if (!list.length || list.length > 64) fail();
     return {consideration, minimumCount, minimumPercent, action, conditionCombination: combination, conditions: list.map(n => {
       if (n.namespaceURI !== SN || n.localName !== 'rollupCondition' || children(n).length) fail(); attrs(n, ['condition', 'operator']);
-      const condition = n.getAttribute('condition'), operator = n.getAttribute('operator') ?? 'noOp';
+      const condition = xmlAtomicToken(n.getAttribute('condition')), operator = xmlAtomicToken(n.getAttribute('operator')) ?? 'noOp';
       if (!['satisfied', 'objectiveStatusKnown', 'objectiveMeasureKnown', 'completed', 'progressKnown', 'attempted', 'attemptLimitExceeded', 'notAttempted', 'always'].includes(condition ?? '') || !['noOp', 'not'].includes(operator)) fail(); return {condition, operator};
     })};
   });
@@ -203,7 +203,7 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
       case 'randomizationControls': {
         attrs(n, ['randomizationTiming', 'selectCount', 'reorderChildren', 'selectionTiming']);
-        const selectionTiming = n.getAttribute('selectionTiming') ?? 'never', randomizationTiming = n.getAttribute('randomizationTiming') ?? 'never';
+        const selectionTiming = xmlAtomicToken(n.getAttribute('selectionTiming')) ?? 'never', randomizationTiming = xmlAtomicToken(n.getAttribute('randomizationTiming')) ?? 'never';
         if (![selectionTiming, randomizationTiming].every(v => ['never', 'once', 'onEachNewAttempt'].includes(v))) fail();
         const selectCount = number(n, 'selectCount', 0, 2048, true);
         out.sequencingControls = {...out.sequencingControls, selectionTiming, randomizationTiming, selectCount: selectCount ?? null, randomizeChildren: bool(n, 'reorderChildren') ?? false};

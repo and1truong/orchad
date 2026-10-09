@@ -93,3 +93,6 @@ export function xmlNumericManifest(xml: string) {
   return xml.replace(/(attemptLimit|selectCount|minimumCount|minimumPercent|measureThreshold|objectiveMeasureWeight|minProgressMeasure|progressWeight)="(\d+(?:\.\d+)?)"/g, (_, name, value) => name + '=" &#x9;+00' + value + '&#xD;&#xA; "')
     .replace(/<s:minNormalizedMeasure>(\d+(?:\.\d+)?)<\/s:minNormalizedMeasure>/g, (_, value) => '<s:minNormalizedMeasure> &#x9;+00' + value + '&#xD;&#xA; </s:minNormalizedMeasure>');
 }
+
+/** IMS restricted token enumerations; opaque identifiers/string fields stay exact. */
+export function xmlTokenManifest(xml: string) {return xml.replace(/(conditionCombination|condition|operator|action|childActivitySet|selectionTiming|randomizationTiming)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
