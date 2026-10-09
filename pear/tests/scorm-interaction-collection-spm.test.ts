@@ -13,13 +13,13 @@ import {scormLearningFixture} from './scorm-learning-fixture.ts';
 import {multiFilePackage} from './scorm-package-fixture.ts';
 import {singleSCOManifest} from './scorm-player-fixture.ts';
 import {fixture} from './helpers.ts';
-import {interactionCollectionScript,interactionPatternOriginsScript} from './scorm-interaction-collection-vectors.ts';
+import {interactionCollectionScript,interactionPatternOriginsScript,interactionInterleavedOriginsScript} from './scorm-interaction-collection-vectors.ts';
 for(const edition of ['2004-2','2004-3','2004-4'] as const){
- for(const patternOrigins of [false,true])test(edition+(patternOrigins?' full-pattern origins':'')+': mandatory250 interaction sets/10 objective IDs/10 patterns plus100 objectives preserve3500-entry provenance, atomic refusal, exact HTTP retry and SQLite resume',async()=>{
+ for(const [profile,patternOrigins,script] of [['',false,interactionCollectionScript],[' full-pattern origins',true,interactionPatternOriginsScript],[' interleaved full-pattern origins',true,interactionInterleavedOriginsScript]] as const)test(edition+profile+': mandatory250 interaction sets/10 objective IDs/10 patterns plus100 objectives preserve3500-entry provenance, atomic refusal, exact HTTP retry and SQLite resume',async()=>{
   const dir=mkdtempSync(join(tmpdir(),'pear-collection-spm-')),path=join(dir,'db.sqlite'),f=await scormLearningFixture(path,multiFilePackage(edition,singleSCOManifest(edition)));let opened:ReturnType<typeof fixture>|undefined;
   try{
    const binding=f.enroll(),launch=f.launch(binding),b=f.player.bootstrap(launch.token);let state:any,writes:any,accept=false;
-   const api=createSCORM2004API({edition,...b,checkpoint(...args:any[]){state=args[0];writes=args[4];return accept;}});assert.equal(api.Initialize(''),'true');runInNewContext(patternOrigins?interactionPatternOriginsScript:interactionCollectionScript,{api});
+   const api=createSCORM2004API({edition,...b,checkpoint(...args:any[]){state=args[0];writes=args[4];return accept;}});assert.equal(api.Initialize(''),'true');const evidence=runInNewContext(script,{api});if(script===interactionInterleavedOriginsScript)assert.deepEqual(JSON.parse(JSON.stringify(evidence)),{writes:10000,records:2,preserved:true});
    assert.equal(api.Commit(''),'false');assert.equal(api.GetLastError(),'391');const originalWrites=structuredClone(writes);accept=true;assert.equal(api.Commit(''),'true');assert.deepEqual(writes,originalWrites);assert.equal(writes.length,3500);
    assert.equal(api.GetValue('cmi.interactions._count'),'250');assert.equal(api.GetValue('cmi.objectives._count'),'100');for(let i=0;i<250;i++){assert.equal(api.GetValue('cmi.interactions.'+i+'.objectives._count'),'10');assert.equal(api.GetValue('cmi.interactions.'+i+'.correct_responses._count'),'10');}
    const request={sequence:1,revision:b.revision,state,finished:false,interactionWrites:writes};assert.ok(Buffer.byteLength(JSON.stringify(request))<2*1024*1024);

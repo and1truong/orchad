@@ -18,3 +18,7 @@ const collectionScript = (patternOrigins:boolean) => String.raw`(function(api){
 
 export const interactionCollectionScript=collectionScript(false);
 export const interactionPatternOriginsScript=collectionScript(true);
+export const interactionInterleavedOriginsScript=interactionPatternOriginsScript.replace("  put('cmi.exit','suspend');",String.raw`
+  let writes=0;for(let n=0;n<5000;n++)for(let i=0;i<2;i++){put('cmi.interactions.'+i+'.type',n%2?'choice':'sequencing');writes++;}
+  put('cmi.exit','suspend');
+  return {writes,records:2,preserved:[0,1].every(i=>api.GetValue('cmi.interactions.'+i+'.type')==='choice'&&api.GetLastError()==='0')};`);

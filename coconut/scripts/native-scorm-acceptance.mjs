@@ -141,6 +141,8 @@ try {
   check('actual native mixed-type collection retains3500 real journal entries and '+(commentSPM?2750:250)+' server-derived original bindings',resumed.largestInteractionJournal===3500&&resumed.responseBindingCheckpoints>0&&resumed.responseWriteCheckpoints>0&&(commentSPM?resumed.largestCheckpointBytes>2*1024*1024&&resumed.largestCheckpointBytes<resumed.largestCheckpointLimit:resumed.largestCheckpointBytes>544*1024&&resumed.largestCheckpointBytes<2*1024*1024)&&resumed.proofs===0&&resumed.certificates===0);
  }
  if(commentSPM){
+  const interleaved=probe=>probe.interleavedHistory?.records===2&&probe.interleavedHistory.preserved===true;
+  check('actual native10000 interleaved type writes retain3500 typed entries and2750 response origins through exact retry and human Close/resume',interleaved(first.probes[0])&&first.probes[0].interleavedHistory.writes===10000&&interleaved(resumed.probes[1])&&resumed.probes[1].interleavedHistory.writes===0&&resumed.largestInteractionJournal===3500&&[first,resumed].every(value=>value.collectionStored?.origins===2750&&value.collectionStored.preserved===true));
   const origins=probe=>probe.fullResponseOrigins?.origins===2750&&probe.fullResponseOrigins.patterns===2500&&probe.fullResponseOrigins.learners===250&&probe.fullResponseOrigins.preserved===true;
   check('actual native all2750 original learner/pattern bindings survive full350 comments, lost ACK, exact retry and human Close/resume',origins(first.probes[0])&&origins(resumed.probes[1])&&[first,resumed].every(value=>value.collectionStored?.origins===2750&&value.collectionStored.preserved===true));
   const comments=probe=>probe.learnerCommentSPM?.comments===250&&probe.learnerCommentSPM.charactersPerComment===4000&&probe.learnerCommentSPM.preserved===true;
