@@ -310,6 +310,18 @@ const contentPresenceUpdates = [
     "|(?:location|suspend_data)|comments_from_(?:learner|lms)"
   ]
 ];
+const timeoutExitAllOriginal = "5020b23897cbf8bca9c4e6ae71633cc6df6389dd70d6f593318bd4ab19f2c6e7";
+const timeoutExitAllPatched = "06459750c6d56c132306b08b89814db746915c44be835fab1e4d1ab29c8bf26f";
+const timeoutExitAllUpdates = [
+  [
+    "    let normalizedRequest = pendingNavRequest;",
+    "    // Pear: RTE time-out ends the sequencing session regardless of authored navigation.\n    let normalizedRequest = exitType === \"time-out\" ? \"exitAll\" : pendingNavRequest;"
+  ],
+  [
+    "    if (pendingNavRequest !== \"_none_\") {\n      const matches = pendingNavRequest.match(choiceJumpRegex);",
+    "    if (pendingNavRequest !== \"_none_\" && exitType !== \"time-out\") {\n      const matches = pendingNavRequest.match(choiceJumpRegex);"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -388,9 +400,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, contentPresenceUpdates);
     if (hash(source) !== contentPresencePatched) throw Error("SCORM content presence checksum mismatch");
   }
+  if (hash(source) === timeoutExitAllOriginal) {
+    source = replace(source, timeoutExitAllUpdates);
+    if (hash(source) !== timeoutExitAllPatched) throw Error("SCORM time-out ExitAll checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === timeoutExitAllPatched) {
+    source = replace(source, timeoutExitAllUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== timeoutExitAllOriginal) throw Error("SCORM time-out ExitAll reverse checksum mismatch");
+  }
   if (hash(source) === contentPresencePatched) {
     source = replace(source, contentPresenceUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== contentPresenceOriginal) throw Error("SCORM content presence reverse checksum mismatch");
