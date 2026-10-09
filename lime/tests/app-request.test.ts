@@ -7,6 +7,7 @@ import {
   APP_RESULT_TYPE,
   MAX_PROMPT_BYTES,
   RATE_LIMIT,
+  PAGE_TIMEOUT_MS,
   makeAppResult,
   parseAppRequestMessage,
   parseForwardedRequest,
@@ -705,4 +706,84 @@ test("page API: no bridge or re-install leaves the surface untouched", () => {
   } finally {
     h.restore();
   }
+});
+
+test("page API: frozen app bridge retains original receiver and methods while request channel installs", async () => {
+  const h = pageHarness();
+  try {
+    const original = Object.freeze({
+      describe() {assert.equal(this, original); return "description";},
+      getContext() {assert.equal(this, original); return "context";},
+      invoke(value: string) {assert.equal(this, original); return value;},
+    });
+    h.page.agentBridgeV1 = original;
+    assert.deepEqual(installAgentRequest(), {installed: true});
+    assert.equal(Object.hasOwn(original, "requestAgentTurn"), false);
+    const wrapper = h.page.agentBridgeV1 as any;
+    assert.equal(Object.isFrozen(wrapper), true);
+    assert.equal(wrapper.describe(), "description");
+    assert.equal(wrapper.getContext(), "context");
+    assert.equal(wrapper.invoke("result"), "result");
+    const pending = wrapper.requestAgentTurn("approved intent"), id = (h.posted[0] as any).requestId;
+    h.resultEvent(id, true);
+    assert.deepEqual(await pending, {ok: true, text: "done"});
+    assert.deepEqual(installAgentRequest(), {installed: false});
+  } finally {h.restore();}
+});
+
+test("relay: duplicate cannot free the original pending slot; host timeout frees an abandoned slot", async (t) => {
+  t.mock.timers.enable({apis: ["setTimeout"]});
+  const h = relayHarness(), first = rid();
+  h.pageMsg({type: APP_REQUEST_TYPE, requestId: first, prompt: "original"});
+  await Promise.resolve();
+  h.pageMsg({type: APP_REQUEST_TYPE, requestId: first, prompt: "replay"});
+  h.pageMsg({type: APP_REQUEST_TYPE, requestId: rid(), prompt: "concurrent"});
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.posted.at(-1)?.error, "request already pending");
+  t.mock.timers.tick(120000);
+  assert.equal(h.posted.at(-1)?.error, "agent request timed out");
+  h.pageMsg({type: APP_REQUEST_TYPE, requestId: rid(), prompt: "after deadline"});
+  await Promise.resolve();
+  assert.equal(h.sent.length, 2);
+});
+
+test("ingress: a cancelled approval's late verdict cannot run or erase a newer request", async () => {
+  const h = ingressHarness();
+  let oldVerdict!: (v: boolean) => void, newVerdict!: (v: boolean) => void;
+  h.setVerdict(new Promise<boolean>(r => {oldVerdict = r;}));
+  const old = h.forward(); await h.call(old); h.ingress.invalidateAll();
+  h.setVerdict(new Promise<boolean>(r => {newVerdict = r;}));
+  const current = h.forward(); assert.equal((await h.call(current)).ok, true);
+  oldVerdict(true); await new Promise(r => setTimeout(r, 0));
+  assert.equal(h.runs.length, 0);
+  assert.equal((await h.call(h.forward())).ok, false);
+  newVerdict(true); await new Promise(r => setTimeout(r, 0));
+  assert.deepEqual(h.runs, [current.prompt]);
+  assert.equal(h.finishes.filter(r => r.requestId === current.requestId).length, 1);
+  assert.equal(h.finishes.at(-1)?.result.ok, true);
+});
+
+test("relay: a late negative host acknowledgement cannot duplicate a timed-out result", async (t) => {
+  t.mock.timers.enable({apis: ["setTimeout"]});
+  let ack!: (value: {ok: boolean; error: string}) => void;
+  const posted: AppResultMessage[] = [];
+  const relay = createRelay({
+    isTopFrame: () => true,
+    postToPage: result => posted.push(result),
+    sendToWorker: () => new Promise(resolve => {ack = resolve;}),
+    onWorkerResult: () => {},
+  });
+  relay.handlePageMessage({source: "window", data: {type: APP_REQUEST_TYPE, requestId: rid(), prompt: "abandoned"}});
+  t.mock.timers.tick(PAGE_TIMEOUT_MS);
+  ack({ok: false, error: "late rejection"}); await Promise.resolve();
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].error, "agent request timed out");
+});
+
+test("ingress: invalidation before deferred approval cannot reopen a stale card", async () => {
+  const h = ingressHarness(), accepted = h.call(h.forward());
+  h.ingress.invalidateAll(); await accepted;
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(h.asks.length, 0); assert.equal(h.runs.length, 0);
+  assert.equal(h.finishes.length, 1); assert.equal(h.finishes[0].result.ok, false);
 });
