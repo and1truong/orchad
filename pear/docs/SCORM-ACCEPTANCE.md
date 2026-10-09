@@ -815,3 +815,42 @@ Predecessor236 owner Windows/macOS/Linux full native logs now checked: each
 16/13/13/24/24/25, five clean exit0/ACKtrue and no forced shutdown. Pear still
 pending; these results do not identify previous Windows failures or satisfy
 this diagnostic owner's future CI gates. Predecessor235 now READY as above.
+
+ADR163 implementation: two shared ID/IDREF reads use existing XML-only token
+helper. Existing collection fixture gains optional manifest input and is reused
+for native imports, preserving all previous authored sequencing bindings.
+Corrected focused59PASS/zero fail/cancel/skip exit0; typecheck/build exit0.
+Built collection3PASS exit0 (10.8s), supplemental native4PASS exit0 (27.3s).
+Original probe9FAIL and NCName6PASS remain retained. Initial wrong-root runner
+and wrong native filename diagnostics exit1/no tests retained; corrected paths
+only, no source/assertion/deadline changes. Full973/136files and full172 running,
+no pending PASS claim. Parent236 now READY: own10 completedSUCCESS/latestfull
+logs/freshhead/review_threads[]; Pear964/237dev/237built/SidePanel4, all3OS
+16/13/13/24/24/25 and five clean ACK/exit0 each. Parent237 diagnostics own CI
+pending; no Windows failure cause or product repair inferred. MatricesOPEN,
+external inputsBLOCKED; epicOPEN/prodDISABLED.
+
+ADR163 fresh full domain973PASS/136files completes with zero fail/cancel/skip;
+every file plan/footer/five counts/exit0 and aggregate exit0 inspected.
+Build/source frozen for full172 browser; no pending browser PASS claim.
+Original collection binding9FAIL and independent NCName6PASS retained.
+Independent subsequent objective XML anyURI original probe11FAIL exit1 on
+unchanged ADR162 tree, canonical manifest comparison; separate ADR164 work,
+not part of this implementation. #222 current e2b owner again has no PR runs;
+no skip-CI marker in commit message, cause remains unproved. No synthetic
+workflow event, unrelated empty commit or descendant substitution.
+
+Final fixed-tree full172 browser:167PASS/5FAIL process exit1 (8.5m), all five
+trace/error contexts inspected. Fourth-edition download60s timeout/cause
+unproved; managed ServiceWorker denial;2004-3 navigation target/retry/retryAll
+next-SCO heading assertion failures (DOM/session evidence recorded in trace,
+root cause unproved). Changed collection3 and supplemental native4 PASS within
+full run. No unrelated repeat to obtain green counts; no clean full local or
+supported153/actual native claim. Original full failure and diagnostics retained;
+no source/build/test/deadline/assertion/retry/policy changes during acceptance.
+Parent237 own Windows/macOS actual native full logs now inspected:16/13/13/
+24/24/25, five clean ACK/native+fixture exit0 each. Measured Windows2004-3/4
+app-to-database-close interval3804/3808ms; cleanup completes3810/3813ms within
+unchanged five-second budget. This locates a slow synchronous operation in
+successful measured runs, not the cause of prior forced failures. Linux/Pear
+remain pending; no diagnostic owner READY or product repair claim.

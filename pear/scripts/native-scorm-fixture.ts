@@ -8,7 +8,7 @@ import {scormLearningFixture} from '../tests/scorm-learning-fixture.ts';
 import {interopPackage} from '../tests/scorm-interop-fixture.ts';
 import {singleSCOManifest} from '../tests/scorm-player-fixture.ts';
 import {sequencingResponsePatterns} from '../tests/scorm-sequencing-response-vectors.ts';
-import {xmlTokenManifest, xmlTimeManifest, xmlSharedTargetManifest} from '../tests/scorm-sequencing-fixture.ts';
+import {collectionManifest, xmlCollectionIdsManifest, xmlTokenManifest, xmlTimeManifest, xmlSharedTargetManifest} from '../tests/scorm-sequencing-fixture.ts';
 import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
 if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsupported native SCORM edition');
@@ -106,7 +106,8 @@ const manifest = standard === '1.2' ? singleSCOManifest(standard) : xmlTimeManif
   .replace('<p:manifest ', '<p:manifest xmlns:s="http://www.imsglobal.org/xsd/imsss" xmlns:a="http://www.adlnet.org/xsd/adlseq_v1p3" ')
   .replace('identifier="intro"', 'identifier="intro" isvisible=" &#x9;1&#xA; "')
   .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/><s:limitConditions attemptLimit=" &#x9;+0003&#xA; " beginTimeLimit="2000-01-01T00:00:00Z" endTimeLimit="2099-01-01T00:00:00Z" attemptAbsoluteDurationLimit="PT3600S" attemptExperiencedDurationLimit="PT3600S" activityAbsoluteDurationLimit="PT3600S" activityExperiencedDurationLimit="PT3600S"/><s:randomizationControls selectionTiming="never" randomizationTiming="never"/><s:sequencingRules><s:preConditionRule><s:ruleConditions conditionCombination="all"><s:ruleCondition condition="always" operator="not"/></s:ruleConditions><s:ruleAction action="disabled"/></s:preConditionRule></s:sequencingRules><a:rollupConsiderations requiredForSatisfied="always" requiredForNotSatisfied="always" requiredForCompleted="always" requiredForIncomplete="always"/></s:sequencing>')));
-const nativeManifest = standard === '2004-4' ? xmlSharedTargetManifest(manifest.replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:data><runtime:map targetID="urn:pear:native-shared-target" readSharedData="true" writeSharedData="true"/></runtime:data>')) : manifest;
+const collections = standard === '1.2' ? manifest : xmlCollectionIdsManifest(collectionManifest(standard, manifest));
+const nativeManifest = standard === '2004-4' ? xmlSharedTargetManifest(collections.replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:data><runtime:map targetID="urn:pear:native-shared-target" readSharedData="true" writeSharedData="true"/></runtime:data>')) : collections;
 const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, nativeManifest)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
 // Synthetic diagnostics record route classes/status, never launch capabilities.
