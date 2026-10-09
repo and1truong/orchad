@@ -2112,3 +2112,13 @@ Broader simultaneous maximal response/SPM combinations can exceed transport
 and64MiB tenant storage; this named finite repair is not full SPM conformance.
 Licenses/authorized authoring exports/Rustici account/actual Safari+Android/
 reviewed production inputs BLOCKED. Epic OPEN; production DISABLED.
+
+
+## ADR-183 native Linux job groups
+
+See ADR-183-native-acceptance-groups.md: original Linux cancellations and
+Windows failure retained; baseline/collections both required at25 minutes,
+unchanged native/cleanup predicates and default all for Windows/macOS.
+Original orchestration0PASS1FAIL/exit1; corrected1PASS/exit0, syntax/YAML
+verified. Own exact-head eleven-job actual native CI/full logs/reviews pending.
+Epic OPEN; production DISABLED.
