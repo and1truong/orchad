@@ -96,3 +96,6 @@ export function xmlNumericManifest(xml: string) {
 
 /** IMS restricted token enumerations; opaque identifiers/string fields stay exact. */
 export function xmlTokenManifest(xml: string) {return xml.replace(/(conditionCombination|condition|operator|action|childActivitySet|selectionTiming|randomizationTiming)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
+
+/** XML atomic dateTime/duration whitespace; admitted values and ceilings stay fixed. */
+export function xmlTimeManifest(xml: string) {return xml.replace(/(beginTimeLimit|endTimeLimit|attemptAbsoluteDurationLimit|attemptExperiencedDurationLimit|activityAbsoluteDurationLimit|activityExperiencedDurationLimit)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}

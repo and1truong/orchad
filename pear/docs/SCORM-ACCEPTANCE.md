@@ -632,3 +632,48 @@ DOM cause. Supplemental native4 remains PASS. Parent2306ec completed Windows/
 macOS logs each16/13/13/23/23/23, five clean exit0/quitAcknowledged records and
 no forced shutdown; Pear/Linux owner jobs still pending. Current successor
 requires its own all10 exact-head CI/full logs/native23/fresh review gates.
+
+
+ADR-158 reuses XML atomic token normalization in the six dateTime/duration
+importer fields; source stays v41 and original ZIP/XML/hash/clock accounting/
+CMI/receipt/proof/Gregorian/timezone/precision/order/quota guards remain.
+Original6FAIL; focused32/35 and full937/940 across132files retained. Three
+failures came from a new fixture retrying a closed capability: server correctly
+refused. Fixed fixture asserts closed refusal/exact retained receipt, pre-close
+retry, host absolute7000ms/experienced2000ms resume and expiry denial; corrected
+standalone9PASS diagnostic only. Final fresh focused/full verification pending.
+Expanded calendar3/duration3 built and native4 import six time fields; native
+fixture calendar2000–2099/authored3600-second limits do not change test budgets.
+Full time/reference/matrices remain OPEN; external blockers unchanged.
+Epic OPEN; production DISABLED.
+
+Final committed-test focused35 completes35PASS/zero fail/skip/cancel exit0
+(16.7s). Fresh-cache full domain940/132files completes all per-file plans/
+footers/five counts/exits and aggregate exit0, with the product closed-capability
+guard retained. Expanded built calendar3/duration3 completes6PASS exit0 (31.6s);
+build/typecheck exit0. Final supplemental native4/full172 browser and final
+typecheck follow on fixed source/build. Original32/3 and937/3 remain separate;
+no failure or historical acceptance is overwritten.
+
+Final supplemental native4 completes PASS exit0 (31.3s), preserving all
+authority/absence/provenance/long decimal/ACK/retry/resume/proof/shutdown checks
+with all six time fields admitted. Final typecheck exit0; build source remains
+fixed v41. Full172 SCORM browser now runs on one unchanged source/build; every
+result/trace will be inspected, without a clean full claim for pending results.
+
+Final XMLtime tree: full172 browser168PASS/4FAIL exit1 (8.2m), all four traces
+inspected. Fourth asset and second retryAll DOM.describeNode/session closed,
+fourth support download60s timeout, managed ServiceWorker permission denial.
+DOM/download causes unproved; changed calendar/duration6 and native4 pass in
+full. Unchanged DOM-only recheck1PASS/1FAIL exit1 (12.9s), retryAll passes and
+asset still DOM/session closed; original/recheck logs/traces remain. No clean
+full supplementary local claim. Domain940/132files all plans/footers/counts/
+exits and aggregate exit0, focused35/built6/native4/typecheck/build exit0.
+Parent2306ec owner37901713762 READY:10completedSUCCESS/full logs inspected,
+Pear919/237/237/4 and all3OS16/13/13/23×3,clean5ACK5; reviews empty.
+Parent2317d owner37903569249 nineSUCCESS/WindowsFAIL:2004-2 fixture forced
+after app-closed/no database-close phase, nativeExit0/quitACK; cause unproved.
+One unchanged Windows-only retry running; original retained. Owner222e2b CI
+absent. Next internal interaction-result fractional cap original6FAIL retained;
+not fixed by XMLtime. Full matrices OPEN; external gates BLOCKED; epic OPEN;
+production DISABLED. See ADR158; no acceptance/history deletion.
