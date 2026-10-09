@@ -75,13 +75,13 @@ function adlObjectives(el: Element, edition: SCORMStandard) {
   if (!list.length || list.length > 1024) fail();
   return list.map(n => {
     if (n.namespaceURI !== ADL || n.localName !== 'objective') fail(); attrs(n, ['objectiveID']);
-    const id = n.getAttribute('objectiveID'); if (!id || !id.trim() || id.length > 4000 || ids.has(id)) fail(); ids.add(id!);
+    const id = xmlAtomicToken(n.getAttribute('objectiveID')); if (!id || !id.trim() || id.length > 4000 || ids.has(id)) fail(); ids.add(id!);
     const mappings = children(n), targets = new Set<string>(); if (!mappings.length || mappings.length > 1024) fail();
     return {id, maps: mappings.map(m => {
       if (m.namespaceURI !== ADL || m.localName !== 'mapInfo' || children(m).length) fail();
       const read = ['readRawScore', 'readMinScore', 'readMaxScore', 'readCompletionStatus', 'readProgressMeasure'];
       const write = ['writeRawScore', 'writeMinScore', 'writeMaxScore', 'writeCompletionStatus', 'writeProgressMeasure'];
-      attrs(m, ['targetObjectiveID', ...read, ...write]); const target = m.getAttribute('targetObjectiveID');
+      attrs(m, ['targetObjectiveID', ...read, ...write]); const target = xmlAtomicToken(m.getAttribute('targetObjectiveID'));
       if (!target || !target.trim() || target.length > 4000 || targets.has(target)) fail(); targets.add(target!);
       return {targetObjectiveID: target, ...Object.fromEntries(read.map(k => [k, bool(m, k) ?? true])), ...Object.fromEntries(write.map(k => [k, bool(m, k) ?? false]))};
     })};
@@ -100,14 +100,14 @@ function rule(el: Element, kind: string) {
   return {action: value, conditionCombination: combination, conditions: list.map(n => {
     if (n.namespaceURI !== SN || n.localName !== 'ruleCondition' || children(n).length) fail();
     attrs(n, ['condition', 'operator', 'referencedObjective', 'measureThreshold']);
-    const condition = xmlAtomicToken(n.getAttribute('condition')), operator = xmlAtomicToken(n.getAttribute('operator')), objective = n.getAttribute('referencedObjective'), threshold = number(n, 'measureThreshold', -1, 1);
+    const condition = xmlAtomicToken(n.getAttribute('condition')), operator = xmlAtomicToken(n.getAttribute('operator')), objective = xmlAtomicToken(n.getAttribute('referencedObjective')), threshold = number(n, 'measureThreshold', -1, 1);
     if (!conditions.includes(condition ?? '') || operator !== null && !['noOp', 'not'].includes(operator) || objective && objective.length > 4000) fail();
     return {condition, ...(operator === 'not' ? {operator} : {}), ...(objective ? {referencedObjective: objective} : {}), ...(threshold !== undefined ? {parameters: {threshold}} : {})};
   })};
 }
 function objective(el: Element, edition: SCORMStandard) {
   attrs(el, ['objectiveID', 'satisfiedByMeasure']);
-  const id = el.getAttribute('objectiveID') ?? ''; if (!id || id.length > 4000) fail();
+  const id = xmlAtomicToken(el.getAttribute('objectiveID')) ?? ''; if (!id || id.length > 4000) fail();
   const out: Record<string, any> = {objectiveID: id, satisfiedByMeasure: bool(el, 'satisfiedByMeasure') ?? false, mapInfo: []};
   for (const n of children(el)) {
     if (n.namespaceURI !== SN) fail();
@@ -119,7 +119,7 @@ function objective(el: Element, edition: SCORMStandard) {
       // not imsss:mapInfo. Keep the IMS namespace vocabulary schema-accurate.
       const names = ['readSatisfiedStatus', 'readNormalizedMeasure', 'writeSatisfiedStatus', 'writeNormalizedMeasure'];
       attrs(n, ['targetObjectiveID', ...names]); if (children(n).length) fail();
-      const target = n.getAttribute('targetObjectiveID'); if (!target || target.length > 4000 || out.mapInfo.some((m: any) => m.targetObjectiveID === target)) fail();
+      const target = xmlAtomicToken(n.getAttribute('targetObjectiveID')); if (!target || target.length > 4000 || out.mapInfo.some((m: any) => m.targetObjectiveID === target)) fail();
       out.mapInfo.push({targetObjectiveID: target, ...Object.fromEntries(names.filter(k => n.hasAttribute(k)).map(k => [k, bool(n, k)]))});
     } else fail();
   }

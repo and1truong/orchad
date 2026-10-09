@@ -105,3 +105,6 @@ export function xmlSharedTargetManifest(xml: string) {return xml.replace(/target
 
 /** Manifest-local xs:ID/IDREF outer XML whitespace, not CP/RTE identifiers. */
 export function xmlCollectionIdsManifest(xml: string) {return xml.replace(/\b(ID|IDRef)="([^"]*)"/g, (_, name, id) => name + '=" &#x9;' + id + '&#xD;&#xA; "');}
+
+/** IMS/ADL objective anyURI names; CP and synchronous RTE identifiers stay exact. */
+export function xmlObjectiveIdsManifest(xml: string) {return xml.replace(/\b(objectiveID|targetObjectiveID|referencedObjective)="([^"]*)"/g, (_, name, id) => name + '=" &#x9;' + id + '&#xD;&#xA; "');}
