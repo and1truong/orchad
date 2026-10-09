@@ -188,3 +188,10 @@ time/proof checks; corrected focused10 pass/typecheck exit0. Whole43 completes42
 (unchanged retryAll DOM.describeNode/session closed). Separate unchanged retryAll recheck1PASS; full145 browser running;
 no clean full local acceptance claim or attribution of every prior failure. CI/reviews and
 production/external gates remain required.
+
+ADR-143 full145 local140PASS/5FAIL and learning observation3/4 retained. One
+observed hidden Close click lands in SCO HTML without shell click/Close request.
+Learning Close now requires scroll/viewport and completed control removal;
+original launches/history/proof/quiz/certificate checks stay intact. Corrected
+learning6/6 and typecheck complete exit0, no clean full local claim; protocol/download/permission evidence
+and exact-head CI/reviews remain required.

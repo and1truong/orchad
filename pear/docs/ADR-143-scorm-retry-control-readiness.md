@@ -25,3 +25,13 @@ results for this test-only change. New-head complete CI and reviews remain
 required. Download/Service Worker local failures, actual Safari/Android,
 licensed authoring exports, Rustici account and reviewed production operations
 remain open. Epic #133 open; production disabled.
+
+The first integrated full145 local run completes140PASS/5FAIL: download event
+and managed Service Worker permission failures, two learning launch-disabled
+timeouts, and2004-2 interaction-records DOM.describeNode/session closed during
+replacement. Retained observation on learning4 completes3PASS/1FAIL. The failing
+hidden journey has the intended Close click landing in SCO HTML, no shell Close
+click and no later Close request; it is the same missed-action family. The
+learning test now scrolls/asserts Close viewport readiness and waits for control
+removal before all original launch/history/proof/quiz/certificate assertions.
+Corrected learning6/6 and typecheck complete exit0. This does not attribute unobserved old failures.
