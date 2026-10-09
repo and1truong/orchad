@@ -21,7 +21,9 @@ for (const {standard, wrapper} of cases) test(standard + ': offline licensed ' +
     await sco.getByRole('button', {name: 'Store licensed progress', exact: true}).click(); await expect(player.getByRole('status')).toContainText('saved by the server');
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
     if (standard === '2004-4') {
-      const downloaded = page.waitForEvent('download'); await player.getByRole('button', {name: 'Download SCORM support details', exact: true}).click();
+      const support = player.getByRole('button', {name: 'Download SCORM support details', exact: true});
+      await support.scrollIntoViewIfNeeded(); await expect(support).toBeInViewport();
+      const downloaded = page.waitForEvent('download'); await support.click();
       const file = await downloaded, packet = JSON.parse(readFileSync((await file.path())!, 'utf8'));
       expect(packet.format).toBe('pear-scorm-support-v1'); expect(packet.launch.sequence).toBeGreaterThanOrEqual(1); expect(packet.launch.sequence).toBe(f.db.prepare('SELECT sequence FROM scorm_engine_launches WHERE id=?').get(packet.launch.id)!.sequence); expect(packet.package.standard).toBe('2004-4');
       const serialized = JSON.stringify(packet); for (const value of ['licensed-state', 'licensed-page', 'suspend_data', 'learner-a', 'runtime_state']) expect(serialized).not.toContain(value);
