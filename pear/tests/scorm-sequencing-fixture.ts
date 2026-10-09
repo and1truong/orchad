@@ -44,9 +44,9 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
   ]);
 }
 
-export function collectionManifest(edition: SCORM2004Edition = '2004-4') {
+export function collectionManifest(edition: SCORM2004Edition = '2004-4', manifest = sequencingManifest(edition)) {
   const definitions: string[] = [];
-  const xml = sequencingManifest(edition).replace(/<s:sequencing>([\s\S]*?)<\/s:sequencing>/g, (_, body) => {
+  const xml = manifest.replace(/<s:sequencing>([\s\S]*?)<\/s:sequencing>/g, (_, body) => {
     const id = 'shared-' + definitions.length; definitions.push(`<s:sequencing ID="${id}">${body}</s:sequencing>`);
     return `<s:sequencing IDRef="${id}"/>`;
   });
@@ -102,3 +102,6 @@ export function xmlTimeManifest(xml: string) {return xml.replace(/(beginTimeLimi
 
 /** Named fourth-edition shared target anyURI outer XML whitespace. */
 export function xmlSharedTargetManifest(xml: string) {return xml.replace(/targetID="([^"]*)"/g, (_, id) => 'targetID=" &#x9;' + id + '&#xD;&#xA; "');}
+
+/** Manifest-local xs:ID/IDREF outer XML whitespace, not CP/RTE identifiers. */
+export function xmlCollectionIdsManifest(xml: string) {return xml.replace(/\b(ID|IDRef)="([^"]*)"/g, (_, name, id) => name + '=" &#x9;' + id + '&#xD;&#xA; "');}

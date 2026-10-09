@@ -150,7 +150,7 @@ export function parseSequencing(parent: Element, edition: SCORMStandard, collect
   const nodes = children(parent).filter(n => n.namespaceURI === SN && n.localName === 'sequencing');
   if (!nodes.length) return undefined; if (nodes.length !== 1 || edition === '1.2') fail();
   const el = nodes[0]; attrs(el, ['IDRef']);
-  const reference = el.getAttribute('IDRef');
+  const reference = xmlAtomicToken(el.getAttribute('IDRef'));
   const referenced = reference === null ? undefined : collections.get(reference);
   if (reference !== null && !referenced) fail();
   // IMS SS XML Binding 3.2: replace an entire top-level XML group, not
@@ -174,7 +174,7 @@ export function parseSequencingCollections(manifest: Element, edition: SCORMStan
   const ncName = new RegExp(`^[${start}][${start}0-9.\\-\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$`, 'u');
   for (const definition of definitions) {
     if (definition.namespaceURI !== SN || definition.localName !== 'sequencing') fail();
-    attrs(definition, ['ID']); const id = definition.getAttribute('ID');
+    attrs(definition, ['ID']); const id = xmlAtomicToken(definition.getAttribute('ID'));
     if (!id || id.length > 4000 || !ncName.test(id) || result.has(id)) fail();
     sequencingDefinition(children(definition), edition, false); result.set(id!, definition);
   }
