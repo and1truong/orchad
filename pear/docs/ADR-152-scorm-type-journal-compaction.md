@@ -85,3 +85,17 @@ history: documentation conflicts retain both evidence blocks. Changed built
 binding/provenance6 completes PASS exit0 under CI30second test budget, including
 5000-type compaction plus lost ACK/Retry/Close/resume/current-type correction.
 Parent225 new-head run37890454443 is pending; historical0ba failures remain.
+
+
+Owner225 b32a9aba now completes all10 current-head jobs/logs:846 domain,
+237 dev/237 built/Side Panel4 and threeOS native2004=20, five clean exit0+ACK
+records each; READY. Owner22619c4efaf/run37890698928 completes nine SUCCESS
+jobs, including threeOS native2004=21/five clean exit0+ACK records each.
+Pear855 domain/237 dev/237 built/host3/browser-host2/Lime/SCORM-Lime1
+complete, but Side Panel starts four tests without a complete footer before
+job cancellation at the25minute deadline (05:53:04–06:18:23 UTC; cancellation
+06:18:17). Original logs/artifact11599286462 remain; this is not full acceptance.
+Increase only the Pear job scheduling ceiling25→35minutes for both browser
+lanes plus host/Side Panel work. Per-test/assertion/fixture deadlines, counts,
+retries and all product budgets are unchanged. New-head all10 CI/logs and
+review gates remain required; no historical/descendant evidence substitutes.
