@@ -3,7 +3,7 @@ import yauzl from 'yauzl';
 import {DOMParser, type Element} from '@xmldom/xmldom';
 import type {SCORMActivity, SCORMManifest, SCORMResource, SCORMStandard} from '../shared/scorm-engine.ts';
 import {crc32} from './scorm-archive.ts';
-import {parseSequencing, parseSequencingCollections, parsePresentation, parseSharedData} from './scorm-sequencing-parser.ts';
+import {parseSequencing, parseSequencingCollections, parsePresentation, parseSharedData, xmlBooleanToken} from './scorm-sequencing-parser.ts';
 import {reject} from './errors.ts';
 
 export const packageLimits = {archive: 32 * 1024 * 1024, expanded: 64 * 1024 * 1024, file: 16 * 1024 * 1024, files: 2048, manifest: 1024 * 1024};
@@ -159,7 +159,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   const resourceIds = new Set(resources.map(r => r.id));
   if (!resources.some(r => r.href) || resources.some(r => r.dependencies.some(d => !resourceIds.has(d)))) invalid('Launchable resource or resource dependency missing');
   const objectiveScope = (organization: Element) => {
-    const qualified = organization.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem'), legacy = organization.getAttribute('objectivesGlobalToSystem');
+    const qualified = xmlBooleanToken(organization.getAttributeNS('http://www.adlnet.org/xsd/adlseq_v1p3', 'objectivesGlobalToSystem')), legacy = xmlBooleanToken(organization.getAttribute('objectivesGlobalToSystem'));
     if (qualified !== null && legacy !== null && qualified !== legacy) invalid('conflicting objective scope');
     const value = qualified ?? legacy ?? 'true';
     if (!['true', 'false', '1', '0'].includes(value)) invalid('invalid objective scope');
@@ -170,7 +170,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   // or unsupported ADL semantics behind the selected profile's feature flags.
   for (const el of [...Array.from(root!.getElementsByTagNameNS(ns!, 'organization')), ...Array.from(root!.getElementsByTagNameNS(ns!, 'item'))]) {
     if (el.localName === 'organization') objectiveScope(el);
-    const scope = el.getAttributeNS(CP2004, 'sharedDataGlobalToSystem');
+    const scope = xmlBooleanToken(el.getAttributeNS(CP2004, 'sharedDataGlobalToSystem'));
     if (scope !== null && (standard !== '2004-4' || el.localName !== 'organization' || !['true', 'false', '1', '0'].includes(scope))) invalid('invalid shared data scope');
     if (parseSharedData(el, standard) && (!resourceIds.has(el.getAttribute('identifierref') ?? '') || resources.find(r => r.id === el.getAttribute('identifierref'))?.kind !== 'sco')) invalid('shared data requires a SCO activity');
     parseSequencing(el, standard, collections);
@@ -181,7 +181,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   if (!org) invalid('default organization unavailable');
   const organizationId = id(org), title = label(org, ns!);
   const activity = (el: Element): SCORMActivity => {
-    const visibility = el.getAttribute('isvisible');
+    const visibility = xmlBooleanToken(el.getAttribute('isvisible'));
     if (visibility !== null && !['true', 'false', '1', '0'].includes(visibility)) invalid('invalid activity visibility');
     const aid = id(el), resourceId = el.getAttribute('identifierref') || undefined, parameters = el.getAttribute('parameters') || undefined;
     if (resourceId && !resourceIds.has(resourceId)) invalid('activity references unknown resource');
@@ -212,7 +212,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
         const numeric = (value: string) => /^(?:0(?:\.\d+)?|1(?:\.0+)?|\.\d+)$/.test(value);
         if (attrs.length) {
           if (standard !== '2004-4' || text || attrs.some(a => a.namespaceURI || !['completedByMeasure', 'minProgressMeasure', 'progressWeight'].includes(a.name))) invalid('completion threshold attributes require 4th edition');
-          const enabled = n.getAttribute('completedByMeasure') ?? 'false', minimum = n.getAttribute('minProgressMeasure') ?? '1', weight = n.getAttribute('progressWeight') ?? '1';
+          const enabled = xmlBooleanToken(n.getAttribute('completedByMeasure')) ?? 'false', minimum = n.getAttribute('minProgressMeasure') ?? '1', weight = n.getAttribute('progressWeight') ?? '1';
           if (!['true', 'false', '1', '0'].includes(enabled) || !numeric(minimum) || !numeric(weight)) invalid('invalid completion threshold attributes');
           if (['true', '1'].includes(enabled)) extensions.completionThreshold = minimum;
           extensions.completionMeasure = {completedByMeasure: ['true', '1'].includes(enabled), minProgressMeasure: Number(minimum), progressWeight: Number(weight)};
@@ -227,7 +227,7 @@ export function inspectManifest(files: Map<string, Buffer>): SCORMManifest {
   // XML ID uniqueness spans the document, including unselected organizations.
   const documentIds = new Set([root!, ...Array.from(root!.getElementsByTagNameNS(ns!, '*'))].map(n => n.getAttribute('identifier')).filter(Boolean));
   if ([...collections.keys()].some(id => documentIds.has(id))) invalid('duplicate sequencing identifier');
-  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global), ...(standard === '2004-4' ? {sharedDataGlobalToSystem: !['false', '0'].includes(org.getAttributeNS(CP2004, 'sharedDataGlobalToSystem') ?? 'true')} : {})} : {}), runtimeFeatures: [...features].sort()};
+  return {standard, identifier, title, organizationId, activities, resources, ...(standard !== '1.2' ? {sequencing: parseSequencing(org, standard, collections), objectivesGlobalToSystem: !['false', '0'].includes(global), ...(standard === '2004-4' ? {sharedDataGlobalToSystem: !['false', '0'].includes(xmlBooleanToken(org.getAttributeNS(CP2004, 'sharedDataGlobalToSystem')) ?? 'true')} : {})} : {}), runtimeFeatures: [...features].sort()};
 }
 
 export async function inspectSCORMPackage(bytes: Buffer) {

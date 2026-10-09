@@ -441,3 +441,39 @@ Increase only the Pear job scheduling ceiling25→35minutes for both browser
 lanes plus host/Side Panel work. Per-test/assertion/fixture deadlines, counts,
 retries and all product budgets are unchanged. New-head all10 CI/logs and
 review gates remain required; no historical/descendant evidence substitutes.
+
+
+ADR-154 original XML boolean whitespace0PASS/12FAIL→named26 domain PASS
+exit0, typecheck/build complete exit0. Shared sequencing/package boolean-token
+normalization preserves XML/source hashes, rejects non-XML/internal spaces, covers
+unused definitions/canonical groups/scopes/visibility/completion/shared-data and
+exact retry/SQLite reopen. Existing choice3 and actual native2004 fixture journeys
+expanded; fresh full domain/browser/current-head all10 CI/reviews pending. Full
+XML typed binding remains OPEN; epic OPEN/prod DISABLED.
+
+Fresh full-domain cache completes893/893 tests across128 files, every plan,
+footer and exit checked, zero fail/skip/cancel and aggregate exit0. PDF5/4/4
+complete in the fresh run. Expanded built choice3 completes PASS under30second
+CI test budget; supplemental native fixture4 completes PASS exit0 (28.6s),
+including authored spaced visibility/tracked flags, old full22 checks unchanged.
+Full172 SCORM browser acceptance is now running; no complete full-browser claim.
+
+Parent227 original9d7b/run37892225012 completed all10 jobs/logs:
+867 domain/237dev/237built/SidePanel4; actual threeOS runtime16/Pear13/1.2=13/
+2004=22/five clean exits+quitAcknowledged each. This is historical after04e299
+merged the scheduling ceiling; current run37893318621 still pending.
+Parent2268f706306/run37893220968 Windows fails2004-3 fixture shutdown after
+app-closed before database-closed: nativeExit0/quitAcknowledged true, fixture
+forced/null exit;2004-4 not run. Original log retained, cause unproved. Linux/
+macOS complete2004=21/five clean exits+ACK each; Pear/run still pending. No
+current-head READY or complete actual-platform assertion based on descendants.
+
+Full172 SCORM built browser completes169PASS/3FAIL exit1 (7.3m):
+2004-4 pipwerks support download waits until60second deadline;2004-3 target
+navigation reports DOM.describeNode/Internal server error/session closed;
+managed ServiceWorker registration is denied. Logs/traces are retained, cause
+unproved beyond observed policy/error. All changed choice3 and supplemental
+native4 pass, as do binding/provenance/URI/Close/reload related journeys. This
+is not clean full local acceptance. Final893 domain/128files, typecheck/build,
+focused26 and focused built7 all complete PASS exit0; current-head CI/native
+threeOS/review gates remain required. No quota/assertion/retry changes.

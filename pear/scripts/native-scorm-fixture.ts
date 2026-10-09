@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import {createApp} from '../src/server/app.ts';
 import {scormLearningFixture} from '../tests/scorm-learning-fixture.ts';
 import {interopPackage} from '../tests/scorm-interop-fixture.ts';
+import {singleSCOManifest} from '../tests/scorm-player-fixture.ts';
 import {sequencingResponsePatterns} from '../tests/scorm-sequencing-response-vectors.ts';
 import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
@@ -81,7 +82,13 @@ const script = `
     injected.textContent='location.href='+JSON.stringify('${origin}${prefix}/pear-canary');parent.document.body.append(injected);
   }},200);
 })();`;
-const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(edition as '1.2' | '2004-2' | '2004-3' | '2004-4', 'pipwerks', script)), binding = f.enroll();
+const standard = edition as '1.2' | '2004-2' | '2004-3' | '2004-4';
+// Exercise XML boolean whitespace in the actual native import/recovery journey.
+const manifest = standard === '1.2' ? singleSCOManifest(standard) : singleSCOManifest(standard)
+  .replace('<p:manifest ', '<p:manifest xmlns:s="http://www.imsglobal.org/xsd/imsss" ')
+  .replace('identifier="intro"', 'identifier="intro" isvisible=" &#x9;1&#xA; "')
+  .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/></s:sequencing>');
+const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, manifest)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
 // Synthetic diagnostics record route classes/status, never launch capabilities.
 content!.addHook('onResponse', async (req, reply) => {

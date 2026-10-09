@@ -84,3 +84,6 @@ export function systemSharedDataManifest() {return sharedDataManifest().replace(
 export function selectionManifest(edition: SCORM2004Edition = '2004-4', selectionTiming = 'once', randomizationTiming = 'once', selectCount = 1, reorderChildren = true) {
   return sequencingManifest(edition).replace(/(<s:controlMode[^>]*\/>)/, '$1' + `<s:randomizationControls selectionTiming="${selectionTiming}" randomizationTiming="${randomizationTiming}" selectCount="${selectCount}" reorderChildren="${reorderChildren}"/>`).replace(/(<p:title>Practice<\/p:title>)<s:sequencing>.*?<\/s:sequencing>/, '$1');
 }
+
+/** Original XML whitespace plus character references; numeric fields stay unchanged. */
+export function xmlBooleanManifest(xml: string) {return xml.replace(/="(true|false)"/g, (_, value) => '=" &#x9;' + (value === 'true' ? '1' : '0') + '&#xD;&#xA; "');}
