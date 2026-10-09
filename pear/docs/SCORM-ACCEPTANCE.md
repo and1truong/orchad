@@ -429,3 +429,15 @@ native Linux/Windows/macOS logs are all inspected: runtime16/Pear13/1.2=13,
 2004=20 (225) or21 (226), five clean native/fixture exit0+quitACK records eachOS.
 No forced shutdown. Both Pear jobs remain pending; no READY claim. Original225
 head0ba Windows failure and local browser failures remain retained/unattributed.
+Owner225 b32a9aba now completes all10 current-head jobs/logs:846 domain,
+237 dev/237 built/Side Panel4 and threeOS native2004=20, five clean exit0+ACK
+records each; READY. Owner22619c4efaf/run37890698928 completes nine SUCCESS
+jobs, including threeOS native2004=21/five clean exit0+ACK records each.
+Pear855 domain/237 dev/237 built/host3/browser-host2/Lime/SCORM-Lime1
+complete, but Side Panel starts four tests without a complete footer before
+job cancellation at the25minute deadline (05:53:04–06:18:23 UTC; cancellation
+06:18:17). Original logs/artifact11599286462 remain; this is not full acceptance.
+Increase only the Pear job scheduling ceiling25→35minutes for both browser
+lanes plus host/Side Panel work. Per-test/assertion/fixture deadlines, counts,
+retries and all product budgets are unchanged. New-head all10 CI/logs and
+review gates remain required; no historical/descendant evidence substitutes.
