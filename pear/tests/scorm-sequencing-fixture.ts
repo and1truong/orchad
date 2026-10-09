@@ -94,8 +94,8 @@ export function xmlNumericManifest(xml: string) {
     .replace(/<s:minNormalizedMeasure>(\d+(?:\.\d+)?)<\/s:minNormalizedMeasure>/g, (_, value) => '<s:minNormalizedMeasure> &#x9;+00' + value + '&#xD;&#xA; </s:minNormalizedMeasure>');
 }
 
-/** IMS restricted token enumerations; opaque identifiers/string fields stay exact. */
-export function xmlTokenManifest(xml: string) {return xml.replace(/(conditionCombination|condition|operator|action|childActivitySet|selectionTiming|randomizationTiming)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
+/** IMS/ADL restricted token enumerations; opaque identifiers/string fields stay exact. */
+export function xmlTokenManifest(xml: string) {return xml.replace(/(conditionCombination|condition|operator|action|childActivitySet|selectionTiming|randomizationTiming|requiredForSatisfied|requiredForNotSatisfied|requiredForCompleted|requiredForIncomplete)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
 
 /** XML atomic dateTime/duration whitespace; admitted values and ceilings stay fixed. */
 export function xmlTimeManifest(xml: string) {return xml.replace(/(beginTimeLimit|endTimeLimit|attemptAbsoluteDurationLimit|attemptExperiencedDurationLimit|activityAbsoluteDurationLimit|activityExperiencedDurationLimit)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}

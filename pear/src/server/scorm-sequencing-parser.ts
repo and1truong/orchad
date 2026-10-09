@@ -194,7 +194,7 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
       else if (n.localName === 'rollupConsiderations') {
         const names = ['requiredForSatisfied', 'requiredForNotSatisfied', 'requiredForCompleted', 'requiredForIncomplete']; attrs(n, [...names, 'measureSatisfactionIfActive']);
         out.rollupConsiderations = {measureSatisfactionIfActive: bool(n, 'measureSatisfactionIfActive') ?? true};
-        for (const name of names) {const value = n.getAttribute(name) ?? 'always'; if (!['always', 'ifAttempted', 'ifNotSkipped', 'ifNotSuspended'].includes(value)) fail(); out.rollupConsiderations[name] = value;}
+        for (const name of names) {const value = xmlAtomicToken(n.getAttribute(name)) ?? 'always'; if (!['always', 'ifAttempted', 'ifNotSkipped', 'ifNotSuspended'].includes(value)) fail(); out.rollupConsiderations[name] = value;}
       } else fail();
       continue;
     }
