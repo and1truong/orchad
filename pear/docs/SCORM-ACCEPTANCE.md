@@ -141,3 +141,12 @@ ADR-136 v32 preserves supplied empty location/suspend_data values versus omitted
 ADR-137 uses the existing transactional SCO ordinal for finished non-sequenced 2004 non-suspend exits: fresh CMI/revision/time, retained old history/receipts, unchanged suspend/unfinished recovery and no SCORM1.2/engine change. Original6 completes3PASS/3FAIL; focused87/full domain773 across112 files/final build/built3 complete exit0. Parent #208 fresh recheck commands complete10 success/3 failure (one selected an extra hidden variant), plus an exact non-hidden learning recheck fails; download/learning/service-worker permission failures remain. Its Windows CI consent-response timeout remains unattributed. New-head full CI/native/Side Panel and lifecycle gaps remain required; production disabled.
 
 ADR-138 derives resume entry from the trusted suspendedActivity matching the selected SCO, overriding normal/empty exit while retaining revision/time/history/receipts and no proof. Original3FAIL; focused70/full domain776 across113 files/build/built3 complete exit0. Exact-head CI pending. Original time-out+continue probes deliver another SCO across three editions; separate root fix required. Parent Windows-only unchanged retry running; original failure retained. No full lifecycle or production claim.
+
+ADR-138 P1 review correction retains trusted resume while the latest scoped
+launch remains unacknowledged, including repeated exact registration keys and
+a lost browser launch response. A content ACK ends the fallback. Original3FAIL;
+owner v32 fresh full domain779/114 files, build and built3 complete exit0.
+Initial browser3FAIL from incorrect alert scope is retained; corrected tests
+assert the actual error and unchanged CMI/history/receipts/no proof. Original
+head CI776/198 dev/198 built was successful but does not cover this correction.
+New-head full CI/native/Side Panel/review gates remain required.

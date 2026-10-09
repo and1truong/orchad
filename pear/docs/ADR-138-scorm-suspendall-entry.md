@@ -24,3 +24,21 @@ failure is retained; its unchanged isolated retry is running. Epic open;
 production disabled.
 
 Reference: https://lms.technology/for/scorm/2004/4th_edition/standards/SCORM_2004_4ED_v1_1_RTE_20090814.pdf.
+
+## Lost launch response review correction
+
+PR #210's P1 review exposes a second launch boundary: ResumeAll consumes the
+suspended snapshot before its launch response reaches the browser. Repeating
+the registration can then replace that unacknowledged launch with empty entry.
+The initializer also preserves resume from the latest sequence-zero launch's
+trusted initial state, scoped to tenant, attempt, SCO and technical ordinal.
+An acknowledged content checkpoint ends this fallback; revision-zero fresh
+attempts still initialize ab-initio. No extra receipt, schema or token reuse.
+
+Original three regressions fail. Exact owner v32 full domain779/779 across114
+files, build and three built lost-response/replacement journeys complete exit0.
+Focused56 also passed diagnostically against descendant v34 before restoring
+owner v32; it is not owner acceptance evidence. Browser first3FAIL used the
+wrong alert scope; the corrected check asserts the actual main alert's exact
+Failed to fetch text and retains lost-response, row, revision, time, history,
+receipt and no-proof assertions. New-head CI and review gates remain required.
