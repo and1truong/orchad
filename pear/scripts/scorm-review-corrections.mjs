@@ -438,6 +438,26 @@ export const uriAuthorityUpdates = [
     "return Scorm2004API;\n}\n// Separate closures preserve the historical 2nd-edition binding without mutable\n// module-wide regexes or duplicating the engine implementation in the bundle.\nconst Scorm2004API = pearSCORM2004Engine();\nconst Scorm2004LegacyAPI = pearSCORM2004Engine(true);\nexport { Scorm2004API, Scorm2004LegacyAPI, Scorm2004API as default };"
   ]
 ]);
+const decimalOriginal = "9ba7375b3f88be0bf54cf02ed4220346f5fbee12de8fa23ac723ba6fe0d0d35c";
+const decimalPatched = "6d9a5a3b33f911fcc447c8edf475022e22b07bb34166122e376d1b1ff32df086";
+export const decimalUpdates = [
+  [
+    "  CMIDecimal: \"^-?([0-9]+)(\\\\.[0-9]{1,18})?$\",",
+    "  CMIDecimal: \"^(?=[\\\\s\\\\S]{1,4096}(?![\\\\s\\\\S]))-?[0-9]+(?:\\\\.[0-9]+)?(?![\\\\s\\\\S])\","
+  ],
+  [
+    "function check2004ValidRange(CMIElement, value, rangePattern) {\n  return checkValidRange(",
+    "function check2004ValidRange(CMIElement, value, rangePattern) {\n  // Pear: integral boundaries are checked before JS double rounding/underflow.\n  const m = /^(-?)([0-9]+)(?:\\.([0-9]+))?$/.exec(value);\n  if (m) {\n    const sign = m[1] === \"-\" ? -1 : 1, whole = sign * Number(m[2]), fraction = /[1-9]/.test(m[3] || \"\");\n    const [min, max] = rangePattern.split(\"#\").map(Number);\n    if (Number.isInteger(min) && (whole < min || fraction && sign < 0 && whole <= min) || Number.isInteger(max) && (whole > max || fraction && sign > 0 && whole >= max)) {\n      throw new Scorm2004ValidationError(CMIElement, scorm2004_errors.VALUE_OUT_OF_RANGE);\n    }\n  }\n  return checkValidRange("
+  ],
+  [
+    "    const num = parseFloat(scaled_passing_score);\n    if (num < -1 || num > 1) {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".scaled_passing_score\",\n        scorm2004_errors.VALUE_OUT_OF_RANGE ?? 407\n      );\n    }",
+    "    check2004ValidRange(this._cmi_element + \".scaled_passing_score\", scaled_passing_score, \"-1#1\");"
+  ],
+  [
+    "    const num = parseFloat(completion_threshold);\n    if (num < 0 || num > 1) {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".completion_threshold\",\n        scorm2004_errors.VALUE_OUT_OF_RANGE ?? 407\n      );\n    }",
+    "    check2004ValidRange(this._cmi_element + \".completion_threshold\", completion_threshold, \"0#1\");"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -542,9 +562,11 @@ export function reviewedSCORMSource(source) {
   }
   if (hash(source) === responseBindingOriginal) {source = replace(source, responseBindingUpdates); if (hash(source) !== responseBindingPatched) throw Error("SCORM response binding checksum mismatch");}
   if (hash(source) === uriAuthorityOriginal) {source = replace(source, uriAuthorityUpdates); if (hash(source) !== uriAuthorityPatched) throw Error("SCORM URI authority checksum mismatch");}
+  if (hash(source) === decimalOriginal) {source = replace(source, decimalUpdates); if (hash(source) !== decimalPatched) throw Error("SCORM decimal checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === decimalPatched) {source = replace(source, decimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== decimalOriginal) throw Error("SCORM decimal reverse checksum mismatch");}
   if (hash(source) === uriAuthorityPatched) {source = replace(source, uriAuthorityUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== uriAuthorityOriginal) throw Error("SCORM URI authority reverse checksum mismatch");}
   if (hash(source) === responseBindingPatched) {source = replace(source, responseBindingUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== responseBindingOriginal) throw Error("SCORM response binding reverse checksum mismatch");}
   if (hash(source) === sequencingResponsePatched) {

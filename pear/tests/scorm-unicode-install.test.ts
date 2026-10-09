@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {runInNewContext} from 'node:vm';
-import {reviewedSCORMSource, unreviewedSCORMSource, uriAuthorityUpdates} from '../scripts/scorm-review-corrections.mjs';
+import {reviewedSCORMSource, unreviewedSCORMSource, uriAuthorityUpdates, decimalUpdates} from '../scripts/scorm-review-corrections.mjs';
 
 test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and rejects unexpected engine bytes/version',()=>{
   const root=mkdtempSync(join(tmpdir(),'pear-unicode-install-')),hash=(s:string)=>createHash('sha256').update(s).digest('hex');
@@ -35,7 +35,9 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   const interactionReadUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const interactionReadUpdates = ')+'const interactionReadUpdates = '.length,reviewScript.indexOf(';\nconst sequencingResponseOriginal',reviewScript.indexOf('const interactionReadUpdates = '))));
   const sequencingResponseUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const sequencingResponseUpdates = ')+'const sequencingResponseUpdates = '.length,reviewScript.indexOf(';\nconst responseBindingOriginal',reviewScript.indexOf('const sequencingResponseUpdates = '))));
   const responseBindingUpdates: [string,string][]=JSON.parse(reviewScript.slice(reviewScript.indexOf('const responseBindingUpdates = ')+'const responseBindingUpdates = '.length,reviewScript.indexOf(';\n// RFC3986',reviewScript.indexOf('const responseBindingUpdates = '))));
-  let uriAuthorityPredecessor=corrected2004;for(const [before,after] of uriAuthorityUpdates.toReversed()){assert.equal(uriAuthorityPredecessor.split(after).length,2);uriAuthorityPredecessor=uriAuthorityPredecessor.replace(after,()=>before);}
+  let decimalPredecessor=corrected2004;for(const [before,after] of decimalUpdates.toReversed()){assert.equal(decimalPredecessor.split(after).length,2);decimalPredecessor=decimalPredecessor.replace(after,()=>before);}
+  assert.equal(hash(decimalPredecessor),'9ba7375b3f88be0bf54cf02ed4220346f5fbee12de8fa23ac723ba6fe0d0d35c');
+  let uriAuthorityPredecessor=decimalPredecessor;for(const [before,after] of uriAuthorityUpdates.toReversed()){assert.equal(uriAuthorityPredecessor.split(after).length,2);uriAuthorityPredecessor=uriAuthorityPredecessor.replace(after,()=>before);}
   assert.equal(hash(uriAuthorityPredecessor),'8bdddcc2d2b129e5541e9f18b46e50353cf72978d591ab9ca98d431876d46f10');
   let responseBindingPredecessor=uriAuthorityPredecessor;for(const [before,after] of responseBindingUpdates.toReversed()){assert.equal(responseBindingPredecessor.split(after).length,2);responseBindingPredecessor=responseBindingPredecessor.replace(after,()=>before);}
   assert.equal(hash(responseBindingPredecessor),'5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276');
@@ -158,7 +160,7 @@ test('actual installation upgrades limits-v3 and pristine 1.2, is idempotent and
   try {
     const directory=join(root,'node_modules/scorm-again'),entries=join(directory,'dist/esm');mkdirSync(entries,{recursive:true});mkdirSync(join(root,'scripts'));
     const script=join(root,'scripts/patch-scorm-logging.mjs');writeFileSync(script,readFileSync(new URL('../scripts/patch-scorm-logging.mjs',import.meta.url)));const metadata=join(directory,'package.json');writeFileSync(metadata,JSON.stringify({version:'3.4.5'}));writeFileSync(join(root,'scripts/scorm-review-corrections.mjs'),readFileSync(new URL('../scripts/scorm-review-corrections.mjs',import.meta.url)));
-    for(const input of [...new Set([pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,timestamps2004,initialized2004,atomic2004,current2004,previousReviewed2004,predecessorReviewed2004,derivedPredecessor,languagePredecessor,time2004Predecessor,urnPredecessor,schemePredecessor,fragmentPredecessor,resultPredecessor,responseNumericPredecessor,emptyLocationPredecessor,choiceSetPredecessor,commentPresencePredecessor,descriptionPresencePredecessor,learnerResponsePresencePredecessor,contentPresencePredecessor,timeoutExitAllPredecessor,logoutExitAllPredecessor,interactionIDPredecessor,urnNulPredecessor,interactionReadPredecessor,sequencingResponsePredecessor,responseBindingPredecessor].flatMap(value=>[value,reviewedSCORMSource(value)]))]){
+    for(const input of [...new Set([pristine,loggingOnly,selected,old2004,unicode2004,localized2004,collections2004,previousResponses2004,responses2004,separators2004,identifiers2004,timestamps2004,initialized2004,atomic2004,current2004,previousReviewed2004,predecessorReviewed2004,derivedPredecessor,languagePredecessor,time2004Predecessor,urnPredecessor,schemePredecessor,fragmentPredecessor,resultPredecessor,responseNumericPredecessor,emptyLocationPredecessor,choiceSetPredecessor,commentPresencePredecessor,descriptionPresencePredecessor,learnerResponsePresencePredecessor,contentPresencePredecessor,timeoutExitAllPredecessor,logoutExitAllPredecessor,interactionIDPredecessor,urnNulPredecessor,interactionReadPredecessor,sequencingResponsePredecessor,responseBindingPredecessor,decimalPredecessor].flatMap(value=>[value,reviewedSCORMSource(value)]))]){
       writeFileSync(join(entries,'scorm2004.js'),input);writeFileSync(join(entries,'scorm12.js'),old12);
       const result=spawnSync(process.execPath,[script],{encoding:'utf8'});assert.equal(result.status,0,result.stderr);assert.equal(readFileSync(join(entries,'scorm2004.js'),'utf8'),corrected2004);assert.equal(readFileSync(join(entries,'scorm12.js'),'utf8'),corrected12);
     }

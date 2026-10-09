@@ -549,3 +549,33 @@ CI/all10 logs/native threeOS22 and fresh reviews remain required before READY.
 No deadline/assertion/retry/envelope change. Next internal decimal precision and
 exact runtime boundary probes reproduce6FAIL+6FAIL; prototype9PASS is diagnostic
 only and does not replace product acceptance. Epic OPEN; production DISABLED.
+
+
+ADR-156/v41 fixes the retained6+6 original shared decimal fraction/range failures.
+Focused42/full domain919 across130files/typecheck/build/expanded built7/
+supplemental native4 complete exit0; after changing native probe field to global
+score.max, its sole affected domain file revalidates5PASS, other914 unchanged.
+Native2004 controller requires23 checks; historical1.2 remains13. Exact CMI
+strings survive atomic406/407 refusal, typed replay/exact retry/SQLite reopen
+and trusted v40-envelope resume. Full fixed172 browser pending; JS-double/full
+numeric response/history/schema matrices OPEN. Parent229c3b Windows forced
+fixture shutdown after app-close/database-close absent is retained/unproved;
+Linux/macOS owner logs each16/13/13/22/22/22 with five clean exit0/ACKs. Pear
+owner still running; no READY claim. Epic OPEN; production DISABLED.
+
+Final fixed-source/build full172 local browser completes168PASS/4FAIL exit1
+(8.3m). Inspected all four traces: fourth-edition licensed support download
+deadline60000ms, managed ServiceWorker permission denial, fourth-edition retry
+and hidden navigation DOM.describeNode/internal server error/session closed.
+All changed decimal7/native4 journeys pass in full. The DOM root cause is
+unproved; no blanket driver explanation or clean full local browser claim.
+No policy/assertion/deadline/retry/envelope relaxation. Current-owner all10 CI
+logs, actual threeOS native23 and fresh reviews remain required before READY.
+Parent229 full CI completes9SUCCESS/WindowsFAIL; Pear910/237dev/237built/
+SidePanel4/host3/browserhost2/Lime/SCORMLime1 footers inspected. One unchanged
+Windows-only retry requested after whole-run completion; original forced
+shutdown evidence remains, and a retry cannot establish its cause or fix.
+
+Unchanged-tree focused recheck of the two DOM-failed journeys completes2PASS
+exit0 (6.3s), all assertions/deadlines retained. Original full168/4 remains;
+this recheck neither proves the cause nor turns the full run into PASS.

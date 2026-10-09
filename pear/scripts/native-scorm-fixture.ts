@@ -25,6 +25,11 @@ const script = `
       if(api.GetValue('cmi.interactions.2.'+field)!=='')throw Error('Absent interaction value');const absentCode=api.GetLastError();
       if(api.GetValue('cmi.interactions.0.'+field)!=='')throw Error('Unset interaction value');return {field,absentCode,unsetCode:api.GetLastError()};
     });
+    const decimals={'cmi.score.min':'0.'+'1'.repeat(4094),'cmi.learner_preference.audio_level':'0.'+'0'.repeat(19)+'1','cmi.score.max':'0.5'+'0'.repeat(40)};
+    const decimalResumed=evidence.entry!=='resume'||Object.entries(decimals).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0');
+    for(const [key,value] of Object.entries(decimals))if(api.SetValue(key,value)!=='true')throw Error('Native long decimal refused');
+    const decimalCodes=[['cmi.score.min','0.'+'1'.repeat(4095)],['cmi.score.max',decimals['cmi.score.max']+'\\n'],['cmi.score.scaled','1.'+'0'.repeat(40)+'1'],['cmi.learner_preference.audio_level','-0.'+'0'.repeat(330)+'1']].map(([key,value])=>{if(api.SetValue(key,value)!=='false')throw Error('Native invalid decimal admitted');return api.GetLastError();});
+    evidence.decimalCapacity={resumed:decimalResumed,preserved:Object.entries(decimals).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0'),codes:decimalCodes};
     const patterns=${JSON.stringify(sequencingResponsePatterns)},base='cmi.interactions.1';
     if(evidence.entry!=='resume'){if(api.SetValue(base+'.id','urn:pear:native-ordered')!=='true'||api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native ordered dependency');for(const [n,p] of patterns.entries())for(let write=0;write<(n===0?5000:1);write++)if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='true')throw Error('Native ordered pattern');}
     const uriIDs='${edition}'==='2004-2'?['custom://registry:alpha@name:part/a','custom:opaque?part']:['http://[2001:DB8::1]:999999/answer?x=1#part','custom://[v1.future:host]/answer'];
