@@ -322,6 +322,22 @@ const timeoutExitAllUpdates = [
     "    if (pendingNavRequest !== \"_none_\" && exitType !== \"time-out\") {\n      const matches = pendingNavRequest.match(choiceJumpRegex);"
   ]
 ];
+const logoutExitAllOriginal = "06459750c6d56c132306b08b89814db746915c44be835fab1e4d1ab29c8bf26f";
+const logoutExitAllPatched = "bc4d03187eb829e7b8a9a22e775b2cf2cfe14d7e0815ad24e518522c6500706a";
+const logoutExitAllUpdates = [
+  [
+    "    let normalizedRequest = exitType === \"time-out\" ? \"exitAll\" : pendingNavRequest;",
+    "    let normalizedRequest = [\"time-out\", \"logout\"].includes(exitType) ? \"exitAll\" : pendingNavRequest;"
+  ],
+  [
+    "    if (pendingNavRequest !== \"_none_\" && exitType !== \"time-out\") {",
+    "    if (pendingNavRequest !== \"_none_\" && ![\"time-out\", \"logout\"].includes(exitType)) {"
+  ],
+  [
+    "// Pear: RTE time-out ends the sequencing session regardless of authored navigation.",
+    "// Pear: RTE time-out/logout end the sequencing session regardless of authored navigation."
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -404,9 +420,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, timeoutExitAllUpdates);
     if (hash(source) !== timeoutExitAllPatched) throw Error("SCORM time-out ExitAll checksum mismatch");
   }
+  if (hash(source) === logoutExitAllOriginal) {
+    source = replace(source, logoutExitAllUpdates);
+    if (hash(source) !== logoutExitAllPatched) throw Error("SCORM logout ExitAll checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === logoutExitAllPatched) {
+    source = replace(source, logoutExitAllUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== logoutExitAllOriginal) throw Error("SCORM logout ExitAll reverse checksum mismatch");
+  }
   if (hash(source) === timeoutExitAllPatched) {
     source = replace(source, timeoutExitAllUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== timeoutExitAllOriginal) throw Error("SCORM time-out ExitAll reverse checksum mismatch");
