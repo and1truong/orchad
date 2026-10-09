@@ -13,7 +13,8 @@ const coconutRoot=fileURLToPath(new URL("..",import.meta.url));
 const pearRoot=fileURLToPath(new URL("../../pear/",import.meta.url));
 const TRUSTED="http://127.0.0.1:4310",SMOKE_PORT=4319,MCP_PORT=14313;
 const edition=process.env.PEAR_NATIVE_SCORM_EDITION??"2004-4";
-const nonce=randomUUID(),lane="native-scorm:"+edition,checks=[];
+const collectionSPM=process.env.PEAR_NATIVE_SCORM_COLLECTION_SPM==="1";
+const nonce=randomUUID(),lane=(collectionSPM?"native-scorm-collection:":"native-scorm:")+edition,checks=[];
 const check=(name,cond)=>{checks.push(name);console.log(`  ${cond?"PASS":"FAIL"} ${name}`);if(!cond)throw Error("Acceptance failed: "+name);};
 const fixture=spawn(process.execPath,["--import","tsx","scripts/native-scorm-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe","ipc"]});
 let fixtureOutput="",fixtureError="",fixtureExit=null,fixtureClosed=false;
@@ -64,7 +65,7 @@ try {
  const target=await waitFor(async()=>(await tool('host_list_targets',{}))?.data?.targets?.find(t=>t.appId==='orchard-pear'&&t.documentId==='learning:demo:learner-a'),30000);
  check('real Tauri WebView binds the authenticated Pear workspace during SCORM playback',!!target);
  await waitMarker(/^COCONUT_SMOKE:ui-response:consent$/,15000); await heartbeat();
- const first=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=1&&value.checkpoints>=1?value:false;},60000);
+ const first=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=1&&value.checkpoints>=1&&(!collectionSPM||value.droppedACK)?value:false;},60000);
  check('real requested edition and actual WebView user agent are recorded',first.edition===edition&&typeof first.probes[0].userAgent==='string'&&first.probes[0].userAgent.length>0);
  console.log(JSON.stringify({platform:process.platform,edition,userAgent:first.probes[0].userAgent}));
  const isolated=probe=>['pearCookieDenied','pearStorageDenied','pearBridgeDenied','pearNativeDenied','noOwnBridge','nativeDenied','externalFetchDenied'].every(key=>probe[key]===true);
@@ -89,11 +90,11 @@ try {
  await command('resume');
  const resumed=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=2&&value.checkpoints>=2?value:false;},60000);
  check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1])&&dynamic(resumed.probes[1])&&resumed.calls.length===0&&resumed.pearCanaryCalls.length===0);
- if(edition==='2004-4'){
+ if(edition==='2004-4'&&!collectionSPM){
   const shared=probe=>probe.sharedTargetID?.resumed===true&&probe.sharedTargetID.id==='urn:pear:native-shared-target'&&probe.sharedTargetID.idCode==='404'&&probe.sharedTargetID.preserved===true;
   check('actual native XML shared target identity persists exact store through lost ACK and durable resume',shared(first.probes[0])&&shared(resumed.probes[1])&&resumed.sharedTargetStored===true);
  }
- if(edition!=='1.2'){
+ if(edition!=='1.2'&&!collectionSPM){
   const expected=['type','timestamp','weighting','result','latency'];
   const reads=probe=>Array.isArray(probe.interactionReadErrors)&&probe.interactionReadErrors.length===expected.length&&probe.interactionReadErrors.every((value,index)=>value.field===expected[index]&&value.absentCode==='301'&&value.unsetCode==='403');
   const paths=['cmi.objectives.0.id','cmi.objectives.0.success_status','cmi.objectives.0.completion_status','cmi.objectives.0.progress_measure','cmi.objectives.0.description','cmi.objectives.0.score.scaled','cmi.objectives.0.score.raw','cmi.objectives.0.score.min','cmi.objectives.0.score.max','cmi.interactions.2.id','cmi.interactions.2.learner_response','cmi.interactions.0.objectives.0.id','cmi.interactions.0.correct_responses.0.pattern'];
@@ -131,6 +132,12 @@ try {
   check('actual native long interaction result preserves exact text and atomic refusal through retry/resume',result(first.probes[0])&&result(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
   check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
+ }
+ if(collectionSPM){
+  const collection=probe=>probe.collectionSPM?.interactions===250&&probe.collectionSPM.objectives===100&&probe.collectionSPM.nestedObjectives===2500&&probe.collectionSPM.patterns===2500&&probe.collectionSPM.preserved===true;
+  const stored=value=>value.collectionSPM===true&&value.collectionStored?.interactions===250&&value.collectionStored.objectives===100&&value.collectionStored.origins===250&&value.collectionStored.preserved===true;
+  check('actual native mandatory collection preserves 250 interactions/100 objectives/2500 IDs/2500 patterns through durable resume',collection(first.probes[0])&&collection(resumed.probes[1])&&stored(first)&&stored(resumed));
+  check('actual native mixed-type collection retains 3500 real journal entries and 250 server-derived original bindings',resumed.largestInteractionJournal===3500&&resumed.responseBindingCheckpoints>0&&resumed.responseWriteCheckpoints>0&&resumed.largestCheckpointBytes>544*1024&&resumed.largestCheckpointBytes<2*1024*1024&&resumed.proofs===0&&resumed.certificates===0);
  }
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);

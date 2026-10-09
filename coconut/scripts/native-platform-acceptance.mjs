@@ -23,7 +23,8 @@ try{
  await run('native-acceptance.mjs');
  await run('native-pear-acceptance.mjs');
  for(const edition of ['1.2','2004-2','2004-3','2004-4'])await run('native-scorm-acceptance.mjs',{PEAR_NATIVE_SCORM_EDITION:edition});
- console.log('[native-platform] actual runtime, Pear and all four SCORM profiles passed');
+ for(const edition of ['2004-2','2004-3','2004-4'])await run('native-scorm-acceptance.mjs',{PEAR_NATIVE_SCORM_EDITION:edition,PEAR_NATIVE_SCORM_COLLECTION_SPM:'1'});
+ console.log('[native-platform] actual runtime, Pear, all four SCORM profiles and three mandatory collection profiles passed');
 }finally{
  vite.kill('SIGTERM');
  if(viteExit===null)await new Promise(resolve=>{const timeout=setTimeout(()=>{vite.kill('SIGKILL');resolve();},5000);vite.once('exit',()=>{clearTimeout(timeout);resolve();});});

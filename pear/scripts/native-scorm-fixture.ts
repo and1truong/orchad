@@ -10,7 +10,10 @@ import {singleSCOManifest} from '../tests/scorm-player-fixture.ts';
 import {sequencingResponsePatterns} from '../tests/scorm-sequencing-response-vectors.ts';
 import {collectionManifest, xmlCollectionIdsManifest, xmlTokenManifest, xmlTimeManifest, xmlSharedTargetManifest} from '../tests/scorm-sequencing-fixture.ts';
 import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
+import {interactionCollectionScript} from '../tests/scorm-interaction-collection-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
+const collectionSPM = process.env.PEAR_NATIVE_SCORM_COLLECTION_SPM === '1';
+if (collectionSPM && edition === '1.2') throw Error('2004 collection profile only');
 if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsupported native SCORM edition');
 const nonce = process.env.PEAR_NATIVE_NONCE;
 if (!nonce || !/^[-a-zA-Z0-9]{20,64}$/.test(nonce)) throw Error('Explicit native fixture nonce required');
@@ -19,7 +22,7 @@ let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '
 const script = `
 (async()=>{
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
-  if('${edition}'!=='1.2'){
+  if('${edition}'!=='1.2'&&!${collectionSPM}){
     if('${edition}'==='2004-4'){
       const api=parent.API_1484_11,id='urn:pear:native-shared-target',store='native-shared-target-notes';
       const resumed=evidence.entry!=='resume'||api.GetValue('adl.data.0.store')===store&&api.GetLastError()==='0';
@@ -96,6 +99,7 @@ const script = `
     const comment='🙂'.repeat(4000);if(evidence.entry!=='resume')for(let n=0;n<35;n++)if(api.SetValue('cmi.comments_from_learner.'+n+'.comment',comment)!=='true')throw Error('Native large comment');
     evidence.checkpointCapacity={count:api.GetValue('cmi.comments_from_learner._count'),preserved:Array.from({length:35},(_,n)=>api.GetValue('cmi.comments_from_learner.'+n+'.comment')===comment&&api.GetLastError()==='0').every(Boolean)};
   }
+  if(${collectionSPM}){const api=parent.API_1484_11;if(evidence.entry!=='resume'){${interactionCollectionScript}}let preserved=api.GetValue('cmi.interactions._count')==='250'&&api.GetValue('cmi.objectives._count')==='100';for(let i=0;i<250;i++){const base='cmi.interactions.'+i;preserved=preserved&&api.GetValue(base+'.type')==='choice'&&api.GetValue(base+'.learner_response')==='{lang=en}Original collection response'&&api.GetValue(base+'.objectives._count')==='10'&&api.GetValue(base+'.correct_responses._count')==='10';for(let j=0;j<10;j++)preserved=preserved&&api.GetValue(base+'.objectives.'+j+'.id')==='urn:pear:collection-objective:'+i+':'+j&&api.GetValue(base+'.correct_responses.'+j+'.pattern')==='urn:pear:collection-choice:'+j;}for(let i=0;i<100;i++)preserved=preserved&&api.GetValue('cmi.objectives.'+i+'.score.raw')==='50';if(!preserved)throw Error('Native mandatory collection lost');evidence.collectionSPM={interactions:250,objectives:100,nestedObjectives:2500,patterns:2500,preserved};}
   const top=parent.parent;
   for(const [key,read] of Object.entries({pearCookieDenied:()=>top.document.cookie,pearStorageDenied:()=>top.localStorage.length,pearBridgeDenied:()=>top.agentBridgeV1,pearNativeDenied:()=>top.__TAURI_INTERNALS__}))try{read();}catch{evidence[key]=true;}
   const native=window.__TAURI_INTERNALS__||parent.__TAURI_INTERNALS__;
@@ -138,7 +142,7 @@ const manifest = standard === '1.2' ? singleSCOManifest(standard) : xmlTimeManif
   .replace('identifier="intro"', 'identifier="intro" isvisible=" &#x9;1&#xA; "')
   .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/><s:limitConditions attemptLimit=" &#x9;+0003&#xA; " beginTimeLimit="2000-01-01T00:00:00Z" endTimeLimit="2099-01-01T00:00:00Z" attemptAbsoluteDurationLimit="PT3600S" attemptExperiencedDurationLimit="PT3600S" activityAbsoluteDurationLimit="PT3600S" activityExperiencedDurationLimit="PT3600S"/><s:randomizationControls selectionTiming="never" randomizationTiming="never"/><s:sequencingRules><s:preConditionRule><s:ruleConditions conditionCombination="all"><s:ruleCondition condition="always" operator="not"/></s:ruleConditions><s:ruleAction action="disabled"/></s:preConditionRule></s:sequencingRules><a:rollupConsiderations requiredForSatisfied="always" requiredForNotSatisfied="always" requiredForCompleted="always" requiredForIncomplete="always"/></s:sequencing>')));
 const collections = standard === '1.2' ? manifest : xmlCollectionIdsManifest(collectionManifest(standard, manifest));
-const nativeManifest = standard === '2004-4' ? xmlSharedTargetManifest(collections.replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:data><runtime:map targetID="urn:pear:native-shared-target" readSharedData="true" writeSharedData="true"/></runtime:data>')) : collections;
+const nativeManifest = collectionSPM ? singleSCOManifest(standard) : standard === '2004-4' ? xmlSharedTargetManifest(collections.replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:data><runtime:map targetID="urn:pear:native-shared-target" readSharedData="true" writeSharedData="true"/></runtime:data>')) : collections;
 const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, nativeManifest)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
 // Synthetic diagnostics record route classes/status, never launch capabilities.
@@ -154,6 +158,8 @@ content!.addHook('onSend', async (req, reply, payload) => {
   if(Array.isArray((req.body as any)?.interactionWrites)&&(req.body as any).interactionWrites.length){responseWriteCheckpoints++;largestInteractionJournal=Math.max(largestInteractionJournal,(req.body as any).interactionWrites.length);}
   const count = Number(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n);
   const revision = Number(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision);
+  // Lose the large collection ACK, never the wrapper's initial small checkpoint.
+  if (collectionSPM && Object.keys((req.body as any)?.state?.interactions ?? {}).length !== 250) return payload;
   if (!droppedACK) {
     droppedACK = true; droppedPayload = serialized; droppedReceipt = String(payload); droppedCount = count; droppedRevision = revision;
     reply.code(503); return JSON.stringify({error: 'Synthetic lost acknowledgement after commit'});
@@ -185,7 +191,16 @@ const consent=Array.from(panel.querySelectorAll('input')).find(i=>i.type==='chec
 const intro=()=>Array.from(panel.querySelectorAll('button')).find(b=>b.textContent.includes('Introduction')&&!b.disabled);(await wait(intro)).click();
 let resumed=false,retried=false;setInterval(async()=>{const state=await(await fetch('${prefix}/state')).json();if(state.action==='retry'&&!retried){retried=true;(await wait(()=>button('Retry engine checkpoint'))).click();}if(state.action==='resume'&&!resumed){resumed=true;(await wait(()=>button('Close SCO and choose another'))).click();(await wait(intro)).click();}},200);
 }catch(error){await fetch('${prefix}/driver-error',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:error.name,message:error.message})});}})();`));
-app.get(prefix + '/state', async () => ({sharedTargetStored: standard !== '2004-4' || f.db.prepare('SELECT store FROM scorm_system_data WHERE target_id=?').get('urn:pear:native-shared-target')?.store === 'native-shared-target-notes', edition, action, droppedACK, exactRetry, largestCheckpointBytes, responseBindingCheckpoints, responseWriteCheckpoints, largestInteractionJournal, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
+// Counts/booleans only: never expose CMI values or capabilities in native diagnostics.
+function collectionStored() {
+  const row = f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts ORDER BY rowid DESC LIMIT 1').get() as any;
+  const receipt = f.db.prepare('SELECT result FROM scorm_engine_checkpoints ORDER BY rowid DESC LIMIT 1').get() as any;
+  const state = row ? JSON.parse(row.runtime_state) : {}, bindings = receipt ? JSON.parse(receipt.result).responseBindings ?? {} : {};
+  const interactions = Object.values(state.interactions ?? {}) as any[], objectives = Object.values(state.objectives ?? {}) as any[];
+  const origins = Object.keys(bindings).length;
+  return {interactions: interactions.length, objectives: objectives.length, origins, preserved: interactions.length === 250 && objectives.length === 100 && origins === 250 && interactions.every((value, i) => value.type === 'choice' && value.learner_response === '{lang=en}Original collection response' && bindings['cmi.interactions.' + i + '.learner_response'] === 'fill-in' && Object.keys(value.objectives ?? {}).length === 10 && Object.keys(value.correct_responses ?? {}).length === 10) && objectives.every(value => value.score?.raw === '50')};
+}
+app.get(prefix + '/state', async () => ({sharedTargetStored: standard !== '2004-4' || f.db.prepare('SELECT store FROM scorm_system_data WHERE target_id=?').get('urn:pear:native-shared-target')?.store === 'native-shared-target-notes', edition, collectionSPM, collectionStored: collectionSPM ? collectionStored() : null, action, droppedACK, exactRetry, largestCheckpointBytes, responseBindingCheckpoints, responseWriteCheckpoints, largestInteractionJournal, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
 app.post(prefix + '/command', async (req, reply) => {const next = (req.body as any)?.action; if (!['retry', 'resume', 'finish', 'navigate'].includes(next)) return reply.code(400).send(); action = next; return {ok: true};});
 app.post(prefix + '/driver-error', async req => {driverErrors.push(String((req.body as any)?.message).slice(0, 200)); return {ok: true};});
 await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host: '127.0.0.1', port: 4315}); await app.listen({host: '127.0.0.1', port: 4310});
