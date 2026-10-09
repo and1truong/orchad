@@ -15,15 +15,18 @@ import {singleSCOManifest} from './scorm-player-fixture.ts';
 import {fixture} from './helpers.ts';
 import {learnerCommentScript,learnerCommentVerifyScript} from './scorm-learner-comment-spm-vectors.ts';
 
-test('Comment allowance counts exact JSON UTF8 bytes only for first250 canonical own scalar strings, with a finite worst-case bound',()=>{
+test('Comment allowance counts exact JSON UTF8 bytes only for first250 learner/100 LMS canonical own scalar strings, with a finite worst-case bound',()=>{
   const bytes=(s:string)=>Buffer.byteLength(JSON.stringify(s));
-  for(const value of ['🙂'.repeat(4000),'\u0000'.repeat(4257),'{lang=en}'+'é'.repeat(4000)])
-    assert.equal(scorm2004CheckpointLimit({comments_from_learner:{0:{comment:value}}}),scorm2004CheckpointBytes+bytes(value));
-  for(const comments of [[],{0:[]},{'00':{comment:'Original'}},{250:{comment:'Original'}},{0:{comment:'x'.repeat(4258)}},{0:{comment:'\ud800'}},Object.create({0:{comment:'Inherited'}}),{0:Object.create({comment:'Inherited'})}])
-    assert.equal(scorm2004CheckpointLimit({comments_from_learner:comments}),scorm2004CheckpointBytes);
-  assert.equal(scorm2004CheckpointLimit(Object.create({comments_from_learner:{0:{comment:'Inherited'}}})),scorm2004CheckpointBytes);
+  for(const [family,count] of [['comments_from_learner',250],['comments_from_lms',100]] as const){
+    for(const value of ['🙂'.repeat(4000),'\u0000'.repeat(4257),'{lang=en}'+'é'.repeat(4000)])
+      assert.equal(scorm2004CheckpointLimit({[family]:{0:{comment:value}}}),scorm2004CheckpointBytes+bytes(value));
+    for(const comments of [[],{0:[]},{'00':{comment:'Original'}},{[count]:{comment:'Original'}},{0:{comment:'x'.repeat(4258)}},{0:{comment:'\ud800'}},Object.create({0:{comment:'Inherited'}}),{0:Object.create({comment:'Inherited'})}])
+      assert.equal(scorm2004CheckpointLimit({[family]:comments}),scorm2004CheckpointBytes);
+    assert.equal(scorm2004CheckpointLimit(Object.create({[family]:{0:{comment:'Inherited'}}})),scorm2004CheckpointBytes);
+  }
   const maximum={comments_from_learner:Object.fromEntries(Array.from({length:250},(_,i)=>[i,{comment:'\u0000'.repeat(4257)}]))};
-  assert.equal(scorm2004CheckpointLimit(maximum),scorm2004CheckpointMaxBytes);
+  assert.equal(scorm2004CheckpointLimit(maximum),scorm2004CheckpointBytes+250*(6*4257+2));
+  assert.equal(scorm2004CheckpointLimit({...maximum,comments_from_lms:Object.fromEntries(Array.from({length:100},(_,i)=>[i,{comment:'\u0000'.repeat(4257)}]))}),scorm2004CheckpointMaxBytes);
 });
 for(const edition of ['2004-2','2004-3','2004-4'] as const){
  test(edition+':250 full Unicode learner comments survive queue refusal, exact HTTP retry and SQLite reopen/resume',async()=>{
