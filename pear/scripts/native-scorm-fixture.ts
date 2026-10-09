@@ -63,7 +63,12 @@ const script = `
     if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native subcode control restoration refused');
     const unregisteredCodes=['en-abc','FRE-abcd','qaa-foobar','SCC-abcdefgh','en-madeup','en-999','en-klingon','en-Qaby'].map(tag=>{if(api.SetValue(ianaKey,'{lang='+tag+'}Rejected text')!=='false')throw Error('Native unregistered subcode admitted');return api.GetLastError();});
     evidence.ianaSubcodes={resumed:ianaResumed,accepted:registeredSubcodes.length,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:unregisteredCodes};
-    const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
+    for(const tag of ['en-001','en-US-11','x-11','i-klingon-a1']){const value='{lang='+tag+'}Native country syntax control';if(api.SetValue(ianaKey,value)!=='true'||api.GetValue(ianaKey)!==value)throw Error('Native country syntax control refused');}
+    if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native country syntax restoration refused');
+    const alphabet='abcdefghijklmnopqrstuvwxyz0123456789',digitCountries=[...alphabet].flatMap(a=>[...alphabet].map(b=>a+b)).filter(code=>/[0-9]/.test(code));
+    const digitCountryCodes=digitCountries.map(code=>{if(api.SetValue(ianaKey,'{lang=FRE-'+code.toUpperCase()+'-demo}Rejected text')!=='false')throw Error('Native mixed/digit country admitted');return api.GetLastError();});
+    evidence.countryCharacters={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:digitCountryCodes};
+    const result='0.5' +'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');
     const resultCodes=[result+'\\n','0.'+'1'.repeat(4095),'9'.repeat(309),'Correct'].map(value=>{if(api.SetValue(resultKey,value)!=='false')throw Error('Native invalid result admitted');return api.GetLastError();});
