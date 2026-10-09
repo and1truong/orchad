@@ -14,3 +14,5 @@ export const reservedCountryUpdates: [string, string][];
 export const countryRegistryUpdates: [string, string][];
 
 export const subcodeRegistryUpdates: [string, string][];
+
+export const countryCharactersUpdates: [string, string][];

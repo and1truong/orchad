@@ -39,6 +39,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.ianaLanguage).toEqual({resumed:true,preserved:true,codes:Array(4).fill('406')});
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.reservedCountry).toEqual({resumed:true,preserved:true,codes:Array(42).fill('406')});
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.countryRegistry).toEqual({resumed:true,accepted:260,preserved:true,codes:Array(4).fill('406')});
+    if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.countryCharacters).toEqual({resumed:true,preserved:true,codes:Array(620).fill('406')});
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.ianaSubcodes).toEqual({resumed:true,accepted:709,preserved:true,codes:Array(8).fill('406')});
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.resultDecimal).toEqual({resumed:true,preserved:true,codes:['406','406','406','406']});
     expect(resumed.calls).toEqual([]); expect(resumed.pearCanaryCalls).toEqual([]);
