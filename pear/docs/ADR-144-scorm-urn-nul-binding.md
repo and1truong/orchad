@@ -17,8 +17,18 @@ the same Date clock. Original valid-vector order/indexes remain unchanged.
 Focused26/26, draft domain804/804 across118 files, build and built URI3/3
 complete exit0. Integrated latest-parent domain804/804 across118 files/build
 and built11/11 (URI3, learning2, close-navigation3, lost-resume-response3)
-complete exit0. Full145 local browser acceptance remains required; earlier
+complete exit0. Full145 local browser on c8aea0d0 completes140PASS/5FAIL, exit1: two
+managed download/Service Worker restrictions and three DOM.describeNode/session-
+closed failures (2004-2 asset advancement, retry and retryAll). Learning normal/
+hidden and all URI journeys pass in that run. No clean full local claim; earlier
 parent failures and observation logs are retained, not erased by these passes.
+Original c8aea0d0 CI Linux native run37871018286/job113628882826 fails at
+smoke quit acknowledgment timeout. The smoke handler calls exit before writing
+its reply, while the runtime driver requires that reply before checking clean
+exit. The handler now acknowledges quit first, then exits without weakening
+exit/forced-kill assertions. A shutdown race is inferred from this ordering;
+that original log alone does not prove the process exit status. Local Rust/native
+tools are absent; compilation and actual three-OS shutdown require new-head CI.
 New-head CI/reviews and full parent acceptance remain required. This closes the
 named NUL guidance only; URI authority/IP literals/UTF8/equivalence and full
 reference/error/edition conformance remain open. Two original edition3/4

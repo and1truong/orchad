@@ -203,3 +203,9 @@ across118 files/build/built11 pass, all exit0. v35 exact bytes/marker upgrades w
 identity/unknown-source refusal, prior receipt/history and SCORM1.2 unchanged.
 Full145 current-parent browser acceptance and new-head CI/reviews remain required.
 URI/IP-literal/full reference and production/external gates remain open.
+
+ADR-144 c8aea0d0 full145 completes140PASS/5FAIL exit1: managed download/SW
+restrictions and three DOM.describeNode/session-closed asset/retry/retryAll
+failures retained. First exact-head CI Linux native smoke quit ACK times out;
+exit-before-reply ordering is corrected to reply-before-exit. No weaker timeout/
+shutdown/policy assertion. Local Rust/native unavailable; new-head CI mandatory.
