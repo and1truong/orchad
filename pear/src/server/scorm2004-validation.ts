@@ -12,16 +12,18 @@ const readonly = /^(?:cmi\.(?:learner_id|learner_name|credit|mode|entry|total_ti
 const container = /^(?:cmi|cmi\.(?:score|learner_preference|comments_from_learner|comments_from_lms|objectives|interactions)|cmi\.(?:comments_from_learner|comments_from_lms|objectives|interactions)\.\d{1,3}|cmi\.objectives\.\d{1,3}\.score|cmi\.interactions\.\d{1,3}\.(?:objectives|correct_responses)|cmi\.interactions\.\d{1,3}\.(?:objectives|correct_responses)\.\d{1,3})$/;
 const localizedField = /^cmi\.(?:comments_from_(?:learner|lms)\.\d+\.comment|(?:objectives|interactions)\.\d+\.description)$/;
 const interactionResponse = /^cmi\.interactions\.\d+\.(?:learner_response|correct_responses\.\d+\.pattern)$/;
-function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}) {
+function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}, quota = {fields: 0}) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || !container.test(prefix)) reject('INVALID_ARGUMENT', 'Unknown or invalid CMI container');
   for (const [key, value] of Object.entries(input)) {
     const path = prefix + '.' + key;
     if (typeof value === 'string') {
       // Envelope quotas count binding delimiters too; engine replay validates each typed record.
       const limit = path === 'cmi.suspend_data' ? 64000 : interactionResponse.test(path) ? 36 * 4000 + 35 * 3 : localizedField.test(path) ? 4257 : 4096;
-      if (Object.keys(out).length >= 2048 || scormCharacters(value) > limit) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
+      // Mandatory250 interaction records:8 scalars,10 objective IDs,10 patterns; at most7000 extra leaves.
+      const interaction = /^cmi\.interactions\.(0|[1-9]\d{0,2})\.(?:id|type|timestamp|weighting|learner_response|result|latency|description|objectives\.[0-9]\.id|correct_responses\.[0-9]\.pattern)$/.exec(path);
+      if ((!(interaction && Number(interaction[1]) < 250) && ++quota.fields > 2048) || scormCharacters(value) > limit) reject('INVALID_ARGUMENT', 'CMI field quota exceeded');
       out[path] = value;
-    } else leaves(value, path, out);
+    } else leaves(value, path, out, quota);
   }
   return out;
 }
