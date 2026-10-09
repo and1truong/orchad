@@ -156,3 +156,17 @@ ADR-139 pear-timeout-exitall-v33 normalizes Terminate navigation and trusted pre
 ADR-140 pear-logout-exitall-v34 extends shared Terminate/preflight ExitAll precedence to logout and terminates the sequencing service, retaining authored request and exact v33 installation/snapshot compatibility. Original6FAIL; focused75/full domain788 across115 files/build/final typecheck/built3 complete exit0. Exact-head CI/native/Side Panel/review pending. Full lifecycle/reference gaps remain OPEN; existing data-free deprecation warning retained; production disabled.
 
 Parent #208 a49cdc8e / run37860684141 attempt2 completed10 jobs; all latest logs/head/reviews inspected. Pear764/192dev/192built/SidePanel4, actual Linux/macOS/Windows16/13/fourSCORM13 and five clean native/fixture exit0 records each. One unchanged Windows-only retry passed; original consent-response timeout retained/unattributed. Local download/learning/SW permission failures retained; no clean full local acceptance or full conformance claim. Successor exact-head CI remains required.
+
+ADR-141 uses existing transactional removal paths and trusted v34 ExitAll for
+acknowledged time-out/logout on human close or replacement, retaining old CMI
+history and receipts without a fabricated Terminate or proof. Original3FAIL;
+first focused82/88 retained, corrected final91/build/built3 complete exit0.
+Fresh integrated full domain797/117 files/build/built6 complete exit0. Full local
+SCORM browser145 completes134PASS/11FAIL, exit1: four EADDRINUSE from concurrent
+draft-worktree port reuse, five unattributed sequencing practice-delivery failures,
+download timeout and managed Service Worker permission refusal. Original traces
+retained; sequential nine-case recheck completes7PASS/2FAIL, exit1. Four session-time
+cases pass; interaction-records2004-3/duration2004-4 practice delivery still fails.
+Retained trace shows server accepted Terminate/nextScoId=practice but no following
+browser status lookup/replacement after manual retry; cause unresolved. No clean
+full local acceptance claim. New-head full CI/native/Side Panel/reviews required.

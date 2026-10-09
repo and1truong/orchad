@@ -22,6 +22,15 @@ import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
 import {SCORM_RUNTIME_LIMITS} from '../shared/scorm-operations.ts';
 
+// An acknowledged time-out/logout ends the attempt when the LMS removes the
+// SCO, even if content never reported Terminate. Keep its original receipt/CMI.
+function endOnNavigation(engine: ReturnType<typeof trustedSequencing>, state: Record<string, any>) {
+  if (!['time-out', 'logout'].includes(state.exit)) return false;
+  engine.loadFromJSON(state);
+  if (engine.Initialize('') !== 'true' || engine.Terminate('') !== 'true') reject('INVALID_ARGUMENT', 'SCORM engine could not end the removed SCO');
+  return true;
+}
+
 export function scorm12LaunchProfile(manifest: SCORMManifest, scoId?: string) {
   const profiles = scorm12Activities(manifest), profile = scoId ? profiles.find(p => p.activity.id === scoId) : profiles[0];
   if (!profile) reject('FORBIDDEN', 'Exact organization SCO required');
@@ -75,10 +84,11 @@ export class SCORMPlayerService {
       const registration = this.store.registration(p, registered.registrationId);
       const rows = this.scos(registered.attemptId, p.tenant), states = activityStates(manifest, rows);
       const overall = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(registered.attemptId, p.tenant) as any;
-      const sequenceScope = {attemptId: registered.attemptId, sha256: registration.sha256}, engine = usesSequencing(manifest) ? trustedSequencing(manifest, overall.sequencing_state, sequenceScope) : undefined;
+      const sequenceScope = {attemptId: registered.attemptId, sha256: registration.sha256};
+      let engine = usesSequencing(manifest) ? trustedSequencing(manifest, overall.sequencing_state, sequenceScope) : undefined;
       if (engine) {loadSystemData(this.db, registration, manifest, engine); loadSystemObjectives(this.db, registration, manifest, engine);}
       const currentId = engine?.getSequencingState()?.currentActivity?.id, current = rows.find(r => r.sco_id === currentId);
-      if (engine && current && !current.finished) {engine.loadFromJSON(JSON.parse(current.runtime_state)); engine.Initialize('');}
+      if (engine && current && !current.finished) {const state = JSON.parse(current.runtime_state); if (endOnNavigation(engine, state)) engine = trustedSequencing(manifest, saveSequencing(engine, manifest, sequenceScope), sequenceScope); else {engine.loadFromJSON(state); engine.Initialize('');}}
       const candidates = playbackActivities(manifest).filter(p => activityAvailable(p, states));
       // Default 2004 launch follows the trusted current delivery/start flow;
       // menu visibility must not turn it into a choice of a different SCO.
@@ -90,9 +100,10 @@ export class SCORMPlayerService {
       const id = randomUUID(), token = randomBytes(32).toString('base64url'), now = Date.now();
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE attempt_id=? AND closed=0').run(registered.attemptId);
       const previousSco = rows.find(r => r.sco_id === profile.activity.id), engineAttempt = engine?.getSequencingState()?.currentActivity?.attemptCount ?? 1;
-      // A finished, non-suspended 2004 session starts another SCO attempt; keep
-      // its old CMI/receipts as history rather than returning them to new content.
-      const freshAttempt = !engine && manifest.standard !== '1.2' && previousSco?.finished && JSON.parse(previousSco.runtime_state).exit !== 'suspend';
+      // A finished non-suspended session, or removal after acknowledged timeout/
+      // logout, starts another 2004 SCO attempt while keeping old CMI/receipts.
+      const previousExit = previousSco && JSON.parse(previousSco.runtime_state).exit;
+      const freshAttempt = !engine && manifest.standard !== '1.2' && previousSco && (previousSco.finished || ['time-out', 'logout'].includes(previousExit)) && previousExit !== 'suspend';
       const scoAttempt = engine ? Math.max(1, engineAttempt, previousSco?.sco_attempt_number ?? 1) : (previousSco?.sco_attempt_number ?? 1) + (freshAttempt ? 1 : 0);
       this.db.prepare('INSERT OR IGNORE INTO scorm_sco_attempts(attempt_id,tenant,sco_id,sco_attempt_number) VALUES(?,?,?,?)').run(registered.attemptId, p.tenant, profile.activity.id, scoAttempt);
       const sco = this.db.prepare('SELECT * FROM scorm_sco_attempts WHERE attempt_id=? AND sco_id=? AND sco_attempt_number=?').get(registered.attemptId, profile.activity.id, scoAttempt) as any, previous = JSON.parse(sco.runtime_state), account = p as any;
@@ -300,7 +311,8 @@ export class SCORMPlayerService {
       if (usesSequencing(manifest)) {
         const attempt = this.db.prepare('SELECT * FROM scorm_engine_attempts WHERE id=? AND tenant=?').get(launch.attempt_id, p.tenant) as any;
         const scope = {attemptId: attempt.id, sha256: registration.sha256}, engine = trustedSequencing(manifest, attempt.sequencing_state, scope);
-        if (pauseDuration(engine)) this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(engine, manifest, scope), attempt.id, p.tenant);
+        const ended = !status.finished && deliveredSCO(engine, manifest)?.activity.id === launch.sco_id && endOnNavigation(engine, status.runtime_state), paused = pauseDuration(engine);
+        if (ended || paused) this.db.prepare('UPDATE scorm_engine_attempts SET sequencing_state=? WHERE id=? AND tenant=?').run(saveSequencing(engine, manifest, scope), attempt.id, p.tenant);
       }
       this.db.prepare('UPDATE scorm_engine_launches SET closed=1 WHERE id=?').run(id);
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant, p.id, 'learning:' + p.tenant + ':' + p.id, 'human_scorm_engine_close', JSON.stringify({launchId: id, sequence: status.sequence}), new Date().toISOString());
