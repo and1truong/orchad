@@ -27,6 +27,12 @@ for (const edition of ['pear', '1.2', '2004-2', '2004-3', '2004-4']) test('real 
     const deadlineExit = Date.now() + 5000;
     while (!exited && Date.now() < deadlineExit) await sleep(50);
     assert.ok(exited, 'IPC close did not finish'); assert.equal(await exit, 0, errors);
-    if (scorm) assert.deepEqual(output.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g), ['received', 'connections-closed', 'sink-closed', 'app-closed', 'database-closed', 'cleanup-complete'].map(phase => 'PEAR_NATIVE_FIXTURE_CLOSE:' + phase));
+    if (scorm) {
+      const phases = ['received', 'connections-closed', 'sink-closed', 'app-closed', 'database-closed', 'cleanup-complete'];
+      assert.deepEqual(output.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g), phases.map(phase => 'PEAR_NATIVE_FIXTURE_CLOSE:' + phase));
+      const times = Array.from(output.matchAll(/PEAR_NATIVE_FIXTURE_CLOSE:([a-z-]+) elapsedMs=(\d+\.\d{3})/g), match => ({phase: match[1], elapsed: Number(match[2])}));
+      assert.deepEqual(times.map(t => t.phase), phases);
+      assert.ok(times.every((t, i) => Number.isFinite(t.elapsed) && t.elapsed >= (times[i - 1]?.elapsed ?? 0) && t.elapsed < 5000), 'Complete monotonic cleanup timings within the existing deadline');
+    }
   } finally {pending?.destroy(); if (!exited) {child.kill('SIGKILL'); await exit;}}
 });

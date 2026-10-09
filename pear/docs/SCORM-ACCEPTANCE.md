@@ -782,3 +782,36 @@ no unrelated repeat just to obtain green counts; no clean full local/
 Chromium153/actual native proof claim. No product/build/test/timeout/assertion/
 retry/policy changes during full acceptance. Engine hashes0447a6/1.2eb7539
 verified unchanged. Fresh owner CI/reviews still required before READY.
+
+ADR162 implemented isolated native SCORM phase writeSync/timing helper,
+existing prefix/order/IPC/server/database/filesystem/deadline unchanged.
+Controller adds only numeric timings/closed/output-error byte metrics, no
+CMI/capability/URL disclosure. Existing real IPC five-fixture lifecycle test
+adds complete finite monotonic phase times within unchanged5000ms criterion.
+Typecheck/build exit0; corrected focused5PASS/zero fail/cancel/skip exit0
+(4.6s). Initial1PASS/4 boot failures from missing dist retained; built then
+reran without source/test relaxation. Native4/fresh full964/135files/full172
+follow; no pending PASS/root-cause/product repair/actual Windows proof claim.
+Parent236411 Draft/run37913908277;234d25 READY10owner latest logs/reviews;
+235de1 original Windows2004-3forced retained/all10logs/one unchanged retry
+pending. MatricesOPEN/externalBLOCKED;epicOPEN/prodDISABLED.
+
+ADR162 native4PASS exit0 (26.2s); fresh full964 domain/135files completes
+964PASS/zero fail/cancel/skip, every file plan/footer/five counts/exit0 and
+aggregate exit0 inspected. Fixed full172 browser running, source/build frozen.
+Original prebuild boot failure retained; no pending browser PASS/Windows
+root cause claim. Independent unused-NCName U+2028/U+2029 rejection probe
+6PASS exit0 on original tree, no NCName product patch; collection ID/IDREF
+valid outer XML whitespace9FAIL remains separate next binding work.
+
+Final fixed-tree full172 browser:166PASS/6FAIL, process exit1 (9.2m).
+Every failed trace/error context inspected: fourth-edition download60s timeout
+(cause unproved), managed ServiceWorker permission denial, and four2004-2/3
+retry/retryAll next-SCO DOM.describeNode/session-closed failures (cause unproved).
+All four supplemental native journeys also PASS inside this full run. No
+product/build/test/timeout/retry/policy changes during the run; no clean full
+local or supported153/native-platform claim. Original failures remain retained.
+Predecessor236 owner Windows/macOS/Linux full native logs now checked: each
+16/13/13/24/24/25, five clean exit0/ACKtrue and no forced shutdown. Pear still
+pending; these results do not identify previous Windows failures or satisfy
+this diagnostic owner's future CI gates. Predecessor235 now READY as above.
