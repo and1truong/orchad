@@ -280,7 +280,10 @@ ADR-149 v39: original four regressions fail; final draft focused27/build/fresh
 full832 across123 domain files/supplementary native fixture4 pass exit0. Accepted
 response type bindings preserve nonempty/supplied empty fields through exact
 retry/trusted close/resume; current-type replacement clears bindings. Public
-metadata/changed invalid input remains refused. Integrated fresh full832/123files/build also pass exit0; new browser3/full169,
+metadata/changed invalid input remains refused. Integrated fresh full832/123files/build and built16 (binding3/reload3/refusal6/
+fixture4) pass exit0; full169 is running. Initial built13PASS/3FAIL wrapper
+checkpoint ordering is retained and corrected with explicit accepted-response
+DB verification.
 new-head CI/review and actual native3OS2004=18 remain required. Parent222 owner
 P1 e2b focused13/lifecycle8/build/fresh828 and changed interop5 pass; full166
 162PASS/4FAIL remains retained and current CI has not yet appeared. First-checkpoint type provenance and full matrices

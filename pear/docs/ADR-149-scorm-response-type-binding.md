@@ -43,7 +43,8 @@ supplemental native fixture4 complete exit0. Tests include sequenced and
 non-sequenced learner/correct responses, nonempty/supplied empty preservation,
 exact original and new receipt retries, no extra revision/receipt, close/resume,
 new-response/extra-metadata refusal and current-type corrections. Integrated successor fresh full832/832 across123 files and build also complete
-exit0; new built journeys remain required. Native fixture
+exit0. Integrated built16 (new binding3, reload guard3, Close refusal6 and
+supplemental native fixture4) complete PASS/exit0; full169 is running. Native fixture
 adds resumed type-change Commit/preservation and an acknowledged nonempty
 binding receipt; actual three OS must verify2004=18,1.2=13 with clean exit/ACK.
 Chromium evidence is supplementary, not actual native acceptance.
@@ -53,7 +54,12 @@ type; an installer regression parser included later declarations (18PASS/1FAIL);
 expanded empty restoration lost initialized-presence flags (23PASS/3FAIL and
 1PASS/3FAIL). Narrow engine typing, exact v39 reversal and restored validated
 presence corrected these; final focused27/full832 complete exit0. Original
-four failing regressions and all intermediate logs remain retained. Parent222
+four failing regressions and all intermediate logs remain retained. Initial
+integrated built16 completes13PASS/3FAIL: the wrapper saved a tiny checkpoint
+before the fixture authored choice responses, so its saved status did not prove
+those responses had been accepted. The fixture now explicitly commits and
+checks the choice responses in DB before changing type; final16PASS/exit0.
+This keeps first-checkpoint invalid type changes outside the claimed scope. Parent222
 Close P1 correction e903caa8 focused13/lifecycle8/confirmed build and fresh
 full828 pass exit0; full166 completes162PASS/4FAIL and changed interop readiness5
 passes exit0. Owner e2b1dfa9 retains those results; exact-head CI/review remains
