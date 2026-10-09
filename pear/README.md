@@ -87,3 +87,28 @@ open. See [ADR-103](docs/ADR-103-reviewed-sso-invitations.md).
 
 Focused checks: `node --import tsx --test tests/invitations.test.ts tests/identity.test.ts`
 and, after `npm run build`, `PEAR_E2E_PRODUCTION=1 npm run test:e2e -- invitations.spec.ts identity.spec.ts`.
+
+### Real Keycloak interoperability acceptance
+
+`npm run build && npm run test:keycloak` requires the local Docker socket and a
+Playwright Chromium installation (`CHROMIUM_PATH` may select a compatible system
+browser). The optional `pear-keycloak` workflow runs it automatically for Pear/bridge-contract
+changes and can be dispatched manually.
+
+The harness uses official Keycloak 26.8.0 pinned by digest, imports only original
+test identities, publishes loopback ports 4336/4337, and removes its uniquely named
+container and in-memory Pear database afterward. The fixture password is public
+test data. No real identity/mail/model credentials are used. S256 PKCE is required;
+the browser exercises the actual provider code/token/JWKS endpoints and existing
+Pear verification, rather than replacing them with the loopback provider stub.
+
+Assertions cover unmapped-account refusal, exact-subject one-time invitation,
+wrong-identity refusal, signed provider role claims that cannot elevate a Pear
+learner, and human unlinking that invalidates an existing Pear session and rejects
+a still-active provider session. Reports/screenshots are produced on success.
+This is a real provider's **loopback development profile**: production TLS, actual
+organization accounts/groups/SCIM, IdP end-session logout and recipient delivery
+remain separate unverified requirements in M6/M7.
+
+References: [Keycloak container guide](https://www.keycloak.org/server/containers),
+[realm import guide](https://www.keycloak.org/server/importExport).
