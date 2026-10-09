@@ -1,6 +1,6 @@
 import {scormCharacters, scorm2004Writable as writable} from '../shared/scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
-import {scorm2004CheckpointBytes, scorm2004FieldError, scorm2004EngineValue, scorm2004ExitRequests, type SCORM2004Edition} from '../shared/scorm2004-runtime.ts';
+import {scorm2004CheckpointBytes, scorm2004FieldError, scorm2004EngineValue, scorm2004ExitRequests, scorm2004Reloadable, type SCORM2004Edition} from '../shared/scorm2004-runtime.ts';
 import {validNavigation} from '../shared/scorm-sequencing-runtime.ts';
 import {applySharedDataWrites} from './scorm-shared-data.ts';
 import {reject} from './errors.ts';
@@ -44,6 +44,8 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
     if (scorm2004FieldError(edition, key, value)) reject('INVALID_ARGUMENT', 'Invalid SCORM 2004 data model field: ' + key);
     if (runtime.SetValue(key, scorm2004EngineValue(key, value)) !== 'true') reject('INVALID_ARGUMENT', 'SCORM 2004 data model rejected checkpoint: ' + key);
   }
+  try {scorm2004Reloadable(runtime.renderCMIToJSONObject().cmi as Record<string, any>);}
+  catch {reject('INVALID_ARGUMENT', 'SCORM 2004 checkpoint cannot be reloaded');}
   if (trustedRuntime) {
     if (scorm2004FieldError(edition, 'adl.nav.request', navigation) || runtime.SetValue('adl.nav.request', navigation) !== 'true') reject('INVALID_ARGUMENT', 'Invalid edition navigation request');
     if (finished && !validNavigation(runtime, navigation)) reject('FORBIDDEN', 'Trusted sequencing denies navigation');

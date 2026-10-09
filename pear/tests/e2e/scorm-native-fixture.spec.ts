@@ -27,6 +27,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.interactionReadErrors).toEqual(['type','timestamp','weighting','result','latency'].map(field=>({field,absentCode:'301',unsetCode:'403'})));
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.collectionReadErrors).toEqual(absentCollectionPaths.map(path=>({path,code:'301'})));
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.sequencingResponses).toEqual({count:'5',codes:['351','351','351'],preserved:true});
+    if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.reloadableCheckpoint).toEqual({typeAccepted:true,commitCode:'391',preserved:true});
     if(edition!=='1.2'){expect(resumed.largestCheckpointBytes).toBeGreaterThan(544*1024);for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.checkpointCapacity).toEqual({count:'35',preserved:true});}
     expect(resumed.calls).toEqual([]); expect(resumed.pearCanaryCalls).toEqual([]);
     await command('finish'); await expect.poll(async () => (await state()).proofs).toBe(1);

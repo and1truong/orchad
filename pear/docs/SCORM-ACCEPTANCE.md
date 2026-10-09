@@ -248,3 +248,11 @@ Actual native over544KiB checkpoint/35 Unicode-record retry/resume and full157
 local/current-head CI/review remain required. Parent220 full151=149PASS/2FAIL
 exit1 download/SW restrictions is retained. Whole SPM combinations/load/ops
 remain open; no production enablement or conformance claim.
+
+ADR-148 guards acknowledged snapshots against strict-loader failure before queue
+and durable replay. Focused3/build/full domain828/122files/built recovery3 plus
+supplemental native fixture4 complete exit0. Full160/new-head actual native CI
+and review remain required; native2004 adds type0/commit391/preservation/recovery
+evidence. This does not complete retained-invalid-response type-change semantics.
+Parent221 full157151PASS/6FAIL is retained, with Windows2004-2 fixture forced
+shutdown after app-close in run37876846214. Epic133 OPEN, production DISABLED.

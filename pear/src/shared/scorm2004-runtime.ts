@@ -8,6 +8,12 @@ export type SCORM2004Edition = Exclude<SCORMStandard, '1.2'>;
 export const scorm2004CheckpointBytes = 2 * 1024 * 1024;
 export const scorm2004ExitRequests = ['_none_', 'exit', 'exitAll', 'abandon', 'abandonAll', 'suspendAll'];
 
+/** Acknowledged snapshots must survive the same strict loader used on resume. */
+export function scorm2004Reloadable(state: Record<string, any>) {
+  new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false}).loadFromJSON(state);
+  return state;
+}
+
 /** SCORM's timeinterval binding, with centisecond precision and bounded arithmetic. */
 export function scorm2004Seconds(value: string): number {
   const m = /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d{1,2})?)S)?)?$/.exec(value);
@@ -42,7 +48,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
   let initialized = false, finished = false, error: string | null = null, navigation = options.navigation ?? '_none_';
   const bad = (code: string) => {error = code; return 'false';};
   const inactive = (before: string, after: string) => !initialized ? before : finished ? after : null;
-  const snapshot = () => runtime.renderCMIToJSONObject().cmi as Record<string, any>;
+  const snapshot = () => scorm2004Reloadable(runtime.renderCMIToJSONObject().cmi as Record<string, any>);
   return Object.freeze({
     Initialize(argument: string) {
       if (finished) return bad('104');

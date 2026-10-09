@@ -97,6 +97,8 @@ try {
   check('actual native absent collection301 and unset interaction403 survive durable retry/resume',reads(first.probes[0])&&reads(resumed.probes[1])&&collections(first.probes[0])&&collections(resumed.probes[1]));
   const ordered=probe=>probe.sequencingResponses?.count==='5'&&probe.sequencingResponses.preserved===true&&Array.isArray(probe.sequencingResponses.codes)&&probe.sequencingResponses.codes.length===3&&probe.sequencingResponses.codes.every(code=>code==='351');
   check('actual native ordered response uniqueness and zero-member record survive durable retry/resume',ordered(first.probes[0])&&ordered(resumed.probes[1]));
+  const reloadable=probe=>probe.reloadableCheckpoint?.typeAccepted===true&&probe.reloadableCheckpoint.commitCode==='391'&&probe.reloadableCheckpoint.preserved===true;
+  check('actual native unreloadable checkpoint refusal preserves responses and permits recovery before retry/resume',reloadable(first.probes[0])&&reloadable(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
   check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
  }

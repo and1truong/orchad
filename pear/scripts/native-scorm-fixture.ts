@@ -29,6 +29,10 @@ const script = `
     const codes=[[1,patterns[0]],[patterns.length,patterns[0]],[patterns.length,'']].map(([n,p])=>{if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='false')throw Error('Native duplicate admitted');return api.GetLastError();});
     const preserved=patterns.every((p,n)=>api.GetValue(base+'.correct_responses.'+n+'.pattern')===p&&api.GetLastError()==='0');
     evidence.sequencingResponses={count:api.GetValue(base+'.correct_responses._count'),codes,preserved};
+    const typeAccepted=api.SetValue(base+'.type','numeric')==='true'&&api.GetLastError()==='0';
+    if(api.Commit('')!=='false')throw Error('Native unreloadable checkpoint queued');const commitCode=api.GetLastError();
+    if(api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native checkpoint recovery');
+    evidence.reloadableCheckpoint={typeAccepted,commitCode,preserved:patterns.every((p,n)=>api.GetValue(base+'.correct_responses.'+n+'.pattern')===p&&api.GetLastError()==='0')};
     const comment='🙂'.repeat(4000);if(evidence.entry!=='resume')for(let n=0;n<35;n++)if(api.SetValue('cmi.comments_from_learner.'+n+'.comment',comment)!=='true')throw Error('Native large comment');
     evidence.checkpointCapacity={count:api.GetValue('cmi.comments_from_learner._count'),preserved:Array.from({length:35},(_,n)=>api.GetValue('cmi.comments_from_learner.'+n+'.comment')===comment&&api.GetLastError()==='0').every(Boolean)};
   }
