@@ -16,3 +16,5 @@ export const countryRegistryUpdates: [string, string][];
 export const subcodeRegistryUpdates: [string, string][];
 
 export const countryCharactersUpdates: [string, string][];
+
+export const legacySingletonUpdates: [string, string][];

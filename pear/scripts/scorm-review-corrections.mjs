@@ -533,6 +533,10 @@ const countryCharactersOriginal = subcodeRegistryPatched;
 const countryCharactersPatched = "5213c4f81ce9d1e252c140a004faba1c7f615910ba781cbfdd81814547815a5b";
 // First two-character ordinary country subcodes must be ISO alpha2, including mixed/digit syntax.
 export const countryCharactersUpdates = [["[a-zA-Z]{2}(?:-|\\\\}|(?![\\\\s\\\\S])))", "[a-zA-Z0-9]{2}(?:-|\\\\}|(?![\\\\s\\\\S])))"]];
+const legacySingletonOriginal = countryCharactersPatched;
+const legacySingletonPatched = "e692d42794558b5ec312207caef86327ca0e7d87e37fdfabad3bf3cd76eed9bc";
+// RFC3066 section2.2 reserves first one-letter ordinary subcodes; later/i/x remain exact.
+export const legacySingletonUpdates = [["const PEAR_ISO_LANGUAGE_PRIMARY = \"","const PEAR_ISO_LANGUAGE_PRIMARY = (legacy ? \"(?![a-zA-Z]{2,3}-[a-zA-Z](?:-|\\\\}|(?![\\\\s\\\\S])))\" : \"\") + \""]];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -646,9 +650,11 @@ export function reviewedSCORMSource(source) {
   if (hash(source) === countryRegistryOriginal) {source = replace(source, countryRegistryUpdates); if (hash(source) !== countryRegistryPatched) throw Error("SCORM country registry checksum mismatch");}
   if (hash(source) === subcodeRegistryOriginal) {source = replace(source, subcodeRegistryUpdates); if (hash(source) !== subcodeRegistryPatched) throw Error("SCORM subcode registry checksum mismatch");}
   if (hash(source) === countryCharactersOriginal) {source = replace(source, countryCharactersUpdates); if (hash(source) !== countryCharactersPatched) throw Error("SCORM country characters checksum mismatch");}
+  if (hash(source) === legacySingletonOriginal) {source = replace(source, legacySingletonUpdates); if (hash(source) !== legacySingletonPatched) throw Error("SCORM legacy singleton checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === legacySingletonPatched) {source = replace(source, legacySingletonUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== legacySingletonOriginal) throw Error("SCORM legacy singleton reverse checksum mismatch");}
   if (hash(source) === countryCharactersPatched) {source = replace(source, countryCharactersUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== countryCharactersOriginal) throw Error("SCORM country characters reverse checksum mismatch");}
   if (hash(source) === subcodeRegistryPatched) {source = replace(source, subcodeRegistryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== subcodeRegistryOriginal) throw Error("SCORM subcode registry reverse checksum mismatch");}
   if (hash(source) === countryRegistryPatched) {source = replace(source, countryRegistryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== countryRegistryOriginal) throw Error("SCORM country registry reverse checksum mismatch");}

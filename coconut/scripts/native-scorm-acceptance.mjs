@@ -125,6 +125,8 @@ try {
   check('actual native mixed/digit first country refusal preserves exact language through retry/resume',digitCountry(first.probes[0])&&digitCountry(resumed.probes[1]));
   const registeredSubcode=probe=>probe.ianaSubcodes?.resumed===true&&probe.ianaSubcodes.accepted===709&&probe.ianaSubcodes.preserved===true&&JSON.stringify(probe.ianaSubcodes.codes)===JSON.stringify(Array(8).fill('406'));
   check('actual native IANA first-subcode membership preserves exact prior language through retry/resume',registeredSubcode(first.probes[0])&&registeredSubcode(resumed.probes[1]));
+  const singleton=probe=>probe.singletonLanguage?.resumed===true&&probe.singletonLanguage.preserved===true&&JSON.stringify(probe.singletonLanguage.codes)===JSON.stringify(Array(26).fill(edition==='2004-2'?'406':'0'));
+  check('actual native first one-letter legacy refusal retains contemporary/later language through retry/resume',singleton(first.probes[0])&&singleton(resumed.probes[1]));
   const result=probe=>probe.resultDecimal?.resumed===true&&probe.resultDecimal.preserved===true&&JSON.stringify(probe.resultDecimal.codes)===JSON.stringify(['406','406','406','406']);
   check('actual native long interaction result preserves exact text and atomic refusal through retry/resume',result(first.probes[0])&&result(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;

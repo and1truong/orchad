@@ -33,6 +33,10 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     const subcodeKey='cmi.comments_from_learner.2.comment',subcodeValue='{lang=en-SCOUSE}Original registered dialect text';
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(subcodeKey)!==subcodeValue)throw Error('registered subcode resume');
     if(api.SetValue(subcodeKey,subcodeValue)!=='true')throw Error('registered subcode write');
+    for(const field of [key,...localizedFields]){const original=api.GetValue(field);for(const char of 'abcdefghijklmnopqrstuvwxyz')for(const tag of ['en-'+char,'FRE-'+char.toUpperCase()+'-demo','qaa-'+char+'-more']){const value=field===key?tag:'{lang='+tag+'}Original singleton text',legacy='${edition}'==='2004-2';if(api.SetValue(field,value)!==(legacy?'false':'true')||api.GetLastError()!==(legacy?'406':'0')||api.GetValue(field)!==(legacy?original:value))throw Error('singleton edition binding '+field);}if(api.SetValue(field,original)!=='true'||api.GetValue(field)!==original)throw Error('singleton restoration '+field);}
+    const singletonKey='cmi.comments_from_learner.3.comment',singletonValue='${edition}'==='2004-2'?'{lang=en-US-a}Original later singleton text':'{lang=en-A}Original contemporary singleton text';
+    if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(singletonKey)!==singletonValue)throw Error('singleton resume');
+    if(api.SetValue(singletonKey,singletonValue)!=='true')throw Error('singleton write');
     document.getElementById('entry').textContent='Preference language preserved';}`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); f.enroll();
   const origin = 'http://127.0.0.1:4696', {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4697', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
@@ -60,6 +64,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
+    expect(stored.comments_from_learner['3'].comment).toBe(edition==='2004-2'?'{lang=en-US-a}Original later singleton text':'{lang=en-A}Original contemporary singleton text');
     expect(stored.comments_from_learner['2'].comment).toBe('{lang=en-SCOUSE}Original registered dialect text');
     expect(stored.comments_from_learner['1'].comment).toBe('{lang=FRE-su}Original historical country text');
     expect(stored.learner_preference.language).toBe(capacity); for(const value of [stored.comments_from_learner['0'].comment,stored.objectives['0'].description,stored.interactions['0'].description,stored.interactions['0'].learner_response,stored.interactions['0'].correct_responses['0'].pattern])expect(value).toBe('{lang=I-MINGO}Original historical IANA text'); expect(stored.completion_status).toBe('incomplete');
