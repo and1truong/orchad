@@ -50,6 +50,9 @@ const script = `
     if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native registered IANA language refused');
     const ianaCodes=['i-madeup','i-klignon','I-UNKNOWN','i'].map(tag=>{if(api.SetValue(ianaKey,'{lang='+tag+'}Rejected text')!=='false')throw Error('Native unknown IANA language admitted');return api.GetLastError();});
     evidence.ianaLanguage={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:ianaCodes};
+    if(api.SetValue(ianaKey,'{lang=en-US}Native country control')!=='true'||api.GetValue(ianaKey)!=='{lang=en-US}Native country control'||api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native country control refused');
+    const countryCodes=${JSON.stringify(JSON.parse(readFileSync(new URL('./scorm-language-registry.json',import.meta.url),'utf8')).userAssignedCountries)}.map(code=>{if(api.SetValue(ianaKey,'{lang=fre-'+code.toLowerCase()+'-demo}Rejected text')!=='false')throw Error('Native reserved country admitted');return api.GetLastError();});
+    evidence.reservedCountry={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:countryCodes};
     const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');

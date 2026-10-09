@@ -8,10 +8,11 @@ import {interopPackage} from '../scorm-interop-fixture.ts';
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': built preference language survive lost ACK and close/resume', async ({page}) => {
   const capacity = 'x' + '-abcdefgh'.repeat(27) + '-abcde';
   const script = `{const api=parent.API_1484_11,key='cmi.learner_preference.language',capacity=${JSON.stringify(capacity)},get=()=>api.GetValue(key),set=v=>api.SetValue(key,v),error=()=>api.GetLastError();
-    for(const value of ['vi-VN-x-demo','en-Latn-US','i-klingon','I-MINGO-x-demo','i-lux','eng','fre','fra','qaa','qtz','mol','scc','scr','jaw','VI-vn-X-DEMO',capacity]){
+    const reservedCountries=${JSON.stringify(JSON.parse(readFileSync(new URL('../../scripts/scorm-language-registry.json',import.meta.url),'utf8')).userAssignedCountries)};
+    for(const value of ['en-US-ZZ','x-ZZ','i-klingon-ZZ','SCC-us','vi-VN-x-demo','en-Latn-US','i-klingon','I-MINGO-x-demo','i-lux','eng','fre','fra','qaa','qtz','mol','scc','scr','jaw','VI-vn-X-DEMO',capacity]){
       if(set(value)!=='true'||get()!==value||error()!=='0')throw Error('valid language '+value);
     }
-    for(const bad of ['i-madeup','I-UNKNOWN','i-klignon','i','a','A','abcd','abcdefgh','abcd-US','zz','ZZ','zz-US','zzz','ZZZ-a','en--US','en-','1en-US','en-abcdefghi','en_US',capacity+'a']){
+    for(const bad of [...reservedCountries.map(code=>'en-'+code),'i-madeup','I-UNKNOWN','i-klignon','i','a','A','abcd','abcdefgh','abcd-US','zz','ZZ','zz-US','zzz','ZZZ-a','en--US','en-','1en-US','en-abcdefghi','en_US',capacity+'a']){
       if(set(bad)!=='false'||error()!=='406'||get()!==capacity||error()!=='0')throw Error('malformed language '+bad);
     }
     if(set('')!=='true'||get()!==''||error()!=='0'||set(capacity)!=='true')throw Error('clear language');
@@ -20,7 +21,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     if(api.GetValue('cmi.entry')==='resume')for(const field of localizedFields)if(api.GetValue(field)!=='{lang=I-MINGO}Original historical IANA text')throw Error('IANA resume '+field);
     for(const field of localizedFields){
       const good='{lang=scc}Original historical text';if(api.SetValue(field,good)!=='true'||api.GetValue(field)!==good)throw Error('localized language '+field);
-      for(const primary of ['i-madeup','I-UNKNOWN','i-klignon','i','zz','zzz','a','abcdefgh'])if(api.SetValue(field,'{lang='+primary+'}Rejected text')!=='false'||api.GetLastError()!=='406'||api.GetValue(field)!==good)throw Error('localized registry '+field);
+      for(const primary of [...reservedCountries.map(code=>'fre-'+code.toLowerCase()+'-demo'),'i-madeup','I-UNKNOWN','i-klignon','i','zz','zzz','a','abcdefgh'])if(api.SetValue(field,'{lang='+primary+'}Rejected text')!=='false'||api.GetLastError()!=='406'||api.GetValue(field)!==good)throw Error('localized registry '+field);
     }
     for(const field of localizedFields)if(api.SetValue(field,'{lang=I-MINGO}Original historical IANA text')!=='true')throw Error('registered IANA '+field);
     document.getElementById('entry').textContent='Preference language preserved';}`;
