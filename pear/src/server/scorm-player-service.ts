@@ -21,7 +21,7 @@ import {exposeDuration, pauseDuration} from '../shared/scorm-duration.ts';
 import {sharedDataClientSnapshot} from './scorm-shared-data.ts';
 import {scormRuntimeStorageBytes} from './scorm-storage.ts';
 import {SCORM_RUNTIME_LIMITS} from '../shared/scorm-operations.ts';
-import {loadResponseState, responseBindings as deriveResponseBindings, type ResponseBindings} from '../shared/scorm-response-bindings.ts';
+import {loadResponseState, type ResponseBindings} from '../shared/scorm-response-bindings.ts';
 
 // An acknowledged time-out/logout ends the attempt when the LMS removes the
 // SCO, even if content never reported Terminate. Keep its original receipt/CMI.
@@ -249,7 +249,7 @@ export class SCORMPlayerService {
       const manifest = this.manifest(c.registration.package_id, c.registration.version, c.p.tenant);
       const profile = launchProfile(manifest, c.launch.sco_id);
       if ((profile.resource.kind === 'asset') !== asset) reject('FORBIDDEN', 'Exact communicating SCO or noncommunicating asset action required');
-      const keys = asset ? ['sequence', 'revision', 'navigation'] : manifest.standard === '1.2' ? ['sequence', 'revision', 'state', 'finished'] : ['sequence', 'revision', 'state', 'finished', 'navigation', 'sharedData'];
+      const keys = asset ? ['sequence', 'revision', 'navigation'] : manifest.standard === '1.2' ? ['sequence', 'revision', 'state', 'finished'] : ['sequence', 'revision', 'state', 'finished', 'navigation', 'sharedData', 'interactionWrites'];
       if (!a || Object.keys(a).some(k => !keys.includes(k)) || !Number.isSafeInteger(a.sequence) || a.sequence < 1 || !Number.isSafeInteger(a.revision) || a.revision < 0 || !asset && typeof a.finished !== 'boolean') reject('INVALID_ARGUMENT', 'Exact checkpoint sequence and revision required');
       const payloadHash = tokenHash(JSON.stringify(a)), old = this.db.prepare('SELECT * FROM scorm_engine_checkpoints WHERE launch_id=? AND sequence=?').get(c.launch.id, a.sequence) as any;
       if (old) {if (old.payload_hash !== payloadHash) reject('IDEMPOTENCY_CONFLICT', 'Checkpoint sequence payload changed'); return JSON.parse(old.result);}
@@ -261,12 +261,13 @@ export class SCORMPlayerService {
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
       if (manifest.standard !== '1.2' && a.navigation !== undefined && typeof a.navigation !== 'string') reject('INVALID_ARGUMENT', 'Exact navigation request required');
       if (a.sharedData !== undefined && manifest.standard !== '2004-4') reject('INVALID_ARGUMENT', 'Shared data requires fourth edition');
-      if (a.sharedData !== undefined && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData})) > scorm2004CheckpointBytes) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
+      if (manifest.standard !== '1.2' && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData, interactionWrites: a.interactionWrites})) > scorm2004CheckpointBytes) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
       const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
       if (engine && deliveredSCO(engine, manifest)?.activity.id !== c.launch.sco_id) reject('STALE_CONTEXT', 'Sequencing has delivered a different SCO');
       if (engine) {loadSystemData(this.db, c.registration, manifest, engine); loadSystemObjectives(this.db, c.registration, manifest, engine);}
       const objectivesBefore = engine ? objectiveSnapshot(engine) : {};
-      const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation, engine, a.sharedData, this.responseBindings(c.sco));
+      let validatedBindings: ResponseBindings = {};
+      const state = manifest.standard === '1.2' ? validateSCORM12Checkpoint(a.state, this.seed(c), a.finished) : validateSCORM2004Checkpoint(a.state, this.seed(c), manifest.standard, a.finished, a.navigation, engine, a.sharedData, this.responseBindings(c.sco), a.interactionWrites, bindings=>{validatedBindings=bindings;});
       saveSystemData(this.db, c.registration, manifest, c.launch.sco_id, a.sharedData);
       if (engine) saveSystemObjectives(this.db, c.registration, manifest, engine, objectivesBefore);
       const seconds = manifest.standard === '1.2' ? scormSeconds(state.core.session_time) : scorm2004Seconds(state.session_time);
@@ -291,7 +292,7 @@ export class SCORMPlayerService {
       // attempt. The old communication session is finished; the shell must
       // close its capability and launch the newly delivered attempt as usual.
       const newSameSCOAttempt = delivered?.isActive && delivered.attemptCount > c.launch.sco_attempt_number;
-      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine || asset ? {nextScoId: nextScoId !== c.launch.sco_id || newSameSCOAttempt ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_', responseBindings: deriveResponseBindings(state, this.seed(c), this.responseBindings(c.sco))} : {})};
+      const result = {launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished, officialLearningChanged, ...(engine || asset ? {nextScoId: nextScoId !== c.launch.sco_id || newSameSCOAttempt ? nextScoId : null} : {}), ...(manifest.standard !== '1.2' ? {navigation: a.navigation ?? '_none_', responseBindings: validatedBindings} : {})};
       this.db.prepare('INSERT INTO scorm_engine_checkpoints VALUES(?,?,?,?)').run(c.launch.id, a.sequence, payloadHash, JSON.stringify(result));
       if (a.sequence > this.limits.maxCheckpointReceiptsPerLaunch || scormRuntimeStorageBytes(this.db, c.p.tenant) > this.limits.maxRuntimeStorageBytesPerTenant) reject('INVALID_ARGUMENT', 'SCORM runtime storage quota reached; contact a content administrator');
       this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(c.p.tenant, c.p.id, 'learning:' + c.p.tenant + ':' + c.p.id, 'runtime_scorm_engine_checkpoint', JSON.stringify({launchId: c.launch.id, sequence: a.sequence, revision, finished: a.finished}), now);

@@ -288,3 +288,14 @@ new-head CI/review and actual native3OS2004=18 remain required. Parent222 owner
 P1 e2b focused13/lifecycle8/build/fresh828 and changed interop5 pass; full166
 162PASS/4FAIL remains retained and current CI has not yet appeared. First-checkpoint type provenance and full matrices
 remain OPEN; historic failures retained in ADR-148–149, production DISABLED.
+
+ADR-150: original first-checkpoint provenance3FAIL→focused10/typecheck/build/
+built19 PASS exit0. Ordered typed journal is replayed/matched server-side; no
+client-asserted origin bindings. New response3, accepted binding3, bounded guard3,
+Close refusal6 and supplementary native fixture4 pass. First full835832PASS/
+3FAIL EADDRINUSE from overlapping lifecycle/browser fixtures is retained; fresh
+full835/124files then expanded838/124files complete PASS/exit0 after browser
+completion; all original failures remain retained. Full172 is running. Full172/current-head CI/review and native
+threeOS2004=19 required. Parent223 all10 jobs/logs verified832/234dev/234built/SidePanel4 and
+actual3OS2004=18 clean5/ACK5, READY; full169165PASS/4FAIL retained. Parent222 e2b missing current CI even after
+one close/reopen event replay; stays Draft. Epic133 OPEN, production DISABLED.

@@ -1,6 +1,7 @@
 import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
 import {loadResponseState, responseBindings, responseStateMatches, setRuntimeResponseBindings, type ResponseBindings} from './scorm-response-bindings.ts';
+import {canonicalInteractionPath, interactionWritePath, interactionResponsePath, interactionTypePath, interactionWriteLimit, type InteractionWrite} from './scorm-interaction-writes.ts';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
 import {scormModelPath, scormSupportCode, type SCORMStandard} from './scorm-engine.ts';
 
@@ -43,7 +44,7 @@ export function scorm2004FieldError(edition: SCORM2004Edition, key: string, valu
 }
 
 /** Exactly the eight IEEE synchronous methods; engine helpers never reach the SCO. */
-export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; responseBindings?: ResponseBindings; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string, sharedData?: Record<string, string>) => unknown}) {
+export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; responseBindings?: ResponseBindings; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string, sharedData?: Record<string, string>, interactionWrites?: InteractionWrite[]) => unknown}) {
   const runtime = options.sequencingTree ? sequencingRuntime(options.sequencingTree, options.sequencingSnapshot) : new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   if (options.state) loadResponseState(runtime, options.state, options.responseBindings);
   let sharedWrites: Record<string, string> = Object.create(null);
@@ -51,10 +52,16 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
   const bad = (code: string) => {error = code; return 'false';};
   const inactive = (before: string, after: string) => !initialized ? before : finished ? after : null;
   let queuedState = structuredClone(options.state ?? runtime.renderCMIToJSONObject().cmi) as Record<string, any>, queuedBindings = options.responseBindings ?? {};
-  let acceptedSnapshot: {state: Record<string, any>; bindings: ResponseBindings} | undefined;
-  const currentBindings = () => responseBindings(runtime.renderCMIToJSONObject().cmi as Record<string, any>, queuedState, queuedBindings);
-  const snapshot = () => {const state = runtime.renderCMIToJSONObject().cmi as Record<string, any>, bindings = currentBindings(); scorm2004Reloadable(state, bindings); acceptedSnapshot = {state: structuredClone(state), bindings}; return state;};
-  const accept = () => {if (acceptedSnapshot) {queuedState = acceptedSnapshot.state; queuedBindings = acceptedSnapshot.bindings; setRuntimeResponseBindings(runtime, queuedBindings);} acceptedSnapshot = undefined;};
+  let acceptedSnapshot: {state: Record<string, any>; bindings: ResponseBindings; writes?: InteractionWrite[]} | undefined;
+  let interactionWrites: InteractionWrite[] = [], writtenOrigins: ResponseBindings = {}, journalBytes = 2, journalOverflow = false;
+  const currentBindings = () => responseBindings(runtime.renderCMIToJSONObject().cmi as Record<string, any>, queuedState, queuedBindings, writtenOrigins);
+  const snapshot = () => {
+    const state = runtime.renderCMIToJSONObject().cmi as Record<string, any>, bindings = currentBindings(), previous = responseBindings(state, queuedState, queuedBindings);
+    const needsWrites = Object.entries(bindings).some(([path,type])=>previous[path]!==type);
+    if (needsWrites && journalOverflow) throw Error('Interaction write journal quota exceeded');
+    scorm2004Reloadable(state, bindings); acceptedSnapshot = {state: structuredClone(state), bindings, ...(needsWrites ? {writes: interactionWrites.map(([key,value])=>[key,value])} : {})}; return state;
+  };
+  const accept = () => {if (acceptedSnapshot) {queuedState = acceptedSnapshot.state; queuedBindings = acceptedSnapshot.bindings; setRuntimeResponseBindings(runtime, queuedBindings); interactionWrites = []; writtenOrigins = {}; journalBytes = 2; journalOverflow = false;} acceptedSnapshot = undefined;};
   return Object.freeze({
     Initialize(argument: string) {
       if (finished) return bad('104');
@@ -90,6 +97,12 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       if (shared?.[2] === 'store' && runtime.getSequencingState()?.currentActivity?.sharedDataMaps[Number(shared[1])]?.writeSharedData === false) return bad('404');
       if (fieldError) return bad(fieldError);
       error = null; const result = runtime.SetValue(key, scorm2004EngineValue(key, value));
+      const interactionKey = canonicalInteractionPath(key);
+      if (result === 'true' && interactionWritePath.test(interactionKey)) {
+        if (interactionResponsePath.test(interactionKey)) writtenOrigins[interactionKey] = runtime.GetValue(interactionTypePath(interactionKey));
+        // ponytail: bounded4096-write/2MiB journal; compact validated histories if larger workloads require it.
+        if (!journalOverflow) {const entry: InteractionWrite = [interactionKey,value], bytes = new TextEncoder().encode(JSON.stringify(entry)).byteLength + 1; if (interactionWrites.length >= interactionWriteLimit || journalBytes + bytes > scorm2004CheckpointBytes) journalOverflow = true; else {interactionWrites.push(entry); journalBytes += bytes;}}
+      }
       if (result === 'true' && key === 'adl.nav.request') navigation = value;
       if (result === 'true' && shared?.[2] === 'store') sharedWrites[runtime.GetValue(`adl.data.${Number(shared[1])}.id`)] = value;
       return result;
@@ -98,7 +111,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const code = inactive('142', '143'); if (code) return bad(code);
       if (argument !== '') return bad('201');
       error = null; const result = runtime.Commit(argument);
-      try {if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');}
+      try {if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}, acceptedSnapshot?.writes) === false) return bad('391');}
       catch {return bad('391');}
       if (result === 'true') {sharedWrites = Object.create(null); accept();}
       return result;
@@ -110,7 +123,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       setRuntimeResponseBindings(runtime, currentBindings());
       try {if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');} catch {return bad('111');}
       // Queue acceptance precedes termination so an unavailable durable queue is retryable.
-      try {if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');}
+      try {if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}, acceptedSnapshot?.writes) === false) return bad('111');}
       catch {return bad('111');}
       accept(); const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },

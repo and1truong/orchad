@@ -2,6 +2,7 @@ import {scormCharacters, scorm2004Writable as writable} from '../shared/scorm-ch
 import Scorm2004API from 'scorm-again/scorm2004';
 import {loadResponseState, responseBindings, setRuntimeResponseBindings, type ResponseBindings} from '../shared/scorm-response-bindings.ts';
 import {scorm2004CheckpointBytes, scorm2004FieldError, scorm2004EngineValue, scorm2004ExitRequests, scorm2004Reloadable, type SCORM2004Edition} from '../shared/scorm2004-runtime.ts';
+import {replayInteractionWrites} from '../shared/scorm-interaction-writes.ts';
 import {validNavigation} from '../shared/scorm-sequencing-runtime.ts';
 import {applySharedDataWrites} from './scorm-shared-data.ts';
 import {reject} from './errors.ts';
@@ -24,7 +25,7 @@ function leaves(input: unknown, prefix = 'cmi', out: Record<string, string> = {}
   return out;
 }
 /** Replay writable strings through the engine; compare LMS-owned fields to trusted seed. */
-export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string, any>, edition: SCORM2004Edition, finished: boolean, navigation = '_none_', trustedRuntime?: Scorm2004API, sharedData?: unknown, bindings: ResponseBindings = {}): Record<string, any> {
+export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string, any>, edition: SCORM2004Edition, finished: boolean, navigation = '_none_', trustedRuntime?: Scorm2004API, sharedData?: unknown, bindings: ResponseBindings = {}, interactionWrites?: unknown, acceptedBindings?: (bindings: ResponseBindings)=>void): Record<string, any> {
   if (Buffer.byteLength(JSON.stringify(input) ?? '') > scorm2004CheckpointBytes || !trustedRuntime && !scorm2004ExitRequests.includes(navigation)) reject('INVALID_ARGUMENT', 'SCORM 2004 checkpoint or navigation quota/profile rejected');
   const incoming = leaves(input), runtime = trustedRuntime ?? new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   loadResponseState(runtime, seed, bindings);
@@ -32,6 +33,8 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
   runtime.Initialize('');
   // Initialize seeds local objectives from the trusted manifest/snapshot. Their
   // default unknown values are not content writes that may override top-level CMI.
+  let writtenOrigins: ResponseBindings = {};
+  if (interactionWrites !== undefined) {try {writtenOrigins = replayInteractionWrites(runtime, interactionWrites, incoming);} catch {reject('INVALID_ARGUMENT', 'SCORM interaction write journal rejected');}}
   const baseline = leaves(runtime.renderCMIToJSONObject().cmi);
   if (sharedData !== undefined) {if (edition !== '2004-4' || !trustedRuntime) reject('INVALID_ARGUMENT', 'Trusted fourth-edition shared data required'); applySharedDataWrites(runtime, sharedData);}
   const priority = (key: string) => key.endsWith('.id') ? 0 : key.endsWith('.type') ? 1 : 2;
@@ -45,7 +48,7 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
     if (scorm2004FieldError(edition, key, value)) reject('INVALID_ARGUMENT', 'Invalid SCORM 2004 data model field: ' + key);
     if (runtime.SetValue(key, scorm2004EngineValue(key, value)) !== 'true') reject('INVALID_ARGUMENT', 'SCORM 2004 data model rejected checkpoint: ' + key);
   }
-  const preservedBindings = responseBindings(runtime.renderCMIToJSONObject().cmi as Record<string, any>, seed, bindings);
+  const preservedBindings = responseBindings(runtime.renderCMIToJSONObject().cmi as Record<string, any>, seed, bindings, writtenOrigins);
   setRuntimeResponseBindings(runtime, preservedBindings);
   try {scorm2004Reloadable(runtime.renderCMIToJSONObject().cmi as Record<string, any>, preservedBindings);}
   catch {reject('INVALID_ARGUMENT', 'SCORM 2004 checkpoint cannot be reloaded');}
@@ -55,11 +58,11 @@ export function validateSCORM2004Checkpoint(input: unknown, seed: Record<string,
     // Commit normalizes threshold/score without processing navigation. Preserve this SCO's
     // CMI before Terminate delivers another SCO and replaces LMS-owned launch fields.
     if (runtime.Commit('') !== 'true') reject('INVALID_ARGUMENT', 'SCORM engine rejected Commit');
-    const state = finished ? validateSCORM2004Checkpoint(runtime.renderCMIToJSONObject().cmi, seed, edition, true, '_none_', undefined, undefined, bindings) : runtime.renderCMIToJSONObject().cmi as Record<string, any>;
+    const state = finished ? validateSCORM2004Checkpoint(runtime.renderCMIToJSONObject().cmi, seed, edition, true, '_none_', undefined, undefined, bindings, interactionWrites) : runtime.renderCMIToJSONObject().cmi as Record<string, any>;
     if (finished) for (const key of ['completion_status', 'success_status']) if (state[key] !== (runtime.renderCMIToJSONObject().cmi as any)[key] && runtime.SetValue('cmi.' + key, state[key]) !== 'true') reject('INVALID_ARGUMENT', 'Engine-derived status rejected');
     if (finished && runtime.Terminate('') !== 'true') reject('INVALID_ARGUMENT', 'SCORM engine rejected Terminate');
-    return state;
+    acceptedBindings?.(preservedBindings); return state;
   }
   if (finished && runtime.Terminate('') !== 'true') reject('INVALID_ARGUMENT', 'SCORM engine rejected Terminate');
-  return runtime.renderCMIToJSONObject().cmi as Record<string, any>;
+  acceptedBindings?.(preservedBindings); return runtime.renderCMIToJSONObject().cmi as Record<string, any>;
 }

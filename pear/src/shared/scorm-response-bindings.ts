@@ -13,12 +13,12 @@ function responses(state:Record<string,any>){
   }
   return values;
 }
-/** ponytail: only prior accepted responses; ordered validated writes are needed for first-checkpoint type changes. */
-export function responseBindings(state:Record<string,any>,previous:Record<string,any>,prior:ResponseBindings={}):ResponseBindings{
+/** Origins are derived from successful ordered engine writes, never asserted client metadata. */
+export function responseBindings(state:Record<string,any>,previous:Record<string,any>,prior:ResponseBindings={},origins:ResponseBindings={}):ResponseBindings{
   const old=responses(previous);
   return Object.fromEntries(Object.entries(responses(state)).flatMap(([path,v])=>{
-    const origin=prior[path]??old[path]?.type;
-    return old[path]?.value===v.value&&origin&&origin!==v.type?[[path,origin]]:[];
+    const origin=origins[path]??(old[path]?.value===v.value?prior[path]??old[path]?.type:undefined);
+    return origin&&origin!==v.type?[[path,origin]]:[];
   }));
 }
 export function runtimeResponseBindings(runtime:Scorm2004API){return {...snapshots.get(runtime)};}

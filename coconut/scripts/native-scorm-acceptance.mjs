@@ -101,6 +101,8 @@ try {
   check('actual native unreloadable checkpoint refusal preserves responses and permits recovery before retry/resume',reloadable(first.probes[0])&&reloadable(resumed.probes[1]));
   await waitFor(async()=>{const value=await state();return value.responseBindingCheckpoints>0?value:false;},30000);
   check('actual native prior accepted response binding persists a legal type change after durable resume',resumed.probes[1].responseBindingCheckpoint?.committed===true&&resumed.probes[1].responseBindingCheckpoint.preserved===true);
+  await waitFor(async()=>{const value=await state();return value.responseWriteCheckpoints>0?value:false;},30000);
+  check('actual native first-checkpoint typed response provenance is accepted and survives exact retry/resume',first.probes[0].responseWriteCheckpoint?.committed===true&&first.probes[0].responseWriteCheckpoint.preserved===true&&resumed.probes[1].responseWriteCheckpoint?.resumed===true);
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
   check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
  }
