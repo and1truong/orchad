@@ -10,3 +10,5 @@ export const languageRegistryUpdates: [string, string][];
 export const ianaLanguageUpdates: [string, string][];
 
 export const reservedCountryUpdates: [string, string][];
+
+export const countryRegistryUpdates: [string, string][];
