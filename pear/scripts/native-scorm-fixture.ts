@@ -83,11 +83,11 @@ const script = `
   }},200);
 })();`;
 const standard = edition as '1.2' | '2004-2' | '2004-3' | '2004-4';
-// Exercise XML boolean whitespace in the actual native import/recovery journey.
+// Exercise XML boolean and integer lexical bindings in the actual native journey.
 const manifest = standard === '1.2' ? singleSCOManifest(standard) : singleSCOManifest(standard)
   .replace('<p:manifest ', '<p:manifest xmlns:s="http://www.imsglobal.org/xsd/imsss" ')
   .replace('identifier="intro"', 'identifier="intro" isvisible=" &#x9;1&#xA; "')
-  .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/></s:sequencing>');
+  .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/><s:limitConditions attemptLimit=" &#x9;+0003&#xA; "/></s:sequencing>');
 const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, manifest)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
 // Synthetic diagnostics record route classes/status, never launch capabilities.
