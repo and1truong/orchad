@@ -26,6 +26,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives', 'redirectDenied']) expect(resumed.probes[1][key], key).toBe(true);
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.interactionReadErrors).toEqual(['type','timestamp','weighting','result','latency'].map(field=>({field,absentCode:'301',unsetCode:'403'})));
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.collectionReadErrors).toEqual(absentCollectionPaths.map(path=>({path,code:'301'})));
+    if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.sequencingResponses).toEqual({count:'5',codes:['351','351','351'],preserved:true});
     expect(resumed.calls).toEqual([]); expect(resumed.pearCanaryCalls).toEqual([]);
     await command('finish'); await expect.poll(async () => (await state()).proofs).toBe(1);
     const finished = await state(); expect(finished.certificates).toBe(0); expect(finished.calls).toEqual([]); expect(finished.edition).toBe(edition);

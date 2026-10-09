@@ -95,6 +95,8 @@ try {
   const paths=['cmi.objectives.0.id','cmi.objectives.0.success_status','cmi.objectives.0.completion_status','cmi.objectives.0.progress_measure','cmi.objectives.0.description','cmi.objectives.0.score.scaled','cmi.objectives.0.score.raw','cmi.objectives.0.score.min','cmi.objectives.0.score.max','cmi.interactions.2.id','cmi.interactions.2.learner_response','cmi.interactions.0.objectives.0.id','cmi.interactions.0.correct_responses.0.pattern'];
   const collections=probe=>Array.isArray(probe.collectionReadErrors)&&probe.collectionReadErrors.length===paths.length&&probe.collectionReadErrors.every((value,index)=>value.path===paths[index]&&value.code==='301');
   check('actual native absent collection301 and unset interaction403 survive durable retry/resume',reads(first.probes[0])&&reads(resumed.probes[1])&&collections(first.probes[0])&&collections(resumed.probes[1]));
+  const ordered=probe=>probe.sequencingResponses?.count==='5'&&probe.sequencingResponses.preserved===true&&Array.isArray(probe.sequencingResponses.codes)&&probe.sequencingResponses.codes.length===3&&probe.sequencingResponses.codes.every(code=>code==='351');
+  check('actual native ordered response uniqueness and zero-member record survive durable retry/resume',ordered(first.probes[0])&&ordered(resumed.probes[1]));
  }
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);

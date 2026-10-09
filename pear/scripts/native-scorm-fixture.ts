@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import {createApp} from '../src/server/app.ts';
 import {scormLearningFixture} from '../tests/scorm-learning-fixture.ts';
 import {interopPackage} from '../tests/scorm-interop-fixture.ts';
+import {sequencingResponsePatterns} from '../tests/scorm-sequencing-response-vectors.ts';
 import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
 if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsupported native SCORM edition');
@@ -20,9 +21,14 @@ const script = `
     const api=parent.API_1484_11;if(api.SetValue('cmi.interactions.0.id','urn:pear:native-read-errors')!=='true')throw Error('Native interaction ID refused');
     evidence.collectionReadErrors=${JSON.stringify(absentCollectionPaths)}.map(path=>{if(api.GetValue(path)!=='')throw Error('Absent collection value');return {path,code:api.GetLastError()};});
     evidence.interactionReadErrors=['type','timestamp','weighting','result','latency'].map(field=>{
-      if(api.GetValue('cmi.interactions.1.'+field)!=='')throw Error('Absent interaction value');const absentCode=api.GetLastError();
+      if(api.GetValue('cmi.interactions.2.'+field)!=='')throw Error('Absent interaction value');const absentCode=api.GetLastError();
       if(api.GetValue('cmi.interactions.0.'+field)!=='')throw Error('Unset interaction value');return {field,absentCode,unsetCode:api.GetLastError()};
     });
+    const patterns=${JSON.stringify(sequencingResponsePatterns)},base='cmi.interactions.1';
+    if(evidence.entry!=='resume'){if(api.SetValue(base+'.id','urn:pear:native-ordered')!=='true'||api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native ordered dependency');for(const [n,p] of patterns.entries())if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='true')throw Error('Native ordered pattern');}
+    const codes=[[1,patterns[0]],[patterns.length,patterns[0]],[patterns.length,'']].map(([n,p])=>{if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='false')throw Error('Native duplicate admitted');return api.GetLastError();});
+    const preserved=patterns.every((p,n)=>api.GetValue(base+'.correct_responses.'+n+'.pattern')===p&&api.GetLastError()==='0');
+    evidence.sequencingResponses={count:api.GetValue(base+'.correct_responses._count'),codes,preserved};
   }
   const top=parent.parent;
   for(const [key,read] of Object.entries({pearCookieDenied:()=>top.document.cookie,pearStorageDenied:()=>top.localStorage.length,pearBridgeDenied:()=>top.agentBridgeV1,pearNativeDenied:()=>top.__TAURI_INTERNALS__}))try{read();}catch{evidence[key]=true;}

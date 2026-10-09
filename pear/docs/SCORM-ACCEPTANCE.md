@@ -230,3 +230,13 @@ built12 pass exit0 (errors3, URI3, learning2, supplementary fixture4). Actual
 three-OS named301/403 and current-head CI/reviews plus full148 local remain
 required. Parent316 native ACK/clean shutdown now verified on all three OS; its
 Pear job is pending. Historical failures/managed policies remain retained.
+
+ADR-146 v38: original9FAIL on v37; shared ordered-array duplicate351 and valid
+zero-member pattern. Focused35/build/typecheck/built7 complete exit0. Fresh full
+domain822/822 across120 files completes exit0; full151 browser and current-head
+CI/review remain required. New native named
+ordered checks require actual three-OS logs; supplementary Chromium is not
+native evidence. Parent21968/run37873160107 all10 jobs/logs verified, Pear813/
+213dev/213built/SidePanel4 and native3OS16/13/1.2=13/2004=14/five clean ACK+exit0
+records each. Parent full148=142PASS/6FAIL exit1 and unchanged diagnostic18PASS
+remain recorded with unattributed driver failures; no clean full local claim.

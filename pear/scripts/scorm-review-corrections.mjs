@@ -366,6 +366,30 @@ const interactionReadUpdates = [
     "/^cmi\\.(?:comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location|timestamp)|objectives\\.\\d+\\.(?:id|success_status|completion_status|progress_measure|description|score\\.(?:scaled|raw|min|max))|interactions\\.\\d+\\.(?:id|type|timestamp|weighting|learner_response|result|latency|description|objectives\\.\\d+\\.id|correct_responses\\.\\d+\\.pattern))$/.test(CMIElement) ?"
   ]
 ];
+const sequencingResponseOriginal = "3d677e8ee9457aa0ca29a68ada989301493de6965c3cc2e51431b0198b2f10aa";
+const sequencingResponsePatched = "5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276";
+const sequencingResponseUpdates = [
+  [
+    "    if (interaction.type !== \"choice\") return false;",
+    "    if (![\"choice\", \"sequencing\"].includes(interaction.type)) return false;"
+  ],
+  [
+    "    if (selected.size !== nodes.length) return false; // The typed setter reports duplicate members as 406.",
+    "    if (interaction.type === \"choice\" && selected.size !== nodes.length) return false; // Choice member duplicates are 406; sequencing permits repeats."
+  ],
+  [
+    "previous.every((identifier) => selected.has(identifier))",
+    "previous.every((identifier, index) => interaction.type === \"sequencing\" ? identifier === nodes[index] : selected.has(identifier))"
+  ],
+  [
+    "if ([\"fill-in\", \"choice\"].includes(this._interactionType) && pattern === \"\")",
+    "if ([\"fill-in\", \"choice\", \"sequencing\"].includes(this._interactionType) && pattern === \"\")"
+  ],
+  [
+    "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n",
+    "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n    if (interaction_type === \"sequencing\" && value === \"\") return; // RTE4.2.9.1: zero-member ordered array.\n"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -464,9 +488,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, interactionReadUpdates);
     if (hash(source) !== interactionReadPatched) throw Error("SCORM interaction read checksum mismatch");
   }
+  if (hash(source) === sequencingResponseOriginal) {
+    source = replace(source, sequencingResponseUpdates);
+    if (hash(source) !== sequencingResponsePatched) throw Error("SCORM sequencing response checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === sequencingResponsePatched) {
+    source = replace(source, sequencingResponseUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== sequencingResponseOriginal) throw Error("SCORM sequencing response reverse checksum mismatch");
+  }
   if (hash(source) === interactionReadPatched) {
     source = replace(source, interactionReadUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== interactionReadOriginal) throw Error("SCORM interaction read reverse checksum mismatch");
