@@ -2279,4 +2279,12 @@ unchanged affected-job recheck requested after workflow completed, pending.
 No deadline weakening. Full-response/SPM/API/URI/time/sequencing/egress/
 recovery/operations/main/production matrices OPEN. Licenses/authorized exports/
 Rustici account/actual Safari+Android/reviewed production inputs BLOCKED.
+
+## ADR-183 native Linux job groups
+
+See ADR-183-native-acceptance-groups.md: original Linux cancellations and
+Windows failure retained; baseline/collections both required at25 minutes,
+unchanged native/cleanup predicates and default all for Windows/macOS.
+Original orchestration0PASS1FAIL/exit1; corrected1PASS/exit0, syntax/YAML
+verified. Own exact-head eleven-job actual native CI/full logs/reviews pending.
 Epic OPEN; production DISABLED.
