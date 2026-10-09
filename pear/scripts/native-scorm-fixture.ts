@@ -33,6 +33,11 @@ const script = `
     evidence.decimalCapacity={resumed:decimalResumed,preserved:Object.entries(decimals).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0'),codes:decimalCodes};
     const patterns=${JSON.stringify(sequencingResponsePatterns)},base='cmi.interactions.1';
     if(evidence.entry!=='resume'){if(api.SetValue(base+'.id','urn:pear:native-ordered')!=='true'||api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native ordered dependency');for(const [n,p] of patterns.entries())for(let write=0;write<(n===0?5000:1);write++)if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='true')throw Error('Native ordered pattern');}
+    const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
+    const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
+    if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');
+    const resultCodes=[result+'\\n','0.'+'1'.repeat(4095),'9'.repeat(309),'Correct'].map(value=>{if(api.SetValue(resultKey,value)!=='false')throw Error('Native invalid result admitted');return api.GetLastError();});
+    evidence.resultDecimal={resumed:resultResumed,preserved:api.GetValue(resultKey)===result&&api.GetLastError()==='0',codes:resultCodes};
     const uriIDs='${edition}'==='2004-2'?['custom://registry:alpha@name:part/a','custom:opaque?part']:['http://[2001:DB8::1]:999999/answer?x=1#part','custom://[v1.future:host]/answer'];
     const uriResumed=evidence.entry!=='resume'||uriIDs.every((id,n)=>api.GetValue(base+'.objectives.'+n+'.id')===id&&api.GetLastError()==='0');
     for(const [n,id] of uriIDs.entries())if(api.SetValue(base+'.objectives.'+n+'.id',id)!=='true')throw Error('Native URI authority rejected');

@@ -458,6 +458,11 @@ export const decimalUpdates = [
     "    check2004ValidRange(this._cmi_element + \".completion_threshold\", completion_threshold, \"0#1\");"
   ]
 ];
+const resultDecimalOriginal = "6d9a5a3b33f911fcc447c8edf475022e22b07bb34166122e376d1b1ff32df086";
+const resultDecimalPatched = "0447a677c989ac331f2e883c3e450a04c9366dcf3b5e4b06c5cbb0d5fdb1a62b";
+export const resultDecimalUpdates = [
+  ["  CMIResult: \"^(correct|incorrect|unanticipated|neutral|-?([0-9]+)(\\\\.[0-9]{1,18})?)(?![\\\\s\\\\S])\",", "  CMIResult: \"^(correct|incorrect|unanticipated|neutral|-?([0-9]+)(\\\\.[0-9]+)?)(?![\\\\s\\\\S])\","]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -563,9 +568,11 @@ export function reviewedSCORMSource(source) {
   if (hash(source) === responseBindingOriginal) {source = replace(source, responseBindingUpdates); if (hash(source) !== responseBindingPatched) throw Error("SCORM response binding checksum mismatch");}
   if (hash(source) === uriAuthorityOriginal) {source = replace(source, uriAuthorityUpdates); if (hash(source) !== uriAuthorityPatched) throw Error("SCORM URI authority checksum mismatch");}
   if (hash(source) === decimalOriginal) {source = replace(source, decimalUpdates); if (hash(source) !== decimalPatched) throw Error("SCORM decimal checksum mismatch");}
+  if (hash(source) === resultDecimalOriginal) {source = replace(source, resultDecimalUpdates); if (hash(source) !== resultDecimalPatched) throw Error("SCORM result decimal checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === resultDecimalPatched) {source = replace(source, resultDecimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== resultDecimalOriginal) throw Error("SCORM result decimal reverse checksum mismatch");}
   if (hash(source) === decimalPatched) {source = replace(source, decimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== decimalOriginal) throw Error("SCORM decimal reverse checksum mismatch");}
   if (hash(source) === uriAuthorityPatched) {source = replace(source, uriAuthorityUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== uriAuthorityOriginal) throw Error("SCORM URI authority reverse checksum mismatch");}
   if (hash(source) === responseBindingPatched) {source = replace(source, responseBindingUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== responseBindingOriginal) throw Error("SCORM response binding reverse checksum mismatch");}

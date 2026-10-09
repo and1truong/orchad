@@ -109,6 +109,8 @@ try {
   check('actual native consecutive learner and pattern response histories compact without losing original types',first.probes[0].responseHistory?.writes===10000&&first.probes[0].responseHistory.preserved===true&&resumed.largestInteractionJournal<=12);
   const decimal=probe=>probe.decimalCapacity?.resumed===true&&probe.decimalCapacity.preserved===true&&JSON.stringify(probe.decimalCapacity.codes)===JSON.stringify(['406','406','407','407']);
   check('actual native long decimal capacity and exact range refusal preserve authored values through retry/resume',decimal(first.probes[0])&&decimal(resumed.probes[1]));
+  const result=probe=>probe.resultDecimal?.resumed===true&&probe.resultDecimal.preserved===true&&JSON.stringify(probe.resultDecimal.codes)===JSON.stringify(['406','406','406','406']);
+  check('actual native long interaction result preserves exact text and atomic refusal through retry/resume',result(first.probes[0])&&result(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
   check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
  }
