@@ -26,7 +26,7 @@ function number(el: Element, name: string, min: number, max: number, integral = 
 // Delivery windows require an explicit timezone so every host enforces the
 // same instant. Validate Gregorian dates before Date can normalize them.
 function calendarLimit(el: Element, name: string) {
-  const value = el.getAttribute(name); if (value === null) return undefined;
+  const value = xmlAtomicToken(el.getAttribute(name)); if (value === null) return undefined;
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
   if (!m) fail();
   const [year, month, day, hour, minute, second] = m!.slice(1, 7).map(Number);
@@ -211,7 +211,7 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
       }
       case 'limitConditions': {
         attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000, true); if (limit !== undefined) out.attemptLimit = limit;
-        for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(n.getAttribute(key)!) + 'S';} catch {fail();}}
+        for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(xmlAtomicToken(n.getAttribute(key))!) + 'S';} catch {fail();}}
         const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');
         if (begin !== undefined) out.beginTimeLimit = begin; if (end !== undefined) out.endTimeLimit = end;
         if (begin !== undefined && end !== undefined && Date.parse(begin) > Date.parse(end)) fail();
