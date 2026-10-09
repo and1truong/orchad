@@ -107,6 +107,8 @@ try {
   check('actual native edition URI authority binding preserves identifiers and atomic refusal through durable resume',uri(first.probes[0])&&uri(resumed.probes[1]));
   check('actual native 5000 consecutive legal type writes compact before first durable save and preserve responses',first.probes[0].typeHistory?.writes===5000&&first.probes[0].typeHistory.preserved===true&&resumed.largestInteractionJournal>0&&resumed.largestInteractionJournal<=12);
   check('actual native consecutive learner and pattern response histories compact without losing original types',first.probes[0].responseHistory?.writes===10000&&first.probes[0].responseHistory.preserved===true&&resumed.largestInteractionJournal<=12);
+  const decimal=probe=>probe.decimalCapacity?.resumed===true&&probe.decimalCapacity.preserved===true&&JSON.stringify(probe.decimalCapacity.codes)===JSON.stringify(['406','406','407','407']);
+  check('actual native long decimal capacity and exact range refusal preserve authored values through retry/resume',decimal(first.probes[0])&&decimal(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
   check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
  }
