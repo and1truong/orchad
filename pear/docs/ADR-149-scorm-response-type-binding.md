@@ -55,7 +55,10 @@ expanded empty restoration lost initialized-presence flags (23PASS/3FAIL and
 presence corrected these; final focused27/full832 complete exit0. Original
 four failing regressions and all intermediate logs remain retained. Parent222
 Close P1 correction e903caa8 focused13/lifecycle8/confirmed build and fresh
-full828 pass exit0; its full166 local and exact-head CI/review remain pending.
+full828 pass exit0; full166 completes162PASS/4FAIL and changed interop readiness5
+passes exit0. Owner e2b1dfa9 retains those results; exact-head CI/review remains
+pending. One acceptance-document append conflict while merging this owner
+correction was resolved by retaining both ADR-148 and ADR-149 evidence.
 Historical10dc full160156PASS/4FAIL and all10 CI logs remain in ADR-148.
 
 References: third/fourth-edition ADL RTE4.2.9.1 type storage/write requirements:

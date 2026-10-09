@@ -26,7 +26,8 @@ for (const {standard, wrapper} of cases) test(standard + ': offline licensed ' +
       expect(packet.format).toBe('pear-scorm-support-v1'); expect(packet.launch.sequence).toBeGreaterThanOrEqual(1); expect(packet.launch.sequence).toBe(f.db.prepare('SELECT sequence FROM scorm_engine_launches WHERE id=?').get(packet.launch.id)!.sequence); expect(packet.package.standard).toBe('2004-4');
       const serialized = JSON.stringify(packet); for (const value of ['licensed-state', 'licensed-page', 'suspend_data', 'learner-a', 'runtime_state']) expect(serialized).not.toContain(value);
     }
-    await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click();
+    const close = player.getByRole('button', {name: 'Close SCO and choose another', exact: true});
+    await close.scrollIntoViewIfNeeded(); await expect(close).toBeInViewport(); await close.click(); await expect(close).toHaveCount(0);
     await player.getByRole('button', {name: /Introduction/}).click(); await expect(sco.getByText('Licensed entry: resume; bookmark: licensed-page', {exact: true})).toBeVisible();
     // A resumed nested frame may be below the viewport after the shell action.
     // Bring its container into view before Chromium's inner-frame rAF stability check.
