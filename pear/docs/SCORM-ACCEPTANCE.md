@@ -712,3 +712,39 @@ PASS exit0; initial facade3PASS/1FAIL was wrong expected1.2 code201 rather
 than405, retained; no integer product change. Next ADL token12FAIL retained,
 primary CAM2nd/3rd/4th§5.1.11 explicitly xs:token; separate successor work.
 EpicOPEN/prodDISABLED; all remaining matrices/external gates retained.
+
+ADR160 ADL rollup tokens: primary CAM2nd/3rd/4th§5.1.11 and ADL schema xs:token;
+original four-field/three-edition12FAIL retained. One shared importer loop reuses
+XML atomic-token normalization; omission defaults/vocabularies/invalid refusal/
+ZIP/hash/identity/receipts/history/proof retained. New9domain all enums/used+unused
+malformed/defaults/SQLite exact retry/resume/one proof. Focused97PASS exit0
+(20.0s), typecheck/build exit0. Engine unchangedv42SHA0447a6/1.2eb7539; controller
+24/1.2=13. Full958/134files and built3/native4/full172 pending. No pending PASS
+claim/deadline/assertion/retry/policy changes. Parent234d25 actual PRnumber,CI
+running; parent23203cd READY10full logs/reviews940/237/237/4/native3OS23clean5ACK5.
+Owner222e2bCI absent; matricesOPEN/externalBLOCKED;epicOPEN/prodDISABLED.
+
+Expanded built ADL3 completes3PASS exit0 (21.0s), supplemental native4 completes
+4PASS exit0 (34.8s), including four ADL attributes with unchanged all prior
+authority/absence/result/journal/ACK/retry/resume/proof/shutdown checks. Fresh
+full958 domain/134files now running; fixed full172 browser follows after it
+ends. No clean full local or pending PASS claim. Engine hashes unchangedv42.
+
+ADL-token fresh full domain completes958PASS/134files, every file plan/footer/
+five counts/exit0 and aggregate exit0 inspected. Expanded built3/native4 PASS,
+fixed full172 browser running; no pending full-browser PASS. Parent234d25
+Windows1.2 original forced fixture cleanup retained/cause unproved; owner CI
+incomplete. Engine/current adaptation remains v42, no pending READY claim.
+
+Fixed source/build full172 browser completes168PASS/4FAIL exit1 (9.5m),
+all four failure traces inspected: managed ServiceWorker permission denial;
+DOM.describeNode/session-closed during2004-4 retry,2004-2 duration and2004-3
+ADL next-SCO delivery. DOM causes unproved; no blanket driver attribution.
+All native4 pass in full; ADL2/3 pass here and earlier focused ADL3/3 PASS
+retained. Original full failure remains; one unchanged exact-three DOM
+diagnostic follows, no clean full/standard Chromium153/native proof claim.
+
+ADL unchanged exact-three DOM diagnostic completes3PASS exit0 (17.5s);
+original full172168PASS/4FAIL remains retained, DOM causes unproved. Fresh
+full958/134files + focused97 + built3 + native4 + typecheck/build PASS; final
+installed source hashes0447a6/1.2eb7539 unchanged. Own CI/review still pending.
