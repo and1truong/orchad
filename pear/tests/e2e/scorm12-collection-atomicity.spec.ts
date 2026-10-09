@@ -12,9 +12,9 @@ for (const edition of ['1.2'] as const) test(edition + ': built failed collectio
     try{for(const [key,value,error] of [
       ['cmi.objectives.'+prior+'.score.raw','bad','405'],
       ['cmi.objectives.'+prior+'.score.raw','101','405'],
-      ['cmi.objectives.'+prior+'.unknown','x','401'],
+      ['cmi.objectives.'+prior+'.unknown','x','201'],
       ['cmi.interactions.0.type','invalid','405'],
-      ['cmi.interactions.0.unknown','x','401']
+      ['cmi.interactions.0.unknown','x','201']
     ]){if(api.LMSSetValue(key,value)!=='false'||api.LMSGetLastError()!==error)throw Error('rejected write '+key);
       if(api.LMSGetValue('cmi.objectives._count')!==prior||api.LMSGetValue('cmi.interactions._count')!=='0')throw Error('failed write changed count');
     }

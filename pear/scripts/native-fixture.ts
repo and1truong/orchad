@@ -25,5 +25,8 @@ app.get("/native-fixture/:nonce/state",async(req,reply)=>{
 await app.listen({host:"127.0.0.1",port:4310});
 console.log("PEAR_NATIVE_FIXTURE_READY");
 let closing=false;
-async function close(){if(closing)return;closing=true;await app.close();db.close();rmSync(dir,{recursive:true,force:true});process.exit(0);}
+async function close(){if(closing)return;closing=true;app.server.closeAllConnections();await app.close();db.close();rmSync(dir,{recursive:true,force:true});process.exit(0);}
 process.on("SIGTERM",()=>void close());process.on("SIGINT",()=>void close());
+
+// Node IPC gives Windows the same graceful fixture cleanup as Unix signals.
+process.on("message", message => {if ((message as any)?.kind === "close") void close();});

@@ -4,7 +4,7 @@ This is the current requirement disposition, not a scope reduction or certificat
 Accepted baseline is main `0888beee461e1656f1c717cefb205923f7705a6d`,
 tree `095549250484b8a8484d8c46a79e76eb8bd01f93`; push acceptance
 [37738101010](https://github.com/and1truong/orchad/actions/runs/37738101010) PASS.
-The source stack is integrated; earlier #164 local counts are historical evidence.
+The initial source stack is integrated; subsequent conformance PRs are stacked and retain exact-head gates; earlier #164 local counts are historical evidence.
 [Completion register](SCORM-CONFORMANCE.md) assigns stable IDs to remaining
 code/validation/external gates. ADR-098 adds textual-response corrections and
 original three-edition domain/built-browser vectors; full compliance is OPEN.
@@ -26,14 +26,14 @@ Built-browser ACK/close/resume vectors are authored; current-head CI is required
 | CMI status, scores, location, suspend, preferences, comments, objectives/interactions | Runtime replay and Unicode/interaction tests; ADR-079/095–097 | Identifier URI grammar and full response/language/error matrix; ADR-098 covers named textual prefix/whitespace cases |
 | Durable ACK, retry, reopen/restart, concurrent/stale/reordered writes | Player/learning/sequencing/system-store tests and lost-ACK built journeys | Additional real engines and production durability/load/DR |
 | Commit vs Finish/Terminate, technical attempts vs domain retake | Runtime/sequencing/selection/duration tests; ADR-078/080/084/094 | Exhaustive reference lifecycle/reset/time behavior |
-| Time and calendar | Reported centiseconds and last-value session replacement, trusted host duration clocks and calendar windows; ADR-088/094/099/103; shared timestamp/calendar/precision/TZD vectors | Year/month/finer-precision duration bindings and standard-aligned calendar conversion; existing 365/30 reported-time policy is not full conformance |
+| Time and calendar | Reported centiseconds and last-value session replacement, trusted host duration clocks and calendar windows; ADR-088/094/099/104/119; shared timestamp/calendar/precision/TZD vectors | Year/month/finer-precision duration bindings and standard-aligned calendar conversion; existing 365/30 reported-time policy is not full conformance |
 | SCORM 1.2 multi-SCO/AICC prerequisites | Learning/player/assets tests and 1.2 built workflow | Full recognized 1.2 prerequisite/data-model reference coverage |
 | 2004 flow/choice/rules/rollup/local maps/retry/limits/selection/assets | Sequencing/selection/assets/duration tests; ADR-080/083–088/092–094 | Exhaustive branching/rule/error/delivery/reference suite |
 | Fourth-edition shared data and system objective maps | Authorized delta stores and migration/reopen/backup tests; ADR-089–091 | Full licensed reference/platform/production validation; unofficial isolation is explicit Pear policy |
 | Standalone/course/module/nested award/cycle proof | Learning/sequencing tests; trusted transaction, per-SCO policy, immutable proof, separate quiz certificate | Reference-specific proof/reuse/retake/issuer equivalence remains #49 scope |
 | Preview/practice and agents | No official proof, redacted semantic context, scoped support packets, host-policy tests | Production/platform authority matrix; agents never impersonate SCO score/commit |
 | Compatibility fixtures | Pinned licensed pipwerks and ADL developer-guide wrappers, synthetic multi-SCO/adversarial packages | Licensed Storyline/Captivate/Rise exports, ADL legacy license/platform resolution, authorized Rustici differential account |
-| Browser/native/device lanes | Built Chromium, actual unpacked Lime, actual Linux Tauri/WebKit in acceptance workflow | Windows WebView2, macOS WKWebView, mobile Safari/Android and native Chrome Side Panel container |
+| Browser/native/device lanes | Built Chromium, actual unpacked Lime and four-profile Linux/macOS native evidence at the historical ADR-116 head; Windows runtime/Pear passed | Repaired exact-head Windows four-profile native acceptance, all successor heads, mobile Safari/Android and native Chrome Side Panel container |
 | Operations/privacy | Diagnostics/log redaction/capacity/rollback/whole-DB backup/offline restore; ADR-082/090/091 | Reviewed production retention/archival/purge, immutable-proof preservation, load/RPO/DR/scanning/deployment |
 | Delivery and register | G05/G10/G14/G18, support matrix/handoff reconciled through ADR-097 | Baseline integrated/main acceptance verified above; successors need their own exact-head evidence; #133 stays open for unfinished requirements |
 
@@ -68,3 +68,47 @@ ADR-109 aligns supported 1.2 core/objective score initialization/reset with the 
 ADR-110 adds nine original domain vectors and four built pipwerks journeys for API/state/argument binding and a throwing checkpoint queue. Failure returns a synchronous string, keeps communication/deltas retryable and does not add accepted receipts; normal persistence, lost ACK/exact retry and close/resume still require successful server acceptance. Exact-head full CI and every remaining register gate apply.
 
 ADR-111 adds twelve original four-profile model-access regressions and four built pipwerks journeys. Engine objects/helpers/private fields are unavailable through synchronous standard methods; denied writes preserve identity/state and cannot replace model objects. Host field/identity validation remains independently tested and mandatory. No sandbox/all-egress/certification claim follows from these bounded API vectors.
+
+ADR-112–115 extend named navigation-target, numeric-capacity, derived-error-reset
+and language-preference evidence through the shared engine and original durable/
+built journeys. They preserve their explicit full grammar/registry/sequencing
+reference gaps in the completion register.
+
+ADR-116 adds actual Windows/macOS runner gates and all four profiles on Linux,
+including lost ACK, identical retry/receipt/revision/history, close/resume,
+completion authority and identity rebind. Initial Linux/macOS logs passed;
+Windows exposed a genuine subframe native callback failure. Supported Tauri
+invoke_system now rejects iframe IPC before creating the key closure. Actual
+new-head native CI remains required; 59 Coconut tests and supplemental browser
+fixtures are not platform PASS.
+
+ADR-117 binds support parameters without content object coercion; ADR-118 binds
+1.2 invalid CMI names to 201 versus unsupported outside models to 401. ADR-119
+binds shared timeinterval grammar and refuses malformed 1.2 latency checkpoints.
+Named failure preservation/retry/receipt/resume evidence extends API-02/TIME-01;
+full reference/field precedence, calendar conversion and every external, actual
+platform, all-egress and operations requirement remain OPEN/BLOCKED.
+
+ADR-120 adds conditional shared URN namespace/NSS binding with exact case/percent preservation and invalid typed/load/replay refusal. Non-URN behavior and 1.2 source stay unchanged. Full URI components, namespace-specific decoding/equivalence and all remaining conformance/platform/operations gates stay OPEN.
+
+ADR-121 expands bounded synthetic dynamic-egress probes in all four native fixture profiles. Local built Chromium preflight 4/4 passed; current-head actual native acceptance remains pending. No all-egress production or mobile/Side Panel claim follows.
+
+ADR-122 requires an actual Chrome SIDE_PANEL context and same-document React mount; CI pending. No extension-page fallback or local managed-policy bypass. Full native container consent/rebind/revoke/player journey remains OPEN.
+
+ADR-123 adds original scheme/relative-first-segment vectors to shared/facade/preload/replay and existing built identifier retry/resume journeys. Full reference/authority/IP/equivalence and external/platform/production gates remain OPEN; exact-head acceptance remains required.
+
+ADR-124 adds original simultaneous-invalid API error/state/queue preservation vectors in all four profiles and existing built refusal/ACK/retry/resume journeys. Exact-head full CI/native/review gates remain required.
+
+ADR-125 adds original raw-fragment delimiter/encoded-data vectors to shared/facade/preload/replay and existing built identifier retry/resume journeys. Exact-head acceptance and remaining full component/authority/IP/equivalence gates remain required.
+
+ADR-126 extends original result real-capacity/dependency/finite-envelope vectors through shared engine/facade/preload/replay and existing built wide-real ACK/retry/resume journeys. Exact-head full CI/native/review and remaining full conformance/external/production gates remain required.
+
+ADR-127 extends the actual Side Panel check in all four SCORM profiles to
+consented metadata read/private-state exclusion, read-consent revocation, exact
+lost-ACK retry/close-resume/finish, account-change denial before gateway and
+fresh pin/Disconnect. Exact native container and unchanged documentId required;
+new-head full CI pending. Local managed extension policy is unchanged.
+
+ADR-128 extends existing three built wide-real journeys to numeric learner/
+correct and performance bound overflow/range refusal, stored exact strings
+and lost-ACK retry/close-resume. Full new-head acceptance remains required.

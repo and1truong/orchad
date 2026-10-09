@@ -1,6 +1,6 @@
 import {scormCharacters, scorm12Writable} from './scorm-characterstring.ts';
 import Scorm12API from 'scorm-again/scorm12';
-import {scormModelPath} from './scorm-engine.ts';
+import {scormModelPath, scormSupportCode} from './scorm-engine.ts';
 
 /** Only the standard synchronous API is exposed to content, never engine helpers. */
 export function createSCORM12API(options: {state?: Record<string, any>; checkpoint?: (state: Record<string, any>, finished: boolean) => unknown} = {}) {
@@ -14,6 +14,7 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
   let initialized = false, finished = false, localError: string | null = null;
   const bad = (code: string) => {localError = code; return 'false';};
   const active = () => initialized && !finished;
+  const modelError = (key: string) => key === 'cmi' || key.startsWith('cmi.') ? '201' : '401';
   return Object.freeze({
     LMSInitialize(argument: string) {
       if (finished) return bad('301');
@@ -26,15 +27,15 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
     LMSGetValue(key: string) {
       if (!active()) {bad('301'); return '';}
       if (typeof key !== 'string' || key === '') {bad('201'); return '';}
-      if (!scormModelPath(key)) {bad('401'); return '';}
+      if (!scormModelPath(key)) {bad(modelError(key)); return '';}
       localError = null; const value = runtime.LMSGetValue(key);
-      if (typeof value !== 'string') {bad('401'); return '';}
+      if (typeof value !== 'string') {bad(modelError(key)); return '';}
       return value;
     },
     LMSSetValue(key: string, value: string) {
       if (!active()) return bad('301');
       if (typeof key !== 'string' || key === '' || typeof value !== 'string') return bad('201');
-      if (!scormModelPath(key) || typeof runtime.LMSGetValue(key) !== 'string') return bad('401');
+      if (!scormModelPath(key) || typeof runtime.LMSGetValue(key) !== 'string') return bad(modelError(key));
       if (scorm12Writable.test(key) && !Number.isFinite(scormCharacters(value)) || key === 'cmi.suspend_data' && scormCharacters(value) > 4096) return bad('405');
       if (key === 'cmi.core.lesson_status' && value === 'not attempted') return bad('405');
       localError = null; return runtime.LMSSetValue(key, value);
@@ -61,9 +62,10 @@ export function createSCORM12API(options: {state?: Record<string, any>; checkpoi
       return value;
     },
     LMSGetLastError() {return localError ?? runtime.LMSGetLastError();},
-    LMSGetErrorString(code: string) {return runtime.LMSGetErrorString(code);},
+    LMSGetErrorString(code: string) {const requested = scormSupportCode(code, '1.2'); return requested === null ? '' : runtime.LMSGetErrorString(requested);},
     LMSGetDiagnostic(code: string) {
-      const requested = code === '' ? localError ?? runtime.LMSGetLastError() : code;
+      const requested = scormSupportCode(code === '' ? localError ?? runtime.LMSGetLastError() : code, '1.2');
+      if (requested === null) return '';
       return localError && requested === localError ? 'SCORM API communication session or data model rejected the operation (' + localError + ')' : runtime.LMSGetDiagnostic(requested);
     },
   });

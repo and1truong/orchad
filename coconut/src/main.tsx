@@ -2,12 +2,13 @@ import React,{useEffect,useRef,useState} from 'react';import {createRoot} from '
 const request=async(r:any)=>{const result=await invoke<any>('host_request',{request:r});if(result?._error)throw Error(result._error);return result;};
 type DStatus={phase:string,conversationId:string,ops:{opId:string,toolName:string,status:string,attempts:number,error:string|null}[],tasks:{name:string,state:string}[],reason?:string,detail?:string};
 function App(){const [url,setUrl]=useState(trustedOrigin.trim()+'/'),[state,setState]=useState<any>({targets:[],approvals:[],audit:[],clients:[],sidebar:{}}),[targetId,setTargetId]=useState(''),[gateway,setGateway]=useState('http://127.0.0.1:4311'),[model,setModel]=useState('mock-scripted'),[token,setToken]=useState(''),[consent,setConsent]=useState(false),[transcript,setTranscript]=useState<string[]>([]),[pair,setPair]=useState(''),[name,setName]=useState('Codex CLI'),[prompt,setPrompt]=useState('Increment by one'),[running,setRunning]=useState(false);
- const [dStatus,setDStatus]=useState<DStatus|null>(null),[dPrompt,setDPrompt]=useState('Increment the counter by one'),[dTranscript,setDTranscript]=useState<any[]|null>(null);const controller=useRef<AbortController|null>(null),callId=useRef(''),hbSeq=useRef(0);const target=state.targets.find((t:any)=>t.targetId===targetId)??state.targets[0];const log=(x:any)=>setTranscript(t=>[...t,typeof x==='string'?x:JSON.stringify(x)]);
+ const [dStatus,setDStatus]=useState<DStatus|null>(null),[dPrompt,setDPrompt]=useState('Increment the counter by one'),[dTranscript,setDTranscript]=useState<any[]|null>(null);const controller=useRef<AbortController|null>(null),callId=useRef(''),hbSeq=useRef(0),hbApplied=useRef(0);const target=state.targets.find((t:any)=>t.targetId===targetId)??state.targets[0];const log=(x:any)=>setTranscript(t=>[...t,typeof x==='string'?x:JSON.stringify(x)]);
  // Snapshot polling + heartbeat: only while the trusted UI is visible. The
  // heartbeat is what keeps the host's UI lease alive — hidden/minimized or
  // unmounted stops it, so approvals can no longer be granted (writes fail
- // closed). hbSeq drops stale responses that land after a newer poll.
- useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible'){const seq=++hbSeq.current;request({action:'heartbeat'}).then(s=>{if(seq===hbSeq.current)setState(s);}).catch(e=>log(String(e)));}},1000);return()=>clearInterval(timer);},[]);
+ // closed). Apply completed snapshots in order; an in-flight newer poll must not
+ // starve the UI when native replies take longer than the polling interval.
+ useEffect(()=>{const timer=setInterval(()=>{if(document.visibilityState==='visible'){const seq=++hbSeq.current;request({action:'heartbeat'}).then(s=>{if(seq>hbApplied.current&&document.visibilityState==='visible'){hbApplied.current=seq;setState(s);}}).catch(e=>log(String(e)));}},1000);return()=>clearInterval(timer);},[]);
  useEffect(()=>{const un=listen<DStatus>('durable-status',e=>setDStatus(e.payload));request({action:'durable_status'}).then(s=>setDStatus(s)).catch(()=>{});return()=>{un.then(f=>f());};},[]);
  // Consent is pinned to the FULL binding plus the egress it names: any
  // change in targetId/pageInstanceId/documentId/sessionEpoch or in

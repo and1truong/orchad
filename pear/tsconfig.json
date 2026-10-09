@@ -25,6 +25,7 @@
     "tests/e2e/host.spec.ts",
     "tests/host.test.ts",
     "scripts/lime-browser.ts",
-    "tests/e2e/scorm-lime.host.spec.ts"
+    "tests/e2e/scorm-lime.host.spec.ts",
+    "tests/e2e/scorm-side-panel.host.spec.ts"
   ]
 }

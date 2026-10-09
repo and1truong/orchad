@@ -65,7 +65,7 @@ jobs:
           npm run build
   coconut-native:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -93,26 +93,55 @@ jobs:
       - name: Rust predicate unit tests
         working-directory: coconut/src-tauri
         run: cargo test
-      # Lane: native-runtime. Drives the real Tauri binary under xvfb through
-      # the COCONUT_SMOKE=1 debug control channel — ready/binding markers,
-      # heartbeat lease, consent, approval-gated mutation, hidden-UI denial,
-      # rebind revocation. Any failure exits non-zero and fails this lane;
-      # there is no `--version` shortcut and no `|| true`.
-      - name: Native runtime acceptance lane
+      - name: Actual native runtime, Pear and all four SCORM profiles
+        working-directory: coconut
+        run: xvfb-run -a node scripts/native-platform-acceptance.mjs src-tauri/target/debug/coconut
+  coconut-native-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: coconut/package-lock.json }
+      - uses: dtolnay/rust-toolchain@stable
+      - working-directory: packages/bridge-contract
+        run: npm ci
+      - working-directory: mango
+        run: npm ci
+      - working-directory: coconut
+        run: |
+          npm ci
+          npm run package:sidecar
+          npm run build
+      - working-directory: pear
+        run: |
+          npm ci
+          npm run build
+          node --import tsx --test --test-isolation=none tests/native-fixture-lifecycle.test.ts
+      - working-directory: coconut/src-tauri
+        run: |
+          cargo build --verbose
+          cargo test
+      - name: Actual WebView2/WKWebView runtime and four-edition SCORM acceptance
         working-directory: coconut
         run: |
-          BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
-          test -n "$BIN"
-          npm run dev >/tmp/coconut-vite.log 2>&1 &
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:1420/ >/dev/null && break; sleep 1; done
-          xvfb-run -a node scripts/native-acceptance.mjs "$BIN"
-      - name: Native Pear WebView and external Coconut MCP acceptance
-        working-directory: coconut
-        run: |
-          BIN=$(find src-tauri/target/debug -maxdepth 1 -type f -executable -name 'coconut*' | head -1)
-          test -n "$BIN"
-          xvfb-run -a node scripts/native-pear-acceptance.mjs "$BIN"
-          xvfb-run -a node scripts/native-scorm-acceptance.mjs "$BIN"
+          BIN=src-tauri/target/debug/coconut
+          if [ "${{ runner.os }}" = Windows ]; then BIN="$BIN.exe"; fi
+          set -o pipefail
+          node scripts/native-platform-acceptance.mjs "$BIN" 2>&1 | tee native-platform.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          retention-days: 7
+          name: native-platform-${{ runner.os }}
+          path: coconut/native-platform.log
   guava:
     runs-on: ubuntu-latest
     steps:
@@ -161,7 +190,7 @@ jobs:
       - name: PDF certificate text verification dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y poppler-utils xvfb
       - working-directory: packages/bridge-contract
         run: npm ci
       - working-directory: pear
@@ -186,6 +215,7 @@ jobs:
           PEAR_E2E_PRODUCTION=1 npm run test:browser-host
           npm run test:lime
           npm run test:scorm:lime
+          xvfb-run -a npm run test:scorm:side-panel
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -4,15 +4,27 @@ import {resolve} from 'node:path';
 import {createApp} from '../../src/server/app.ts';
 import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 import {interopPackage} from '../scorm-interop-fixture.ts';
+import {scorm12PrecedenceWrites, scorm2004PrecedenceWrites} from '../scorm-api-precedence-vectors.ts';
 
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(edition + ': built API refusals stay synchronous and retry after a throwing queue', async ({page}) => {
   const script = `{const old=${JSON.stringify(edition === '1.2')},api=old?parent.API:parent.API_1484_11,
     read=(k)=>old?api.LMSGetValue(k):api.GetValue(k),write=(k,v)=>old?api.LMSSetValue(k,v):api.SetValue(k,v),
     commit=()=>old?api.LMSCommit(''):api.Commit(''),end=()=>old?api.LMSFinish(''):api.Terminate(''),error=()=>old?api.LMSGetLastError():api.GetLastError(),
     key=old?'cmi.core.lesson_location':'cmi.location';
+    if(read('cmi.interactions._count')!=='0')throw Error('initial or resumed interaction records');
     const button=document.createElement('button');button.textContent='Verify API refusals';document.body.append(button);
     button.onclick=()=>{
       const before=read(key);
+      const writes=${JSON.stringify(edition === '1.2' ? scorm12PrecedenceWrites : scorm2004PrecedenceWrites)};
+      for(const [name,value,expected]of writes){
+        if(write(name,value)!=='false'||error()!==expected)throw Error('access/type/dependency '+name);
+        if(read('cmi.interactions._count')!=='0')throw Error('refusal created interaction '+name);
+      }
+      let coercions=0;const poison={toString(){coercions++;throw Error('authored coercion');},valueOf(){coercions++;throw Error('authored coercion');}};
+      for(const value of [undefined,null,0,poison,Symbol('authored')]){
+        if(read(value)!==''||error()!=='201'||write(key,value)!=='false'||error()!=='201')throw Error('typed argument');
+      }
+      if(coercions||read(key)!==before)throw Error('authored coercion/state');
       if(read('')!==''||error()!==(old?'201':'301'))throw Error('empty get');
       if(write('','replacement')!=='false'||error()!==(old?'201':'351'))throw Error('empty set');
       if(read(key)!==before)throw Error('bookmark changed');
@@ -53,7 +65,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(editi
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    expect(edition === '1.2' ? stored.core.lesson_location : stored.location).toBe('licensed-page');
+    expect(edition === '1.2' ? stored.core.lesson_location : stored.location).toBe('licensed-page'); expect(Object.keys(stored.interactions)).toHaveLength(0);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Licensed entry: resume; bookmark: licensed-page', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);

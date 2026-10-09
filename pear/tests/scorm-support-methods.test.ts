@@ -56,7 +56,7 @@ test('1.2: requested diagnostics preserve local and engine errors before initial
   assert.equal(api.LMSInitialize(''), 'true'); support('0');
   assert.equal(api.LMSSetValue('cmi.suspend_data', '\ud800'), 'false'); support('405');
   assert.equal(api.LMSSetValue('cmi.core.lesson_location', 'original'), 'true'); support('0');
-  assert.equal(api.LMSGetValue('cmi.unknown'), ''); support('401');
+  assert.equal(api.LMSGetValue('cmi.unknown'), ''); support('201');
   assert.equal(api.LMSCommit(''), 'true'); support('0');
   assert.equal(api.LMSFinish(''), 'true'); support('0');
   assert.equal(api.LMSSetValue('cmi.core.lesson_location', 'replacement'), 'false'); support('301');

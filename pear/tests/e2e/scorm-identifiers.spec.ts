@@ -5,9 +5,13 @@ import {createApp} from '../../src/server/app.ts';
 import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 import {interopPackage} from '../scorm-interop-fixture.ts';
 import {validIdentifiers, invalidIdentifiers} from '../scorm-identifier-vectors.ts';
+import {validURNs, invalidURNs} from '../scorm-urn-vectors.ts';
+import {validSchemeReferences, invalidSchemeReferences} from '../scorm-uri-scheme-vectors.ts';
+import {validFragmentReferences, invalidFragmentReferences} from '../scorm-uri-fragment-vectors.ts';
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': built URI bindings and full-capacity choice survive lost ACK and close/resume', async ({page}) => {
-  const script = `const valid=${JSON.stringify(validIdentifiers)},invalid=${JSON.stringify(invalidIdentifiers)},api=parent.API_1484_11;
+  const valid = [...validIdentifiers, ...validURNs, ...validSchemeReferences, ...validFragmentReferences], invalid = [...invalidIdentifiers, ...invalidURNs, ...invalidSchemeReferences, ...invalidFragmentReferences], fullIndex = valid.length;
+  const script = `const valid=${JSON.stringify(valid)},invalid=${JSON.stringify(invalid)},api=parent.API_1484_11;
     for(const [i,value] of valid.entries()){const base='cmi.interactions.'+i;
       if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.id')!==value)throw Error('ID resume');
       if(api.SetValue(base+'.id',value)!=='true'||api.SetValue(base+'.type','likert')!=='true')throw Error('ID dependency');
@@ -16,7 +20,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
         for(const bad of invalid)if(api.SetValue(base+suffix,bad)!=='false'||api.GetLastError()!=='406'||api.GetValue(base+suffix)!==value)throw Error('invalid URI');
       }
     }
-    const full=Array.from({length:36},(_,i)=>String(i).padStart(2,'0')+'a'.repeat(3998)).join('[,]'),base='cmi.interactions.6';
+    const full=Array.from({length:36},(_,i)=>String(i).padStart(2,'0')+'a'.repeat(3998)).join('[,]'),base='cmi.interactions.${fullIndex}';
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.learner_response')!==full)throw Error('full choice resume');
     if(api.SetValue(base+'.id','urn:pear:full-choice')!=='true'||api.SetValue(base+'.type','choice')!=='true')throw Error('choice dependency');
     for(const suffix of ['.learner_response','.correct_responses.0.pattern'])if(api.SetValue(base+suffix,full)!=='true')throw Error('full choice');
@@ -47,8 +51,8 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    for (const [i, value] of validIdentifiers.entries()) expect(stored.interactions[i].id).toBe(value);
-    expect(stored.interactions[6].learner_response.length).toBe(144105); expect(stored.interactions[6].correct_responses[0].pattern).toBe(stored.interactions[6].learner_response);
+    for (const [i, value] of valid.entries()) expect(stored.interactions[i].id).toBe(value);
+    expect(stored.interactions[fullIndex].learner_response.length).toBe(144105); expect(stored.interactions[fullIndex].correct_responses[0].pattern).toBe(stored.interactions[fullIndex].learner_response);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('URI bindings verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);

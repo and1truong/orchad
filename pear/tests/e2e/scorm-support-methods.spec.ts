@@ -6,15 +6,16 @@ import {scormLearningFixture} from '../scorm-learning-fixture.ts';
 import {interopPackage} from '../scorm-interop-fixture.ts';
 
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) test(edition + ': built synchronous support methods preserve error state and address requested diagnostics', async ({page}) => {
-  const old = edition === '1.2', localError = old ? '405' : '406';
+  const old = edition === '1.2', localError = old ? '405' : '406', modelError = old ? '201' : '401';
   const script = `const api=${old ? "{SetValue:parent.API.LMSSetValue,GetValue:parent.API.LMSGetValue,GetLastError:parent.API.LMSGetLastError,GetDiagnostic:parent.API.LMSGetDiagnostic,GetErrorString:parent.API.LMSGetErrorString}" : 'parent.API_1484_11'};
     function verify(){
       if(api.SetValue('cmi.suspend_data','\\ud800')!=='false'||api.GetLastError()!=='${localError}')throw Error('local error');
       const current=api.GetDiagnostic('');
       if(!current||api.GetDiagnostic('${localError}')!==current||api.GetDiagnostic('201')===current)throw Error('requested diagnostic');
       ${old ? '' : "for(const code of ['unknown','999','65536','406suffix','__proto__','constructor','toString'])if(api.GetDiagnostic(code)!==''||api.GetErrorString(code)!==''||api.GetLastError()!=='406')throw Error('unknown lookup');"}
-      if(api.GetValue('cmi.unknown')!==''||api.GetLastError()!=='401')throw Error('engine error');
-      if(!api.GetDiagnostic('')||api.GetDiagnostic('401')!==api.GetDiagnostic('')||api.GetLastError()!=='401')throw Error('engine diagnostic');
+      if(api.GetValue('cmi.unknown')!==''||api.GetLastError()!=='${modelError}')throw Error('engine error');
+      if(!api.GetDiagnostic('')||api.GetDiagnostic('${modelError}')!==api.GetDiagnostic('')||api.GetLastError()!=='${modelError}')throw Error('engine diagnostic');
+      if(api.GetValue('xyz.score.result')!==''||api.GetLastError()!=='401'||!api.GetDiagnostic('')||api.GetDiagnostic('401')!==api.GetDiagnostic('')||api.GetLastError()!=='401')throw Error('outside model diagnostic');
       if(api.SetValue('${old ? 'cmi.core.lesson_location' : 'cmi.location'}','diagnostic-page')!=='true'||api.GetLastError()!=='0')throw Error('recovery');
       document.getElementById('entry').textContent='Support methods verified';
     }verify();`;

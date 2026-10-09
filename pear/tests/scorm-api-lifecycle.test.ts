@@ -5,6 +5,7 @@ import {createSCORM2004API} from '../src/shared/scorm2004-runtime.ts';
 import {scormLearningFixture} from './scorm-learning-fixture.ts';
 import {multiFilePackage} from './scorm-package-fixture.ts';
 import {sharedDataManifest} from './scorm-sequencing-fixture.ts';
+import {scorm12PrecedenceWrites, scorm2004PrecedenceWrites} from './scorm-api-precedence-vectors.ts';
 
 // Original vectors: ADL 1.2 RTE §§3.3.2–3; 2004 RTE §§3.1.2–7.
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) {
@@ -13,6 +14,35 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4'] as const) {
     : ['Initialize', 'GetValue', 'SetValue', 'Commit', 'Terminate', 'GetLastError', 'GetErrorString', 'GetDiagnostic'];
   const key = old ? 'cmi.core.lesson_location' : 'cmi.location';
   const make = (checkpoint: (state: any, finished: boolean) => unknown) => old ? createSCORM12API({checkpoint}) : createSCORM2004API({edition, checkpoint});
+
+  test(edition + ': simultaneous invalid inputs retain session/access/type errors without coercion or state changes', () => {
+    let coercions = 0; const checkpoints: any[] = [];
+    const poison = {toString() {coercions++; throw Error('authored coercion');}, valueOf() {coercions++; throw Error('authored coercion');}};
+    const malformed = [undefined, null, 0, poison, Symbol('authored')];
+    const api: any = make((state, finished) => checkpoints.push({state: structuredClone(state), finished}));
+    const call = (i: number, ...args: any[]) => api[names[i]](...args);
+    const refused = (i: number, args: any[], error: string) => {
+      assert.equal(call(i, ...args), i === 1 ? '' : 'false'); assert.equal(call(5), error);
+      assert.equal(typeof call(6, error), 'string'); assert.equal(typeof call(7, ''), 'string'); assert.equal(call(5), error);
+    };
+    for (const value of malformed) {
+      refused(1, [value], old ? '301' : '122'); refused(2, [value, poison], old ? '301' : '132');
+      refused(3, [value], old ? '301' : '142'); refused(4, [value], old ? '301' : '112');
+    }
+    assert.equal(call(0, ''), 'true'); assert.equal(call(2, key, 'retained'), 'true');
+    const writes = old ? scorm12PrecedenceWrites : scorm2004PrecedenceWrites;
+    for (const [name, value, error] of writes) refused(2, [name, value], error);
+    for (const value of malformed) {refused(1, [value], '201'); refused(2, [value, poison], '201'); refused(2, [key, value], '201'); refused(3, [value], '201'); refused(4, [value], '201');}
+    assert.equal(call(1, key), 'retained'); assert.equal(checkpoints.length, 0);
+    assert.equal(call(3, ''), 'true'); assert.equal(call(4, ''), 'true');
+    assert.deepEqual(checkpoints.map(x => x.finished), [false, true]);
+    for (const {state} of checkpoints) {assert.equal(old ? state.core.lesson_location : state.location, 'retained'); assert.equal(Object.keys(state.interactions).length, 0);}
+    for (const value of malformed) {
+      refused(0, [value], old ? '301' : '104'); refused(1, [value], old ? '301' : '123');
+      refused(2, [value, poison], old ? '301' : '133'); refused(3, [value], old ? '301' : '143'); refused(4, [value], old ? '301' : '113');
+    }
+    assert.equal(coercions, 0); assert.equal(checkpoints.length, 2);
+  });
 
   test(edition + ': eight-method communication/argument matrix preserves state and checkpoint count', () => {
     const checkpoints: any[] = [], api: any = make((state, finished) => {checkpoints.push({state, finished});});

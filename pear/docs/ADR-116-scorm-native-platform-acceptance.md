@@ -1,0 +1,100 @@
+# ADR-116: actual native platform and four-profile acceptance gates
+
+Epic #133, stacked on ADR-115 / PR #185. The former native lane tested only
+SCORM 2004 fourth edition on Linux. Platform requirements cannot be proved by a
+Chromium viewport; GitHub-hosted Windows/macOS runners can execute the existing
+actual Tauri/WebView controller rather than being presumed unavailable.
+
+One Node orchestrator starts the real trusted UI and runs unchanged native
+runtime and Pear MCP controllers plus the SCORM controller in all four profiles.
+Linux uses xvfb; Windows/macOS run the same real debug binary/controller with
+WebView2/WKWebView. CI gates cargo build/test, dependencies, guest build, fixture
+cleanup and every native journey, and uploads native logs. It records actual
+WebView user agent and runner OS/image; no browser stub or successful skip.
+The development binary still requires Node on PATH. Packaging/signing and real
+production deployment are outside this bounded acceptance slice.
+
+The synthetic Pear fixture selects the requested profile, with its actual entry
+and bookmark names. Its content-server response hook loses one ACK only after
+the real player transaction commits. The UI driver retries the original queued
+request; the hook checks identical request/receipt and unchanged revision/history
+before the next queued save. Close/resume retains the bookmark; Terminate creates
+one authoritative proof without satisfying the independent quiz requirement.
+Actual native controllers retain cross-origin credential/native/agent denial,
+fixture fetch/image egress refusal, real external MCP metadata reads and account
+rebind revocation. This is not exhaustive all-egress enforcement.
+
+Fixture shutdown uses Node IPC so Windows executes the same graceful server/DB/
+synthetic-directory cleanup as Unix signals. Existing signal handlers remain.
+Fixtures/control channels are CI-only and never mounted by product entry points.
+Five original real server/DB cleanup tests and four supplemental Chromium driver
+journeys check shutdown/profile/fault logic. Supplementary Chromium journeys
+never count as actual native platform evidence. Actual Windows/macOS and expanded
+Linux PASS remains pending completed exact-head CI logs.
+
+The shared engine remains pear-preference-language-v19 with unchanged hashes and
+snapshot policy. No product authority, production gate, schema or historical
+learning data changes. Safari/Android actual devices/runners, full conformance,
+licensed package/Rustici differential and real isolation/operations remain
+OPEN/BLOCKED; epic stays open and production disabled.
+
+First Windows attempt on head 35a1121d failed in tauri-build because the default
+Windows resource icon was missing, before playback could run (job 113470724312,
+run 37823636259). Add only icons/icon.ico generated from the existing tracked
+64×64 icons/icon.png with the installed Tauri CLI (`tauri icon`); no replacement
+artwork or platform bypass. Actual Windows build/runtime evidence remains required.
+
+Run 37823636259 completed the actual Linux and macOS lanes on initial head
+35a1121d: runtime 16/16, Pear/MCP 13/13, each SCORM profile 11/11. Their complete
+logs include the real WebView user agents and runner images (Linux job
+113470724545; macOS job 113470724658). Windows failed the missing resource, so the
+whole run was not PASS. The four-profile Linux execution took about eleven
+minutes after setup; enlarge its former one-profile 15-minute job budget to 25
+minutes for dependency/build overhead. New-head acceptance is still required.
+
+Second Windows attempt (7d830eea, run 37824748788/job 113474582293) built
+and completed real runtime 16/16 and Pear/MCP 13/13, then SCORM 1.2 timed out
+waiting for its first content probe/checkpoint. This is a failed playback gate,
+not platform PASS. Fixture failure diagnostics now record only route classes/
+status and progress counters, without launch tokens or authored/private state,
+to locate the actual WebView2 failure; no assertion/timeout bypass.
+
+Pear CI on 7d830eea/e5247941 passed its complete domain suite but failed the
+old native-fixture browser preflight: it requested close/resume before retrying
+the deliberately lost ACK. Extend that existing preflight to all four profiles
+and the required identical retry; retain its initial-entry, zero-proof/calls,
+resume/bookmark, completion/quiz and driver-error assertions. Remove only the
+new redundant four-profile driver file in favor of the existing suite. The
+production durability guard is unchanged. First CI failures remain recorded.
+
+Windows SCO native invocation is now bounded for diagnostics: an unresolved
+Promise records only API/transport types and remains nativeDenied=false, so
+timeout cannot count as denial or platform PASS. No CSP or native capability
+is relaxed. The four-profile preflight still checks the same durability flow.
+
+Bounded Windows evidence on 98dc59e7 (run 37828878720/job 113488729503)
+shows actual WebView2 153 loads the SCO and has invoke/ipc/postMessage/message
+channel functions, but its subframe native Promise remains pending. It failed
+the isolation assertion; runtime 16/16 and Pear/MCP 13/13 passed.
+
+Use Tauri 2.12.1's supported Builder::invoke_system to deny subframe IPC
+synchronously before creating a closure with the invoke key. Top-frame
+Coconut commands/events use the supported JSON postMessage transport with
+proper callback/error IDs and response mode; Rust ACL, label/origin/action
+authorization remains unchanged. This avoids relying on subframe callback
+routing or relaxing SCO CSP/capabilities. Two original VM tests execute the
+actual included initializer; actual three-platform native CI remains required.
+Reference: https://docs.rs/tauri/2.12.1/tauri/struct.Builder.html#method.invoke_system
+
+
+Windows cleanup followup: exact e594815c run 37830380908 failed SCORM
+2004-3 shutdown; attempt 2 failed native Pear shutdown after its authority
+checks passed. Both failures remain recorded. An original incomplete-HTTP
+request regression reproduces Pear fixture shutdown failure (4/5 pass, Pear
+fails), because Fastify waits for live connections. CI-only Pear cleanup now
+closes those connections before Fastify/database cleanup, matching SCORM.
+The unchanged five-second budget and clean exit-0 requirements remain; forced
+kills cannot pass. Native/Pear fixture exit codes, signals, forced-kill and
+quit acknowledgement are logged separately to identify any further failure.
+Current-head native acceptance remains required; this fix does not prove the
+previous SCORM failure shares that cause.

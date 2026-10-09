@@ -1,4 +1,66 @@
-# Current continuation — 2026-10-08
+# Active continuation — 2026-10-08
+
+Continue stacked PRs without waiting for merge (AGENTS.md). #172,#174,#175,
+#177–191 are ready after completed exact-head acceptance/review; latest heads,
+full logs and retained first failures are in PR descriptions. #186–190 actual
+Linux/macOS/Windows runtime16/Pear-MCP13/four SCORM11 passed. #191 head2fc52af0,
+run37839013479 completed10/10 jobs,718 domain,192 dev/192 built journeys and
+all three actual OS runtime16/Pear-MCP13/four SCORM12 with dynamic denial,
+exit0 and no forced kills. Mango's three paid live tests remain skipped.
+
+#192 owner33897329 failed Side Panel optional MessageSender.documentId
+correlation after actual SIDE_PANEL and UI mount were observed; reporter now
+uses a unique URL getContexts ID and independently matches background query.
+Current b9c42239 includes fixed-phase/IPC shutdown diagnostics. Earlier Windows
+2004-2 shutdown failed (native0, fixture forced); local stress did not reproduce
+it. Keep the failure and five-second/exit0 conditions; current native CI required.
+Local system Chromium managed ExtensionInstallBlocklist[*] remains untouched;
+actual container runs in the existing extension-capable CI lane.
+
+#193 URI-scheme v23 extends shared/facade/preload/replay/installer and existing
+built identifier journeys. Local718/105,focused13,build,three built journeys
+passed; initial operations v22-pin failure retained. Parent #192 correction is
+incorporated by real merge; current-head CI/review remain required.
+Successor codex/pear-scorm-api-precedence-133 adds ADR-124 original simultaneous
+invalid/session/access/type/range/dependency/no-coercion vectors. Local722/105,
+lifecycle13,build,four built journeys passed. No new runtime patch; full current
+CI/native/review remain required. Historical slice adaptation pear-uri-scheme-binding-v23.
+
+#195 fragment successor v24 completed local722/105,focused13,build and three
+built identifier journeys; exact current-head CI remains pending. PR #198
+codex/pear-scorm-result-capacity-133 adds ADR-126/v25 shared interaction result
+real capacity and missing-ID408 rollback. All twelve original regressions failed
+before correction; local focused26,full725/105,build,three built wide-real
+journeys passed. Exact-head full CI/native/review remain required. Current
+adaptation pear-result-binding-v25;1.2 bytes stay unchanged.
+
+PR #199 codex/pear-native-side-panel-journey-133 stacks on #198.
+ADR-127 extends actual Side Panel journeys across all four profiles with
+consent/read/revoke/rebind, identical lost-ACK retry/close-resume/finish and
+unchanged native document. Local host typecheck/discovery are required; actual
+CI pending. #192 stdout drain review fixed at70452253 and real-merged through
+the stack; local five cleanup checks passed. #194 adds collection count/state
+assertions in built runtime, persisted checkpoint and resume after review.
+
+Latest branch codex/pear-scorm-numeric-response-binding-133 stacks on #199.
+ADR-128/v26 binds numeric learner responses and numeric/performance correct
+bounds through the existing shared finite/capacity validator, exact strings
+and bracketed numeric ranges. Before12 expanded regressions failed; focused37
+full728/105, build and all three built journeys passed with complete exit0. Current adaptation
+pear-numeric-response-binding-v26. Parent #192 polling/order/hidden-reply fixes
+completed local Coconut62/build; current full native CI required, with prior
+macOS consent timeout and Windows forced cleanup failures preserved.
+
+Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
+external gates. Legacy ADL license/platform, authorized commercial exports and
+Rustici account, real Safari/Android runners/devices, reviewed production
+origin/scanner/storage/retention/load/RPO/DR remain unresolved. Full native Side
+Panel consent/rebind/revoke/player journey and all-egress enforcement remain
+OPEN. Keep #133 open and production disabled. Preserve historical failure logs.
+
+## Historical continuation records
+
+### Earlier continuation — 2026-10-08
 
 Main baseline `0888beee461e1656f1c717cefb205923f7705a6d`, exact tree
 `095549250484b8a8484d8c46a79e76eb8bd01f93`, push acceptance 37738101010 PASS.

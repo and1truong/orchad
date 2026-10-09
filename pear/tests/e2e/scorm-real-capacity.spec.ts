@@ -9,10 +9,19 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
   const prefix = '';
   const script = `{const api=parent.API_1484_11,get=k=>api.${prefix}GetValue(k),set=(k,v)=>api.${prefix}SetValue(k,v),error=()=>api.${prefix}GetLastError();
     const value='12345678901.125';
-    for(const key of ['cmi.score.raw','cmi.score.max','cmi.learner_preference.audio_level','cmi.learner_preference.delivery_speed']){
+    if(get('cmi.interactions._count')==='0'&&(set('cmi.interactions.0.result','correct')!=='false'||error()!=='408'||get('cmi.interactions._count')!=='0'))throw Error('result missing-ID rollback');
+    if(set('cmi.interactions.0.id','urn:pear:result')!=='true'||set('cmi.interactions.0.type','numeric')!=='true')throw Error('result dependency');
+    for(const key of ['cmi.score.raw','cmi.score.max','cmi.learner_preference.audio_level','cmi.learner_preference.delivery_speed','cmi.interactions.0.result','cmi.interactions.0.learner_response']){
       if(set(key,value)!=='true'||error()!=='0'||get(key)!==value)throw Error('wide finite real '+key);
       for(const bad of ['9'.repeat(309),value+'junk','0'.repeat(4097)])if(set(key,bad)!=='false'||error()!=='406'||get(key)!==value)throw Error('invalid real changed state '+key);
     }
+    const pattern='cmi.interactions.0.correct_responses.0.pattern',range='12345678901.125[:]12345678999.5';
+    if(set(pattern,range)!=='true'||get(pattern)!==range)throw Error('numeric range');
+    for(const bad of [value,'9'.repeat(309)+'[:]', '[:]'+'9'.repeat(309),'0'.repeat(4097)+'[:]'])if(set(pattern,bad)!=='false'||error()!=='406'||get(pattern)!==range||get('cmi.interactions.0.correct_responses._count')!=='1')throw Error('invalid numeric range rollback');
+    if(set('cmi.interactions.1.id','urn:pear:performance')!=='true'||set('cmi.interactions.1.type','performance')!=='true')throw Error('performance dependency');
+    const step='cmi.interactions.1.correct_responses.0.pattern',answer='step[.]12345678901[:]12345678999.5';
+    if(set(step,answer)!=='true')throw Error('performance range');
+    for(const bad of ['step[.]'+'9'.repeat(309)+'[:]', 'step[.][:]'+'9'.repeat(309)])if(set(step,bad)!=='false'||error()!=='406'||get(step)!==answer)throw Error('performance overflow rollback');
     if(set('cmi.score.scaled',value)!=='false'||error()!=='407')throw Error('scaled range');
     document.getElementById('entry').textContent='Wide finite reals verified';}`;
   const f = await scormLearningFixture(undefined, interopPackage(edition, 'pipwerks', script)); f.enroll();
@@ -41,7 +50,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    expect(stored.score.raw).toBe('12345678901.125'); expect(stored.learner_preference.audio_level).toBe('12345678901.125');
+    expect(stored.score.raw).toBe('12345678901.125'); expect(stored.learner_preference.audio_level).toBe('12345678901.125'); expect(stored.interactions[0].result).toBe('12345678901.125'); expect(stored.interactions[0].learner_response).toBe('12345678901.125'); expect(stored.interactions[0].correct_responses[0].pattern).toBe('12345678901.125[:]12345678999.5'); expect(stored.interactions[1].correct_responses[0].pattern).toBe('step[.]12345678901[:]12345678999.5');
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Wide finite reals verified', {exact: true})).toBeVisible();
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
