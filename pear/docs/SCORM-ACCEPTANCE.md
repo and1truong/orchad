@@ -276,6 +276,20 @@ Current e903 workflow/check runs are
 absent; direct gh API is Forbidden. Draft pending new-head CI/reviews, with
 original/intermediate/full failures retained and no clean full claim.
 
+PR222 support-download readiness repair: exact e2b1dfa original isolated five
+interop journeys complete4PASS/1FAIL exit1(1.2m). Fourth-edition download60s
+timeout trace/network/context read; pointer reaches SCO HTML, no diagnostics
+request. Build on exact old product completes exit0. Reuse existing explicit
+viewport readiness before the real support click, keeping packet/sequence/
+redaction/close/resume/Finish/proof assertions. Accepted interop5PASS/exit0
+(26.2s). No product/engine change, deadline/assertion/policy relaxation or
+empty CI-trigger commit. Temporary instrumentation is outside tracked tests.
+This reproduces and fixes this isolated missed action, not all historic causes.
+Parent full828/122files and full166162PASS/4FAIL remain inherited evidence,
+not rerun full results for this test-only repair. Historical10dc CI is not
+new-head proof; own CI/all full logs/fresh reviews required. Existing P1 fix
+and history retained; epic OPEN, production DISABLED.
+
 ADR-149 v39: original four regressions fail; final draft focused27/build/fresh
 full832 across123 domain files/supplementary native fixture4 pass exit0. Accepted
 response type bindings preserve nonempty/supplied empty fields through exact
