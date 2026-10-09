@@ -94,9 +94,9 @@ export class AppRequestIngress {
     // Deferred so a synchronous throw in ask/run settles the pending entry
     // instead of leaking it (a stuck entry would block all later requests).
     Promise.resolve()
-      .then(() => this.deps.ask(approval))
+      .then(() => this.pending?.requestId === req.requestId && this.deps.ask(approval))
       .then((yes) =>
-        yes
+        yes && this.pending?.requestId === req.requestId
           ? this.deps.run(req.prompt)
           : Promise.resolve<AppResult>({
               ok: false,
@@ -124,8 +124,8 @@ export class AppRequestIngress {
 
   private settle(requestId: string, result: AppResult) {
     const p = this.pending;
-    this.pending = null;
     if (!p || p.requestId !== requestId) return;
+    this.pending = null;
     this.deps.finish(p.page, requestId, result);
   }
 }
