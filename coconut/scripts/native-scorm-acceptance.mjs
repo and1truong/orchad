@@ -143,6 +143,8 @@ try {
  if(commentSPM){
   const comments=probe=>probe.learnerCommentSPM?.comments===250&&probe.learnerCommentSPM.charactersPerComment===4000&&probe.learnerCommentSPM.preserved===true;
   check('actual native full Unicode learner comments remain exact in SQLite and the SCO through lost ACK, retry and human Close/resume',Number.isFinite(resumed.largestCheckpointLimit)&&comments(first.probes[0])&&comments(resumed.probes[1])&&[first,resumed].every(value=>value.commentSPM===true&&value.collectionStored?.comments?.count===250&&value.collectionStored.comments.preserved===true));
+  const lms=probe=>probe.lmsCommentSPM?.comments===100&&probe.lmsCommentSPM.charactersPerComment===4000&&probe.lmsCommentSPM.preserved===true&&probe.lmsCommentSPM.readonly===true;
+  check('actual native100 full LMS comments remain exact and readonly alongside learner comments/collection/journal through durable resume',lms(first.probes[0])&&lms(resumed.probes[1])&&resumed.largestCheckpointBytes>6097652&&[first,resumed].every(value=>value.collectionStored?.lmsComments?.count===100&&value.collectionStored.lmsComments.preserved===true));
  }
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);

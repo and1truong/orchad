@@ -8,16 +8,18 @@ import {scormModelPath, scormSupportCode, type SCORMStandard} from './scorm-engi
 export type SCORM2004Edition = Exclude<SCORMStandard, '1.2'>;
 // Bounded transport for named full choice/performance SPM snapshots, including Unicode.
 export const scorm2004CheckpointBytes = 2 * 1024 * 1024;
-// First250 learner comments:4000 Unicode scalars plus bounded localization metadata.
-export const scorm2004CheckpointMaxBytes = scorm2004CheckpointBytes + 250 * (6 * 4257 + 2);
+// First250 learner and100 trusted LMS comments:4000 scalars plus localization metadata.
+export const scorm2004CheckpointMaxBytes = scorm2004CheckpointBytes + 350 * (6 * 4257 + 2);
 export function scorm2004CheckpointLimit(state: any): number {
   let bytes = scorm2004CheckpointBytes;
-  const comments = state && typeof state === 'object' && Object.hasOwn(state, 'comments_from_learner') ? state.comments_from_learner : undefined;
-  if (!comments || typeof comments !== 'object' || Array.isArray(comments)) return bytes;
-  for (let i = 0; i < 250; i++) {
-    const record = Object.hasOwn(comments, i) ? comments[i] : undefined;
-    const value = record && typeof record === 'object' && !Array.isArray(record) && Object.hasOwn(record, 'comment') ? record.comment : undefined;
-    if (typeof value === 'string' && value.length <= 8514 && scormCharacters(value) <= 4257) bytes += new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  for (const [family, count] of [['comments_from_learner', 250], ['comments_from_lms', 100]] as const) {
+    const comments = state && typeof state === 'object' && Object.hasOwn(state, family) ? state[family] : undefined;
+    if (!comments || typeof comments !== 'object' || Array.isArray(comments)) continue;
+    for (let i = 0; i < count; i++) {
+      const record = Object.hasOwn(comments, i) ? comments[i] : undefined;
+      const value = record && typeof record === 'object' && !Array.isArray(record) && Object.hasOwn(record, 'comment') ? record.comment : undefined;
+      if (typeof value === 'string' && value.length <= 8514 && scormCharacters(value) <= 4257) bytes += new TextEncoder().encode(JSON.stringify(value)).byteLength;
+    }
   }
   return bytes;
 }
