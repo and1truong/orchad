@@ -1,0 +1,87 @@
+{
+  "realm": "pear-original-acceptance",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "clients": [
+    {
+      "clientId": "pear-original-browser",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1:4336/api/auth/callback"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "hostile-role-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "role",
+            "claim.value": "admin",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "91ef9e50-f7c1-4f88-bcc0-706039947a11",
+      "username": "reviewed-admin",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "original-test-only",
+          "temporary": false
+        }
+      ],
+      "firstName": "Original",
+      "lastName": "Fixture",
+      "email": "reviewed-admin@example.test",
+      "emailVerified": true
+    },
+    {
+      "id": "91ef9e50-f7c1-4f88-bcc0-706039947a12",
+      "username": "invited-learner",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "original-test-only",
+          "temporary": false
+        }
+      ],
+      "firstName": "Original",
+      "lastName": "Fixture",
+      "email": "invited-learner@example.test",
+      "emailVerified": true
+    },
+    {
+      "id": "91ef9e50-f7c1-4f88-bcc0-706039947a13",
+      "username": "wrong-identity",
+      "enabled": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "original-test-only",
+          "temporary": false
+        }
+      ],
+      "firstName": "Original",
+      "lastName": "Fixture",
+      "email": "wrong-identity@example.test",
+      "emailVerified": true
+    }
+  ]
+}
