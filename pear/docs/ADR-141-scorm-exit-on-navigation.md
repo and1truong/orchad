@@ -48,3 +48,12 @@ Rustici account and reviewed deployment/storage/scanner/recovery inputs remain
 external blockers; production disabled and epic open.
 
 Reference: https://lms.technology/for/scorm/2004/4th_edition/standards/SCORM_2004_4ED_v1_1_RTE_20090814.pdf (RTE4.2.8).
+
+## Close completion observation
+
+A descendant integrated v35 browser run completes8/9 with one premature state
+read: Introduction is already visible before Close finishes. The test now waits
+for the Close control to disappear before reading its trusted sequencing state;
+all prior CMI/history/receipt/no-proof assertions and timeout budgets remain.
+Exact owner v34 build and three built journeys complete exit0. Full prior local
+failures/recheck evidence remains above; new owner-head CI is required.

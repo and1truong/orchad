@@ -22,7 +22,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     await expect(sco.getByText('Sequencing entry: ab-initio; bookmark:', {exact: true})).toBeVisible();
     await sco.getByRole('button', {name: 'End sequencing session', exact: true}).click(); await expect(sco.getByText('Time-out Commit: true', {exact: true})).toBeVisible(); await expect(player.getByRole('status')).toContainText('saved by the server');
     const receipts = Number(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n);
-    await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await expect(player.getByRole('button', {name: /Introduction/})).toBeVisible();
+    await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await expect(player.getByRole('button', {name: 'Close SCO and choose another', exact: true})).toHaveCount(0); await expect(player.getByRole('button', {name: /Introduction/})).toBeVisible();
     const old = f.db.prepare('SELECT * FROM scorm_sco_attempts').get()!; expect(old.finished).toBe(0); expect(old.reported_seconds).toBe(12);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(receipts+1);
     const snapshot=JSON.parse(JSON.parse(String(f.db.prepare('SELECT sequencing_state FROM scorm_engine_attempts').get()!.sequencing_state)).snapshot);
