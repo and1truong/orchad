@@ -119,6 +119,8 @@ try {
   check('actual native IANA prefix refusal preserves historical registration through retry/resume',iana(first.probes[0])&&iana(resumed.probes[1]));
   const country=probe=>probe.reservedCountry?.resumed===true&&probe.reservedCountry.preserved===true&&JSON.stringify(probe.reservedCountry.codes)===JSON.stringify(Array(42).fill('406'));
   check('actual native reserved country refusal preserves historical language through retry/resume',country(first.probes[0])&&country(resumed.probes[1]));
+  const assignedCountry=probe=>probe.countryRegistry?.resumed===true&&probe.countryRegistry.accepted===260&&probe.countryRegistry.preserved===true&&JSON.stringify(probe.countryRegistry.codes)===JSON.stringify(Array(4).fill('406'));
+  check('actual native ISO country membership preserves exact prior language through retry/resume',assignedCountry(first.probes[0])&&assignedCountry(resumed.probes[1]));
   const result=probe=>probe.resultDecimal?.resumed===true&&probe.resultDecimal.preserved===true&&JSON.stringify(probe.resultDecimal.codes)===JSON.stringify(['406','406','406','406']);
   check('actual native long interaction result preserves exact text and atomic refusal through retry/resume',result(first.probes[0])&&result(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;

@@ -53,6 +53,11 @@ const script = `
     if(api.SetValue(ianaKey,'{lang=en-US}Native country control')!=='true'||api.GetValue(ianaKey)!=='{lang=en-US}Native country control'||api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native country control refused');
     const countryCodes=${JSON.stringify(JSON.parse(readFileSync(new URL('./scorm-language-registry.json',import.meta.url),'utf8')).userAssignedCountries)}.map(code=>{if(api.SetValue(ianaKey,'{lang=fre-'+code.toLowerCase()+'-demo}Rejected text')!=='false')throw Error('Native reserved country admitted');return api.GetLastError();});
     evidence.reservedCountry={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:countryCodes};
+    const assignedCountries=${JSON.stringify((()=>{const r=JSON.parse(readFileSync(new URL('./scorm-language-registry.json',import.meta.url),'utf8'));return [...r.countryAlpha2,...r.historicalCountryAlpha2];})())};
+    for(const code of assignedCountries){const value='{lang=FRE-'+code.toLowerCase()+'}Native historical country';if(api.SetValue(ianaKey,value)!=='true'||api.GetValue(ianaKey)!==value)throw Error('Native ISO country refused');}
+    if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native country control restoration refused');
+    const unassignedCodes=['en-OO','FRE-ab','qaa-CJ-demo','SCC-oh'].map(tag=>{if(api.SetValue(ianaKey,'{lang='+tag+'}Rejected text')!=='false')throw Error('Native unassigned ISO country admitted');return api.GetLastError();});
+    evidence.countryRegistry={resumed:ianaResumed,accepted:assignedCountries.length,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:unassignedCodes};
     const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');
