@@ -130,7 +130,7 @@ export async function dispatcher(
 // Fixed MAIN-world installer for the opt-in app-initiated prompt channel
 // (issue #50). Chrome serializes this function; like the dispatcher it takes
 // no closures. It adds `requestAgentTurn` to the app's own agentBridgeV1
-// object — an explicitly host-injected API, not part of the Bridge 0.1
+// surface — an explicitly host-injected API, not part of the Bridge 0.1
 // contract surface the app registers — only while the target is pinned and
 // consented. The page promise resolves with the final agent-turn result or
 // failure only; tool results never cross to the page.
@@ -168,7 +168,7 @@ export function installAgentRequest(): { installed: boolean } {
     window.removeEventListener("message", entry.listener);
     entry.resolve(result);
   };
-  bridge.requestAgentTurn = (prompt: unknown) => {
+  const requestAgentTurn = (prompt: unknown) => {
     if (typeof prompt !== "string" || prompt.length === 0)
       return Promise.resolve({ ok: false, error: "prompt must be a string" });
     if (new TextEncoder().encode(prompt).length > MAX_PROMPT_BYTES)
@@ -182,7 +182,7 @@ export function installAgentRequest(): { installed: boolean } {
         error: "an agent request is already pending",
       });
     const requestId = "appreq-" + crypto.randomUUID();
-    return new Promise((resolve) => {
+    return new Promise<{ ok: boolean; text?: string; error?: string }>((resolve) => {
       const listener = (event: MessageEvent) => {
         if (event.source !== window) return;
         const d = event.data;
@@ -212,6 +212,17 @@ export function installAgentRequest(): { installed: boolean } {
       );
     });
   };
+  if (Object.isExtensible(bridge)) bridge.requestAgentTurn = requestAgentTurn;
+  else {
+    // Apps such as Pear freeze their contract object. Delegate the original
+    // methods with their original receiver; never thaw or mutate that object.
+    const wrapper: Record<string, unknown> = {...bridge, requestAgentTurn};
+    for (const key of ["describe", "getContext", "invoke"]) {
+      const method = bridge[key];
+      if (typeof method === "function") wrapper[key] = (...args: unknown[]) => method.apply(bridge, args);
+    }
+    (window as unknown as {agentBridgeV1: unknown}).agentBridgeV1 = Object.freeze(wrapper);
+  }
   return { installed: true };
 }
 export class ChromePageAdapter implements PageAdapter {
