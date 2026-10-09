@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import {randomBytes} from 'node:crypto';
 import type {SCORMPlayerService} from './scorm-player-service.ts';
 import {DomainError} from './errors.ts';
-import {scorm2004CheckpointBytes} from '../shared/scorm2004-runtime.ts';
+import {scorm2004CheckpointLimit, scorm2004CheckpointMaxBytes} from '../shared/scorm2004-runtime.ts';
 
 export function contentHostOrigins(pearOrigin: string, contentOrigin: string) {
   const pear = new URL(pearOrigin), content = new URL(contentOrigin);
@@ -79,8 +79,10 @@ export function createSCORMContentHost(options: {pearOrigin: string; contentOrig
       if (req.headers.origin !== origins.contentOrigin || req.headers['content-type']?.split(';')[0] !== 'application/json') return reply.code(403).send({error: 'Content-origin JSON required'});
       return player.advanceAsset((req.params as any).token, req.body);
     });
-    app.post('/launch/:token/checkpoint', {bodyLimit: scorm2004CheckpointBytes + 32 * 1024}, async (req, reply) => {
+    app.post('/launch/:token/checkpoint', {bodyLimit: scorm2004CheckpointMaxBytes + 32 * 1024}, async (req, reply) => {
       if (req.headers.origin !== origins.contentOrigin || req.headers['content-type']?.split(';')[0] !== 'application/json') return reply.code(403).send({error: 'Content-origin JSON required'});
+      const body = req.body as any, limit = scorm2004CheckpointLimit(body?.state);
+      if (Buffer.byteLength(JSON.stringify(body)) > limit + 32 * 1024 || Buffer.byteLength(JSON.stringify({state: body?.state, sharedData: body?.sharedData, interactionWrites: body?.interactionWrites})) > limit) return reply.code(413).send({error: 'INVALID_ARGUMENT'});
       return player.checkpoint((req.params as any).token, req.body);
     });
   }
