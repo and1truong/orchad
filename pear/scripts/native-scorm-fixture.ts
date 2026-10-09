@@ -1,5 +1,5 @@
 // Isolated CI fixture. Not imported or mounted by any product entry point.
-import {mkdtempSync, rmSync, readFileSync} from 'node:fs';
+import {mkdtempSync, rmSync, readFileSync, writeSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import Fastify from 'fastify';
@@ -160,12 +160,15 @@ await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host:
 console.log('PEAR_NATIVE_FIXTURE_READY');
 let closing = false;
 async function close() {
-  if (closing) return; closing = true; console.log('PEAR_NATIVE_FIXTURE_CLOSE:received');
+  if (closing) return; closing = true;
+  // Flush phase evidence before a synchronous close/cleanup can block or exit.
+  const started = performance.now(), phase = (name: string) => writeSync(1, 'PEAR_NATIVE_FIXTURE_CLOSE:' + name + ' elapsedMs=' + (performance.now() - started).toFixed(3) + '\n');
+  phase('received');
   sink.server.closeAllConnections(); content!.server.closeAllConnections(); app.server.closeAllConnections();
-  console.log('PEAR_NATIVE_FIXTURE_CLOSE:connections-closed');
-  await sink.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:sink-closed');
-  await app.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:app-closed');
-  f.db.close(); console.log('PEAR_NATIVE_FIXTURE_CLOSE:database-closed'); rmSync(dir, {recursive: true, force: true}); console.log('PEAR_NATIVE_FIXTURE_CLOSE:cleanup-complete'); process.exit(0);
+  phase('connections-closed');
+  await sink.close(); phase('sink-closed');
+  await app.close(); phase('app-closed');
+  f.db.close(); phase('database-closed'); rmSync(dir, {recursive: true, force: true}); phase('cleanup-complete'); process.exit(0);
 }
 process.on('SIGTERM', () => void close()); process.on('SIGINT', () => void close());
 
