@@ -31,22 +31,25 @@ export function responseStateMatches(runtime:Scorm2004API,state:Record<string,an
 export function loadResponseState(runtime:Scorm2004API,state:Record<string,any>,bindings:ResponseBindings={}){
   if(!bindings||typeof bindings!=='object'||Array.isArray(bindings)||Object.keys(bindings).length>2048)throw Error('Invalid response bindings');
   if(!Object.keys(bindings).length){runtime.loadFromJSON(state);snapshots.set(runtime,{});return;}
-  const values=responses(state),copy=structuredClone(state),records=new Set<string>();
+  const values=responses(state),copy=structuredClone(state),records=new Set<string>(),patternRecords=new Set<string>();
   for(const [path,type] of Object.entries(bindings)){
     const m=/^cmi\.interactions\.(0|[1-9]\d{0,2})\.(learner_response|correct_responses\.(0|[1-9]\d{0,2})\.pattern)$/.exec(path);
-    if(!m||!types.includes(type)||!values[path])throw Error('Invalid response binding');records.add(m[1]);
+    if(!m||!types.includes(type)||!values[path])throw Error('Invalid response binding');records.add(m[1]);if(m[2]!=='learner_response')patternRecords.add(m[1]);
   }
-  for(const n of records){delete copy.interactions[n].learner_response;copy.interactions[n].correct_responses={};}
+  for(const n of records){delete copy.interactions[n].learner_response;if(patternRecords.has(n))copy.interactions[n].correct_responses={};}
   runtime.loadFromJSON(copy);
   for(const n of records){
     const r=state.interactions[n],record=runtime.cmi.interactions.childArray[Number(n)] as any,base='cmi.interactions.'+n;
-    record._learner_response=undefined;record.correct_responses.childArray=[];
+    record._learner_response=undefined;
     if(typeof r.learner_response==='string'){
       const probe=engine(runtime);probe.loadFromJSON({interactions:{0:{id:r.id,type:bindings[base+'.learner_response']??r.type,learner_response:r.learner_response}}});
       // Restore only a string validated under its host-recorded original type.
       record._learner_response=(probe.cmi.interactions.childArray[0] as any)._learner_response;
       (runtime as any)._setCMIElements.add(base+'.learner_response');
     }
+    // Current-type patterns stay together for packed-index and duplicate-set validation.
+    if(!patternRecords.has(n))continue;
+    record.correct_responses.childArray=[];
     const patterns=Object.entries(r.correct_responses??{}).sort(([a],[b])=>Number(a)-Number(b));
     for(const [index,p] of patterns as [string,any][]){
       if(Number(index)!==record.correct_responses.childArray.length)throw Error('Invalid response index');
