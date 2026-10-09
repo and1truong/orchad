@@ -64,6 +64,10 @@ jobs:
           npm test
           npm run build
   coconut-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [baseline, collections]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -93,9 +97,9 @@ jobs:
       - name: Rust predicate unit tests
         working-directory: coconut/src-tauri
         run: cargo test
-      - name: Actual native runtime, Pear and all four SCORM profiles
+      - name: Actual native ${{ matrix.group }} acceptance
         working-directory: coconut
-        run: xvfb-run -a node scripts/native-platform-acceptance.mjs src-tauri/target/debug/coconut
+        run: xvfb-run -a node scripts/native-platform-acceptance.mjs src-tauri/target/debug/coconut ${{ matrix.group }}
   coconut-native-platform:
     strategy:
       fail-fast: false
