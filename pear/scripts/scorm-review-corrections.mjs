@@ -338,6 +338,14 @@ const logoutExitAllUpdates = [
     "// Pear: RTE time-out/logout end the sequencing session regardless of authored navigation."
   ]
 ];
+const interactionIDOriginal = "bc4d03187eb829e7b8a9a22e775b2cf2cfe14d7e0815ad24e518522c6500706a";
+const interactionIDPatched = "ca2588b34c137ee832c2b58cadde4ad5c6260286c3fe5ce0e25470f55b40dc31";
+const interactionIDUpdates = [
+  [
+    "  /**\n   * Setter for _id\n   * Per SCORM 2004 RTE: identifier SHALL NOT be empty or contain only whitespace\n   * Per SCORM 2004 RTE Section 4.1.6: Once set, an interaction ID is immutable (error 351)\n   * @param {string} id\n   */\n  set id(id) {\n    if (id === \"\" || id.trim() === \"\") {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.TYPE_MISMATCH\n      );\n    }\n    if (this._idIsSet && this._id !== id) {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.GENERAL_SET_FAILURE\n      );\n    }\n",
+    "  /**\n   * Setter for _id\n   * Per SCORM 2004 RTE: identifier SHALL NOT be empty or contain only whitespace\n   * Pear: RTE 4.2.9 recommends avoiding ID changes but permits valid replacements.\n   * @param {string} id\n   */\n  set id(id) {\n    if (id === \"\" || id.trim() === \"\") {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.TYPE_MISMATCH\n      );\n    }\n"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -424,9 +432,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, logoutExitAllUpdates);
     if (hash(source) !== logoutExitAllPatched) throw Error("SCORM logout ExitAll checksum mismatch");
   }
+  if (hash(source) === interactionIDOriginal) {
+    source = replace(source, interactionIDUpdates);
+    if (hash(source) !== interactionIDPatched) throw Error("SCORM interaction ID checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === interactionIDPatched) {
+    source = replace(source, interactionIDUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== interactionIDOriginal) throw Error("SCORM interaction ID reverse checksum mismatch");
+  }
   if (hash(source) === logoutExitAllPatched) {
     source = replace(source, logoutExitAllUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== logoutExitAllOriginal) throw Error("SCORM logout ExitAll reverse checksum mismatch");

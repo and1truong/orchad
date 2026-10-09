@@ -13,13 +13,15 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
   const valid = [...validIdentifiers, ...validURNs, ...validSchemeReferences, ...validFragmentReferences], invalid = [...invalidIdentifiers, ...invalidURNs, ...invalidSchemeReferences, ...invalidFragmentReferences], fullIndex = valid.length;
   const script = `const valid=${JSON.stringify(valid)},invalid=${JSON.stringify(invalid)},api=parent.API_1484_11;
     for(const [i,value] of valid.entries()){const base='cmi.interactions.'+i;
-      if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.id')!==value)throw Error('ID resume');
+      if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.id')!==(i===0?'urn:pear:replacement':value))throw Error('ID resume');
       if(api.SetValue(base+'.id',value)!=='true'||api.SetValue(base+'.type','likert')!=='true')throw Error('ID dependency');
       for(const suffix of ['.learner_response','.correct_responses.0.pattern']){
         if(api.SetValue(base+suffix,value)!=='true')throw Error('valid URI');
         for(const bad of invalid)if(api.SetValue(base+suffix,bad)!=='false'||api.GetLastError()!=='406'||api.GetValue(base+suffix)!==value)throw Error('invalid URI');
       }
     }
+    if(api.SetValue('cmi.interactions.0.id','urn:pear:replacement')!=='true'||api.GetValue('cmi.interactions.0.id')!=='urn:pear:replacement'||api.GetValue('cmi.interactions.0.learner_response')!==valid[0]||api.GetValue('cmi.interactions.0.correct_responses.0.pattern')!==valid[0])throw Error('ID replacement retains response');
+    for(const bad of ['bad%','1:invalid','a\\n'])if(api.SetValue('cmi.interactions.0.id',bad)!=='false'||api.GetLastError()!=='406'||api.GetValue('cmi.interactions.0.id')!=='urn:pear:replacement')throw Error('ID replacement refusal');
     const full=Array.from({length:36},(_,i)=>String(i).padStart(2,'0')+'a'.repeat(3998)).join('[,]'),base='cmi.interactions.${fullIndex}';
     if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.learner_response')!==full)throw Error('full choice resume');
     if(api.SetValue(base+'.id','urn:pear:full-choice')!=='true'||api.SetValue(base+'.type','choice')!=='true')throw Error('choice dependency');
@@ -56,7 +58,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision).toBe(initialRevision + 1);
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-    for (const [i, value] of valid.entries()) expect(stored.interactions[i].id).toBe(value);
+    for (const [i, value] of valid.entries()) expect(stored.interactions[i].id).toBe(i === 0 ? 'urn:pear:replacement' : value);
     expect(stored.interactions[fullIndex].learner_response.length).toBe(144105); expect(stored.interactions[fullIndex].correct_responses[0].pattern).toBe(stored.interactions[fullIndex].learner_response);
     expect(stored.interactions[fullIndex].correct_responses[1].pattern).toBe('b[,]a'); expect(Object.keys(stored.interactions[fullIndex].correct_responses)).toHaveLength(2);
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();

@@ -170,3 +170,13 @@ cases pass; interaction-records2004-3/duration2004-4 practice delivery still fai
 Retained trace shows server accepted Terminate/nextScoId=practice but no following
 browser status lookup/replacement after manual retry; cause unresolved. No clean
 full local acceptance claim. New-head full CI/native/Side Panel/reviews required.
+
+ADR-142 v35 permits valid interaction ID replacement while retaining objective
+ID immutability and URI/dependency/packed-array guards in the shared engine.
+Original6FAIL; draft focused39/build/built3 pass. First integrated799/803 and
+compatibility803/804 failures retained; timestamp oracle now uses one controlled
+Date clock and complete restored-state equality. Build/integrated built9 pass;
+fresh final domain804/804 across118 files/typecheck/focused64/64 complete exit0.
+Historical v34 bytes/marker are
+accepted with identity/unknown-source refusal. New-head full CI/reviews and
+parent browser failures remain required; epic open, production disabled.

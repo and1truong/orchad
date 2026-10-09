@@ -1,6 +1,6 @@
 export const SCORM_STANDARDS = ['1.2', '2004-2', '2004-3', '2004-4'] as const;
 export type SCORMStandard = typeof SCORM_STANDARDS[number];
-export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-logout-exitall-v34'} as const;
+export const SCORM_ENGINE = {name: 'scorm-again', version: '3.4.5', adaptation: 'pear-interaction-id-v35'} as const;
 /** Model keywords are public; backing fields and engine roots are not API elements. */
 export function scormModelPath(key: string) {
   // Target delimiters contain authored values; the engine binds this whole family.
