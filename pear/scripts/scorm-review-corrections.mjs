@@ -346,6 +346,18 @@ const interactionIDUpdates = [
     "  /**\n   * Setter for _id\n   * Per SCORM 2004 RTE: identifier SHALL NOT be empty or contain only whitespace\n   * Pear: RTE 4.2.9 recommends avoiding ID changes but permits valid replacements.\n   * @param {string} id\n   */\n  set id(id) {\n    if (id === \"\" || id.trim() === \"\") {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.TYPE_MISMATCH\n      );\n    }\n"
   ]
 ];
+const urnNulOriginal = "ca2588b34c137ee832c2b58cadde4ad5c6260286c3fe5ce0e25470f55b40dc31";
+const urnNulPatched = "35b50ad4ce8742e927725802ccba2b9950532f637d3a0ea74daa886155ff0790";
+const urnNulUpdates = [
+  [
+    "  CMIShortIdentifier: \"^(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n",
+    "  CMIShortIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n"
+  ],
+  [
+    "  CMILongIdentifier: \"^(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n",
+    "  CMILongIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -436,9 +448,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, interactionIDUpdates);
     if (hash(source) !== interactionIDPatched) throw Error("SCORM interaction ID checksum mismatch");
   }
+  if (hash(source) === urnNulOriginal) {
+    source = replace(source, urnNulUpdates);
+    if (hash(source) !== urnNulPatched) throw Error("SCORM URN NUL checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === urnNulPatched) {
+    source = replace(source, urnNulUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== urnNulOriginal) throw Error("SCORM URN NUL reverse checksum mismatch");
+  }
   if (hash(source) === interactionIDPatched) {
     source = replace(source, interactionIDUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== interactionIDOriginal) throw Error("SCORM interaction ID reverse checksum mismatch");

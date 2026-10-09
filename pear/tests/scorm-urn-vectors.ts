@@ -1,3 +1,3 @@
 // Original RFC 2141 §§2–2.4 vectors. Reserved /?# are SHOULD NOT, not MUST NOT.
-export const validURNs = ['urn:a:a', 'UrN:Pear:answer%2cpart', 'urn:a-:a/b?c#d', 'urn:1:()+,-.:=@;$_!*\'', 'urn:' + 'a'.repeat(32) + ':answer', 'urn:pear:encoded%26%7E%5B%5D'];
-export const invalidURNs = ['urn:', 'urn::answer', 'urn:pear:', 'urn:-pear:answer', 'urn:pear_name:answer', 'urn:pear.name:answer', 'urn:pear+name:answer', 'urn:urn:answer', 'URN:UrN:answer', 'urn:' + 'a'.repeat(33) + ':answer', 'urn:pear:a&b', 'urn:pear:a~b'];
+export const validURNs = ['urn:a:a', 'UrN:Pear:answer%2cpart', 'urn:a-:a/b?c#d', 'urn:1:()+,-.:=@;$_!*\'', 'urn:' + 'a'.repeat(32) + ':answer', 'urn:pear:encoded%26%7E%5B%5D', 'urn:pear:a%01b', 'urn:pear:literal%2500', 'https://example.test/a%00b'];
+export const invalidURNs = ['urn:', 'urn::answer', 'urn:pear:', 'urn:-pear:answer', 'urn:pear_name:answer', 'urn:pear.name:answer', 'urn:pear+name:answer', 'urn:urn:answer', 'URN:UrN:answer', 'urn:' + 'a'.repeat(33) + ':answer', 'urn:pear:a&b', 'urn:pear:a~b', 'urn:pear:%00', 'URN:PeAr:before%00after', 'urn:pear:a%00'];

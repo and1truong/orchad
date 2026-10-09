@@ -195,3 +195,11 @@ Learning Close now requires scroll/viewport and completed control removal;
 original launches/history/proof/quiz/certificate checks stay intact. Corrected
 learning6/6 and typecheck complete exit0, no clean full local claim; protocol/download/permission evidence
 and exact-head CI/reviews remain required.
+
+ADR-144 pear-urn-nul-v36 binds RFC2141 null-octet guidance in the shared short/
+long identifier expressions. Original6FAIL, draft focused26/full804 across118
+files/build/built URI3 pass, all exit0. Integrated latest-parent domain804/804
+across118 files/build/built11 pass, all exit0. v35 exact bytes/marker upgrades with
+identity/unknown-source refusal, prior receipt/history and SCORM1.2 unchanged.
+Full145 current-parent browser acceptance and new-head CI/reviews remain required.
+URI/IP-literal/full reference and production/external gates remain open.

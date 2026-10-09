@@ -42,11 +42,11 @@ for(const edition of ['2004-2','2004-3','2004-4'] as const){
  });
 }
 
-test('v35 accepts exact v34 sequencing envelopes while keeping identity and unknown-adaptation refusal',async(t)=>{
+test('v36 accepts exact v34/v35 sequencing envelopes while keeping identity and unknown-adaptation refusal',async(t)=>{
  const {manifest}=await inspectSCORMPackage(multiFilePackage('2004-4',sequencingManifest('2004-4'))),scope={attemptId:'original-attempt',sha256:'a'.repeat(64)};
  t.mock.timers.enable({apis:['Date'],now:Date.UTC(2026,9,9)});
- const engine=trustedSequencing(manifest,'{}',scope),saved=JSON.parse(saveSequencing(engine,manifest,scope)),restored=trustedSequencing(manifest,JSON.stringify(saved),scope).serializeSequencingState();saved.engine.adaptation='pear-logout-exitall-v34';
- assert.equal(trustedSequencing(manifest,JSON.stringify(saved),scope).serializeSequencingState(),restored);
+ const engine=trustedSequencing(manifest,'{}',scope),saved=JSON.parse(saveSequencing(engine,manifest,scope)),restored=trustedSequencing(manifest,JSON.stringify(saved),scope).serializeSequencingState();for(const marker of ['pear-logout-exitall-v34','pear-interaction-id-v35']){saved.engine.adaptation=marker;
+ assert.equal(trustedSequencing(manifest,JSON.stringify(saved),scope).serializeSequencingState(),restored);}
  assert.throws(()=>trustedSequencing(manifest,JSON.stringify(saved),{...scope,attemptId:'different-attempt'}),/identity changed/);
  saved.engine.adaptation='unreviewed';assert.throws(()=>trustedSequencing(manifest,JSON.stringify(saved),scope),/identity changed/);
 });
