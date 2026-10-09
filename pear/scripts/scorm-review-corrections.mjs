@@ -1,6 +1,7 @@
 // Exact reviewed successors of published engine sources; unknown bytes remain
 // subject to the installer's original version/source locks. Keep MIT headers.
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const pins = {
   "17b3f713e5ddf6caf3206c77d2ea19e17fef5d4610b2d61d267f523012064871": "03213a703fe000cdf1ed1bb531f4f67dca0b68fb6f5d57f587ebd2c8ac2c1be3",
@@ -472,6 +473,42 @@ export const legacyAbsoluteUpdates = uriAuthorityUpdates.slice(0, 2).map(([, bef
   const pattern = JSON.parse(match[1]);
   return [before, before.replace(match[1], () => JSON.stringify('^(?![A-Za-z][A-Za-z0-9+.-]*:(?:#|$))' + pattern.slice(1)))];
 });
+const languageRegistryOriginal = legacyAbsolutePatched;
+const languageRegistryPatched = "a8a7d45aae0d80cd982ab7260c2279b304e5da5f364622a636f5f879e426c9a3";
+const languageRegistry = JSON.parse(readFileSync(new URL('./scorm-language-registry.json', import.meta.url), 'utf8'));
+const caseCode = code => Array.from(code, c => '[' + c + c.toUpperCase() + ']').join('');
+// ponytail: pinned ISO snapshot; review registry changes before updating its engine checksum.
+const isoPrimary = '(?:' + [...languageRegistry.alpha2, ...languageRegistry.alpha3, ...languageRegistry.historicalAlpha3].map(caseCode).join('|') + '|[qQ][a-tA-T][a-zA-Z]|[iIxX])';
+export const languageRegistryUpdates = [
+  [
+    "const scorm2004_regex = {",
+    '// Pear: registered ISO primary codes and reserved i/x prefixes; subcodes retain ADR115 policy.\nconst PEAR_ISO_LANGUAGE_PRIMARY = ' + JSON.stringify(isoPrimary) + ';\nconst scorm2004_regex = {'
+  ],
+  [
+    "  CMILang: \"^(?=[\\\\s\\\\S]{0,250}(?![\\\\s\\\\S]))(?:[a-zA-Z]{1,8}(?:-[a-zA-Z0-9]{1,8})*)?(?![\\\\s\\\\S])\",",
+    "  CMILang: \"^(?=[\\\\s\\\\S]{0,250}(?![\\\\s\\\\S]))(?:\" + PEAR_ISO_LANGUAGE_PRIMARY + \"(?:-[a-zA-Z0-9]{1,8})*)?(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILangString250: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=([a-zA-Z]{1,8})((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,250}(?![\\\\s\\\\S])\",",
+    "  CMILangString250: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=(\" + PEAR_ISO_LANGUAGE_PRIMARY + \")((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,250}(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILangString: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=([a-zA-Z]{1,8})((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF])*(?![\\\\s\\\\S])\",",
+    "  CMILangString: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=(\" + PEAR_ISO_LANGUAGE_PRIMARY + \")((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF])*(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILangcr: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=([a-zA-Z]{1,8})((?:-[a-zA-Z0-9]{1,8})*)\\\\}))((?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF])*)(?![\\\\s\\\\S])\",",
+    "  CMILangcr: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=(\" + PEAR_ISO_LANGUAGE_PRIMARY + \")((?:-[a-zA-Z0-9]{1,8})*)\\\\}))((?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF])*)(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILangString250cr: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=([a-zA-Z]{1,8})((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,250}(?![\\\\s\\\\S])\",",
+    "  CMILangString250cr: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=(\" + PEAR_ISO_LANGUAGE_PRIMARY + \")((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,250}(?![\\\\s\\\\S])\","
+  ],
+  [
+    "  CMILangString4000: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=([a-zA-Z]{1,8})((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,4000}(?![\\\\s\\\\S])\",",
+    "  CMILangString4000: \"^((?=\\\\{lang=[^}]{1,250}\\\\})(\\\\{lang=(\" + PEAR_ISO_LANGUAGE_PRIMARY + \")((?:-[a-zA-Z0-9]{1,8})*)\\\\}))?(?!\\\\{lang=)(?:[\\\\u0000-\\\\uD7FF\\\\uE000-\\\\uFFFF]|[\\\\uD800-\\\\uDBFF][\\\\uDC00-\\\\uDFFF]){0,4000}(?![\\\\s\\\\S])\","
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -579,9 +616,11 @@ export function reviewedSCORMSource(source) {
   if (hash(source) === decimalOriginal) {source = replace(source, decimalUpdates); if (hash(source) !== decimalPatched) throw Error("SCORM decimal checksum mismatch");}
   if (hash(source) === resultDecimalOriginal) {source = replace(source, resultDecimalUpdates); if (hash(source) !== resultDecimalPatched) throw Error("SCORM result decimal checksum mismatch");}
   if (hash(source) === legacyAbsoluteOriginal) {source = replace(source, legacyAbsoluteUpdates); if (hash(source) !== legacyAbsolutePatched) throw Error("SCORM legacy absolute checksum mismatch");}
+  if (hash(source) === languageRegistryOriginal) {source = replace(source, languageRegistryUpdates); if (hash(source) !== languageRegistryPatched) throw Error("SCORM language registry checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === languageRegistryPatched) {source = replace(source, languageRegistryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== languageRegistryOriginal) throw Error("SCORM language registry reverse checksum mismatch");}
   if (hash(source) === legacyAbsolutePatched) {source = replace(source, legacyAbsoluteUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== legacyAbsoluteOriginal) throw Error("SCORM legacy absolute reverse checksum mismatch");}
   if (hash(source) === resultDecimalPatched) {source = replace(source, resultDecimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== resultDecimalOriginal) throw Error("SCORM result decimal reverse checksum mismatch");}
   if (hash(source) === decimalPatched) {source = replace(source, decimalUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== decimalOriginal) throw Error("SCORM decimal reverse checksum mismatch");}
