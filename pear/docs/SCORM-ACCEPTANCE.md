@@ -240,3 +240,11 @@ native evidence. Parent21968/run37873160107 all10 jobs/logs verified, Pear813/
 213dev/213built/SidePanel4 and native3OS16/13/1.2=13/2004=14/five clean ACK+exit0
 records each. Parent full148=142PASS/6FAIL exit1 and unchanged diagnostic18PASS
 remain recorded with unattributed driver failures; no clean full local claim.
+
+ADR-147: original3 performance-capacity regressions FAIL on v38; bounded2MiB
+checkpoint queue/server/HTTP agreement. Focused24/build/typecheck/full825 across
+121 files, large/ordered built9 and supplemental native fixture4 PASS exit0.
+Actual native over544KiB checkpoint/35 Unicode-record retry/resume and full157
+local/current-head CI/review remain required. Parent220 full151=149PASS/2FAIL
+exit1 download/SW restrictions is retained. Whole SPM combinations/load/ops
+remain open; no production enablement or conformance claim.

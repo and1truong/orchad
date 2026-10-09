@@ -4,7 +4,8 @@ import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts'
 import {scormModelPath, scormSupportCode, type SCORMStandard} from './scorm-engine.ts';
 
 export type SCORM2004Edition = Exclude<SCORMStandard, '1.2'>;
-export const scorm2004CheckpointBytes = 512 * 1024;
+// Bounded transport for named full choice/performance SPM snapshots, including Unicode.
+export const scorm2004CheckpointBytes = 2 * 1024 * 1024;
 export const scorm2004ExitRequests = ['_none_', 'exit', 'exitAll', 'abandon', 'abandonAll', 'suspendAll'];
 
 /** SCORM's timeinterval binding, with centisecond precision and bounded arithmetic. */

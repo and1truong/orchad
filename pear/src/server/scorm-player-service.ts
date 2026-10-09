@@ -10,7 +10,7 @@ import {reject} from './errors.ts';
 import {scoEvidence, meetsSCORMPolicy} from './scorm-evidence.ts';
 import {scorm12Activities, playbackActivities, activityStates, activityAvailable} from './scorm-activities.ts';
 import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
-import {scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
+import {scorm2004CheckpointBytes, scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
@@ -256,7 +256,7 @@ export class SCORMPlayerService {
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
       if (manifest.standard !== '1.2' && a.navigation !== undefined && typeof a.navigation !== 'string') reject('INVALID_ARGUMENT', 'Exact navigation request required');
       if (a.sharedData !== undefined && manifest.standard !== '2004-4') reject('INVALID_ARGUMENT', 'Shared data requires fourth edition');
-      if (a.sharedData !== undefined && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData})) > 512 * 1024) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
+      if (a.sharedData !== undefined && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData})) > scorm2004CheckpointBytes) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
       const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
       if (engine && deliveredSCO(engine, manifest)?.activity.id !== c.launch.sco_id) reject('STALE_CONTEXT', 'Sequencing has delivered a different SCO');
       if (engine) {loadSystemData(this.db, c.registration, manifest, engine); loadSystemObjectives(this.db, c.registration, manifest, engine);}
