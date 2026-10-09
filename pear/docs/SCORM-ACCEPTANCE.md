@@ -565,3 +565,56 @@ shutdown evidence remains, and a retry cannot establish its cause or fix.
 Unchanged-tree focused recheck of the two DOM-failed journeys completes2PASS
 exit0 (6.3s), all assertions/deadlines retained. Original full168/4 remains;
 this recheck neither proves the cause nor turns the full run into PASS.
+
+
+ADR-157 reuses XML atomic token normalization at recognized IMS rule/rollup/
+selection enumeration reads; present empty operator now refuses, omission
+defaults/vocabulary/IDs/strings/history remain exact. Original9FAIL+3FAIL
+retained. Focused55/typecheck/build completes exit0;12 token tests exercise
+currently supported vocabulary/defaults, used/unused invalid definitions,
+immutable XML/hash, exact retry, SQLite reopen/resume and exactly-one proof.
+Expanded13 built/native4/full931domain/full172browser pending. Actual native
+fixture includes token-authored never/always-not controls;2004=23 unchanged.
+Full schema/condition semantics/reference/history/operations matrices OPEN;
+external blockers unchanged. Epic OPEN; production DISABLED.
+
+Fresh full domain931/131files completes all per-file plans/footers/five counts/
+exit0 and aggregate exit0. Native4 completes PASS exit0 (27.3s), build/typecheck
+exit0. Expanded built13 initial run completes10PASS/3FAIL exit1 (1.0m): third-/
+fourth-edition retryAll and fourth-edition weighted navigation. All three traces
+show DOM.describeNode/internal server error/session closed; cause unproved.
+No generic driver claim or assertion/timeout weakening. Preserve initial logs/
+traces and run the required full172 suite on one fixed source/build. The full
+run will independently exercise every changed journey; pending results are not
+PASS. Current-head all10 CI/log/review/native23 gates remain required.
+
+Next internal XML dateTime/duration whitespace probe retains0PASS/6FAIL on this
+tree (scorm-xml-time-whitespace-before.log); standards XSD collapse binding is
+confirmed but not changed in this token slice. Full standard/calendar duration
+profile remains OPEN; no external-blocker attribution for this internal bug.
+
+Parent229c3b8592d/run37899289895 is now READY: all10 latest completed SUCCESS
+jobs/full logs inspected, fresh owner head/reviews clear. Pear910/237dev/237built/
+SidePanel4/host lanes; each Linux/macOS/Windows runtime16/Pear13/1.2=13/three
+2004=22, five clean native/fixture exits and quitAcknowledged perOS. One
+unchanged Windows-only retry passed; original forced shutdown after app-close/
+no database-close remains retained/unattributed. This does not establish a cause
+or fix or replace owner222e2b's absent CI. Successor2306ec owner CI still running.
+
+Fixed-source/build full172 SCORM browser completes170PASS/2FAIL exit1 (7.7m):
+managed ServiceWorker permission denial and fourth-edition weighted navigation
+DOM.describeNode/internal server error/session closed. Both traces inspected;
+DOM root cause unproved. Twelve of thirteen changed sequencing journeys and
+all four native fixture journeys pass in full. The two retryAll journeys that
+failed in the initial focused13 pass unchanged in full; all original10/3 logs/
+traces remain. Weighted-only recheck follows; no clean full local/browser/native
+conformance claim, and no policy/assertion/deadline/retry relaxation.
+
+Unchanged-tree weighted-only recheck completes1PASS exit0 (5.5s), retaining
+every viewport/ACK/retry/rollup/proof assertion. This plus twelve affected
+sequencing journeys passing in full covers all thirteen changed journeys across
+separate runs; it does not make the original10/3 or full170/2 runs PASS or prove
+DOM cause. Supplemental native4 remains PASS. Parent2306ec completed Windows/
+macOS logs each16/13/13/23/23/23, five clean exit0/quitAcknowledged records and
+no forced shutdown; Pear/Linux owner jobs still pending. Current successor
+requires its own all10 exact-head CI/full logs/native23/fresh review gates.
