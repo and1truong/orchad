@@ -57,3 +57,36 @@ Commercial exports/Rustici, actual Safari/Android, exact legacy reference
 license/platform and reviewed production storage/scanner/load/retention/RPO/DR
 inputs remain absent. Internal conformance matrices remain incomplete.
 Epic133 OPEN; production DISABLED.
+
+## Close refusal review correction
+
+Review P1 `PRRT_kwDOU7-JSc6qofz3` exposed a caller defect: flush ignored
+Commit false/391 and acknowledged an empty queue, closing the iframe with live
+unsaved responses. All six original browser regressions fail on10dcee62,
+complete exit1. Flush now records the refusal and sends an authenticated status
+to both practice and enrolled shells. Each shell rejects its pending Close
+promptly, releases the busy state and keeps the iframe/capability open. The SCO
+can correct its response, queue a valid commit, explicitly Retry, then Close and
+Resume. Existing origin/source/launch/sequence checks and12s fallback remain.
+
+Final focused browser13 (six refusal, four Close races, three reload guards),
+domain/lifecycle8 and confirmed final build complete exit0. The tests require
+Close to be enabled within the existing assertion budget, unchanged revision/
+receipts/launch before recovery and exact corrected response after resume.
+An intermediate child-only fix completed12PASS/1FAIL: the2004-4 enrolled Retry
+produced no second checkpoint request. Its trace/failure remains retained; the
+final shell refusal path passes all13 without retries or budget/policy changes.
+An unelevated lifecycle run completed3PASS/5FAIL because fixture listen returned
+EPERM; the authorized loopback run completed8PASS. A final build process handle
+was lost during environment restart; a separate confirmed rebuild exits0.
+
+Historical10dcee62 CI run37878186313 completed all10 jobs/logs: Pear828 domain,
+225 dev/225 built/SidePanel4; actual three OS runtime16/Pear13/1.2=13/2004=17,
+five clean native exit0 and five quit ACK pairs per OS. Historical full160 local
+browser completed156PASS/4FAIL exit1 (2004-4 download timeout, managed Service
+Worker denial,2004-2 Retry/interaction-record DOM.describeNode/session closure).
+All reload guards/native fixture journeys passed. Parent221 unchanged isolated
+Windows attempt2 completed all profiles/clean shutdown; all10 latest-attempt
+logs are verified. Its original SIGKILL failure remains retained/unattributed.
+Fresh full domain828/browser166 and new-head CI/review are required for this
+Close correction; historical checks are not current-head acceptance.

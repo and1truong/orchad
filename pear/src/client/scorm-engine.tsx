@@ -93,7 +93,9 @@ export function EnginePackages(p: {session: Session; busy: boolean; run: (fn: ()
         const target = frame.current?.contentWindow;
         const timer = setTimeout(() => {window.removeEventListener('message', message); reject(Error('Package has not acknowledged its final checkpoint. Retry before closing.'));}, 12_000);
         function message(event: MessageEvent) {
-          if (event.source !== target || event.origin !== current.contentOrigin || event.data?.kind !== 'pear-scorm-engine-ready-to-close' || event.data.launchId !== current.launchId || !Number.isSafeInteger(event.data.sequence)) return;
+          if (event.source !== target || event.origin !== current.contentOrigin || event.data?.launchId !== current.launchId || !Number.isSafeInteger(event.data.sequence)) return;
+          if (event.data.kind === 'pear-scorm-engine-status' && event.data.refused === true) {clearTimeout(timer); window.removeEventListener('message', message); reject(Error('The package could not save its progress. Keep the activity open and retry before closing.')); return;}
+          if (event.data.kind !== 'pear-scorm-engine-ready-to-close') return;
           clearTimeout(timer); window.removeEventListener('message', message); resolve(event.data.sequence);
         }
         window.addEventListener('message', message);

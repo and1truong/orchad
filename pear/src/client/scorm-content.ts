@@ -9,9 +9,9 @@ type Pending = {state: Record<string, any>; finished: boolean; navigation?: stri
 const queue: Pending[] = [];
 let revision = config.revision, sequence = config.sequence, saving = false, failed = false, active = false, closing = false;
 function readyToClose() {if (closing && !queue.length && !saving && !failed) parent.postMessage({kind: 'pear-scorm-engine-ready-to-close', launchId: config.launchId, sequence}, config.pearOrigin);}
-function notify(message: string, acknowledged = false) {
+function notify(message: string, acknowledged = false, refused = false) {
   status.textContent = message; retry.hidden = !failed;
-  parent.postMessage({kind: 'pear-scorm-engine-status', launchId: config.launchId, sequence, acknowledged, message}, config.pearOrigin);
+  parent.postMessage({kind: 'pear-scorm-engine-status', launchId: config.launchId, sequence, acknowledged, refused, message}, config.pearOrigin);
 }
 async function save() {
   if (saving || failed || !queue.length) return;
@@ -55,7 +55,12 @@ retry.onclick = () => {failed = false; void save();};
 window.addEventListener('message', event => {
   if (event.origin !== config.pearOrigin || event.source !== parent || event.data?.launchId !== config.launchId) return;
   if (event.data.kind === 'pear-scorm-engine-retry') {failed = false; void save();}
-  if (event.data.kind === 'pear-scorm-engine-flush') {closing = true; if (active) commit(); readyToClose();}
+  if (event.data.kind === 'pear-scorm-engine-flush') {
+    closing = true;
+    // A local refusal must not acknowledge an empty flush and discard live changes.
+    if (active && commit() !== 'true') {closing = false; failed = true; notify('Package progress has not been acknowledged. Keep the activity open, save again and retry before closing.', false, true); return;}
+    readyToClose();
+  }
 });
 setInterval(() => {if (active && !closing && !saving && !failed && !queue.length) commit();}, 15_000);
 window.addEventListener('beforeunload', event => {if (queue.length || saving || failed) {event.preventDefault(); event.returnValue = '';}});

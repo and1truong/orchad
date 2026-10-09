@@ -256,3 +256,13 @@ and review remain required; native2004 adds type0/commit391/preservation/recover
 evidence. This does not complete retained-invalid-response type-change semantics.
 Parent221 full157151PASS/6FAIL is retained, with Windows2004-2 fixture forced
 shutdown after app-close in run37876846214. Epic133 OPEN, production DISABLED.
+
+ADR-148 P1 Close correction: original six practice/enrolled refusal journeys
+fail on10dcee62; final focused browser13, domain/lifecycle8 and confirmed build
+pass with complete exit0. Local Commit refusal now promptly rejects both shells'
+Close while preserving iframe/live response/launch/revision/receipts. Correction,
+explicit Retry, Close and exact Resume remain verified. Intermediate12PASS/1FAIL
+and sandbox3PASS/5EPERM failures are retained in ADR-148. Historical10dc CI all10
+logs/Pear828/225dev/225built/SidePanel4/native3OS2004=17 is verified, but new-head
+CI and fresh full828/166 acceptance remain pending. Full160156PASS/4FAIL remains
+retained; no clean full local claim. Epic133 OPEN, production DISABLED.
