@@ -346,3 +346,23 @@ Playwright1.63 expects Chromium153. Installation to the user-specified browser
 directory is blocked by CDN403 Domain forbidden, complete installer exit1; no
 dependency, policy, timeout or assertion is changed. This is not clean full
 local acceptance. Exact-head CI/native3OS2004=20/review gates remain required.
+
+
+Head0ba183c7/run37888472163 attempt1 completes eight SUCCESS/two FAILURE.
+Linux/macOS runtime16/Pear13/1.2=13/each2004=20 pass with five clean native/
+fixture exit0 and quitACK records each. Windows113683752681 fails1.2 fixture
+shutdown after app-closed, before database-closed; native exit0/ACK true, fixture
+forced,2004 profiles not run. Cause unproved; original log retained. Pear
+113683752715 completes846 domain/237 dev PASS; built236PASS/1FAIL exit1,
+2004-3 bound-response correction click after resume waits for visible/enabled/
+stable in a nested frame. Side Panel/host lanes not reached. Both binding and
+first-provenance journeys now scroll the resumed outer iframe into viewport
+and assert readiness before clicking correction. All recovery/state/proof
+assertions and time budgets are retained; no forced click or retry is added.
+This follows the existing interop readiness step. Original CI timeout retained;
+changed journeys and complete new-head CI/log/review gates remain required.
+No runtime, engine adaptation, source checksum or receipt/history change.
+
+Changed built journeys complete6/6 PASS exit0 (2.1–2.5seconds each); footer and
+process completion checked. Original failures remain retained. The current
+head requires complete exact-head CI and native/review gates before READY.
