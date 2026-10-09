@@ -180,3 +180,11 @@ fresh final domain804/804 across118 files/typecheck/focused64/64 complete exit0.
 Historical v34 bytes/marker are
 accepted with identity/unknown-source refusal. New-head full CI/reviews and
 parent browser failures remain required; epic open, production disabled.
+
+ADR-143 records v35 whole sequencing35/43 and diagnostic failures. Two observed
+Retry clicks land in SCO HTML without shell click/runtime retry message. Explicit
+scroll/viewport readiness keeps the original human click and all ACK/navigation/
+time/proof checks; corrected focused10 pass/typecheck exit0. Whole43 completes42PASS/1FAIL
+(unchanged retryAll DOM.describeNode/session closed). Separate unchanged retryAll recheck1PASS; full145 browser running;
+no clean full local acceptance claim or attribution of every prior failure. CI/reviews and
+production/external gates remain required.
