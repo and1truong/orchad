@@ -3,7 +3,7 @@ import Scorm2004API from 'scorm-again/scorm2004';
 export type ResponseBindings = Record<string,string>;
 const types=['true-false','choice','fill-in','long-fill-in','matching','performance','sequencing','likert','numeric','other'];
 const snapshots=new WeakMap<Scorm2004API,ResponseBindings>();
-const engine=()=>new Scorm2004API({logLevel:'NONE',autocommit:false,lmsCommitUrl:false,accumulateSessionTimeOnTerminate:false});
+const engine=(runtime:Scorm2004API)=>new (runtime.constructor as typeof Scorm2004API)({logLevel:'NONE',autocommit:false,lmsCommitUrl:false,accumulateSessionTimeOnTerminate:false});
 function responses(state:Record<string,any>){
   const values:Record<string,{value:string;type:string}>=Object.create(null);
   for(const [n,r] of Object.entries(state.interactions??{}) as [string,any][]){
@@ -42,7 +42,7 @@ export function loadResponseState(runtime:Scorm2004API,state:Record<string,any>,
     const r=state.interactions[n],record=runtime.cmi.interactions.childArray[Number(n)] as any,base='cmi.interactions.'+n;
     record._learner_response=undefined;record.correct_responses.childArray=[];
     if(typeof r.learner_response==='string'){
-      const probe=engine();probe.loadFromJSON({interactions:{0:{id:r.id,type:bindings[base+'.learner_response']??r.type,learner_response:r.learner_response}}});
+      const probe=engine(runtime);probe.loadFromJSON({interactions:{0:{id:r.id,type:bindings[base+'.learner_response']??r.type,learner_response:r.learner_response}}});
       // Restore only a string validated under its host-recorded original type.
       record._learner_response=(probe.cmi.interactions.childArray[0] as any)._learner_response;
       (runtime as any)._setCMIElements.add(base+'.learner_response');
@@ -50,7 +50,7 @@ export function loadResponseState(runtime:Scorm2004API,state:Record<string,any>,
     const patterns=Object.entries(r.correct_responses??{}).sort(([a],[b])=>Number(a)-Number(b));
     for(const [index,p] of patterns as [string,any][]){
       if(Number(index)!==record.correct_responses.childArray.length)throw Error('Invalid response index');
-      const probe=engine();probe.loadFromJSON({interactions:{0:{id:r.id,type:bindings[base+'.correct_responses.'+index+'.pattern']??r.type,correct_responses:{0:{pattern:p.pattern}}}}});
+      const probe=engine(runtime);probe.loadFromJSON({interactions:{0:{id:r.id,type:bindings[base+'.correct_responses.'+index+'.pattern']??r.type,correct_responses:{0:{pattern:p.pattern}}}}});
       const pattern=(probe.cmi.interactions.childArray[0] as any).correct_responses.childArray[0];
       pattern._interactionType=r.type;record.correct_responses.childArray.push(pattern);
       (runtime as any)._setCMIElements.add(base+'.correct_responses.'+index+'.pattern');

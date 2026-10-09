@@ -299,3 +299,50 @@ completion; all original failures remain retained. Full172 is running. Full172/c
 threeOS2004=19 required. Parent223 all10 jobs/logs verified832/234dev/234built/SidePanel4 and
 actual3OS2004=18 clean5/ACK5, READY; full169165PASS/4FAIL retained. Parent222 e2b missing current CI even after
 one close/reopen event replay; stays Draft. Epic133 OPEN, production DISABLED.
+
+ADR-150/head72c2072f full172166PASS/6FAIL exit1 retained: download timeout,
+managed ServiceWorker denial and four DOM.describeNode/session-closed failures
+remain unattributed; all provenance3/binding3/guard3/Close6/native4 pass.
+Run37885369934 attempt1: nine jobs SUCCESS/all ten logs read; Pear838/237dev/
+237built/Side4, Linux/macOS runtime16/Pear13/1.2=13/each2004=19 clean5/ACK5.
+Windows2004-3 fixture is forced after app-closed, before database-closed;
+2004-4 not run. Original failure retained/unproved; unchanged Windows-only
+retry accepted after run completion. #224 remains draft pending its gates.
+
+ADR-151/v40 isolates contemporary RFC3986 URI components/authority/IP literals
+from historical second-edition v39 lexical compatibility. Constructor profile
+follows typed writes, trusted preload/bound-response probes/queue reload and
+sequencing/selection/navigation copies; old v39 envelopes remain admitted.
+Original IP-literal trial3FAIL; preliminary focused28/full844 and corrected
+build pass. Initial built13 completes9PASS/4FAIL: native3 resume probes collided
+with objective absence assertions, corrected using a separate collection;
+2004-2 provenance click timeout unattributed. Final edition-scoped845/125files,
+build and focused built22 PASS exit0; additional response-family matrix file8
+passes. Fresh846 and full172 required; actual native3OS2004=20/current-head
+CI/review required. Full RFC2396, exhaustive contemporary reference/URN/UTF8/
+equivalence/dependency/type/SPM/seq/ops matrices remain OPEN, alongside external
+license/account/export/platform/production-policy blockers. Epic133 OPEN;
+production DISABLED.
+
+ADR-151 fresh expanded846/846 across125 files completes PASS/exit0; every
+footer/plan/exit checked, URI file8 includes all five response families/edition
+bindings. Final focused built22 PASS/exit0. Full172 built browser running;
+exact-head CI/native/review still pending.
+
+Final head72c2072f/run37885369934 attempt2 completes all10SUCCESS/all10 latest
+attempt logs inspected (nine retain original timestamps; only Windows reruns).
+Unchanged Windows retry113679323066 passes runtime16/Pear13/1.2=13/each2004=19,
+clean native/fixture exit0 and quitACK five times without forced shutdown.
+Linux/macOS also clean5/ACK5; Pear838/237dev/237built/Side4 and host3/
+browser-host2/Lime-host1 pass. Original Windows fixture failure retained/
+unattributed. Fresh exact head and no unresolved review threads verified before
+#224 READY; no clean full local acceptance or completed epic/production claim.
+
+Final full172 built SCORM browser completes170PASS/2FAIL exit1: managed
+ServiceWorker permission denial and2004-3 calendar DOM.describeNode/session
+closed. Original logs/traces retained; driver cause unproved. All expanded URI3,
+binding3/provenance3/guard3/Close6/native4 pass. Chromium151 is supplementary;
+Playwright1.63 expects Chromium153. Installation to the user-specified browser
+directory is blocked by CDN403 Domain forbidden, complete installer exit1; no
+dependency, policy, timeout or assertion is changed. This is not clean full
+local acceptance. Exact-head CI/native3OS2004=20/review gates remain required.

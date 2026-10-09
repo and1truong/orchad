@@ -8,9 +8,10 @@ import {validIdentifiers, invalidIdentifiers} from '../scorm-identifier-vectors.
 import {validURNs, invalidURNs} from '../scorm-urn-vectors.ts';
 import {validSchemeReferences, invalidSchemeReferences} from '../scorm-uri-scheme-vectors.ts';
 import {validFragmentReferences, invalidFragmentReferences} from '../scorm-uri-fragment-vectors.ts';
+import {validAuthorityReferences, invalidAuthorityReferences, validLegacyAuthorityReferences, invalidLegacyAuthorityReferences} from '../scorm-uri-authority-vectors.ts';
 
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ': built URI bindings and full-capacity choice survive lost ACK and close/resume', async ({page}) => {
-  const valid = [...validIdentifiers, ...validURNs, ...validSchemeReferences, ...validFragmentReferences], invalid = [...invalidIdentifiers, ...invalidURNs, ...invalidSchemeReferences, ...invalidFragmentReferences], fullIndex = valid.length;
+  const valid = [...validIdentifiers, ...validURNs, ...validSchemeReferences, ...validFragmentReferences, ...(edition === '2004-2' ? validLegacyAuthorityReferences : validAuthorityReferences)], invalid = [...invalidIdentifiers, ...invalidURNs, ...invalidSchemeReferences, ...invalidFragmentReferences, ...(edition === '2004-2' ? invalidLegacyAuthorityReferences : invalidAuthorityReferences)], fullIndex = valid.length;
   const script = `const valid=${JSON.stringify(valid)},invalid=${JSON.stringify(invalid)},api=parent.API_1484_11;
     for(const [i,value] of valid.entries()){const base='cmi.interactions.'+i;
       if(api.GetValue('cmi.entry')==='resume'&&api.GetValue(base+'.id')!==(i===0?'urn:pear:replacement':value))throw Error('ID resume');

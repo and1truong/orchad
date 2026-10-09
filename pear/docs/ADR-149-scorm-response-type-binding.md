@@ -75,3 +75,13 @@ remaining conformance matrices remain OPEN. Legacy license/platform, authorized
 commercial exports/Rustici account, actual Safari/Android and reviewed real
 storage/scanner/load/retention/RPO/DR inputs remain absent. Epic133 OPEN;
 production DISABLED.
+
+Final integrated d738df39 full169 completes165PASS/4FAIL exit1: pipwerks2004-4
+download timeout, managed ServiceWorker permission denial and two
+DOM.describeNode/session-closed failures remain retained/unattributed. All
+binding/reload/Close/native focused journeys pass. Exact-head run37883481084
+completes all10SUCCESS and all10 logs are read:832domain/234dev/234built/Side4,
+actual Linux/macOS/Windows runtime16/Pear13/SCORM1.2=13/each2004=18, five clean
+exit0 and quitACK records each. Fresh head and no unresolved threads verified;
+#223 READY. #222 owner e2b1dfa9 remains draft because its exact-head CI is absent,
+including after one reversible close/reopen event; descendant CI is not owner CI.
