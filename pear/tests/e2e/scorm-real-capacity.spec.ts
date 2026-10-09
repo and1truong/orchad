@@ -23,7 +23,8 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     if(set(step,answer)!=='true')throw Error('performance range');
     for(const bad of ['step[.]'+'9'.repeat(309)+'[:]', 'step[.][:]'+'9'.repeat(309)])if(set(step,bad)!=='false'||error()!=='406'||get(step)!==answer)throw Error('performance overflow rollback');
     if(set('cmi.score.scaled',value)!=='false'||error()!=='407')throw Error('scaled range');
-    const decimals={'cmi.score.min':'0.'+'1'.repeat(4094),'cmi.progress_measure':'0.'+'0'.repeat(19)+'1','cmi.score.scaled':'-0.'+'0'.repeat(19)+'1','cmi.interactions.0.weighting':'0.5'+'0'.repeat(40)};
+    if(set('cmi.interactions.2.id','urn:pear:long-result')!=='true')throw Error('long result ID');
+    const decimals={'cmi.score.min':'0.'+'1'.repeat(4094),'cmi.progress_measure':'0.'+'0'.repeat(19)+'1','cmi.score.scaled':'-0.'+'0'.repeat(19)+'1','cmi.interactions.0.weighting':'0.5'+'0'.repeat(40),'cmi.interactions.2.result':'0.5'+'0'.repeat(40)};
     for(const [key,decimal] of Object.entries(decimals)){
       if(get('cmi.entry')==='resume'&&get(key)!==decimal)throw Error('decimal resume '+key);
       if(set(key,decimal)!=='true'||get(key)!==decimal)throw Error('long decimal '+key);
@@ -58,6 +59,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
     expect(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n).toBe(initialReceipts + 1); await page.unroute('**/launch/*/checkpoint');
     const stored = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
     expect(stored.score.raw).toBe('12345678901.125'); expect(stored.learner_preference.audio_level).toBe('12345678901.125'); expect(stored.interactions[0].result).toBe('12345678901.125'); expect(stored.interactions[0].learner_response).toBe('12345678901.125'); expect(stored.interactions[0].correct_responses[0].pattern).toBe('12345678901.125[:]12345678999.5'); expect(stored.interactions[1].correct_responses[0].pattern).toBe('step[.]12345678901[:]12345678999.5');
+    expect(stored.interactions[2].result).toBe('0.5'+'0'.repeat(40));
     expect(stored.score.min).toBe('0.'+'1'.repeat(4094)); expect(stored.progress_measure).toBe('0.'+'0'.repeat(19)+'1'); expect(stored.score.scaled).toBe('-0.'+'0'.repeat(19)+'1'); expect(stored.interactions[0].weighting).toBe('0.5'+'0'.repeat(40));
     await player.getByRole('button', {name: 'Close SCO and choose another', exact: true}).click(); await player.getByRole('button', {name: /Introduction/}).click();
     await expect(sco.getByText('Wide finite reals verified', {exact: true})).toBeVisible();

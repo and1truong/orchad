@@ -677,3 +677,52 @@ One unchanged Windows-only retry running; original retained. Owner222e2b CI
 absent. Next internal interaction-result fractional cap original6FAIL retained;
 not fixed by XMLtime. Full matrices OPEN; external gates BLOCKED; epic OPEN;
 production DISABLED. See ADR158; no acceptance/history deletion.
+
+ADR159 interaction-result decimal capacity: original v41 probe six failures
+(raw+facade/all three2004 editions), numeric learner/range values pass first.
+Checksum-locked v42 removes only18-place result fraction ceiling, preserves
+finite4096-character/type/vocabulary/dependency/error/receipt/proof guards;1.2
+source unchanged. Wrong-cwd/installer-name/forward-chain diagnostics and two
+focused10/35 failures retained, corrected engine39/6 false fixture assumptions
+retained; final focused45PASS exit0 (16.5s), typecheck/build exit0. New9domain
+raw/facade/preload/forged atomic replay/v41 SQLite resume; controller24/1.2=13
+with pre-write exact-result native resume probe, existing built wide-real3.
+Fresh full949/133files running; built3 completesPASS exit0. Full172/native4
+follow without deadlines/assertions/retry/policy changes. Owner-head gates
+required independently; no clean full local claim. Epic OPEN/prod DISABLED.
+
+Result v42 initial full949:948PASS/1FAIL/133files aggregate exit1 retained;
+sole failure installer predecessor chain lacked v42 reversal. Corrected exact
+chain includes v41 as an input and retains every historical checksum/input,
+install/idempotence/unexpected-byte/version check. Focused installer1PASS
+exit0 (42.8s), supplemental native4PASS exit0 (33.6s), final typecheck exit0.
+Fresh full949 running, no prior full PASS claim. Parent231 latest2 READY with
+10current-owner full logs/reviews; all3OS native23clean5ACK5; original Windows
+failure/unproved cause retained. Parent2329SUCCESS/Pearrunning.
+
+Final fresh-cache full949/133files completes949PASS with every plan/footer/
+five counts/per-file exit0 and aggregate exit0 inspected. Source/build fixed
+for full172 SCORM browser now running; no pending browser PASS claim.
+Successor ADL rollup token whitespace original12FAIL across four fields and
+three editions retained; all three primary CAM§5.1.11 sources bind xs:token.
+No ADL importer change in this result-only slice.
+
+Parent23203cd READY: current owner37906112237 all10completedSUCCESS, every
+full log inspected, Pear940/237/237/4 plus host lanes and all3OS native16/13/
+13/23×3,clean5ACK5/no forced; fresh review threads empty. Separate asset
+pointerdown diagnostic on this fixed v42 build completes1PASS exit0 (6.0s),
+clicks correct Continue/Retry/Finish targets; original DOM cause remains
+unproved. First standalone probe failed module initialization/no tests exit1
+and is retained separately. No product/test asset change or clean full claim.
+
+Fixed source/build full172 SCORM browser completes170PASS/2FAIL exit1 (8.3m),
+both failure traces inspected: fourth licensed support download60s timeout
+(cause unproved), managed ServiceWorker enumeration permission denial. Every
+changed built3/native4 passes in full. Original local full2FAIL remains, no
+clean full local claim; supplementary Chromium151 is not supported153/native
+proof. No retries/assertion/deadline/policy changes. Final source hash0447a6,
+1.2eb7539 unchanged. Independent integer newline check confirms raw4/facade4
+PASS exit0; initial facade3PASS/1FAIL was wrong expected1.2 code201 rather
+than405, retained; no integer product change. Next ADL token12FAIL retained,
+primary CAM2nd/3rd/4th§5.1.11 explicitly xs:token; separate successor work.
+EpicOPEN/prodDISABLED; all remaining matrices/external gates retained.
