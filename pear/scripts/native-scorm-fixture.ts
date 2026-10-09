@@ -45,6 +45,11 @@ const script = `
     for(const [key,value] of Object.entries(languageValues))if(api.SetValue(key,value)!=='true')throw Error('Native registered language refused');
     const languageCodes=Object.keys(languageValues).flatMap(key=>['zz','zzz','ZZ-us','a','abcdefgh'].map(primary=>{const value=key==='cmi.learner_preference.language'?primary:'{lang='+primary+'}Rejected text';if(api.SetValue(key,value)!=='false')throw Error('Native unknown ISO language admitted');return api.GetLastError();}));
     evidence.languageRegistry={resumed:languageResumed,preserved:Object.entries(languageValues).every(([key,value])=>api.GetValue(key)===value&&api.GetLastError()==='0'),codes:languageCodes};
+    const ianaKey='cmi.interactions.0.description',ianaValue='{lang=I-MINGO}Native historical IANA text';
+    const ianaResumed=evidence.entry!=='resume'||api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0';
+    if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native registered IANA language refused');
+    const ianaCodes=['i-madeup','i-klignon','I-UNKNOWN','i'].map(tag=>{if(api.SetValue(ianaKey,'{lang='+tag+'}Rejected text')!=='false')throw Error('Native unknown IANA language admitted');return api.GetLastError();});
+    evidence.ianaLanguage={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:ianaCodes};
     const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');

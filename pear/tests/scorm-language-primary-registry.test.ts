@@ -29,7 +29,7 @@ for(const edition of ['2004-2','2004-3','2004-4'] as const) {
   for(let second=97;second<=116;second++)for(let third=97;third<=122;third++)codes.push('q'+String.fromCharCode(second,third));assert.equal(codes.length,1220);
   const api=new (scorm2004Engine(edition))({logLevel:'NONE',autocommit:false,lmsCommitUrl:false});assert.equal(api.Initialize(''),'true');
   for(const code of codes){const value=code.toUpperCase()+'-a';assert.equal(api.SetValue(fields[0],value),'true',code);assert.equal(api.GetValue(fields[0]),value);}
-  for(const value of ['i-klingon','x-private','i','x']){assert.equal(api.SetValue(fields[0],value),'true');assert.equal(api.GetValue(fields[0]),value);}
+  for(const value of ['i-klingon','x-private','x']){assert.equal(api.SetValue(fields[0],value),'true');assert.equal(api.GetValue(fields[0]),value);}
  });
  test(edition+': strict preload checks all localized fields including LMS comments without rewriting historical codes',()=>{
   const state:any={learner_preference:{language:values[fields[0]]},comments_from_learner:{0:{comment:values[fields[1]]}},comments_from_lms:{0:{comment:'{lang=jaw}Historical LMS text'}},objectives:{0:{id:'urn:pear:iso-objective',description:values[fields[2]]}},interactions:{0:{id:'urn:pear:iso-interaction',type:'fill-in',description:values[fields[3]],learner_response:values[fields[4]],correct_responses:{0:{pattern:values[fields[5]]}}}}};
