@@ -100,3 +100,8 @@ Playwright1.63 expects Chromium153. Installation to the user-specified browser
 directory is blocked by CDN403 Domain forbidden, complete installer exit1; no
 dependency, policy, timeout or assertion is changed. This is not clean full
 local acceptance. Exact-head CI/native3OS2004=20/review gates remain required.
+
+Published #225/head0ba183c7/run37888472163: Windows attempt1 job113683752681
+fails1.2 clean shutdown after app-closed, before database-closed; native exit0/
+quitACK true, fixture forced. Pre-shutdown checks pass;2004 profiles not run.
+Cause unproved, original log retained; PR remains draft while run completes.

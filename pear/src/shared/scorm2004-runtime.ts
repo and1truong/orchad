@@ -100,8 +100,17 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const interactionKey = canonicalInteractionPath(key);
       if (result === 'true' && interactionWritePath.test(interactionKey)) {
         if (interactionResponsePath.test(interactionKey)) writtenOrigins[interactionKey] = runtime.GetValue(interactionTypePath(interactionKey));
-        // ponytail: bounded4096-write/2MiB journal; compact validated histories if larger workloads require it.
-        if (!journalOverflow) {const entry: InteractionWrite = [interactionKey,value], bytes = new TextEncoder().encode(JSON.stringify(entry)).byteLength + 1; if (interactionWrites.length >= interactionWriteLimit || journalBytes + bytes > scorm2004CheckpointBytes) journalOverflow = true; else {interactionWrites.push(entry); journalBytes += bytes;}}
+        // Consecutive successful writes to the same type have the last type's
+        // effect; no intervening response can lose its original validation type.
+        // ponytail: other histories remain bounded4096/2MiB; validated witness compaction if needed.
+        if (!journalOverflow) {
+          const entry: InteractionWrite = [interactionKey,value], last = interactionWrites.at(-1);
+          const compact = interactionKey.endsWith('.type') && last?.[0] === interactionKey;
+          const bytes = (write: InteractionWrite) => new TextEncoder().encode(JSON.stringify(write)).byteLength + 1;
+          const growth = bytes(entry) - (compact ? bytes(last!) : 0);
+          if ((!compact && interactionWrites.length >= interactionWriteLimit) || journalBytes + growth > scorm2004CheckpointBytes) journalOverflow = true;
+          else {if (compact) interactionWrites[interactionWrites.length - 1] = entry; else interactionWrites.push(entry); journalBytes += growth;}
+        }
       }
       if (result === 'true' && key === 'adl.nav.request') navigation = value;
       if (result === 'true' && shared?.[2] === 'store') sharedWrites[runtime.GetValue(`adl.data.${Number(shared[1])}.id`)] = value;

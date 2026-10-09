@@ -346,3 +346,29 @@ Playwright1.63 expects Chromium153. Installation to the user-specified browser
 directory is blocked by CDN403 Domain forbidden, complete installer exit1; no
 dependency, policy, timeout or assertion is changed. This is not clean full
 local acceptance. Exact-head CI/native3OS2004=20/review gates remain required.
+
+ADR-152 original consecutive-type history0PASS/6FAIL→basic6 and expanded
+focused18/build PASS exit0. Mixed-origin durable Commit/Terminate/queue refusal/
+forged journal deletion/receipt exact retry/Close/resume covered; no quota
+relaxation. Old type-only quota cases0PASS/3FAIL retained; noncompactable
+response/type histories preserve every refusal/Close/recovery assertion.
+Built5000-type history and native journal length evidence added to existing
+journeys; final focused built22 and fresh full domain855/126 files complete
+PASS exit0. Full172 browser and actual3OS2004=21/current CI/review required. General witness compaction/full matrices remain OPEN.
+Parent225 CI Windows1.2 fixture forced after app-closed,2004 not run; cause
+unproved and original log retained, Draft until exact-head gates pass.
+
+
+Full172 SCORM built browser completes169PASS/3FAIL exit1: support download
+timeout,2004-2 target navigation DOM.describeNode/session-closed, and managed
+ServiceWorker permission denial. All changed provenance/type-history3, binding3,
+URI3, reload3, Close6 and supplemental native4 journeys pass. Full logs/traces
+retained; no clean full local acceptance or proved driver cause. Supported
+Chromium153 installation remains blocked by CDN403. Fresh domain855/126 files,
+final build, focused18 and built22 complete PASS exit0. Parent225 head0ba also
+fails built response correction after resume (846 domain/237 dev pass;
+236 built pass/1fail, Side Panel/host not reached); its viewport correction is
+being validated at its owner before integration. Windows shutdown cause remains
+unproved. General successful response histories remain OPEN: an independent
+original5000 consecutive learner/pattern-write regression across three editions
+and Commit/Terminate completes0PASS/12FAIL exit1, preserved for a successor.
