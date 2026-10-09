@@ -9,6 +9,7 @@
 
 import {
   APP_RESULT_TYPE,
+  PAGE_TIMEOUT_MS,
   APP_REQUEST_WIRE,
   AppRequestBook,
   RateLimiter,
@@ -40,6 +41,12 @@ export interface RelayDeps {
 export function createRelay(deps: RelayDeps) {
   const book = new AppRequestBook();
   const rate = new RateLimiter();
+  const deadlines = new Map<string, ReturnType<typeof setTimeout>>();
+  const leave = (requestId: string) => {
+    clearTimeout(deadlines.get(requestId));
+    deadlines.delete(requestId);
+    book.leave(requestId);
+  };
 
   const deliver = (requestId: string, result: AppResult) =>
     deps.postToPage(makeAppResult(requestId, result));
@@ -59,25 +66,33 @@ export function createRelay(deps: RelayDeps) {
     const { requestId, prompt } = parsed;
     const blocked = book.enter(requestId);
     if (blocked || !rate.allow()) {
-      book.leave(requestId);
+      if (!blocked) leave(requestId);
       deliver(requestId, {
         ok: false,
         error: blocked ?? "rate limit exceeded",
       });
       return;
     }
+    const deadline = setTimeout(() => {
+      leave(requestId);
+      deliver(requestId, {ok: false, error: "agent request timed out"});
+    }, PAGE_TIMEOUT_MS);
+    deadline.unref?.(); // Node tests must not keep the process alive; browser timers are numbers.
+    deadlines.set(requestId, deadline);
     deps
       .sendToWorker({ type: APP_REQUEST_WIRE, requestId, prompt })
       .then((ack) => {
+        if (!book.has(requestId)) return;
         if (ack?.ok) return; // accepted into the approval flow; await result
-        book.leave(requestId);
+        leave(requestId);
         deliver(requestId, {
           ok: false,
           error: ack?.error || "rejected by host",
         });
       })
       .catch((e: unknown) => {
-        book.leave(requestId);
+        if (!book.has(requestId)) return;
+        leave(requestId);
         deliver(requestId, {
           ok: false,
           error: e instanceof Error ? e.message : "host unreachable",
@@ -88,7 +103,7 @@ export function createRelay(deps: RelayDeps) {
   function handleWorkerResult(message: unknown) {
     const result = parseAppResultMessage(message);
     if (!result || !book.has(result.requestId)) return;
-    book.leave(result.requestId);
+    leave(result.requestId);
     deps.postToPage(result);
   }
 
