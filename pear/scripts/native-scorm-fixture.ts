@@ -68,6 +68,9 @@ const script = `
     const alphabet='abcdefghijklmnopqrstuvwxyz0123456789',digitCountries=[...alphabet].flatMap(a=>[...alphabet].map(b=>a+b)).filter(code=>/[0-9]/.test(code));
     const digitCountryCodes=digitCountries.map(code=>{if(api.SetValue(ianaKey,'{lang=FRE-'+code.toUpperCase()+'-demo}Rejected text')!=='false')throw Error('Native mixed/digit country admitted');return api.GetLastError();});
     evidence.countryCharacters={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:digitCountryCodes};
+    const singletonCodes=[...'abcdefghijklmnopqrstuvwxyz'].map(char=>{const value='{lang=FRE-'+char.toUpperCase()+'-demo}Native singleton text',expected='${edition}'==='2004-2'?'false':'true';if(api.SetValue(ianaKey,value)!==expected)throw Error('Native singleton edition binding');const code=api.GetLastError();if(api.GetValue(ianaKey)!==(expected==='false'?ianaValue:value))throw Error('Native singleton state lost');return code;});
+    if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native singleton restoration refused');
+    evidence.singletonLanguage={resumed:ianaResumed,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:singletonCodes};
     const result='0.5' +'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');
