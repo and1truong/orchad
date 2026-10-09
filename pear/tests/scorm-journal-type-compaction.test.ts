@@ -25,7 +25,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ':
       const binding=f.enroll(),launch=f.launch(binding),b=f.player.bootstrap(launch.token);let state:any,writes:any,accept=false;
       const api=createSCORM2004API({edition,...b,checkpoint(...args:any[]){state=args[0];writes=args[4];return accept;}});
       assert.equal(api.Initialize(''),'true');
-      for(const [key,value] of [['id','urn:pear:type-origins'],['type','choice'],['learner_response','retained'],['correct_responses.0.pattern','retained'],['type','sequencing'],['learner_response','a[,]a']]) assert.equal(api.SetValue('cmi.interactions.0.'+key,value),'true');
+      for(const [key,value] of [['id','urn:pear:type-origins'],['type','choice'],['learner_response','retained'],['correct_responses.0.pattern','retained'],['type','sequencing'],['learner_response','a[,]a']]) for(let n=0;n<(key==='learner_response'||key.endsWith('.pattern')?5000:1);n++)assert.equal(api.SetValue('cmi.interactions.0.'+key,value),'true');
       for(let n=0;n<5000;n++)assert.equal(api.SetValue('cmi.interactions.0.type',n%2?'choice':'sequencing'),'true');
       assert.equal(api.SetValue('cmi.interactions.0.type','unknown'),'false');assert.equal(api.GetLastError(),'406');
       assert.equal(api.SetValue('cmi.interactions.0.type','numeric'),'true');assert.equal(api.SetValue('cmi.exit','suspend'),'true');

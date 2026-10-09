@@ -100,12 +100,12 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const interactionKey = canonicalInteractionPath(key);
       if (result === 'true' && interactionWritePath.test(interactionKey)) {
         if (interactionResponsePath.test(interactionKey)) writtenOrigins[interactionKey] = runtime.GetValue(interactionTypePath(interactionKey));
-        // Consecutive successful writes to the same type have the last type's
-        // effect; no intervening response can lose its original validation type.
+        // Consecutive successful writes to the same type or response keep the
+        // last value; an intervening type/response cannot lose its origin.
         // ponytail: other histories remain bounded4096/2MiB; validated witness compaction if needed.
         if (!journalOverflow) {
           const entry: InteractionWrite = [interactionKey,value], last = interactionWrites.at(-1);
-          const compact = interactionKey.endsWith('.type') && last?.[0] === interactionKey;
+          const compact = (interactionKey.endsWith('.type') || interactionResponsePath.test(interactionKey)) && last?.[0] === interactionKey;
           const bytes = (write: InteractionWrite) => new TextEncoder().encode(JSON.stringify(write)).byteLength + 1;
           const growth = bytes(entry) - (compact ? bytes(last!) : 0);
           if ((!compact && interactionWrites.length >= interactionWriteLimit) || journalBytes + growth > scorm2004CheckpointBytes) journalOverflow = true;

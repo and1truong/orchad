@@ -398,3 +398,34 @@ history: documentation conflicts retain both evidence blocks. Changed built
 binding/provenance6 completes PASS exit0 under CI30second test budget, including
 5000-type compaction plus lost ACK/Retry/Close/resume/current-type correction.
 Parent225 new-head run37890454443 is pending; historical0ba failures remain.
+
+
+ADR-153 original0PASS/12FAIL consecutive learner/pattern histories retained;
+focused24/24 PASS exit0 with unchanged quotas and expanded mixed-origin durable
+refusal/forged witness/exact receipt retry/Close/resume. Existing built provenance
+and native histories now exercise5000 writes perresponse; native2004=22 and
+1.2=13/five clean shutdown+ACK perOS/current-head CI/review required. Full domain/
+build/browser pending; general witness/full matrices OPEN. Epic OPEN/prod DISABLED.
+
+Fresh full domain completes867/867 across127 files, every footer/plan/exit
+checked, no skipped/cancelled cases; final build/typecheck completes exit0.
+Focused/full browser and actual current-head CI/review gates remain required.
+
+Expanded focused built19/19 completes PASS exit0: native4/reload3/Close6/
+binding3/provenance3, including5000 learner/pattern writes and five-entry
+provenance witness. The URI selector matched no file; URI3 are in the existing
+scorm-identifiers journey and remain included in the full172 run now underway.
+No22-test focused claim; exact-head CI/review remain pending.
+
+Full172 built SCORM browser completes168PASS/4FAIL exit1: support-download
+timeout,2004-2 target navigation and same-SCO retry DOM.describeNode/session
+closed, managed ServiceWorker permission denial. Logs/traces retained; driver
+cause unproved. All expanded response/type-history/provenance3, binding3, URI3,
+Close6/reload3/native4 pass. This is not clean full local acceptance; Chromium151
+is supplementary and supported153 CDN remains blocked.
+
+Parent225 current b32/run37890454443 and226 current19c4efaf/run37890698928
+native Linux/Windows/macOS logs are all inspected: runtime16/Pear13/1.2=13,
+2004=20 (225) or21 (226), five clean native/fixture exit0+quitACK records eachOS.
+No forced shutdown. Both Pear jobs remain pending; no READY claim. Original225
+head0ba Windows failure and local browser failures remain retained/unattributed.
