@@ -358,6 +358,14 @@ const urnNulUpdates = [
     "  CMILongIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n"
   ]
 ];
+const interactionReadOriginal = "35b50ad4ce8742e927725802ccba2b9950532f637d3a0ea74daa886155ff0790";
+const interactionReadPatched = "3d677e8ee9457aa0ca29a68ada989301493de6965c3cc2e51431b0198b2f10aa";
+const interactionReadUpdates = [
+  [
+    "/^cmi\\.(?:comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location|timestamp)|(?:objectives|interactions)\\.\\d+\\.description)$/.test(CMIElement) ?",
+    "/^cmi\\.(?:comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location|timestamp)|objectives\\.\\d+\\.(?:id|success_status|completion_status|progress_measure|description|score\\.(?:scaled|raw|min|max))|interactions\\.\\d+\\.(?:id|type|timestamp|weighting|learner_response|result|latency|description|objectives\\.\\d+\\.id|correct_responses\\.\\d+\\.pattern))$/.test(CMIElement) ?"
+  ]
+];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -452,9 +460,17 @@ export function reviewedSCORMSource(source) {
     source = replace(source, urnNulUpdates);
     if (hash(source) !== urnNulPatched) throw Error("SCORM URN NUL checksum mismatch");
   }
+  if (hash(source) === interactionReadOriginal) {
+    source = replace(source, interactionReadUpdates);
+    if (hash(source) !== interactionReadPatched) throw Error("SCORM interaction read checksum mismatch");
+  }
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === interactionReadPatched) {
+    source = replace(source, interactionReadUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== interactionReadOriginal) throw Error("SCORM interaction read reverse checksum mismatch");
+  }
   if (hash(source) === urnNulPatched) {
     source = replace(source, urnNulUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== urnNulOriginal) throw Error("SCORM URN NUL reverse checksum mismatch");

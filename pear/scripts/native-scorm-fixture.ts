@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import {createApp} from '../src/server/app.ts';
 import {scormLearningFixture} from '../tests/scorm-learning-fixture.ts';
 import {interopPackage} from '../tests/scorm-interop-fixture.ts';
+import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
 if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsupported native SCORM edition');
 const nonce = process.env.PEAR_NATIVE_NONCE;
@@ -15,6 +16,14 @@ let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '
 const script = `
 (async()=>{
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
+  if('${edition}'!=='1.2'){
+    const api=parent.API_1484_11;if(api.SetValue('cmi.interactions.0.id','urn:pear:native-read-errors')!=='true')throw Error('Native interaction ID refused');
+    evidence.collectionReadErrors=${JSON.stringify(absentCollectionPaths)}.map(path=>{if(api.GetValue(path)!=='')throw Error('Absent collection value');return {path,code:api.GetLastError()};});
+    evidence.interactionReadErrors=['type','timestamp','weighting','result','latency'].map(field=>{
+      if(api.GetValue('cmi.interactions.1.'+field)!=='')throw Error('Absent interaction value');const absentCode=api.GetLastError();
+      if(api.GetValue('cmi.interactions.0.'+field)!=='')throw Error('Unset interaction value');return {field,absentCode,unsetCode:api.GetLastError()};
+    });
+  }
   const top=parent.parent;
   for(const [key,read] of Object.entries({pearCookieDenied:()=>top.document.cookie,pearStorageDenied:()=>top.localStorage.length,pearBridgeDenied:()=>top.agentBridgeV1,pearNativeDenied:()=>top.__TAURI_INTERNALS__}))try{read();}catch{evidence[key]=true;}
   const native=window.__TAURI_INTERNALS__||parent.__TAURI_INTERNALS__;

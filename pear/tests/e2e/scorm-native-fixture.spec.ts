@@ -1,5 +1,6 @@
 // Supplemental Chromium check of the real fixture/fault driver, not native evidence.
 import {test, expect} from '@playwright/test';
+import {absentCollectionPaths} from '../scorm-collection-read-vectors.ts';
 import {spawn} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
 for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': native fixture driver loses ACK, retries exactly, resumes and finishes', async ({page}) => {
@@ -23,6 +24,8 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     await expect.poll(async () => (await state()).probes.length).toBe(2);
     const resumed = await state(); expect(resumed.driverErrors).toEqual([]); expect(resumed.probes[1].entry).toBe('resume'); expect(resumed.probes[1].bookmark).toBe('licensed-page');
     for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives', 'redirectDenied']) expect(resumed.probes[1][key], key).toBe(true);
+    if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.interactionReadErrors).toEqual(['type','timestamp','weighting','result','latency'].map(field=>({field,absentCode:'301',unsetCode:'403'})));
+    if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.collectionReadErrors).toEqual(absentCollectionPaths.map(path=>({path,code:'301'})));
     expect(resumed.calls).toEqual([]); expect(resumed.pearCanaryCalls).toEqual([]);
     await command('finish'); await expect.poll(async () => (await state()).proofs).toBe(1);
     const finished = await state(); expect(finished.certificates).toBe(0); expect(finished.calls).toEqual([]); expect(finished.edition).toBe(edition);

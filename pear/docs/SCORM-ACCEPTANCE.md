@@ -209,3 +209,24 @@ restrictions and three DOM.describeNode/session-closed asset/retry/retryAll
 failures retained. First exact-head CI Linux native smoke quit ACK times out;
 exit-before-reply ordering is corrected to reply-before-exit. No weaker timeout/
 shutdown/policy assertion. Local Rust/native unavailable; new-head CI mandatory.
+
+ADR-145 v37 corrects absent interaction type/timestamp/weighting/result/latency
+reads301 while preserving existing unset403/defaults/serialization/dependencies.
+Final original6FAIL, focused32/build/built3/full domain810 across119 files/
+supplementary native fixture4 pass exit0; integrated root acceptance pending. Sandbox PDF timeout and discarded initial
+object-shape assertion failures are retained. Actual native301/403 checks before/
+after resume and exact-head CI/reviews remain required; epic/prod gates unchanged.
+
+ADR-145 caller review expands v37 to named objective/interaction scalar/score
+fields and nested objective IDs/correct patterns: narrow focused32/full draft
+810/build/browser3/fixture4/integrated root810/build pass retained; extension3
+originalFAIL, broader focused35/build pass exit0. Broader full domain/browser/
+root checks pending. Native fixture now records thirteen absent paths plus five
+unset fields before/after resume; actual native CI required.
+
+ADR-145 final broad source full813/813 across119 files passes exit0; reviewed
+source/new test/vector files match root exactly. Integrated root focused35/build/
+built12 pass exit0 (errors3, URI3, learning2, supplementary fixture4). Actual
+three-OS named301/403 and current-head CI/reviews plus full148 local remain
+required. Parent316 native ACK/clean shutdown now verified on all three OS; its
+Pear job is pending. Historical failures/managed policies remain retained.
