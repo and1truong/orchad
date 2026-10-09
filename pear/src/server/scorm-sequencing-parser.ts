@@ -10,7 +10,9 @@ function children(el: Element) {const out: Element[] = []; for (let n = el.first
 function attrs(el: Element, names: string[]) {
   for (let i = 0; i < el.attributes.length; i++) {const a = el.attributes.item(i)!; if (a.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue; if (a.namespaceURI || !names.includes(a.name)) fail();}
 }
-function bool(el: Element, name: string) {const v = el.getAttribute(name); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
+// xs:boolean collapses XML whitespace only; Unicode spaces remain invalid.
+export function xmlBooleanToken(value: string | null) {return value?.replace(/^[\x20\x09\x0a\x0d]+|[\x20\x09\x0a\x0d]+$/g, '') ?? null;}
+function bool(el: Element, name: string) {const v = xmlBooleanToken(el.getAttribute(name)); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
 function number(el: Element, name: string, min: number, max: number) {const v = el.getAttribute(name); if (v === null) return undefined; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v) || Number(v) < min || Number(v) > max) fail(); return Number(v);}
 // Delivery windows require an explicit timezone so every host enforces the
 // same instant. Validate Gregorian dates before Date can normalize them.
