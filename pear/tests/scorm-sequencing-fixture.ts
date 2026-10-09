@@ -87,3 +87,9 @@ export function selectionManifest(edition: SCORM2004Edition = '2004-4', selectio
 
 /** Original XML whitespace plus character references; numeric fields stay unchanged. */
 export function xmlBooleanManifest(xml: string) {return xml.replace(/="(true|false)"/g, (_, value) => '=" &#x9;' + (value === 'true' ? '1' : '0') + '&#xD;&#xA; "');}
+
+/** Numeric XML lexical spellings differ; their mathematical values stay fixed. */
+export function xmlNumericManifest(xml: string) {
+  return xml.replace(/(attemptLimit|selectCount|minimumCount|minimumPercent|measureThreshold|objectiveMeasureWeight|minProgressMeasure|progressWeight)="(\d+(?:\.\d+)?)"/g, (_, name, value) => name + '=" &#x9;+00' + value + '&#xD;&#xA; "')
+    .replace(/<s:minNormalizedMeasure>(\d+(?:\.\d+)?)<\/s:minNormalizedMeasure>/g, (_, value) => '<s:minNormalizedMeasure> &#x9;+00' + value + '&#xD;&#xA; </s:minNormalizedMeasure>');
+}

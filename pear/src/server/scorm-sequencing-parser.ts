@@ -10,10 +10,19 @@ function children(el: Element) {const out: Element[] = []; for (let n = el.first
 function attrs(el: Element, names: string[]) {
   for (let i = 0; i < el.attributes.length; i++) {const a = el.attributes.item(i)!; if (a.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue; if (a.namespaceURI || !names.includes(a.name)) fail();}
 }
-// xs:boolean collapses XML whitespace only; Unicode spaces remain invalid.
-export function xmlBooleanToken(value: string | null) {return value?.replace(/^[\x20\x09\x0a\x0d]+|[\x20\x09\x0a\x0d]+$/g, '') ?? null;}
-function bool(el: Element, name: string) {const v = xmlBooleanToken(el.getAttribute(name)); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
-function number(el: Element, name: string, min: number, max: number) {const v = el.getAttribute(name); if (v === null) return undefined; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v) || Number(v) < min || Number(v) > max) fail(); return Number(v);}
+// Atomic XML tokens use XML whitespace only; Unicode spaces remain invalid.
+export function xmlAtomicToken(value: string | null) {return value?.replace(/^[\x20\x09\x0a\x0d]+|[\x20\x09\x0a\x0d]+$/g, '') ?? null;}
+function bool(el: Element, name: string) {const v = xmlAtomicToken(el.getAttribute(name)); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
+/** All supported numeric bounds are integral; compare before floating conversion. */
+export function xmlNumber(value: string | null, min: number, max: number, integral = false) {
+  const v = xmlAtomicToken(value); if (v === null) return undefined;
+  const m = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/.exec(v);
+  if (!m || integral && v.includes('.')) fail();
+  const sign = m![1] === '-' ? -1 : 1, whole = sign * Number(m![2] ?? '0'), fractional = /[1-9]/.test(m![3] ?? m![4] ?? '');
+  if (whole < min || whole > max || fractional && (sign < 0 && whole <= min || sign > 0 && whole >= max)) fail();
+  return Number(v) || 0;
+}
+function number(el: Element, name: string, min: number, max: number, integral = false) {return xmlNumber(el.getAttribute(name), min, max, integral);}
 // Delivery windows require an explicit timezone so every host enforces the
 // same instant. Validate Gregorian dates before Date can normalize them.
 function calendarLimit(el: Element, name: string) {
@@ -104,7 +113,7 @@ function objective(el: Element, edition: SCORMStandard) {
     if (n.namespaceURI !== SN) fail();
     if (n.localName === 'minNormalizedMeasure') {
       if (out.minNormalizedMeasure !== undefined || children(n).length) fail(); attrs(n, []);
-      const value = n.textContent?.trim() ?? ''; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) || Number(value) < -1 || Number(value) > 1) fail(); out.minNormalizedMeasure = Number(value);
+      out.minNormalizedMeasure = xmlNumber(n.textContent ?? '', -1, 1);
     } else if (n.localName === 'mapInfo') {
       // Fourth-edition score/completion/progress maps belong to adlseq:mapInfo,
       // not imsss:mapInfo. Keep the IMS namespace vocabulary schema-accurate.
@@ -121,8 +130,8 @@ function rollup(el: Element) {
   const controls = {...Object.fromEntries(['rollupObjectiveSatisfied', 'rollupProgressCompletion'].filter(k => el.hasAttribute(k)).map(k => [k, bool(el, k)])), ...(el.hasAttribute('objectiveMeasureWeight') ? {objectiveMeasureWeight: number(el, 'objectiveMeasureWeight', 0, 1)} : {})};
   const rules = children(el).map(r => {
     if (r.namespaceURI !== SN || r.localName !== 'rollupRule') fail(); attrs(r, ['childActivitySet', 'minimumCount', 'minimumPercent']);
-    const consideration = r.getAttribute('childActivitySet') ?? 'all', minimumCount = number(r, 'minimumCount', 0, 10000), minimumPercent = number(r, 'minimumPercent', 0, 1);
-    if (!['all', 'any', 'none', 'atLeastCount', 'atLeastPercent'].includes(consideration) || minimumCount !== undefined && !Number.isInteger(minimumCount)) fail();
+    const consideration = r.getAttribute('childActivitySet') ?? 'all', minimumCount = number(r, 'minimumCount', 0, 10000, true), minimumPercent = number(r, 'minimumPercent', 0, 1);
+    if (!['all', 'any', 'none', 'atLeastCount', 'atLeastPercent'].includes(consideration)) fail();
     const ns = children(r), cs = ns.find(n => n.localName === 'rollupConditions'), act = ns.find(n => n.localName === 'rollupAction');
     if (ns.length !== 2 || !cs || !act || ns.some(n => n.namespaceURI !== SN)) fail(); attrs(cs!, ['conditionCombination']); attrs(act!, ['action']);
     const combination = cs!.getAttribute('conditionCombination') ?? 'all', action = act!.getAttribute('action');
@@ -196,13 +205,12 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
         attrs(n, ['randomizationTiming', 'selectCount', 'reorderChildren', 'selectionTiming']);
         const selectionTiming = n.getAttribute('selectionTiming') ?? 'never', randomizationTiming = n.getAttribute('randomizationTiming') ?? 'never';
         if (![selectionTiming, randomizationTiming].every(v => ['never', 'once', 'onEachNewAttempt'].includes(v))) fail();
-        if (n.hasAttribute('selectCount') && !/^[+-]?\d+$/.test(n.getAttribute('selectCount')!)) fail();
-        const selectCount = number(n, 'selectCount', 0, 2048); if (selectCount !== undefined && !Number.isInteger(selectCount)) fail();
+        const selectCount = number(n, 'selectCount', 0, 2048, true);
         out.sequencingControls = {...out.sequencingControls, selectionTiming, randomizationTiming, selectCount: selectCount ?? null, randomizeChildren: bool(n, 'reorderChildren') ?? false};
         break;
       }
       case 'limitConditions': {
-        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
+        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000, true); if (limit !== undefined) out.attemptLimit = limit;
         for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(n.getAttribute(key)!) + 'S';} catch {fail();}}
         const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');
         if (begin !== undefined) out.beginTimeLimit = begin; if (end !== undefined) out.endTimeLimit = end;

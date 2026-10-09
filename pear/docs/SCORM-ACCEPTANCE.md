@@ -477,3 +477,61 @@ native4 pass, as do binding/provenance/URI/Close/reload related journeys. This
 is not clean full local acceptance. Final893 domain/128files, typecheck/build,
 focused26 and focused built7 all complete PASS exit0; current-head CI/native
 threeOS/review gates remain required. No quota/assertion/retry changes.
+
+
+ADR-155 original XML numeric probes0PASS/4FAIL,1PASS/6FAIL,0PASS/9FAIL retained.
+Initial focused36PASS/4FAIL retained: three incorrect fixture targets repaired,
+real accepted+000.50 completion CMI bootstrap mismatch fixed via canonical
+translation. Later40PASS footer/wrapper exit1 retained; explicit repeat40PASS/
+zero fail/skip/cancel NODE_EXIT=0 is final focused evidence. Fresh full907/907,
+129 files/all plans/footers/exits checked, aggregate exit0; typecheck/build exit0.
+Expanded choice3/weighted1/selected-pool3 completes7PASS exit0 with unchanged
+ACK/retry/Close/resume/navigation/proof assertions. Actual native manifest
+includes spaced+0003 attemptLimit; supplemental4/full172/current-head CI pending.
+Source adaptation v40 unchanged; JS double precision/10000 and2048 integer
+ceilings remain. Parent2268f latest10/logs READY855/237/237/4/native21 clean5ACK5,
+original Windows forced shutdown retained/unattributed after unchanged retry;
+parent22704e READY867/237/237/4/native22 clean5ACK5. Owner228 CI pending.
+Epic OPEN; production DISABLED; full matrices/external blockers unchanged.
+
+ADR-155 notation follow-up: original completion0PASS/1FAIL and scaled passing
+score0PASS/3FAIL retained; notation fixes and signed score3 regressions produce
+final focused43PASS/build/typecheck exit0. Earlier full907 is historical; full
+browser in progress saw a server/build change, so not final-tree evidence.
+Fresh final domain/browser required. Intermediate38PASS/2FAIL reveals shared
+engine18-digit fractional ceiling (valid XML20digits fails bootstrap): internal
+OPEN next slice; do not claim full numeric conformance or external blocker.
+
+Final domain910/129files completes all plans/footers/exits and aggregate exit0.
+Expanded native test1PASS/3FAIL retained: adding a primary objective populated
+CMI objective data, contradicting the existing absent-collection fixture; trace
+pageError explicitly says Absent collection value. Remove only this added
+objective from that fixture, retain the spaced integer definition and all
+absence/lost-ACK/retry/resume/native assertions. Small passing-score binding
+remains in built choice3 and domain3; no product guard or budget weakened.
+Fresh native4/full browser and final fixture-dependent domain verification follow.
+
+Corrected native4 completes PASS exit0 (26.9s). The sole domain file depending
+on the native fixture, native-fixture-lifecycle.test.ts, revalidates5PASS exit0
+(4.7s) after its manifest correction; remaining905 tests/128 files unchanged
+from fresh full910/129files. Final expanded built7 PASS exit0; build/typecheck
+exit0. Full172 final browser uses one fixed build/source throughout, pending.
+Parent2283f65b8a5/run37895406184 now READY: all10 SUCCESS jobs/logs893 domain/
+237dev/237built/SidePanel4 and host lanes; threeOS runtime16/Pear13/1.2=13/
+2004=22, five clean native/fixture exits and quitAcknowledged perOS, no forced
+shutdown, fresh owner head and no unresolved reviews. Historical/local failures
+remain separate. Precision successor original6FAIL/prototype6PASS retained;
+prototype is not product/browser/native acceptance.
+
+Exact final-tree full172 SCORM browser completes169PASS/3FAIL exit1 (7.4m):
+2004-4 support download deadline, managed ServiceWorker permission denial,
+2004-3 Retry DOM.describeNode/internal server error/session closed. Every trace
+inspected; cause unproved beyond these observations. All changed numeric7 and
+native4 journeys pass in full. Historical mixed-build172=168PASS/4FAIL retained,
+not final-tree evidence. Current local validation: full910/129files plus affected
+fixture5 revalidation, focused43, expanded built11, typecheck/build complete
+exit0; no clean full local/browser/platform conformance claim. Current owner-head
+CI/all10 logs/native threeOS22 and fresh reviews remain required before READY.
+No deadline/assertion/retry/envelope change. Next internal decimal precision and
+exact runtime boundary probes reproduce6FAIL+6FAIL; prototype9PASS is diagnostic
+only and does not replace product acceptance. Epic OPEN; production DISABLED.
