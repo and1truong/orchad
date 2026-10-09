@@ -6,17 +6,17 @@ import {multiFilePackage} from './scorm-package-fixture.ts';
 import {singleSCOManifest} from './scorm-player-fixture.ts';
 import {sequencingPackage} from './scorm-sequencing-fixture.ts';
 for(const edition of ['2004-2','2004-3','2004-4'] as const)test(edition+': unreloadable type-change checkpoint is refused atomically and remains recoverable',async()=>{
-  for(const sequenced of [false,true]){
+  for(const sequenced of [false,true])for(const uncommitted of ['uncommitted-answer','']){
     const f=await scormLearningFixture(undefined,sequenced?sequencingPackage(edition):multiFilePackage(edition,singleSCOManifest(edition)));
     try{const binding=f.enroll(),launch=f.launch(binding),b=f.player.bootstrap(launch.token);let state:any,calls=0;
       const api=createSCORM2004API({edition,state:b.state,sequencingTree:b.sequencingTree,sequencingSnapshot:b.sequencingSnapshot,checkpoint(v){state=v;calls++;}});
       assert.equal(api.Initialize(''),'true');for(const [key,value] of [['id','urn:pear:reload'],['type','choice'],['learner_response','answer']])assert.equal(api.SetValue('cmi.interactions.0.'+key,value),'true');
       assert.equal(api.SetValue('cmi.exit','suspend'),'true');assert.equal(api.Commit(''),'true');
       const request={sequence:1,revision:b.revision,state,finished:false},receipt=f.player.checkpoint(launch.token,request),stored=f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state;
-      assert.equal(api.SetValue('cmi.interactions.0.type','numeric'),'true');assert.equal(api.GetLastError(),'0');assert.equal(api.GetValue('cmi.interactions.0.learner_response'),'answer');
-      assert.equal(api.Commit(''),'false');assert.equal(api.GetLastError(),'391');assert.equal(api.Terminate(''),'false');assert.equal(api.GetLastError(),'111');assert.equal(calls,1,'no unreloadable snapshot queued');
-      const invalid=structuredClone(state);invalid.interactions[0].type='numeric';
-      assert.throws(()=>f.player.checkpoint(launch.token,{...request,sequence:2,revision:b.revision+1,state:invalid}),/cannot be reloaded/);
+      assert.equal(api.SetValue('cmi.interactions.0.learner_response',uncommitted),'true');assert.equal(api.SetValue('cmi.interactions.0.type','numeric'),'true');assert.equal(api.GetLastError(),'0');assert.equal(api.GetValue('cmi.interactions.0.learner_response'),uncommitted);
+      assert.equal(api.Commit(''),'false');assert.equal(api.GetLastError(),'391');if(sequenced)assert.equal(api.SetValue('adl.nav.request','continue'),'true');assert.equal(api.Terminate(''),'false');assert.equal(api.GetLastError(),'111');assert.equal(calls,1,'no unreloadable snapshot queued');if(sequenced)assert.equal(api.SetValue('adl.nav.request','_none_'),'true');
+      const invalid=structuredClone(state);invalid.interactions[0].type='numeric';invalid.interactions[0].learner_response=uncommitted;
+      assert.throws(()=>f.player.checkpoint(launch.token,{...request,sequence:2,revision:b.revision+1,state:invalid}),/(cannot be reloaded|rejected checkpoint)/);
       assert.equal(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state,stored);assert.equal(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision,b.revision+1);assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n,1);assert.deepEqual(f.player.checkpoint(launch.token,request),receipt);
       assert.equal(api.SetValue('cmi.interactions.0.learner_response','42'),'true');assert.equal(api.Commit(''),'true');assert.equal(calls,2);
       const next={...request,sequence:2,revision:b.revision+1,state},accepted=f.player.checkpoint(launch.token,next);assert.deepEqual(f.player.checkpoint(launch.token,next),accepted);

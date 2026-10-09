@@ -1,5 +1,6 @@
 import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
 import Scorm2004API from 'scorm-again/scorm2004';
+import {loadResponseState, responseBindings, responseStateMatches, setRuntimeResponseBindings, type ResponseBindings} from './scorm-response-bindings.ts';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
 import {scormModelPath, scormSupportCode, type SCORMStandard} from './scorm-engine.ts';
 
@@ -9,8 +10,9 @@ export const scorm2004CheckpointBytes = 2 * 1024 * 1024;
 export const scorm2004ExitRequests = ['_none_', 'exit', 'exitAll', 'abandon', 'abandonAll', 'suspendAll'];
 
 /** Acknowledged snapshots must survive the same strict loader used on resume. */
-export function scorm2004Reloadable(state: Record<string, any>) {
-  new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false}).loadFromJSON(state);
+export function scorm2004Reloadable(state: Record<string, any>, bindings: ResponseBindings = {}) {
+  const runtime = new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false}); loadResponseState(runtime, state, bindings);
+  if (!responseStateMatches(runtime, state)) throw Error('SCORM response presence changed on reload');
   return state;
 }
 
@@ -41,14 +43,18 @@ export function scorm2004FieldError(edition: SCORM2004Edition, key: string, valu
 }
 
 /** Exactly the eight IEEE synchronous methods; engine helpers never reach the SCO. */
-export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string, sharedData?: Record<string, string>) => unknown}) {
+export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; responseBindings?: ResponseBindings; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string, sharedData?: Record<string, string>) => unknown}) {
   const runtime = options.sequencingTree ? sequencingRuntime(options.sequencingTree, options.sequencingSnapshot) : new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
-  if (options.state) runtime.loadFromJSON(options.state);
+  if (options.state) loadResponseState(runtime, options.state, options.responseBindings);
   let sharedWrites: Record<string, string> = Object.create(null);
   let initialized = false, finished = false, error: string | null = null, navigation = options.navigation ?? '_none_';
   const bad = (code: string) => {error = code; return 'false';};
   const inactive = (before: string, after: string) => !initialized ? before : finished ? after : null;
-  const snapshot = () => scorm2004Reloadable(runtime.renderCMIToJSONObject().cmi as Record<string, any>);
+  let queuedState = structuredClone(options.state ?? runtime.renderCMIToJSONObject().cmi) as Record<string, any>, queuedBindings = options.responseBindings ?? {};
+  let acceptedSnapshot: {state: Record<string, any>; bindings: ResponseBindings} | undefined;
+  const currentBindings = () => responseBindings(runtime.renderCMIToJSONObject().cmi as Record<string, any>, queuedState, queuedBindings);
+  const snapshot = () => {const state = runtime.renderCMIToJSONObject().cmi as Record<string, any>, bindings = currentBindings(); scorm2004Reloadable(state, bindings); acceptedSnapshot = {state: structuredClone(state), bindings}; return state;};
+  const accept = () => {if (acceptedSnapshot) {queuedState = acceptedSnapshot.state; queuedBindings = acceptedSnapshot.bindings; setRuntimeResponseBindings(runtime, queuedBindings);} acceptedSnapshot = undefined;};
   return Object.freeze({
     Initialize(argument: string) {
       if (finished) return bad('104');
@@ -94,18 +100,19 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       error = null; const result = runtime.Commit(argument);
       try {if (result === 'true' && options.checkpoint?.(snapshot(), false, navigation, {...sharedWrites}) === false) return bad('391');}
       catch {return bad('391');}
-      if (result === 'true') sharedWrites = Object.create(null);
+      if (result === 'true') {sharedWrites = Object.create(null); accept();}
       return result;
     },
     Terminate(argument: string) {
       const code = inactive('112', '113'); if (code) return bad(code);
       if (argument !== '') return bad('201');
       error = null;
-      if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');
+      setRuntimeResponseBindings(runtime, currentBindings());
+      try {if (options.sequencingTree && !validNavigation(runtime, navigation)) return bad('111');} catch {return bad('111');}
       // Queue acceptance precedes termination so an unavailable durable queue is retryable.
       try {if (options.checkpoint?.(snapshot(), true, navigation, {...sharedWrites}) === false) return bad('111');}
       catch {return bad('111');}
-      const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
+      accept(); const result = runtime.Terminate(argument); if (result === 'true') {finished = true; sharedWrites = Object.create(null);} return result;
     },
     GetLastError() {return error ?? runtime.GetLastError();},
     GetErrorString(code: string) {const requested = scormSupportCode(code, options.edition); return requested === null ? '' : runtime.GetErrorString(requested);},

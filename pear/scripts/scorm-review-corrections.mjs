@@ -390,6 +390,9 @@ const sequencingResponseUpdates = [
     "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n    if (interaction_type === \"sequencing\" && value === \"\") return; // RTE4.2.9.1: zero-member ordered array.\n"
   ]
 ];
+const responseBindingOriginal = "5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276";
+const responseBindingPatched = "8bdddcc2d2b129e5541e9f18b46e50353cf72978d591ab9ca98d431876d46f10";
+const responseBindingUpdates = [["        this._type = type;", "        this._type = type;\n        this.correct_responses.childArray.forEach(response => {response._interactionType = type;});"]];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -492,9 +495,11 @@ export function reviewedSCORMSource(source) {
     source = replace(source, sequencingResponseUpdates);
     if (hash(source) !== sequencingResponsePatched) throw Error("SCORM sequencing response checksum mismatch");
   }
+  if (hash(source) === responseBindingOriginal) {source = replace(source, responseBindingUpdates); if (hash(source) !== responseBindingPatched) throw Error("SCORM response binding checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === responseBindingPatched) {source = replace(source, responseBindingUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== responseBindingOriginal) throw Error("SCORM response binding reverse checksum mismatch");}
   if (hash(source) === sequencingResponsePatched) {
     source = replace(source, sequencingResponseUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== sequencingResponseOriginal) throw Error("SCORM sequencing response reverse checksum mismatch");

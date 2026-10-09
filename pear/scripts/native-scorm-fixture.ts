@@ -13,7 +13,7 @@ if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsup
 const nonce = process.env.PEAR_NATIVE_NONCE;
 if (!nonce || !/^[-a-zA-Z0-9]{20,64}$/.test(nonce)) throw Error('Explicit native fixture nonce required');
 const dir = mkdtempSync(join(tmpdir(), 'pear-native-scorm-')), prefix = '/native-scorm/' + nonce, origin = 'http://127.0.0.1:4310';
-let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '', droppedReceipt = '', droppedCount = 0, droppedRevision = 0, largestCheckpointBytes = 0; const probes: any[] = [], calls: string[] = [], navigationAttempts: string[] = [], pearCanaryCalls: string[] = [], navigationViolations: string[] = [], driverErrors: string[] = [], contentRequests: {kind: string; status: number}[] = [];
+let action = 'start', droppedACK = false, exactRetry = false, droppedPayload = '', droppedReceipt = '', droppedCount = 0, droppedRevision = 0, largestCheckpointBytes = 0, responseBindingCheckpoints = 0; const probes: any[] = [], calls: string[] = [], navigationAttempts: string[] = [], pearCanaryCalls: string[] = [], navigationViolations: string[] = [], driverErrors: string[] = [], contentRequests: {kind: string; status: number}[] = [];
 const script = `
 (async()=>{
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
@@ -29,10 +29,13 @@ const script = `
     const codes=[[1,patterns[0]],[patterns.length,patterns[0]],[patterns.length,'']].map(([n,p])=>{if(api.SetValue(base+'.correct_responses.'+n+'.pattern',p)!=='false')throw Error('Native duplicate admitted');return api.GetLastError();});
     const preserved=patterns.every((p,n)=>api.GetValue(base+'.correct_responses.'+n+'.pattern')===p&&api.GetLastError()==='0');
     evidence.sequencingResponses={count:api.GetValue(base+'.correct_responses._count'),codes,preserved};
+    if(api.SetValue(base+'.correct_responses.0.pattern','uncommitted[,]pattern')!=='true')throw Error('Native unsaved response');
     const typeAccepted=api.SetValue(base+'.type','numeric')==='true'&&api.GetLastError()==='0';
     if(api.Commit('')!=='false')throw Error('Native unreloadable checkpoint queued');const commitCode=api.GetLastError();
     if(api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native checkpoint recovery');
+    if(api.SetValue(base+'.correct_responses.0.pattern',patterns[0])!=='true')throw Error('Native original response recovery');
     evidence.reloadableCheckpoint={typeAccepted,commitCode,preserved:patterns.every((p,n)=>api.GetValue(base+'.correct_responses.'+n+'.pattern')===p&&api.GetLastError()==='0')};
+    if(evidence.entry==='resume'){if(api.SetValue(base+'.type','numeric')!=='true'||api.Commit('')!=='true')throw Error('Native accepted response type change');evidence.responseBindingCheckpoint={committed:true,preserved:patterns.every((p,n)=>api.GetValue(base+'.correct_responses.'+n+'.pattern')===p&&api.GetLastError()==='0')};if(api.SetValue(base+'.type','sequencing')!=='true')throw Error('Native binding recovery');}
     const comment='🙂'.repeat(4000);if(evidence.entry!=='resume')for(let n=0;n<35;n++)if(api.SetValue('cmi.comments_from_learner.'+n+'.comment',comment)!=='true')throw Error('Native large comment');
     evidence.checkpointCapacity={count:api.GetValue('cmi.comments_from_learner._count'),preserved:Array.from({length:35},(_,n)=>api.GetValue('cmi.comments_from_learner.'+n+'.comment')===comment&&api.GetLastError()==='0').every(Boolean)};
   }
@@ -82,6 +85,7 @@ content!.addHook('onResponse', async (req, reply) => {
 content!.addHook('onSend', async (req, reply, payload) => {
   if (!req.url.endsWith('/checkpoint') || reply.statusCode !== 200) return payload;
   const serialized = JSON.stringify(req.body);largestCheckpointBytes=Math.max(largestCheckpointBytes,Buffer.byteLength(serialized));
+  if(Object.keys(JSON.parse(String(payload)).responseBindings??{}).length)responseBindingCheckpoints++;
   const count = Number(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n);
   const revision = Number(f.db.prepare('SELECT revision FROM scorm_sco_attempts').get()!.revision);
   if (!droppedACK) {
@@ -115,7 +119,7 @@ const consent=Array.from(panel.querySelectorAll('input')).find(i=>i.type==='chec
 const intro=()=>Array.from(panel.querySelectorAll('button')).find(b=>b.textContent.includes('Introduction')&&!b.disabled);(await wait(intro)).click();
 let resumed=false,retried=false;setInterval(async()=>{const state=await(await fetch('${prefix}/state')).json();if(state.action==='retry'&&!retried){retried=true;(await wait(()=>button('Retry engine checkpoint'))).click();}if(state.action==='resume'&&!resumed){resumed=true;(await wait(()=>button('Close SCO and choose another'))).click();(await wait(intro)).click();}},200);
 }catch(error){await fetch('${prefix}/driver-error',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:error.name,message:error.message})});}})();`));
-app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, largestCheckpointBytes, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
+app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, largestCheckpointBytes, responseBindingCheckpoints, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
 app.post(prefix + '/command', async (req, reply) => {const next = (req.body as any)?.action; if (!['retry', 'resume', 'finish', 'navigate'].includes(next)) return reply.code(400).send(); action = next; return {ok: true};});
 app.post(prefix + '/driver-error', async req => {driverErrors.push(String((req.body as any)?.message).slice(0, 200)); return {ok: true};});
 await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host: '127.0.0.1', port: 4315}); await app.listen({host: '127.0.0.1', port: 4310});
