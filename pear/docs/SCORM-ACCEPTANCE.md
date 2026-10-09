@@ -266,3 +266,12 @@ and sandbox3PASS/5EPERM failures are retained in ADR-148. Historical10dc CI all1
 logs/Pear828/225dev/225built/SidePanel4/native3OS2004=17 is verified, but new-head
 CI and fresh full828/166 acceptance remain pending. Full160156PASS/4FAIL remains
 retained; no clean full local claim. Epic133 OPEN, production DISABLED.
+
+ADR-148 fresh owner P1 full828/122files PASS exit0; full166 completes162PASS/
+4FAIL exit1 (interop2004-4 reopen timeout, managed Service Worker denial,
+2004-2 RetryAll and2004-3 ADL DOM.describeNode/session closure). All refusal6/
+reload3/Close race4/native fixture4 pass. Interop explicit Close readiness and
+disappearance verification completes5PASS/exit0; original full failure remains.
+Current e903 workflow/check runs are
+absent; direct gh API is Forbidden. Draft pending new-head CI/reviews, with
+original/intermediate/full failures retained and no clean full claim.

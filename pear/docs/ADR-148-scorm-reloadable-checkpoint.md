@@ -90,3 +90,19 @@ Windows attempt2 completed all profiles/clean shutdown; all10 latest-attempt
 logs are verified. Its original SIGKILL failure remains retained/unattributed.
 Fresh full domain828/browser166 and new-head CI/review are required for this
 Close correction; historical checks are not current-head acceptance.
+
+Fresh owner correction full domain828/122files completes exit0. Full166 browser
+completes162PASS/4FAIL exit1: interop2004-4 times out reopening Introduction
+after Close, managed player Service Worker access is denied,2004-2 RetryAll and
+2004-3 ADL navigation show DOM.describeNode internal/session-closed errors.
+All local refusal6/reload guard3/Close race4/native fixture4 pass in full.
+The interop trace shows Close click completion but no launch-close request,
+with periodic checkpoints continuing; this does not prove a driver root cause.
+The harness now explicitly scrolls/asserts Close viewport readiness and requires
+Close disappearance before reopening; all five targeted interop journeys
+complete PASS/exit0. The original full failure remains; no causality or clean
+full acceptance claim follows from this changed-harness check.
+No automatic rerun, weakened assertion, changed policy or timeout budget.
+GitHub returns no current e903caa8 workflow/check runs yet. Direct gh API access
+is Forbidden by the managed environment. Keep Draft pending exact-head CI and
+fresh review checks; this is not an approval rejection or a CI PASS claim.
