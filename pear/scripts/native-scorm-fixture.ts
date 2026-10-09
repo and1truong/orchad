@@ -8,7 +8,7 @@ import {scormLearningFixture} from '../tests/scorm-learning-fixture.ts';
 import {interopPackage} from '../tests/scorm-interop-fixture.ts';
 import {singleSCOManifest} from '../tests/scorm-player-fixture.ts';
 import {sequencingResponsePatterns} from '../tests/scorm-sequencing-response-vectors.ts';
-import {xmlTokenManifest, xmlTimeManifest} from '../tests/scorm-sequencing-fixture.ts';
+import {xmlTokenManifest, xmlTimeManifest, xmlSharedTargetManifest} from '../tests/scorm-sequencing-fixture.ts';
 import {absentCollectionPaths} from '../tests/scorm-collection-read-vectors.ts';
 const edition = process.env.PEAR_NATIVE_SCORM_EDITION ?? '2004-4';
 if (!['1.2', '2004-2', '2004-3', '2004-4'].includes(edition)) throw Error('Unsupported native SCORM edition');
@@ -20,6 +20,13 @@ const script = `
 (async()=>{
   const evidence={pearCookieDenied:false,pearStorageDenied:false,pearBridgeDenied:false,pearNativeDenied:false,noOwnBridge:!window.agentBridgeV1&&!parent.agentBridgeV1,nativeDenied:false,externalFetchDenied:false,userAgent:navigator.userAgent,entry:get('${edition === '1.2' ? 'cmi.core.entry' : 'cmi.entry'}'),bookmark:get('${edition === '1.2' ? 'cmi.core.lesson_location' : 'cmi.location'}')};
   if('${edition}'!=='1.2'){
+    if('${edition}'==='2004-4'){
+      const api=parent.API_1484_11,id='urn:pear:native-shared-target',store='native-shared-target-notes';
+      const resumed=evidence.entry!=='resume'||api.GetValue('adl.data.0.store')===store&&api.GetLastError()==='0';
+      if(api.SetValue('adl.data.0.store',store)!=='true')throw Error('Native shared target write refused');
+      if(api.SetValue('adl.data.0.id','forged')!=='false')throw Error('Native shared target ID mutation admitted');const idCode=api.GetLastError();
+      evidence.sharedTargetID={resumed,idCode,id:api.GetValue('adl.data.0.id'),preserved:api.GetValue('adl.data.0.store')===store&&api.GetLastError()==='0'};
+    }
     const api=parent.API_1484_11;if(api.SetValue('cmi.interactions.0.id','urn:pear:native-read-errors')!=='true')throw Error('Native interaction ID refused');
     evidence.collectionReadErrors=${JSON.stringify(absentCollectionPaths)}.map(path=>{if(api.GetValue(path)!=='')throw Error('Absent collection value');return {path,code:api.GetLastError()};});
     evidence.interactionReadErrors=['type','timestamp','weighting','result','latency'].map(field=>{
@@ -99,7 +106,8 @@ const manifest = standard === '1.2' ? singleSCOManifest(standard) : xmlTimeManif
   .replace('<p:manifest ', '<p:manifest xmlns:s="http://www.imsglobal.org/xsd/imsss" xmlns:a="http://www.adlnet.org/xsd/adlseq_v1p3" ')
   .replace('identifier="intro"', 'identifier="intro" isvisible=" &#x9;1&#xA; "')
   .replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><s:sequencing><s:deliveryControls tracked=" &#xD;true&#xA; "/><s:limitConditions attemptLimit=" &#x9;+0003&#xA; " beginTimeLimit="2000-01-01T00:00:00Z" endTimeLimit="2099-01-01T00:00:00Z" attemptAbsoluteDurationLimit="PT3600S" attemptExperiencedDurationLimit="PT3600S" activityAbsoluteDurationLimit="PT3600S" activityExperiencedDurationLimit="PT3600S"/><s:randomizationControls selectionTiming="never" randomizationTiming="never"/><s:sequencingRules><s:preConditionRule><s:ruleConditions conditionCombination="all"><s:ruleCondition condition="always" operator="not"/></s:ruleConditions><s:ruleAction action="disabled"/></s:preConditionRule></s:sequencingRules><a:rollupConsiderations requiredForSatisfied="always" requiredForNotSatisfied="always" requiredForCompleted="always" requiredForIncomplete="always"/></s:sequencing>')));
-const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, manifest)), binding = f.enroll();
+const nativeManifest = standard === '2004-4' ? xmlSharedTargetManifest(manifest.replace('<p:title>Introduction</p:title>', '<p:title>Introduction</p:title><runtime:data><runtime:map targetID="urn:pear:native-shared-target" readSharedData="true" writeSharedData="true"/></runtime:data>')) : manifest;
+const f = await scormLearningFixture(join(dir, 'pear.sqlite'), interopPackage(standard, 'pipwerks', script, nativeManifest)), binding = f.enroll();
 const {app, scormContentApp: content} = await createApp({db: f.db, origin, developmentAuth: true, staticRoot: resolve('dist'), scormContent: {origin: 'http://localhost:4315', runtimeBundle: readFileSync('dist/scorm/runtime.js')}});
 // Synthetic diagnostics record route classes/status, never launch capabilities.
 content!.addHook('onResponse', async (req, reply) => {
@@ -145,7 +153,7 @@ const consent=Array.from(panel.querySelectorAll('input')).find(i=>i.type==='chec
 const intro=()=>Array.from(panel.querySelectorAll('button')).find(b=>b.textContent.includes('Introduction')&&!b.disabled);(await wait(intro)).click();
 let resumed=false,retried=false;setInterval(async()=>{const state=await(await fetch('${prefix}/state')).json();if(state.action==='retry'&&!retried){retried=true;(await wait(()=>button('Retry engine checkpoint'))).click();}if(state.action==='resume'&&!resumed){resumed=true;(await wait(()=>button('Close SCO and choose another'))).click();(await wait(intro)).click();}},200);
 }catch(error){await fetch('${prefix}/driver-error',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:error.name,message:error.message})});}})();`));
-app.get(prefix + '/state', async () => ({edition, action, droppedACK, exactRetry, largestCheckpointBytes, responseBindingCheckpoints, responseWriteCheckpoints, largestInteractionJournal, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
+app.get(prefix + '/state', async () => ({sharedTargetStored: standard !== '2004-4' || f.db.prepare('SELECT store FROM scorm_system_data WHERE target_id=?').get('urn:pear:native-shared-target')?.store === 'native-shared-target-notes', edition, action, droppedACK, exactRetry, largestCheckpointBytes, responseBindingCheckpoints, responseWriteCheckpoints, largestInteractionJournal, binding, contentRequests, probes, calls, navigationAttempts, pearCanaryCalls, navigationViolations, driverErrors, checkpoints: (f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get() as any).n, proofs: (f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get() as any).n, certificates: (f.db.prepare('SELECT count(*) n FROM certificates').get() as any).n}));
 app.post(prefix + '/command', async (req, reply) => {const next = (req.body as any)?.action; if (!['retry', 'resume', 'finish', 'navigate'].includes(next)) return reply.code(400).send(); action = next; return {ok: true};});
 app.post(prefix + '/driver-error', async req => {driverErrors.push(String((req.body as any)?.message).slice(0, 200)); return {ok: true};});
 await sink.listen({host: '127.0.0.1', port: 4316}); await content!.listen({host: '127.0.0.1', port: 4315}); await app.listen({host: '127.0.0.1', port: 4310});

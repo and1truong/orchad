@@ -64,7 +64,7 @@ export function parseSharedData(item: Element, edition: SCORMStandard) {
   if (!maps.length || maps.length > 64) fail();
   return maps.map(n => {
     if (n.namespaceURI !== cp || n.localName !== 'map' || children(n).length) fail(); attrs(n, ['targetID', 'readSharedData', 'writeSharedData']);
-    const targetID = n.getAttribute('targetID');
+    const targetID = xmlAtomicToken(n.getAttribute('targetID'));
     if (!targetID || targetID.length > 4000 || /\s|[\u0000-\u001f\u007f]/.test(targetID) || ids.has(targetID)) fail(); ids.add(targetID!);
     return {targetID: targetID!, readSharedData: bool(n, 'readSharedData') ?? true, writeSharedData: bool(n, 'writeSharedData') ?? false};
   });
