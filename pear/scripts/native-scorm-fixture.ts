@@ -58,6 +58,11 @@ const script = `
     if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native country control restoration refused');
     const unassignedCodes=['en-OO','FRE-ab','qaa-CJ-demo','SCC-oh'].map(tag=>{if(api.SetValue(ianaKey,'{lang='+tag+'}Rejected text')!=='false')throw Error('Native unassigned ISO country admitted');return api.GetLastError();});
     evidence.countryRegistry={resumed:ianaResumed,accepted:assignedCountries.length,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:unassignedCodes};
+    const registeredSubcodes=${JSON.stringify(JSON.parse(readFileSync(new URL('./scorm-language-registry.json',import.meta.url),'utf8')).ianaSubcodes)};
+    for(const code of registeredSubcodes){const value='{lang=FRE-'+code.toUpperCase()+'}Native registered subcode';if(api.SetValue(ianaKey,value)!=='true'||api.GetValue(ianaKey)!==value)throw Error('Native registered subcode refused');}
+    if(api.SetValue(ianaKey,ianaValue)!=='true')throw Error('Native subcode control restoration refused');
+    const unregisteredCodes=['en-abc','FRE-abcd','qaa-foobar','SCC-abcdefgh','en-madeup','en-999','en-klingon','en-Qaby'].map(tag=>{if(api.SetValue(ianaKey,'{lang='+tag+'}Rejected text')!=='false')throw Error('Native unregistered subcode admitted');return api.GetLastError();});
+    evidence.ianaSubcodes={resumed:ianaResumed,accepted:registeredSubcodes.length,preserved:api.GetValue(ianaKey)===ianaValue&&api.GetLastError()==='0',codes:unregisteredCodes};
     const result='0.5'+'0'.repeat(40),resultKey=base+'.result';
     const resultResumed=evidence.entry!=='resume'||api.GetValue(resultKey)===result&&api.GetLastError()==='0';
     if(api.SetValue(resultKey,result)!=='true')throw Error('Native long interaction result refused');

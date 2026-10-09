@@ -524,6 +524,11 @@ const countryRegistryPatched = "aed6a0dda87c61dd3fbddc8e756ea4ee03f07d4895540f30
 const isoCountries = [...languageRegistry.countryAlpha2, ...languageRegistry.historicalCountryAlpha2].map(code => caseCode(code.toLowerCase())).join('|');
 const countryBoundary = '(?:-|\\}|(?![\\s\\S]))';
 export const countryRegistryUpdates = [['const PEAR_ISO_LANGUAGE_PRIMARY = "', 'const PEAR_ISO_LANGUAGE_PRIMARY = "' + JSON.stringify('(?![a-zA-Z]{2,3}-(?!(?:' + isoCountries + ')' + countryBoundary + ')[a-zA-Z]{2}' + countryBoundary + ')').slice(1, -1)]];
+const subcodeRegistryOriginal = countryRegistryPatched;
+const subcodeRegistryPatched = "173633c973ab69464aba8afd36c615bc9e9e23d0b520037a2859cf732258865a";
+// Registered first3–8 tokens only; prefix-language semantics remain separately reviewed.
+const ianaSubcodes = languageRegistry.ianaSubcodes.map(caseCode).join('|');
+export const subcodeRegistryUpdates = [['const PEAR_ISO_LANGUAGE_PRIMARY = "', 'const PEAR_ISO_LANGUAGE_PRIMARY = "' + JSON.stringify('(?![a-zA-Z]{2,3}-(?!(?:' + ianaSubcodes + ')' + countryBoundary + ')[a-zA-Z0-9]{3,8}' + countryBoundary + ')').slice(1, -1)]];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -635,9 +640,11 @@ export function reviewedSCORMSource(source) {
   if (hash(source) === ianaLanguageOriginal) {source = replace(source, ianaLanguageUpdates); if (hash(source) !== ianaLanguagePatched) throw Error("SCORM IANA language checksum mismatch");}
   if (hash(source) === reservedCountryOriginal) {source = replace(source, reservedCountryUpdates); if (hash(source) !== reservedCountryPatched) throw Error("SCORM reserved country checksum mismatch");}
   if (hash(source) === countryRegistryOriginal) {source = replace(source, countryRegistryUpdates); if (hash(source) !== countryRegistryPatched) throw Error("SCORM country registry checksum mismatch");}
+  if (hash(source) === subcodeRegistryOriginal) {source = replace(source, subcodeRegistryUpdates); if (hash(source) !== subcodeRegistryPatched) throw Error("SCORM subcode registry checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === subcodeRegistryPatched) {source = replace(source, subcodeRegistryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== subcodeRegistryOriginal) throw Error("SCORM subcode registry reverse checksum mismatch");}
   if (hash(source) === countryRegistryPatched) {source = replace(source, countryRegistryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== countryRegistryOriginal) throw Error("SCORM country registry reverse checksum mismatch");}
   if (hash(source) === reservedCountryPatched) {source = replace(source, reservedCountryUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== reservedCountryOriginal) throw Error("SCORM reserved country reverse checksum mismatch");}
   if (hash(source) === ianaLanguagePatched) {source = replace(source, ianaLanguageUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== ianaLanguageOriginal) throw Error("SCORM IANA language reverse checksum mismatch");}
