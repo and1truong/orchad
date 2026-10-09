@@ -762,3 +762,37 @@ ADL unchanged exact-three DOM diagnostic completes3PASS exit0 (17.5s);
 original full172168PASS/4FAIL remains retained, DOM causes unproved. Fresh
 full958/134files + focused97 + built3 + native4 + typecheck/build PASS; final
 installed source hashes0447a6/1.2eb7539 unchanged. Own CI/review still pending.
+
+ADR161 shared targetID xs:anyURI outer-XML-whitespace: original local/system
+four-whitespace-kind probe0PASS/8FAIL exit1 retained; one shared targetID read
+reuses xmlAtomicToken before existing bounds/duplicate/profile checks. New6
+domain canonical4000/immutable hash/invalid-used-unused/scoped exact receipts/
+SQLite resume/permissions/redaction/learner separation/one proof. Corrected
+focused91PASS exit0 (17.1s), typecheck/build exit0. Initial root runner and
+85PASS/one syntax TransformError/typecheck/build failures retained; corrected
+computed-key syntax only. Built2/native4/full964/135files/full172 pending.
+Native only2004-4 gains25th named shared-target check;1.2=13/other2004=24.
+Engine unchangedv42SHA0447a6/1.2eb7539; defaults/authority/deadlines unchanged.
+CAM/schema writeSharedData default conflict OPEN, no full XML anyURI claim.
+Owner235de1CI pending;234d25original9SUCCESS/Win1.2fixtureForced retained,
+all ten original full logs inspected, one unchanged Windows retry pending.
+Owner222e2bCI absent;matricesOPEN/externalBLOCKED;epicOPEN/prodDISABLED.
+
+Final added native shared-target assertions/typecheck complete; native4PASS
+exit0 (25.0s), built2PASS exit0 (11.0s). Fresh full964 domain/135files completes
+964PASS, zero fail/cancel/skip; each file plan/footer/all five counts/exit0
+and aggregate exit0 inspected. Fixed full172 browser running on unchanged
+source/build. Installed source hashes0447a6/1.2eb7539 unchanged. Independent
+next XML collection ID/IDREF whitespace probe0PASS/9FAIL exit1 retained;
+no collection/product changes in this slice.
+
+Fixed full172 browser completes168PASS/4FAIL exit1 (7.6m), all four
+traces inspected: fourth support download60sec timeout/cause unproved;
+managed ServiceWorker permission denial;2004-2 retry and2004-3 retryAll
+DOM.describeNode/session-closed at next-SCO delivery/cause unproved. Both
+changed built shared/local-system journeys and native4 pass in full, including
+new canonical-ID404/store/resume assertions. Original full failure retained,
+no unrelated repeat just to obtain green counts; no clean full local/
+Chromium153/actual native proof claim. No product/build/test/timeout/assertion/
+retry/policy changes during full acceptance. Engine hashes0447a6/1.2eb7539
+verified unchanged. Fresh owner CI/reviews still required before READY.

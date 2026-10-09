@@ -99,3 +99,6 @@ export function xmlTokenManifest(xml: string) {return xml.replace(/(conditionCom
 
 /** XML atomic dateTime/duration whitespace; admitted values and ceilings stay fixed. */
 export function xmlTimeManifest(xml: string) {return xml.replace(/(beginTimeLimit|endTimeLimit|attemptAbsoluteDurationLimit|attemptExperiencedDurationLimit|activityAbsoluteDurationLimit|activityExperiencedDurationLimit)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
+
+/** Named fourth-edition shared target anyURI outer XML whitespace. */
+export function xmlSharedTargetManifest(xml: string) {return xml.replace(/targetID="([^"]*)"/g, (_, id) => 'targetID=" &#x9;' + id + '&#xD;&#xA; "');}

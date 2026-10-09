@@ -89,6 +89,10 @@ try {
  await command('resume');
  const resumed=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=2&&value.checkpoints>=2?value:false;},60000);
  check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1])&&dynamic(resumed.probes[1])&&resumed.calls.length===0&&resumed.pearCanaryCalls.length===0);
+ if(edition==='2004-4'){
+  const shared=probe=>probe.sharedTargetID?.resumed===true&&probe.sharedTargetID.id==='urn:pear:native-shared-target'&&probe.sharedTargetID.idCode==='404'&&probe.sharedTargetID.preserved===true;
+  check('actual native XML shared target identity persists exact store through lost ACK and durable resume',shared(first.probes[0])&&shared(resumed.probes[1])&&resumed.sharedTargetStored===true);
+ }
  if(edition!=='1.2'){
   const expected=['type','timestamp','weighting','result','latency'];
   const reads=probe=>Array.isArray(probe.interactionReadErrors)&&probe.interactionReadErrors.length===expected.length&&probe.interactionReadErrors.every((value,index)=>value.field===expected[index]&&value.absentCode==='301'&&value.unsetCode==='403');

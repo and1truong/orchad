@@ -24,6 +24,7 @@ for (const edition of ['1.2', '2004-2', '2004-3', '2004-4']) test(edition + ': n
     await expect.poll(async () => (await state()).probes.length).toBe(2);
     const resumed = await state(); expect(resumed.driverErrors).toEqual([]); expect(resumed.probes[1].entry).toBe('resume'); expect(resumed.probes[1].bookmark).toBe('licensed-page');
     for (const key of ['popupDenied', 'serviceWorkerDenied', 'egressDirectives', 'redirectDenied']) expect(resumed.probes[1][key], key).toBe(true);
+    if(edition==='2004-4'){for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.sharedTargetID).toEqual({resumed:true,idCode:'404',id:'urn:pear:native-shared-target',preserved:true});expect(resumed.sharedTargetStored).toBe(true);}
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.interactionReadErrors).toEqual(['type','timestamp','weighting','result','latency'].map(field=>({field,absentCode:'301',unsetCode:'403'})));
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.collectionReadErrors).toEqual(absentCollectionPaths.map(path=>({path,code:'301'})));
     if(edition!=='1.2')for(const probe of [first.probes[0],resumed.probes[1]])expect(probe.sequencingResponses).toEqual({count:'5',codes:['351','351','351'],preserved:true});
