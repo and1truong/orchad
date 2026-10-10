@@ -89,6 +89,23 @@ try {
  await command('resume');
  const resumed=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=2&&value.checkpoints>=2?value:false;},60000);
  check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1])&&dynamic(resumed.probes[1])&&resumed.calls.length===0&&resumed.pearCanaryCalls.length===0);
+ if(edition!=='1.2'){
+  const expected=['type','timestamp','weighting','result','latency'];
+  const reads=probe=>Array.isArray(probe.interactionReadErrors)&&probe.interactionReadErrors.length===expected.length&&probe.interactionReadErrors.every((value,index)=>value.field===expected[index]&&value.absentCode==='301'&&value.unsetCode==='403');
+  const paths=['cmi.objectives.0.id','cmi.objectives.0.success_status','cmi.objectives.0.completion_status','cmi.objectives.0.progress_measure','cmi.objectives.0.description','cmi.objectives.0.score.scaled','cmi.objectives.0.score.raw','cmi.objectives.0.score.min','cmi.objectives.0.score.max','cmi.interactions.2.id','cmi.interactions.2.learner_response','cmi.interactions.0.objectives.0.id','cmi.interactions.0.correct_responses.0.pattern'];
+  const collections=probe=>Array.isArray(probe.collectionReadErrors)&&probe.collectionReadErrors.length===paths.length&&probe.collectionReadErrors.every((value,index)=>value.path===paths[index]&&value.code==='301');
+  check('actual native absent collection301 and unset interaction403 survive durable retry/resume',reads(first.probes[0])&&reads(resumed.probes[1])&&collections(first.probes[0])&&collections(resumed.probes[1]));
+  const ordered=probe=>probe.sequencingResponses?.count==='5'&&probe.sequencingResponses.preserved===true&&Array.isArray(probe.sequencingResponses.codes)&&probe.sequencingResponses.codes.length===3&&probe.sequencingResponses.codes.every(code=>code==='351');
+  check('actual native ordered response uniqueness and zero-member record survive durable retry/resume',ordered(first.probes[0])&&ordered(resumed.probes[1]));
+  const reloadable=probe=>probe.reloadableCheckpoint?.typeAccepted===true&&probe.reloadableCheckpoint.commitCode==='391'&&probe.reloadableCheckpoint.preserved===true;
+  check('actual native unreloadable checkpoint refusal preserves responses and permits recovery before retry/resume',reloadable(first.probes[0])&&reloadable(resumed.probes[1]));
+  await waitFor(async()=>{const value=await state();return value.responseBindingCheckpoints>0?value:false;},30000);
+  check('actual native prior accepted response binding persists a legal type change after durable resume',resumed.probes[1].responseBindingCheckpoint?.committed===true&&resumed.probes[1].responseBindingCheckpoint.preserved===true);
+  await waitFor(async()=>{const value=await state();return value.responseWriteCheckpoints>0?value:false;},30000);
+  check('actual native first-checkpoint typed response provenance is accepted and survives exact retry/resume',first.probes[0].responseWriteCheckpoint?.committed===true&&first.probes[0].responseWriteCheckpoint.preserved===true&&resumed.probes[1].responseWriteCheckpoint?.resumed===true);
+  const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
+  check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
+ }
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);
  check('native Terminate projects exactly one authoritative SCORM proof and preserves quiz requirement',completed.proofs===1&&completed.certificates===0&&completed.calls.length===0);

@@ -5,7 +5,7 @@ import {scormLearningFixture} from './scorm-learning-fixture.ts';
 import {multiFilePackage} from './scorm-package-fixture.ts';
 import {singleSCOManifest} from './scorm-player-fixture.ts';
 for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
-  for (const finished of [false, true]) test(edition + ': ' + (finished ? 'Terminate keeps suspended data and starts a fresh non-suspended SCO attempt' : 'interrupted unfinished sessions retain acknowledged state independently of exit hints'), async () => {
+  for (const finished of [false, true]) test(edition + ': ' + (finished ? 'Terminate keeps suspended data and starts a fresh non-suspended SCO attempt' : 'human close ends acknowledged time-out/logout while other unfinished sessions retain state'), async () => {
     for (const exit of ['normal', 'logout', 'time-out', '', 'suspend']) {
       const f = await scormLearningFixture(undefined, multiFilePackage(edition, singleSCOManifest(edition)));
       try {
@@ -16,7 +16,7 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
         const request = {sequence: 1, revision: b.revision, state, finished}, receipt = f.player.checkpoint(launch.token, request); assert.deepEqual(f.player.checkpoint(launch.token, request), receipt);
         const old = f.db.prepare('SELECT * FROM scorm_sco_attempts').get()!;
         f.player.close(f.service.principal('learner-a'), launch.launchId, 'session-learner-a'); const next = f.launch(binding), boot = f.player.bootstrap(next.token);
-        const fresh = finished && exit !== 'suspend';
+        const fresh = finished && exit !== 'suspend' || ['time-out','logout'].includes(exit);
         assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_sco_attempts').get()!.n, fresh ? 2 : 1, exit);
         const restored = createSCORM2004API({edition, state: boot.state}); assert.equal(restored.Initialize(''), 'true');
         for (const [field, value] of [['location', 'original-bookmark'], ['suspend_data', 'original-data']]) {assert.equal(restored.GetValue('cmi.' + field), fresh ? '' : value, exit); assert.equal(restored.GetLastError(), fresh ? '403' : '0');}

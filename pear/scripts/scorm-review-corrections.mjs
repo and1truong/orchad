@@ -322,6 +322,77 @@ const timeoutExitAllUpdates = [
     "    if (pendingNavRequest !== \"_none_\" && exitType !== \"time-out\") {\n      const matches = pendingNavRequest.match(choiceJumpRegex);"
   ]
 ];
+const logoutExitAllOriginal = "06459750c6d56c132306b08b89814db746915c44be835fab1e4d1ab29c8bf26f";
+const logoutExitAllPatched = "bc4d03187eb829e7b8a9a22e775b2cf2cfe14d7e0815ad24e518522c6500706a";
+const logoutExitAllUpdates = [
+  [
+    "    let normalizedRequest = exitType === \"time-out\" ? \"exitAll\" : pendingNavRequest;",
+    "    let normalizedRequest = [\"time-out\", \"logout\"].includes(exitType) ? \"exitAll\" : pendingNavRequest;"
+  ],
+  [
+    "    if (pendingNavRequest !== \"_none_\" && exitType !== \"time-out\") {",
+    "    if (pendingNavRequest !== \"_none_\" && ![\"time-out\", \"logout\"].includes(exitType)) {"
+  ],
+  [
+    "// Pear: RTE time-out ends the sequencing session regardless of authored navigation.",
+    "// Pear: RTE time-out/logout end the sequencing session regardless of authored navigation."
+  ]
+];
+const interactionIDOriginal = "bc4d03187eb829e7b8a9a22e775b2cf2cfe14d7e0815ad24e518522c6500706a";
+const interactionIDPatched = "ca2588b34c137ee832c2b58cadde4ad5c6260286c3fe5ce0e25470f55b40dc31";
+const interactionIDUpdates = [
+  [
+    "  /**\n   * Setter for _id\n   * Per SCORM 2004 RTE: identifier SHALL NOT be empty or contain only whitespace\n   * Per SCORM 2004 RTE Section 4.1.6: Once set, an interaction ID is immutable (error 351)\n   * @param {string} id\n   */\n  set id(id) {\n    if (id === \"\" || id.trim() === \"\") {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.TYPE_MISMATCH\n      );\n    }\n    if (this._idIsSet && this._id !== id) {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.GENERAL_SET_FAILURE\n      );\n    }\n",
+    "  /**\n   * Setter for _id\n   * Per SCORM 2004 RTE: identifier SHALL NOT be empty or contain only whitespace\n   * Pear: RTE 4.2.9 recommends avoiding ID changes but permits valid replacements.\n   * @param {string} id\n   */\n  set id(id) {\n    if (id === \"\" || id.trim() === \"\") {\n      throw new Scorm2004ValidationError(\n        this._cmi_element + \".id\",\n        scorm2004_errors.TYPE_MISMATCH\n      );\n    }\n"
+  ]
+];
+const urnNulOriginal = "ca2588b34c137ee832c2b58cadde4ad5c6260286c3fe5ce0e25470f55b40dc31";
+const urnNulPatched = "35b50ad4ce8742e927725802ccba2b9950532f637d3a0ea74daa886155ff0790";
+const urnNulUpdates = [
+  [
+    "  CMIShortIdentifier: \"^(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n",
+    "  CMIShortIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,250}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n"
+  ],
+  [
+    "  CMILongIdentifier: \"^(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n",
+    "  CMILongIdentifier: \"^(?![uU][rR][nN]:[\\\\s\\\\S]*%00)(?![^#]*#[\\\\s\\\\S]*#)(?:(?=[A-Za-z][A-Za-z0-9+.-]*:)|(?=[^:/?#]*(?:[/?#]|$)))(?:(?![uU][rR][nN]:)|(?=[uU][rR][nN]:(?![uU][rR][nN]:)[A-Za-z0-9][A-Za-z0-9-]{0,31}:(?:[A-Za-z0-9()+,\\\\-.:=@;$_!*'/?#]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])))(?=[\\\\s\\\\S]{1,4000}(?![\\\\s\\\\S]))(?:[A-Za-z0-9\\\\-._~:/?#@!$&'()*+,;=]|%[0-9A-Fa-f]{2})+(?![\\\\s\\\\S])\",\n"
+  ]
+];
+const interactionReadOriginal = "35b50ad4ce8742e927725802ccba2b9950532f637d3a0ea74daa886155ff0790";
+const interactionReadPatched = "3d677e8ee9457aa0ca29a68ada989301493de6965c3cc2e51431b0198b2f10aa";
+const interactionReadUpdates = [
+  [
+    "/^cmi\\.(?:comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location|timestamp)|(?:objectives|interactions)\\.\\d+\\.description)$/.test(CMIElement) ?",
+    "/^cmi\\.(?:comments_from_(?:learner|lms)\\.\\d+\\.(?:comment|location|timestamp)|objectives\\.\\d+\\.(?:id|success_status|completion_status|progress_measure|description|score\\.(?:scaled|raw|min|max))|interactions\\.\\d+\\.(?:id|type|timestamp|weighting|learner_response|result|latency|description|objectives\\.\\d+\\.id|correct_responses\\.\\d+\\.pattern))$/.test(CMIElement) ?"
+  ]
+];
+const sequencingResponseOriginal = "3d677e8ee9457aa0ca29a68ada989301493de6965c3cc2e51431b0198b2f10aa";
+const sequencingResponsePatched = "5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276";
+const sequencingResponseUpdates = [
+  [
+    "    if (interaction.type !== \"choice\") return false;",
+    "    if (![\"choice\", \"sequencing\"].includes(interaction.type)) return false;"
+  ],
+  [
+    "    if (selected.size !== nodes.length) return false; // The typed setter reports duplicate members as 406.",
+    "    if (interaction.type === \"choice\" && selected.size !== nodes.length) return false; // Choice member duplicates are 406; sequencing permits repeats."
+  ],
+  [
+    "previous.every((identifier) => selected.has(identifier))",
+    "previous.every((identifier, index) => interaction.type === \"sequencing\" ? identifier === nodes[index] : selected.has(identifier))"
+  ],
+  [
+    "if ([\"fill-in\", \"choice\"].includes(this._interactionType) && pattern === \"\")",
+    "if ([\"fill-in\", \"choice\", \"sequencing\"].includes(this._interactionType) && pattern === \"\")"
+  ],
+  [
+    "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n",
+    "  checkValidResponseType(CMIElement, response_type, value, interaction_type) {\n    if (interaction_type === \"sequencing\" && value === \"\") return; // RTE4.2.9.1: zero-member ordered array.\n"
+  ]
+];
+const responseBindingOriginal = "5153a70d4100dd05c905d4df8ad4f27dbab16292e4f27ef461096b77f022f276";
+const responseBindingPatched = "8bdddcc2d2b129e5541e9f18b46e50353cf72978d591ab9ca98d431876d46f10";
+const responseBindingUpdates = [["        this._type = type;", "        this._type = type;\n        this.correct_responses.childArray.forEach(response => {response._interactionType = type;});"]];
 export function reviewedSCORMSource(source) {
   const expected = pins[hash(source)];
   if (expected) {
@@ -404,9 +475,51 @@ export function reviewedSCORMSource(source) {
     source = replace(source, timeoutExitAllUpdates);
     if (hash(source) !== timeoutExitAllPatched) throw Error("SCORM time-out ExitAll checksum mismatch");
   }
+  if (hash(source) === logoutExitAllOriginal) {
+    source = replace(source, logoutExitAllUpdates);
+    if (hash(source) !== logoutExitAllPatched) throw Error("SCORM logout ExitAll checksum mismatch");
+  }
+  if (hash(source) === interactionIDOriginal) {
+    source = replace(source, interactionIDUpdates);
+    if (hash(source) !== interactionIDPatched) throw Error("SCORM interaction ID checksum mismatch");
+  }
+  if (hash(source) === urnNulOriginal) {
+    source = replace(source, urnNulUpdates);
+    if (hash(source) !== urnNulPatched) throw Error("SCORM URN NUL checksum mismatch");
+  }
+  if (hash(source) === interactionReadOriginal) {
+    source = replace(source, interactionReadUpdates);
+    if (hash(source) !== interactionReadPatched) throw Error("SCORM interaction read checksum mismatch");
+  }
+  if (hash(source) === sequencingResponseOriginal) {
+    source = replace(source, sequencingResponseUpdates);
+    if (hash(source) !== sequencingResponsePatched) throw Error("SCORM sequencing response checksum mismatch");
+  }
+  if (hash(source) === responseBindingOriginal) {source = replace(source, responseBindingUpdates); if (hash(source) !== responseBindingPatched) throw Error("SCORM response binding checksum mismatch");}
   return source;
 }
 export function unreviewedSCORMSource(source) {
+  if (hash(source) === responseBindingPatched) {source = replace(source, responseBindingUpdates.toReversed().map(([before, after]) => [after, before])); if (hash(source) !== responseBindingOriginal) throw Error("SCORM response binding reverse checksum mismatch");}
+  if (hash(source) === sequencingResponsePatched) {
+    source = replace(source, sequencingResponseUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== sequencingResponseOriginal) throw Error("SCORM sequencing response reverse checksum mismatch");
+  }
+  if (hash(source) === interactionReadPatched) {
+    source = replace(source, interactionReadUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== interactionReadOriginal) throw Error("SCORM interaction read reverse checksum mismatch");
+  }
+  if (hash(source) === urnNulPatched) {
+    source = replace(source, urnNulUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== urnNulOriginal) throw Error("SCORM URN NUL reverse checksum mismatch");
+  }
+  if (hash(source) === interactionIDPatched) {
+    source = replace(source, interactionIDUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== interactionIDOriginal) throw Error("SCORM interaction ID reverse checksum mismatch");
+  }
+  if (hash(source) === logoutExitAllPatched) {
+    source = replace(source, logoutExitAllUpdates.toReversed().map(([before, after]) => [after, before]));
+    if (hash(source) !== logoutExitAllOriginal) throw Error("SCORM logout ExitAll reverse checksum mismatch");
+  }
   if (hash(source) === timeoutExitAllPatched) {
     source = replace(source, timeoutExitAllUpdates.toReversed().map(([before, after]) => [after, before]));
     if (hash(source) !== timeoutExitAllOriginal) throw Error("SCORM time-out ExitAll reverse checksum mismatch");

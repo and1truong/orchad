@@ -152,3 +152,164 @@ head CI776/198 dev/198 built was successful but does not cover this correction.
 New-head full CI/native/Side Panel/review gates remain required.
 
 ADR-139 pear-timeout-exitall-v33 normalizes Terminate navigation and trusted preflight to ExitAll for time-out, preserving authored pending request until termination and historical v32 bytes/envelopes. Original6FAIL; first focused66/69 retained three test-only snapshot-access failures; corrected focused69/full domain782 across114 files/build/final typecheck/built3 complete exit0. Exact-head CI/native/Side Panel/review pending. Logout preflight/full lifecycle/independent reference gates remain OPEN; production disabled.
+
+ADR-140 pear-logout-exitall-v34 extends shared Terminate/preflight ExitAll precedence to logout and terminates the sequencing service, retaining authored request and exact v33 installation/snapshot compatibility. Original6FAIL; focused75/full domain788 across115 files/build/final typecheck/built3 complete exit0. Exact-head CI/native/Side Panel/review pending. Full lifecycle/reference gaps remain OPEN; existing data-free deprecation warning retained; production disabled.
+
+Parent #208 a49cdc8e / run37860684141 attempt2 completed10 jobs; all latest logs/head/reviews inspected. Pear764/192dev/192built/SidePanel4, actual Linux/macOS/Windows16/13/fourSCORM13 and five clean native/fixture exit0 records each. One unchanged Windows-only retry passed; original consent-response timeout retained/unattributed. Local download/learning/SW permission failures retained; no clean full local acceptance or full conformance claim. Successor exact-head CI remains required.
+
+ADR-141 uses existing transactional removal paths and trusted v34 ExitAll for
+acknowledged time-out/logout on human close or replacement, retaining old CMI
+history and receipts without a fabricated Terminate or proof. Original3FAIL;
+first focused82/88 retained, corrected final91/build/built3 complete exit0.
+Fresh integrated full domain797/117 files/build/built6 complete exit0. Full local
+SCORM browser145 completes134PASS/11FAIL, exit1: four EADDRINUSE from concurrent
+draft-worktree port reuse, five unattributed sequencing practice-delivery failures,
+download timeout and managed Service Worker permission refusal. Original traces
+retained; sequential nine-case recheck completes7PASS/2FAIL, exit1. Four session-time
+cases pass; interaction-records2004-3/duration2004-4 practice delivery still fails.
+Retained trace shows server accepted Terminate/nextScoId=practice but no following
+browser status lookup/replacement after manual retry; cause unresolved. No clean
+full local acceptance claim. New-head full CI/native/Side Panel/reviews required.
+
+ADR-142 v35 permits valid interaction ID replacement while retaining objective
+ID immutability and URI/dependency/packed-array guards in the shared engine.
+Original6FAIL; draft focused39/build/built3 pass. First integrated799/803 and
+compatibility803/804 failures retained; timestamp oracle now uses one controlled
+Date clock and complete restored-state equality. Build/integrated built9 pass;
+fresh final domain804/804 across118 files/typecheck/focused64/64 complete exit0.
+Historical v34 bytes/marker are
+accepted with identity/unknown-source refusal. New-head full CI/reviews and
+parent browser failures remain required; epic open, production disabled.
+
+ADR-143 records v35 whole sequencing35/43 and diagnostic failures. Two observed
+Retry clicks land in SCO HTML without shell click/runtime retry message. Explicit
+scroll/viewport readiness keeps the original human click and all ACK/navigation/
+time/proof checks; corrected focused10 pass/typecheck exit0. Whole43 completes42PASS/1FAIL
+(unchanged retryAll DOM.describeNode/session closed). Separate unchanged retryAll recheck1PASS; full145 browser running;
+no clean full local acceptance claim or attribution of every prior failure. CI/reviews and
+production/external gates remain required.
+
+ADR-143 full145 local140PASS/5FAIL and learning observation3/4 retained. One
+observed hidden Close click lands in SCO HTML without shell click/Close request.
+Learning Close now requires scroll/viewport and completed control removal;
+original launches/history/proof/quiz/certificate checks stay intact. Corrected
+learning6/6 and typecheck complete exit0, no clean full local claim; protocol/download/permission evidence
+and exact-head CI/reviews remain required.
+
+ADR-144 pear-urn-nul-v36 binds RFC2141 null-octet guidance in the shared short/
+long identifier expressions. Original6FAIL, draft focused26/full804 across118
+files/build/built URI3 pass, all exit0. Integrated latest-parent domain804/804
+across118 files/build/built11 pass, all exit0. v35 exact bytes/marker upgrades with
+identity/unknown-source refusal, prior receipt/history and SCORM1.2 unchanged.
+Full145 current-parent browser acceptance and new-head CI/reviews remain required.
+URI/IP-literal/full reference and production/external gates remain open.
+
+ADR-144 c8aea0d0 full145 completes140PASS/5FAIL exit1: managed download/SW
+restrictions and three DOM.describeNode/session-closed asset/retry/retryAll
+failures retained. First exact-head CI Linux native smoke quit ACK times out;
+exit-before-reply ordering is corrected to reply-before-exit. No weaker timeout/
+shutdown/policy assertion. Local Rust/native unavailable; new-head CI mandatory.
+
+ADR-145 v37 corrects absent interaction type/timestamp/weighting/result/latency
+reads301 while preserving existing unset403/defaults/serialization/dependencies.
+Final original6FAIL, focused32/build/built3/full domain810 across119 files/
+supplementary native fixture4 pass exit0; integrated root acceptance pending. Sandbox PDF timeout and discarded initial
+object-shape assertion failures are retained. Actual native301/403 checks before/
+after resume and exact-head CI/reviews remain required; epic/prod gates unchanged.
+
+ADR-145 caller review expands v37 to named objective/interaction scalar/score
+fields and nested objective IDs/correct patterns: narrow focused32/full draft
+810/build/browser3/fixture4/integrated root810/build pass retained; extension3
+originalFAIL, broader focused35/build pass exit0. Broader full domain/browser/
+root checks pending. Native fixture now records thirteen absent paths plus five
+unset fields before/after resume; actual native CI required.
+
+ADR-145 final broad source full813/813 across119 files passes exit0; reviewed
+source/new test/vector files match root exactly. Integrated root focused35/build/
+built12 pass exit0 (errors3, URI3, learning2, supplementary fixture4). Actual
+three-OS named301/403 and current-head CI/reviews plus full148 local remain
+required. Parent316 native ACK/clean shutdown now verified on all three OS; its
+Pear job is pending. Historical failures/managed policies remain retained.
+
+ADR-146 v38: original9FAIL on v37; shared ordered-array duplicate351 and valid
+zero-member pattern. Focused35/build/typecheck/built7 complete exit0. Fresh full
+domain822/822 across120 files completes exit0; full151 browser and current-head
+CI/review remain required. New native named
+ordered checks require actual three-OS logs; supplementary Chromium is not
+native evidence. Parent21968/run37873160107 all10 jobs/logs verified, Pear813/
+213dev/213built/SidePanel4 and native3OS16/13/1.2=13/2004=14/five clean ACK+exit0
+records each. Parent full148=142PASS/6FAIL exit1 and unchanged diagnostic18PASS
+remain recorded with unattributed driver failures; no clean full local claim.
+
+ADR-147: original3 performance-capacity regressions FAIL on v38; bounded2MiB
+checkpoint queue/server/HTTP agreement. Focused24/build/typecheck/full825 across
+121 files, large/ordered built9 and supplemental native fixture4 PASS exit0.
+Actual native over544KiB checkpoint/35 Unicode-record retry/resume and full157
+local/current-head CI/review remain required. Parent220 full151=149PASS/2FAIL
+exit1 download/SW restrictions is retained. Whole SPM combinations/load/ops
+remain open; no production enablement or conformance claim.
+
+ADR-148 guards acknowledged snapshots against strict-loader failure before queue
+and durable replay. Focused3/build/full domain828/122files/built recovery3 plus
+supplemental native fixture4 complete exit0. Full160/new-head actual native CI
+and review remain required; native2004 adds type0/commit391/preservation/recovery
+evidence. This does not complete retained-invalid-response type-change semantics.
+Parent221 full157151PASS/6FAIL is retained, with Windows2004-2 fixture forced
+shutdown after app-close in run37876846214. Epic133 OPEN, production DISABLED.
+
+ADR-148 P1 Close correction: original six practice/enrolled refusal journeys
+fail on10dcee62; final focused browser13, domain/lifecycle8 and confirmed build
+pass with complete exit0. Local Commit refusal now promptly rejects both shells'
+Close while preserving iframe/live response/launch/revision/receipts. Correction,
+explicit Retry, Close and exact Resume remain verified. Intermediate12PASS/1FAIL
+and sandbox3PASS/5EPERM failures are retained in ADR-148. Historical10dc CI all10
+logs/Pear828/225dev/225built/SidePanel4/native3OS2004=17 is verified, but new-head
+CI and fresh full828/166 acceptance remain pending. Full160156PASS/4FAIL remains
+retained; no clean full local claim. Epic133 OPEN, production DISABLED.
+
+ADR-148 fresh owner P1 full828/122files PASS exit0; full166 completes162PASS/
+4FAIL exit1 (interop2004-4 reopen timeout, managed Service Worker denial,
+2004-2 RetryAll and2004-3 ADL DOM.describeNode/session closure). All refusal6/
+reload3/Close race4/native fixture4 pass. Interop explicit Close readiness and
+disappearance verification completes5PASS/exit0; original full failure remains.
+Current e903 workflow/check runs are
+absent; direct gh API is Forbidden. Draft pending new-head CI/reviews, with
+original/intermediate/full failures retained and no clean full claim.
+
+PR222 support-download readiness repair: exact e2b1dfa original isolated five
+interop journeys complete4PASS/1FAIL exit1(1.2m). Fourth-edition download60s
+timeout trace/network/context read; pointer reaches SCO HTML, no diagnostics
+request. Build on exact old product completes exit0. Reuse existing explicit
+viewport readiness before the real support click, keeping packet/sequence/
+redaction/close/resume/Finish/proof assertions. Accepted interop5PASS/exit0
+(26.2s). No product/engine change, deadline/assertion/policy relaxation or
+empty CI-trigger commit. Temporary instrumentation is outside tracked tests.
+This reproduces and fixes this isolated missed action, not all historic causes.
+Parent full828/122files and full166162PASS/4FAIL remain inherited evidence,
+not rerun full results for this test-only repair. Historical10dc CI is not
+new-head proof; own CI/all full logs/fresh reviews required. Existing P1 fix
+and history retained; epic OPEN, production DISABLED.
+
+ADR-149 v39: original four regressions fail; final draft focused27/build/fresh
+full832 across123 domain files/supplementary native fixture4 pass exit0. Accepted
+response type bindings preserve nonempty/supplied empty fields through exact
+retry/trusted close/resume; current-type replacement clears bindings. Public
+metadata/changed invalid input remains refused. Integrated fresh full832/123files/build and built16 (binding3/reload3/refusal6/
+fixture4) pass exit0; full169 is running. Initial built13PASS/3FAIL wrapper
+checkpoint ordering is retained and corrected with explicit accepted-response
+DB verification.
+new-head CI/review and actual native3OS2004=18 remain required. Parent222 owner
+P1 e2b focused13/lifecycle8/build/fresh828 and changed interop5 pass; full166
+162PASS/4FAIL remains retained and current CI has not yet appeared. First-checkpoint type provenance and full matrices
+remain OPEN; historic failures retained in ADR-148–149, production DISABLED.
+
+ADR-150: original first-checkpoint provenance3FAIL→focused10/typecheck/build/
+built19 PASS exit0. Ordered typed journal is replayed/matched server-side; no
+client-asserted origin bindings. New response3, accepted binding3, bounded guard3,
+Close refusal6 and supplementary native fixture4 pass. First full835832PASS/
+3FAIL EADDRINUSE from overlapping lifecycle/browser fixtures is retained; fresh
+full835/124files then expanded838/124files complete PASS/exit0 after browser
+completion; all original failures remain retained. Full172 is running. Full172/current-head CI/review and native
+threeOS2004=19 required. Parent223 all10 jobs/logs verified832/234dev/234built/SidePanel4 and
+actual3OS2004=18 clean5/ACK5, READY; full169165PASS/4FAIL retained. Parent222 e2b missing current CI even after
+one close/reopen event replay; stays Draft. Epic133 OPEN, production DISABLED.

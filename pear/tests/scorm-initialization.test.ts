@@ -36,14 +36,15 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
     assert.equal(api.Terminate(''), 'true'); assert.equal(api.SetValue('cmi.comments_from_lms.0.comment', 'forged'), 'false'); assert.equal(api.GetLastError(), '133');
   });
 
-  test(edition + ': initialized preloaded nested collections retain writable fields, exact patterns and immutable identifiers', () => {
+  test(edition + ': initialized preloaded nested collections retain writable fields, exact patterns and immutable objective identifiers', () => {
     const engine = new Scorm2004API({logLevel: 'NONE'});
     engine.loadFromJSON({exit: 'suspend', comments_from_lms: {0: lmsComment}, comments_from_learner: {0: {comment: 'Original learner comment', timestamp: '2026'}}, interactions: {0: {id: 'urn:pear:q', type: 'choice', learner_response: 'a', objectives: {0: {id: 'urn:pear:o'}}, correct_responses: {0: {pattern: 'a'}}}}, objectives: {0: {id: 'urn:pear:o', description: 'Original', score: {scaled: '0.5'}}}});
     assert.equal(engine.Initialize(''), 'true');
     for (const [key, value] of [['cmi.comments_from_learner.0.comment', 'updated'], ['cmi.comments_from_learner.0.timestamp', '2026-10-08'], ['cmi.interactions.0.correct_responses.0.pattern', 'b'], ['cmi.interactions.0.learner_response', 'b'], ['cmi.objectives.0.score.scaled', '0.75'], ['cmi.objectives.0.description', 'updated']]) {
       assert.equal(engine.SetValue(key, value), 'true', key + ': ' + engine.GetDiagnostic('')); assert.equal(engine.GetValue(key), value);
     }
-    for (const key of ['cmi.interactions.0.id', 'cmi.objectives.0.id']) {assert.equal(engine.SetValue(key, 'different'), 'false'); assert.equal(engine.GetLastError(), '351');}
+    assert.equal(engine.SetValue('cmi.interactions.0.id', 'different'), 'true'); assert.equal(engine.GetLastError(), '0'); assert.equal(engine.GetValue('cmi.interactions.0.id'), 'different');
+    assert.equal(engine.SetValue('cmi.objectives.0.id', 'different'), 'false'); assert.equal(engine.GetLastError(), '351');
     engine.reset(); engine.loadFromJSON({comments_from_lms: {0: lmsComment}}); assert.equal(engine.Initialize(''), 'true');
     assert.equal(engine.SetValue('cmi.comments_from_lms.0.comment', 'forged'), 'false'); assert.equal(engine.GetLastError(), '404');
   });

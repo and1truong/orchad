@@ -55,7 +55,8 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) for (const profil
     await sco.getByRole('button', {name: 'Continue sequencing SCO', exact: true}).click();
     await expect(runtime.getByRole('status')).toContainText('not been acknowledged');
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(0);
-    await player.getByRole('button', {name: 'Retry engine checkpoint', exact: true}).click();
+    const retry = player.getByRole('button', {name: 'Retry engine checkpoint', exact: true});
+    await retry.scrollIntoViewIfNeeded(); await expect(retry).toBeInViewport(); await retry.click();
     await expect(sco.getByRole('heading', {name: 'Original sequencing practice', exact: true})).toBeVisible();
     await expect(sco.getByText('Sequencing entry: ab-initio; bookmark:', {exact: true})).toBeVisible();
     if (profile === 'shared' || profile === 'system-shared') await expect(sco.getByText('Shared notes: authored-shared-notes', {exact: true})).toBeVisible();
@@ -101,7 +102,8 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) test(edition + ' 
     await expect(sco.getByText('Sequencing entry: resume; bookmark: sequencing-page', {exact: true})).toBeVisible();
     let dropped = false; await page.route('**/launch/*/checkpoint', async route => {if (!dropped && route.request().postDataJSON().finished) {dropped = true; await route.fetch(); await route.abort();} else await route.continue();});
     await sco.getByRole('button', {name: 'End sequencing session', exact: true}).click(); await expect(runtime.getByRole('status')).toContainText('not been acknowledged');
-    const accepted = String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence); await player.getByRole('button', {name: 'Retry engine checkpoint', exact: true}).click(); await expect(player.getByRole('status')).toContainText('completion accepted');
+    const accepted = String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence); const retry = player.getByRole('button', {name: 'Retry engine checkpoint', exact: true});
+    await retry.scrollIntoViewIfNeeded(); await expect(retry).toBeInViewport(); await retry.click(); await expect(player.getByRole('status')).toContainText('completion accepted');
     expect(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n).toBe(1); expect(String(f.db.prepare('SELECT evidence FROM scorm_completion_proofs').get()!.evidence)).toBe(accepted);
     const proof = JSON.parse(accepted); expect(proof.scos.map((s: any) => s.scoId)).toEqual([selected]); expect(proof.selection[0].selectedChildren).toEqual(plan.selectedChildIds); expect(proof.scos[0].seconds).toBe(40); expect(f.db.prepare('SELECT count(*) n FROM scorm_sco_attempts').get()!.n).toBe(1);
   } finally {await page.close(); content!.server.closeAllConnections(); app.server.closeAllConnections(); await app.close(); f.db.close();}
