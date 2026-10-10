@@ -72,3 +72,26 @@ linked in ADR-149. Full edition/type/sequence/URI/SPM/operations matrices remain
 OPEN. Legacy license/platform, authorized commercial exports/Rustici account,
 actual Safari/Android and reviewed real storage/scanner/load/retention/RPO/DR
 inputs remain absent. Epic133 OPEN; production DISABLED.
+
+Head72c2072f full172 completes166PASS/6FAIL exit1: pipwerks2004-4 download
+timeout, managed ServiceWorker permission denial and four DOM.describeNode/
+session-closed failures (2004-3 retry/retryAll,2004-4 duration/shared) remain
+retained/unattributed. New provenance3/binding3/guard3/Close6/native4 all pass.
+Run37885369934 attempt1 completes nine successful jobs; all ten job logs read.
+Pear838domain/237dev/237built/Side4, actual Linux/macOS runtime16/Pear13/
+SCORM1.2=13/each2004=19 with five clean exit0 and quitACK records each. Windows
+2004-3 passes its18 pre-shutdown checks but fixture stalls after app-closed,
+before database-closed, then is forced (native exit0/quitACK true);2004-4 did
+not run. Original failure retained and cause unproved. A Windows-only rerun on
+unchanged head was accepted after run completion; first request while Pear
+was running returned GitHub403 already-running. #224 remains draft pending
+completed exact-head retry/log/review gates.
+
+Final head72c2072f/run37885369934 attempt2 completes all10SUCCESS/all10 latest
+attempt logs inspected (nine retain original timestamps; only Windows reruns).
+Unchanged Windows retry113679323066 passes runtime16/Pear13/1.2=13/each2004=19,
+clean native/fixture exit0 and quitACK five times without forced shutdown.
+Linux/macOS also clean5/ACK5; Pear838/237dev/237built/Side4 and host3/
+browser-host2/Lime-host1 pass. Original Windows fixture failure retained/
+unattributed. Fresh exact head and no unresolved review threads verified before
+#224 READY; no clean full local acceptance or completed epic/production claim.

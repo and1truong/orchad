@@ -1,5 +1,5 @@
 import {scormCharacters, scorm2004Writable} from './scorm-characterstring.ts';
-import Scorm2004API from 'scorm-again/scorm2004';
+import {scorm2004Engine} from './scorm2004-engine.ts';
 import {loadResponseState, responseBindings, responseStateMatches, setRuntimeResponseBindings, type ResponseBindings} from './scorm-response-bindings.ts';
 import {canonicalInteractionPath, interactionWritePath, interactionResponsePath, interactionTypePath, interactionWriteLimit, type InteractionWrite} from './scorm-interaction-writes.ts';
 import {sequencingRuntime, validNavigation} from './scorm-sequencing-runtime.ts';
@@ -11,8 +11,8 @@ export const scorm2004CheckpointBytes = 2 * 1024 * 1024;
 export const scorm2004ExitRequests = ['_none_', 'exit', 'exitAll', 'abandon', 'abandonAll', 'suspendAll'];
 
 /** Acknowledged snapshots must survive the same strict loader used on resume. */
-export function scorm2004Reloadable(state: Record<string, any>, bindings: ResponseBindings = {}) {
-  const runtime = new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false}); loadResponseState(runtime, state, bindings);
+export function scorm2004Reloadable(state: Record<string, any>, bindings: ResponseBindings = {}, edition: SCORM2004Edition = '2004-4') {
+  const runtime = new (scorm2004Engine(edition))({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false}); loadResponseState(runtime, state, bindings);
   if (!responseStateMatches(runtime, state)) throw Error('SCORM response presence changed on reload');
   return state;
 }
@@ -45,7 +45,7 @@ export function scorm2004FieldError(edition: SCORM2004Edition, key: string, valu
 
 /** Exactly the eight IEEE synchronous methods; engine helpers never reach the SCO. */
 export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: Record<string, any>; responseBindings?: ResponseBindings; navigation?: string; sequencingTree?: Record<string, any>; sequencingSnapshot?: string; checkpoint?: (state: Record<string, any>, finished: boolean, navigation: string, sharedData?: Record<string, string>, interactionWrites?: InteractionWrite[]) => unknown}) {
-  const runtime = options.sequencingTree ? sequencingRuntime(options.sequencingTree, options.sequencingSnapshot) : new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
+  const runtime = options.sequencingTree ? sequencingRuntime(options.sequencingTree, options.sequencingSnapshot, options.edition) : new (scorm2004Engine(options.edition))({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false});
   if (options.state) loadResponseState(runtime, options.state, options.responseBindings);
   let sharedWrites: Record<string, string> = Object.create(null);
   let initialized = false, finished = false, error: string | null = null, navigation = options.navigation ?? '_none_';
@@ -59,7 +59,7 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
     const state = runtime.renderCMIToJSONObject().cmi as Record<string, any>, bindings = currentBindings(), previous = responseBindings(state, queuedState, queuedBindings);
     const needsWrites = Object.entries(bindings).some(([path,type])=>previous[path]!==type);
     if (needsWrites && journalOverflow) throw Error('Interaction write journal quota exceeded');
-    scorm2004Reloadable(state, bindings); acceptedSnapshot = {state: structuredClone(state), bindings, ...(needsWrites ? {writes: interactionWrites.map(([key,value])=>[key,value])} : {})}; return state;
+    scorm2004Reloadable(state, bindings, options.edition); acceptedSnapshot = {state: structuredClone(state), bindings, ...(needsWrites ? {writes: interactionWrites.map(([key,value])=>[key,value])} : {})}; return state;
   };
   const accept = () => {if (acceptedSnapshot) {queuedState = acceptedSnapshot.state; queuedBindings = acceptedSnapshot.bindings; setRuntimeResponseBindings(runtime, queuedBindings); interactionWrites = []; writtenOrigins = {}; journalBytes = 2; journalOverflow = false;} acceptedSnapshot = undefined;};
   return Object.freeze({
@@ -100,8 +100,17 @@ export function createSCORM2004API(options: {edition: SCORM2004Edition; state?: 
       const interactionKey = canonicalInteractionPath(key);
       if (result === 'true' && interactionWritePath.test(interactionKey)) {
         if (interactionResponsePath.test(interactionKey)) writtenOrigins[interactionKey] = runtime.GetValue(interactionTypePath(interactionKey));
-        // ponytail: bounded4096-write/2MiB journal; compact validated histories if larger workloads require it.
-        if (!journalOverflow) {const entry: InteractionWrite = [interactionKey,value], bytes = new TextEncoder().encode(JSON.stringify(entry)).byteLength + 1; if (interactionWrites.length >= interactionWriteLimit || journalBytes + bytes > scorm2004CheckpointBytes) journalOverflow = true; else {interactionWrites.push(entry); journalBytes += bytes;}}
+        // Consecutive successful writes to the same type or response keep the
+        // last value; an intervening type/response cannot lose its origin.
+        // ponytail: other histories remain bounded4096/2MiB; validated witness compaction if needed.
+        if (!journalOverflow) {
+          const entry: InteractionWrite = [interactionKey,value], last = interactionWrites.at(-1);
+          const compact = (interactionKey.endsWith('.type') || interactionResponsePath.test(interactionKey)) && last?.[0] === interactionKey;
+          const bytes = (write: InteractionWrite) => new TextEncoder().encode(JSON.stringify(write)).byteLength + 1;
+          const growth = bytes(entry) - (compact ? bytes(last!) : 0);
+          if ((!compact && interactionWrites.length >= interactionWriteLimit) || journalBytes + growth > scorm2004CheckpointBytes) journalOverflow = true;
+          else {if (compact) interactionWrites[interactionWrites.length - 1] = entry; else interactionWrites.push(entry); journalBytes += growth;}
+        }
       }
       if (result === 'true' && key === 'adl.nav.request') navigation = value;
       if (result === 'true' && shared?.[2] === 'store') sharedWrites[runtime.GetValue(`adl.data.${Number(shared[1])}.id`)] = value;

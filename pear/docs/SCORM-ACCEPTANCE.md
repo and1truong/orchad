@@ -313,3 +313,145 @@ completion; all original failures remain retained. Full172 is running. Full172/c
 threeOS2004=19 required. Parent223 all10 jobs/logs verified832/234dev/234built/SidePanel4 and
 actual3OS2004=18 clean5/ACK5, READY; full169165PASS/4FAIL retained. Parent222 e2b missing current CI even after
 one close/reopen event replay; stays Draft. Epic133 OPEN, production DISABLED.
+
+ADR-150/head72c2072f full172166PASS/6FAIL exit1 retained: download timeout,
+managed ServiceWorker denial and four DOM.describeNode/session-closed failures
+remain unattributed; all provenance3/binding3/guard3/Close6/native4 pass.
+Run37885369934 attempt1: nine jobs SUCCESS/all ten logs read; Pear838/237dev/
+237built/Side4, Linux/macOS runtime16/Pear13/1.2=13/each2004=19 clean5/ACK5.
+Windows2004-3 fixture is forced after app-closed, before database-closed;
+2004-4 not run. Original failure retained/unproved; unchanged Windows-only
+retry accepted after run completion. #224 remains draft pending its gates.
+
+ADR-151/v40 isolates contemporary RFC3986 URI components/authority/IP literals
+from historical second-edition v39 lexical compatibility. Constructor profile
+follows typed writes, trusted preload/bound-response probes/queue reload and
+sequencing/selection/navigation copies; old v39 envelopes remain admitted.
+Original IP-literal trial3FAIL; preliminary focused28/full844 and corrected
+build pass. Initial built13 completes9PASS/4FAIL: native3 resume probes collided
+with objective absence assertions, corrected using a separate collection;
+2004-2 provenance click timeout unattributed. Final edition-scoped845/125files,
+build and focused built22 PASS exit0; additional response-family matrix file8
+passes. Fresh846 and full172 required; actual native3OS2004=20/current-head
+CI/review required. Full RFC2396, exhaustive contemporary reference/URN/UTF8/
+equivalence/dependency/type/SPM/seq/ops matrices remain OPEN, alongside external
+license/account/export/platform/production-policy blockers. Epic133 OPEN;
+production DISABLED.
+
+ADR-151 fresh expanded846/846 across125 files completes PASS/exit0; every
+footer/plan/exit checked, URI file8 includes all five response families/edition
+bindings. Final focused built22 PASS/exit0. Full172 built browser running;
+exact-head CI/native/review still pending.
+
+Final head72c2072f/run37885369934 attempt2 completes all10SUCCESS/all10 latest
+attempt logs inspected (nine retain original timestamps; only Windows reruns).
+Unchanged Windows retry113679323066 passes runtime16/Pear13/1.2=13/each2004=19,
+clean native/fixture exit0 and quitACK five times without forced shutdown.
+Linux/macOS also clean5/ACK5; Pear838/237dev/237built/Side4 and host3/
+browser-host2/Lime-host1 pass. Original Windows fixture failure retained/
+unattributed. Fresh exact head and no unresolved review threads verified before
+#224 READY; no clean full local acceptance or completed epic/production claim.
+
+Final full172 built SCORM browser completes170PASS/2FAIL exit1: managed
+ServiceWorker permission denial and2004-3 calendar DOM.describeNode/session
+closed. Original logs/traces retained; driver cause unproved. All expanded URI3,
+binding3/provenance3/guard3/Close6/native4 pass. Chromium151 is supplementary;
+Playwright1.63 expects Chromium153. Installation to the user-specified browser
+directory is blocked by CDN403 Domain forbidden, complete installer exit1; no
+dependency, policy, timeout or assertion is changed. This is not clean full
+local acceptance. Exact-head CI/native3OS2004=20/review gates remain required.
+
+ADR-152 original consecutive-type history0PASS/6FAIL→basic6 and expanded
+focused18/build PASS exit0. Mixed-origin durable Commit/Terminate/queue refusal/
+forged journal deletion/receipt exact retry/Close/resume covered; no quota
+relaxation. Old type-only quota cases0PASS/3FAIL retained; noncompactable
+response/type histories preserve every refusal/Close/recovery assertion.
+Built5000-type history and native journal length evidence added to existing
+journeys; final focused built22 and fresh full domain855/126 files complete
+PASS exit0. Full172 browser and actual3OS2004=21/current CI/review required. General witness compaction/full matrices remain OPEN.
+Parent225 CI Windows1.2 fixture forced after app-closed,2004 not run; cause
+unproved and original log retained, Draft until exact-head gates pass.
+
+
+Full172 SCORM built browser completes169PASS/3FAIL exit1: support download
+timeout,2004-2 target navigation DOM.describeNode/session-closed, and managed
+ServiceWorker permission denial. All changed provenance/type-history3, binding3,
+URI3, reload3, Close6 and supplemental native4 journeys pass. Full logs/traces
+retained; no clean full local acceptance or proved driver cause. Supported
+Chromium153 installation remains blocked by CDN403. Fresh domain855/126 files,
+final build, focused18 and built22 complete PASS exit0. Parent225 head0ba also
+fails built response correction after resume (846 domain/237 dev pass;
+236 built pass/1fail, Side Panel/host not reached); its viewport correction is
+being validated at its owner before integration. Windows shutdown cause remains
+unproved. General successful response histories remain OPEN: an independent
+original5000 consecutive learner/pattern-write regression across three editions
+and Commit/Terminate completes0PASS/12FAIL exit1, preserved for a successor.
+
+
+Head0ba183c7/run37888472163 attempt1 completes eight SUCCESS/two FAILURE.
+Linux/macOS runtime16/Pear13/1.2=13/each2004=20 pass with five clean native/
+fixture exit0 and quitACK records each. Windows113683752681 fails1.2 fixture
+shutdown after app-closed, before database-closed; native exit0/ACK true, fixture
+forced,2004 profiles not run. Cause unproved; original log retained. Pear
+113683752715 completes846 domain/237 dev PASS; built236PASS/1FAIL exit1,
+2004-3 bound-response correction click after resume waits for visible/enabled/
+stable in a nested frame. Side Panel/host lanes not reached. Both binding and
+first-provenance journeys now scroll the resumed outer iframe into viewport
+and assert readiness before clicking correction. All recovery/state/proof
+assertions and time budgets are retained; no forced click or retry is added.
+This follows the existing interop readiness step. Original CI timeout retained;
+changed journeys and complete new-head CI/log/review gates remain required.
+No runtime, engine adaptation, source checksum or receipt/history change.
+
+Changed built journeys complete6/6 PASS exit0 (2.1–2.5seconds each); footer and
+process completion checked. Original failures remain retained. The current
+head requires complete exact-head CI and native/review gates before READY.
+
+Integrated owner225 viewport correction b32a9aba without rewriting either
+history: documentation conflicts retain both evidence blocks. Changed built
+binding/provenance6 completes PASS exit0 under CI30second test budget, including
+5000-type compaction plus lost ACK/Retry/Close/resume/current-type correction.
+Parent225 new-head run37890454443 is pending; historical0ba failures remain.
+
+
+ADR-153 original0PASS/12FAIL consecutive learner/pattern histories retained;
+focused24/24 PASS exit0 with unchanged quotas and expanded mixed-origin durable
+refusal/forged witness/exact receipt retry/Close/resume. Existing built provenance
+and native histories now exercise5000 writes perresponse; native2004=22 and
+1.2=13/five clean shutdown+ACK perOS/current-head CI/review required. Full domain/
+build/browser pending; general witness/full matrices OPEN. Epic OPEN/prod DISABLED.
+
+Fresh full domain completes867/867 across127 files, every footer/plan/exit
+checked, no skipped/cancelled cases; final build/typecheck completes exit0.
+Focused/full browser and actual current-head CI/review gates remain required.
+
+Expanded focused built19/19 completes PASS exit0: native4/reload3/Close6/
+binding3/provenance3, including5000 learner/pattern writes and five-entry
+provenance witness. The URI selector matched no file; URI3 are in the existing
+scorm-identifiers journey and remain included in the full172 run now underway.
+No22-test focused claim; exact-head CI/review remain pending.
+
+Full172 built SCORM browser completes168PASS/4FAIL exit1: support-download
+timeout,2004-2 target navigation and same-SCO retry DOM.describeNode/session
+closed, managed ServiceWorker permission denial. Logs/traces retained; driver
+cause unproved. All expanded response/type-history/provenance3, binding3, URI3,
+Close6/reload3/native4 pass. This is not clean full local acceptance; Chromium151
+is supplementary and supported153 CDN remains blocked.
+
+Parent225 current b32/run37890454443 and226 current19c4efaf/run37890698928
+native Linux/Windows/macOS logs are all inspected: runtime16/Pear13/1.2=13,
+2004=20 (225) or21 (226), five clean native/fixture exit0+quitACK records eachOS.
+No forced shutdown. Both Pear jobs remain pending; no READY claim. Original225
+head0ba Windows failure and local browser failures remain retained/unattributed.
+Owner225 b32a9aba now completes all10 current-head jobs/logs:846 domain,
+237 dev/237 built/Side Panel4 and threeOS native2004=20, five clean exit0+ACK
+records each; READY. Owner22619c4efaf/run37890698928 completes nine SUCCESS
+jobs, including threeOS native2004=21/five clean exit0+ACK records each.
+Pear855 domain/237 dev/237 built/host3/browser-host2/Lime/SCORM-Lime1
+complete, but Side Panel starts four tests without a complete footer before
+job cancellation at the25minute deadline (05:53:04–06:18:23 UTC; cancellation
+06:18:17). Original logs/artifact11599286462 remain; this is not full acceptance.
+Increase only the Pear job scheduling ceiling25→35minutes for both browser
+lanes plus host/Side Panel work. Per-test/assertion/fixture deadlines, counts,
+retries and all product budgets are unchanged. New-head all10 CI/logs and
+review gates remain required; no historical/descendant evidence substitutes.

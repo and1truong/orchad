@@ -1,9 +1,11 @@
-import Scorm2004API from 'scorm-again/scorm2004';
+import type Scorm2004API from 'scorm-again/scorm2004';
+import {scorm2004Engine} from './scorm2004-engine.ts';
+import type {SCORMStandard} from './scorm-engine.ts';
 import {loadResponseState, runtimeResponseBindings} from './scorm-response-bindings.ts';
 import {installDurationClock} from './scorm-duration.ts';
 /** Host-only engine construction. Serialized state is always from the trusted database. */
-export function sequencingRuntime(tree: Record<string, any>, snapshot?: string) {
-  const runtime = new Scorm2004API({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false,
+export function sequencingRuntime(tree: Record<string, any>, snapshot?: string, edition: SCORMStandard = '2004-4') {
+  const runtime = new (scorm2004Engine(edition))({logLevel: 'NONE', autocommit: false, lmsCommitUrl: false, accumulateSessionTimeOnTerminate: false,
     sequencing: {activityTree: tree as any, autoRollupOnCMIChange: false, autoProgressOnCompletion: false, validateNavigationRequests: true, enableEventSystem: false, logLevel: 'error'}});
   if (!runtime.getSequencingService()) throw Error('SCORM sequencing engine unavailable');
   // Upstream's Map-to-object snapshots lose the legal ID __proto__. Keep the
@@ -44,7 +46,7 @@ export function validNavigation(runtime: Scorm2004API, request: string) {
   if (!allowed.includes(nav.request) || ['choice', 'jump'].includes(nav.request) && !nav.target) return false;
   // Evaluate complete navigation on a restored copy; the real engine stays unchanged.
   const tree = (runtime.settings.sequencing?.activityTree ?? {}) as Record<string, any>;
-  const copy = sequencingRuntime(tree, runtime.serializeSequencingState());
+  const copy = sequencingRuntime(tree, runtime.serializeSequencingState(), runtime.constructor === scorm2004Engine('2004-2') ? '2004-2' : '2004-4');
   loadResponseState(copy, runtime.renderCMIToJSONObject().cmi as Record<string, any>, runtimeResponseBindings(runtime));
   copy.Initialize('');
   return copy.processNavigationRequest(nav.request, nav.target);
