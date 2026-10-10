@@ -101,6 +101,7 @@ export async function createApp(opts: {
     string,
     { requests: number; failures: number; until: number }
   >();
+  // Executable content may mutate its same-origin player; do not allow arbitrary Pear frame navigation.
   app.addHook("onSend", async (req, reply) => {
     if ((req.url.split("?")[0].startsWith("/api/interactive/")||req.url.split("?")[0].startsWith("/api/scorm/launch/"))) {
       reply
@@ -124,7 +125,7 @@ export async function createApp(opts: {
         "Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https: blob:; connect-src 'self'" +
           (opts.dev ? " ws:" : "") +
-          "; frame-src 'self'" + (scormOrigins ? " " + scormOrigins.contentOrigin : "") + "; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          "; frame-src " + (scormOrigins ? scormOrigins.contentOrigin + " " + parsed.origin + "/api/scorm/launch/ " + parsed.origin + "/api/interactive/ blob:" : "'self'") + "; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
     if (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))) reply.header("Cache-Control", reply.getHeader("Cache-Control")==="private, no-store"?"private, no-store":"no-store");
   });

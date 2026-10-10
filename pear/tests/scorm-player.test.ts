@@ -112,6 +112,7 @@ test('acknowledged state and idempotent checkpoint receipts survive database and
 test('content host serves capability-scoped assets and refuses application credentials and forged origins', async () => {
   const f = await playerFixture(), launch = f.launch(), content = createSCORMContentHost({pearOrigin: 'http://127.0.0.1:4338', contentOrigin: 'http://localhost:4339', player: f.player, runtimeBundle: Buffer.from('/* fixture runtime */')});
   const base = '/launch/' + launch.token, host = 'localhost:4339';
+  for (const [path,target] of Object.entries({'off-origin':'http://127.0.0.1:4338/synthetic-canary','protocol-relative':'//127.0.0.1:4338/synthetic-canary','invalid':'http://[invalid','credentials':'http://user:pass@localhost:4339/health','relative':'/health'})) content.get('/synthetic-'+path,async (_req,reply)=>reply.redirect(target));
   try {
     const bootstrap = await content.inject({url: base, headers: {host}}); assert.equal(bootstrap.statusCode, 200);
     assert.match(bootstrap.headers['content-security-policy'] as string, /sandbox allow-scripts allow-same-origin/);
@@ -124,6 +125,8 @@ test('content host serves capability-scoped assets and refuses application crede
     assert.equal(range.statusCode, 206); assert.equal(range.body, 'body{c');
     assert.equal((await content.inject({url: base + '/files/assets/style.css', headers: {host, range: 'bytes=0-2,4-6'}})).statusCode, 416);
     assert.equal((await content.inject({url: base + '/files/../outside', headers: {host}})).statusCode, 403);
+    for (const path of ['off-origin','protocol-relative','invalid','credentials']) {const denied=await content.inject({url:'/synthetic-'+path,headers:{host}}); assert.equal(denied.statusCode,403); assert.equal(denied.headers.location,undefined);}
+    assert.equal((await content.inject({url:'/synthetic-relative',headers:{host}})).statusCode,302);
     const state = snapshot(f.player.bootstrap(launch.token).state), request = {sequence: 1, revision: 0, state, finished: false};
     assert.equal((await content.inject({url: base + '/checkpoint', method: 'POST', headers: {host, origin: 'http://127.0.0.1:4338'}, payload: request})).statusCode, 403);
     assert.equal((await content.inject({url: base + '/checkpoint', method: 'POST', headers: {host, origin: 'http://localhost:4339'}, payload: request})).statusCode, 200);
@@ -142,6 +145,9 @@ test('authenticated launch endpoints retain CSRF/session epoch boundaries and pr
   try {
     const login = await app.inject({url: '/api/login', method: 'POST', headers: {host: '127.0.0.1:4338', origin}, payload: {username: 'learner-a', password: 'learner-a-dev'}});
     const session = login.json(), headers = {host: '127.0.0.1:4338', origin, cookie: String(login.headers['set-cookie']).split(';')[0]!, 'x-csrf-token': session.csrf, 'x-pear-epoch': session.sessionEpoch};
+    const policy=String((await app.inject({url: '/',headers:{host:'127.0.0.1:4338'}})).headers['content-security-policy']);
+    assert.ok(policy.includes('frame-src http://localhost:4339 http://127.0.0.1:4338/api/scorm/launch/ http://127.0.0.1:4338/api/interactive/ blob:;'));
+    assert.ok(!policy.includes("frame-src 'self'"));
     const payload = {packageId: f.pkg.id, version: 1, mode: 'normal', confirmed: true, revision: 0, key: 'http-launch'};
     const send = (h: any, data = payload) => app.inject({url: '/api/scorm-engine/launch', method: 'POST', headers: h, payload: data});
     assert.equal((await send({...headers, 'x-csrf-token': 'wrong'})).statusCode, 403);

@@ -7,7 +7,7 @@ import {resolve} from "node:path";
 test("human imports and reviews original ZIP; isolated SCO persists and resumes private reported state without official learning credit",async({page})=>{
  test.setTimeout(60000);
  const f=fixture(),origin="http://127.0.0.1:4321",bytes=zip();
- const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist")});
+ const {app}=await createApp({db:f.db,origin,developmentAuth:true,staticRoot:resolve("dist"),scormContent:{origin:"http://localhost:4322",runtimeBundle:readFileSync("dist/scorm/runtime.js")}});
  async function login(id:string){await page.getByLabel("Account",{exact:true}).fill(id);await page.getByLabel("Password",{exact:true}).fill(id+"-dev");await page.getByRole("button",{name:"Sign in",exact:true}).click();await expect(page.getByRole("button",{name:"Sign out",exact:true})).toBeVisible();}
  try{
   await app.listen({port:4321,host:"127.0.0.1"});await page.goto(origin);await login("admin");await page.getByRole("button",{name:"Administration",exact:true}).click();

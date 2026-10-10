@@ -112,3 +112,43 @@ new-head full CI pending. Local managed extension policy is unchanged.
 ADR-128 extends existing three built wide-real journeys to numeric learner/
 correct and performance bound overflow/range refusal, stored exact strings
 and lost-ACK retry/close-resume. Full new-head acceptance remains required.
+
+ADR-129 adds six original three-profile shared/facade/typed replay cases for
+empty locations/comment records and extends the existing three built read-only
+comment journeys with empty save, persisted count/value and lost-ACK/resume.
+Local734/106,focused50,build,three built journeys completed; new-head full CI
+and all native/review gates remain required. Durable initialized/unset presence
+and full field matrix remain OPEN.
+
+ADR-130 adds six original choice-set append/replacement/preload/replay cases
+and extends all three built URI/full-capacity journeys with reordered duplicate
+refusal, retained pattern/count, same-index authored order and lost-ACK/resume.
+Local740/107,focused34,build,three built journeys completed with exit0; full
+new-head CI/native/review and remaining response/equivalence gates are required.
+
+ADR-131 retains two original actual-request navigation/redirect counterexamples. Final build and six built Chromium journeys completed with exit0, including four real fault-driver profiles and combined inline playback. New native controller requires13 checks per SCORM profile with attempted/frame-src/403/zero-canary evidence, unchanged proofs and clean exit. Fresh full domain740/107 completed with exit0; exact-head CI/native/review remain required; full strict-egress remains OPEN.
+
+ADR-132 controlled script-delivery regression fails before original fixture handler readiness is corrected. Fresh domain740/107/build pass. Full local43 completes32PASS/11FAIL; targeted12 completes10PASS/2FAIL, final unchanged three-case check3PASS. Passing evidence across attempts is not a clean full acceptance run. New-head full CI is mandatory, original failures retained, no assertions/timeouts relaxed.
+
+ADR-133 focused70/fresh domain746 across108 files/build and three built comment journeys completed with exit0. Original six presence regressions failed; corrected shared/facade/preload/typed replay covers omitted children403 versus explicit blanks0, missing records301, read-only404 and malformed406 without mutation. Existing ACK/retry/revision/count/receipt/proof assertions remain. Exact-head CI/native/review remain required.
+
+ADR-134 original six description-presence regressions failed; focused88 includes shared/facade/seed/typed replay/count/history/exact retry/resume plus sequencing/system-objective compatibility and historical installer checks. Build/fresh full domain752 across109 files/three built journeys complete exit0; exact-head CI/native/review remain required.
+
+ADR-135 original6FAIL -> focused94/build complete exit0. Current legacy-scalar vectors6, fresh full domain758 across110 files and three built response/comment/description journeys complete exit0; exact-head CI/native/review remain required. Valid empty responses and absent response presence use shared model/loader/typed replay without weakening dependency/vocabulary/Unicode guards.
+
+ADR-136 v32 preserves supplied empty location/suspend_data values versus omitted fields403 through shared snapshots/reset/loading and typed durable replay. Original6FAIL; final focused106/full domain764 across111 files/build/built3 complete exit0. Full local127 completes114PASS/13FAIL, retained; fresh-process failed-case rechecks pending. No clean full local acceptance claim. Historical explicit blanks are preserved without provenance inference. Full exact-head acceptance and remaining conformance gates stay required.
+
+ADR-137 uses the existing transactional SCO ordinal for finished non-sequenced 2004 non-suspend exits: fresh CMI/revision/time, retained old history/receipts, unchanged suspend/unfinished recovery and no SCORM1.2/engine change. Original6 completes3PASS/3FAIL; focused87/full domain773 across112 files/final build/built3 complete exit0. Parent #208 fresh recheck commands complete10 success/3 failure (one selected an extra hidden variant), plus an exact non-hidden learning recheck fails; download/learning/service-worker permission failures remain. Its Windows CI consent-response timeout remains unattributed. New-head full CI/native/Side Panel and lifecycle gaps remain required; production disabled.
+
+ADR-138 derives resume entry from the trusted suspendedActivity matching the selected SCO, overriding normal/empty exit while retaining revision/time/history/receipts and no proof. Original3FAIL; focused70/full domain776 across113 files/build/built3 complete exit0. Exact-head CI pending. Original time-out+continue probes deliver another SCO across three editions; separate root fix required. Parent Windows-only unchanged retry running; original failure retained. No full lifecycle or production claim.
+
+ADR-138 P1 review correction retains trusted resume while the latest scoped
+launch remains unacknowledged, including repeated exact registration keys and
+a lost browser launch response. A content ACK ends the fallback. Original3FAIL;
+owner v32 fresh full domain779/114 files, build and built3 complete exit0.
+Initial browser3FAIL from incorrect alert scope is retained; corrected tests
+assert the actual error and unchanged CMI/history/receipts/no proof. Original
+head CI776/198 dev/198 built was successful but does not cover this correction.
+New-head full CI/native/Side Panel/review gates remain required.
+
+ADR-139 pear-timeout-exitall-v33 normalizes Terminate navigation and trusted preflight to ExitAll for time-out, preserving authored pending request until termination and historical v32 bytes/envelopes. Original6FAIL; first focused66/69 retained three test-only snapshot-access failures; corrected focused69/full domain782 across114 files/build/final typecheck/built3 complete exit0. Exact-head CI/native/Side Panel/review pending. Logout preflight/full lifecycle/independent reference gates remain OPEN; production disabled.

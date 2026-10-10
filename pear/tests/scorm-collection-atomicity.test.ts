@@ -93,11 +93,12 @@ for (const edition of ['2004-2', '2004-3', '2004-4'] as const) {
       const receipt = f.player.checkpoint(launch.token, request); assert.deepEqual(f.player.checkpoint(launch.token, request), receipt);
       assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_engine_checkpoints').get()!.n, 1);
       const saved = JSON.parse(f.db.prepare('SELECT runtime_state FROM scorm_sco_attempts').get()!.runtime_state as string);
-      assert.deepEqual(saved.comments_from_learner, {0: {comment: 'Only successful comment', location: '', timestamp: ''}});
+      assert.deepEqual(saved.comments_from_learner, {0: {comment: 'Only successful comment'}});
       assert.deepEqual(saved.interactions, {}); assert.deepEqual(saved.objectives, {});
       f.player.close(f.service.principal('learner-a'), launch.launchId, 'session-learner-a');
       const resumed = createSCORM2004API({edition, state: f.player.bootstrap(f.launch(binding).token).state});
       assert.equal(resumed.Initialize(''), 'true'); assert.equal(resumed.GetValue('cmi.comments_from_learner._count'), '1');
+      for (const field of ['location', 'timestamp']) {assert.equal(resumed.GetValue('cmi.comments_from_learner.0.' + field), ''); assert.equal(resumed.GetLastError(), '403');}
       assert.equal(resumed.GetValue('cmi.interactions._count'), '0'); assert.equal(resumed.GetValue('cmi.objectives._count'), '0');
       assert.equal(f.db.prepare('SELECT count(*) n FROM scorm_completion_proofs').get()!.n, 0);
     } finally {f.db.close();}

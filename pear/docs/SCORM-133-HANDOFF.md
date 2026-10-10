@@ -42,7 +42,7 @@ CI pending. #192 stdout drain review fixed at70452253 and real-merged through
 the stack; local five cleanup checks passed. #194 adds collection count/state
 assertions in built runtime, persisted checkpoint and resume after review.
 
-Latest branch codex/pear-scorm-numeric-response-binding-133 stacks on #199.
+PR #200 codex/pear-scorm-numeric-response-binding-133 stacks on #199.
 ADR-128/v26 binds numeric learner responses and numeric/performance correct
 bounds through the existing shared finite/capacity validator, exact strings
 and bracketed numeric ranges. Before12 expanded regressions failed; focused37
@@ -50,6 +50,22 @@ full728/105, build and all three built journeys passed with complete exit0. Curr
 pear-numeric-response-binding-v26. Parent #192 polling/order/hidden-reply fixes
 completed local Coconut62/build; current full native CI required, with prior
 macOS consent timeout and Windows forced cleanup failures preserved.
+
+PR #201 codex/pear-scorm-empty-location-binding-133 stacks on #200.
+ADR-129/v27 fixes shared empty location refusal and dropped explicit empty
+comment/location records in JSON restoration/server replay. Baseline six fail;
+corrected focused50/full734 across106 files/build/three built journeys completed
+with exit0. First replay/default and fixture-save failures retained. Full new
+CI/native/review and durable initialized/unset field semantics remain required.
+Windows current #192/#193/#195 and macOS #194 logs completed runtime16/Pear13/
+four SCORM12 with clean exit0/no forced kills; full stack CI still pending.
+
+Latest branch codex/pear-scorm-choice-set-binding-133 stacks on #201.
+ADR-130/v28 fixes shared order-insignificant choice-set uniqueness in every
+append/replacement/load path. Before six fail; corrected focused34/full740
+across107 files/build/three built URI/choice journeys completed with exit0.
+Exact-head CI/native/review remain required; identifier equivalence/full
+response conformance stay OPEN.
 
 Use SCORM-CONFORMANCE.md for all unfinished internal semantics/validation and
 external gates. Legacy ADL license/platform, authorized commercial exports and
@@ -211,3 +227,17 @@ remains recorded. #182 head f0f0de3d / run 37817524964 completed SUCCESS 8/8,
 domain 673 and 175/175 dev/built browser. Successor CI must finish before ready.
 Independent clause-level work and real external/deployment gates remain open;
 no epic closure or production enablement.
+
+Active branch codex/pear-scorm-navigation-probes-133 stacks on #202. ADR-131 closes the demonstrated arbitrary Pear player self-navigation and off-origin HTTP redirect response paths; preserve failure logs and inline support. Final build/six built browser journeys and scratch redirect regression pass; fresh domain740/107 completed with exit0; new-head CI/review remain pending. #200 old head c47b6daa CI37849982707 failed all four actual Side Panel journeys at context.pages(): Chrome SIDE_PANEL/report/document correlation succeeded, but automation had no panel page. Fix at owner #199 via public CDP reconnect to the already verified existing panel; no navigation/tab fallback, same document ID must match. Actual execution still requires the extension-capable CI lane.
+
+Active successor codex/pear-scorm-fixture-handler-readiness-133 stacks on #2038ad046ef. ADR-132 corrects shared original sequencing fixture controls before external script initialization/handlers, with controlled delayed-script regression. Fresh domain740/107/build pass; full local43=32PASS11FAIL, targeted12=10PASS2FAIL, final3PASS includes remaining failures/regression. Do not call this a clean full browser acceptance run. Local sanitized diagnostic records DOM.describeNode/session closed; original CI attribution remains unproved and failures preserved. #19494d5e318/CI37848251611 completed10/10 fully reviewed logs,722 domain192 dev192 built, all3OS16/13/fourSCORM12 clean/no forced; review resolved. #195 exact-head10jobs success pending final metadata/review verification.
+
+Active successor codex/pear-scorm-comment-presence-binding-133 stacks on unmerged #204d2575865. ADR-133 v29 fixes shared comment-child omission/403 and absent-record301; original6FAIL, focused70/fresh domain746 across108 files/build/built3PASS. Original full743/746 default-sibling assertions retained in logs, corrected full complete exit0. #1988463717e/CI37848261473 now completely verified10jobs,725 domain192dev192built/all3OS16/13/four12 clean and reviews empty; #1956b8b9eb5 also fully verified. #203 actual Windows/macOS four profiles13checks clean, Linux/browser pending. #201 current b0916df0 Windows native1.2 cleanup fails after app-closed, fixture forced/no database-closed; cause unassigned. Retry refused while Pear still running. Keep five-second/no-forced/exit0 gates, epic open/production disabled.
+
+Owner #1998de3d63e opens native Tool activity before the unchanged visible STALE_CONTEXT assertion; host typecheck exit0, actual four-profile CI pending. Real merges propagated into #2009d162f7d/#201205fb646/#20298e6199a/#203d5603470/#204d2575865; new exact-head acceptance required. #192358d3172/CI37848218201 attempt2 completely verified10logs,718domain192dev192built/all3OS16/13/four12 and five clean shutdowns per OS, resolved review; original initial-ACK failure remains unassigned.
+
+Active codex/pear-scorm-description-presence-binding-133 stacks on #205b29a246e, whose exact-head CI37857582164 is queued/running. ADR-134 v30 corrects objective/interaction description omission versus explicit blanks through shared getters/serializer/loader/server replay; original6FAIL, focused88/build/fresh full752 across109 files/built3 complete exit0; exact-head CI/native/review pending. #193da5b6d72/CI37848253593 attempt2 completely verified10logs718domain192dev192built/all3OS16/13/four12 clean, reviews empty; retain initial retryAll-count failure. No full conformance/production claim.
+
+Active codex/pear-scorm-learner-response-presence-binding-133 stacks on #206756f7579/CI37858195374. ADR-135 v31 preserves valid empty learner responses0 versus absent403 across shared snapshots/load/typed replay; declared ID/type bind before response irrespective of JSON order. Original6FAIL,focused94/build exit0; fresh full758 across110 files/current legacy vectors6/built3 complete exit0. #1998de3d63e current actual all3OS16/13/four12 with five clean shutdowns each read; Pear/actual four Side Panel journeys still pending. No full successor CI/production claim.
+
+ADR-136 v32 preserves supplied empty location/suspend_data values versus omitted fields403 through shared snapshots/reset/loading and typed durable replay. Original6FAIL; final focused106/full domain764 across111 files/build/built3 complete exit0. Full local127 completes114PASS/13FAIL, retained; fresh-process failed-case rechecks pending. No clean full local acceptance claim. Historical explicit blanks are preserved without provenance inference. Full exact-head acceptance and remaining conformance gates stay required.
