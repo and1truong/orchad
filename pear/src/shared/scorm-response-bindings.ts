@@ -29,7 +29,8 @@ export function responseStateMatches(runtime:Scorm2004API,state:Record<string,an
 }
 /** Metadata comes from host bootstrap/accepted receipts, never from checkpoint input. */
 export function loadResponseState(runtime:Scorm2004API,state:Record<string,any>,bindings:ResponseBindings={}){
-  if(!bindings||typeof bindings!=='object'||Array.isArray(bindings)||Object.keys(bindings).length>2048)throw Error('Invalid response bindings');
+  // Mandatory250 interactions: one learner response plus ten correct patterns each.
+  if(!bindings||typeof bindings!=='object'||Array.isArray(bindings)||Object.keys(bindings).length>2750)throw Error('Invalid response bindings');
   if(!Object.keys(bindings).length){runtime.loadFromJSON(state);snapshots.set(runtime,{});return;}
   const values=responses(state),copy=structuredClone(state),records=new Set<string>(),patternRecords=new Set<string>();
   for(const [path,type] of Object.entries(bindings)){
@@ -51,10 +52,17 @@ export function loadResponseState(runtime:Scorm2004API,state:Record<string,any>,
     if(!patternRecords.has(n))continue;
     record.correct_responses.childArray=[];
     const patterns=Object.entries(r.correct_responses??{}).sort(([a],[b])=>Number(a)-Number(b));
+    const origin=(index:string)=>Object.hasOwn(bindings,base+'.correct_responses.'+index+'.pattern')?bindings[base+'.correct_responses.'+index+'.pattern']:undefined;
+    const current=patterns.filter(([index])=>!origin(index));let currentPatterns:any[]=[],currentIndex=0;
+    if(current.length){
+      const probe=engine(runtime);probe.loadFromJSON({interactions:{0:{id:r.id,type:r.type,correct_responses:Object.fromEntries(current.map(([,p],i)=>[i,p]))}}});
+      currentPatterns=(probe.cmi.interactions.childArray[0] as any).correct_responses.childArray;
+    }
     for(const [index,p] of patterns as [string,any][]){
       if(Number(index)!==record.correct_responses.childArray.length)throw Error('Invalid response index');
-      const probe=engine(runtime);probe.loadFromJSON({interactions:{0:{id:r.id,type:bindings[base+'.correct_responses.'+index+'.pattern']??r.type,correct_responses:{0:{pattern:p.pattern}}}}});
-      const pattern=(probe.cmi.interactions.childArray[0] as any).correct_responses.childArray[0];
+      let pattern=currentPatterns[currentIndex];const type=origin(index);
+      if(type){const probe=engine(runtime);probe.loadFromJSON({interactions:{0:{id:r.id,type,correct_responses:{0:{pattern:p.pattern}}}}});pattern=(probe.cmi.interactions.childArray[0] as any).correct_responses.childArray[0];}
+      else currentIndex++;
       pattern._interactionType=r.type;record.correct_responses.childArray.push(pattern);
       (runtime as any)._setCMIElements.add(base+'.correct_responses.'+index+'.pattern');
     }
