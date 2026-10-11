@@ -2390,3 +2390,34 @@ Full simultaneous SPM/API/DM/URI/time/sequencing/egress/recovery/operations/
 main/production matrices OPEN. License/authorized exports/Rustici account/
 actual Safari+Android/reviewed production inputs BLOCKED. Epic OPEN;
 production DISABLED.
+
+
+## ADR-184 independent interaction journal histories
+
+See [ADR-184](ADR-184-scorm-interleaved-journal.md). Shared same-field compaction
+uses the latest write in its own interaction; own ID/type/other-response
+barriers remain. Original three-edition6000-successful-interleaved-type writes
+then Commit391/no callback and original domain9PASS3FAIL/exit1 are retained.
+Corrected focused30PASS/exit0, typecheck/buildPASS/exit0, six built real-service
+journeysPASS/exit0(29.0s), full149-domain1132PASS/exit0 with every file/case/
+footer/duration/exit independently inspected. Full258-browser/108 files253PASS5FAIL/exit1(16.4m), all five original full
+ZIP/network/context artifacts archived/read; four DOM heading/sessionclosed
+and managed SW denial, no page errors/heading causes UNPROVED. No clean
+full local browser PASS; unchanged affected four heading4PASS/exit0(13.2s) separately; original retained. New native interleaved vector
+OPEN; existing native profiles are regressions. Own eleven-job exact-head CI,
+full logs and fresh unresolved reviews0 required. See ADR184 for original
+command mistakes and exact scope. Engine/quotas/deadlines unchanged.
+Parent#25421e1a897/#2555e830485 actual Linux baseline+collections and Windows/
+Mac complete; each union has eleven clean/ten ordered six-phase finite direct
+DB records. Parents254/255/257 READY own11/full logs/reviews0 at19:37UTC;
+1114/1120/1129 domain,252/252/255 dev+built,SidePanel4,combined17/17/17
+(254/255) and18/18/18(257). #25692ffbd6a Windows113980206239 failed forced
+fixture/null/four phases/no DB or cleanup; cause UNPROVED, original retained.
+Internal exhaustive matrices/full simultaneous SPM OPEN; external license/
+exports/account/Safari+Android/reviewed production inputs BLOCKED. Epic OPEN,
+production DISABLED.
+
+
+## ADR-185 native interleaved journal
+
+See [ADR-185](ADR-185-scorm-native-interleaved-journal.md). ADR-185: existing combined three-edition native profiles now measure10000 successful interleaved type setters/record0+1 and zero repeated writes on resume; expected19/19/19 actual-native checks, exact3500 journal/2750 origins/all2500 patterns/350 full comments retained. Original four and small three profiles unchanged; prior vector exports byte-identical. Local focused24/build/export/lifecycle11/full149-domain1135PASS/exit0 with exact cases/plans/counters/durations/exits inspected. Full unfiltered258 browser/108 files252PASS6FAIL/exit1(17.4m), exact discovery/case IDs/map/footer/exit inspected; all six complete original ZIPs archived/hash-verified before parsing, all trace/network/context errors reviewed. Native third resume observation/fourth dropped-ACK predicate, bound-response viewport ratio0, two sequencing DOM.describeNode/session-closed headings and managed SW enumeration denial retained; no page errors/causes UNPROVED. Unchanged affected6PASS/exit0(57.8s) separately includes all three combined profiles; no clean full-browser PASS. Own11-job actual3OS/full raw logs/fresh reviews0 required; DRAFT. Parent25692ffbd6a READY own11/full logs/reviews0 after one unchanged Windows retry; original failure retained. Parent2581693f52b Windows original forced/null/four phases/no DB cleanup UNPROVED, own gate pending. Internal full matrices OPEN; external license/exports/account/Safari/Android/reviewed production inputs BLOCKED. Epic OPEN/production DISABLED.
