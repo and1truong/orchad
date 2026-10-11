@@ -13,7 +13,9 @@ const coconutRoot=fileURLToPath(new URL("..",import.meta.url));
 const pearRoot=fileURLToPath(new URL("../../pear/",import.meta.url));
 const TRUSTED="http://127.0.0.1:4310",SMOKE_PORT=4319,MCP_PORT=14313;
 const edition=process.env.PEAR_NATIVE_SCORM_EDITION??"2004-4";
-const nonce=randomUUID(),lane="native-scorm:"+edition,checks=[];
+const commentSPM=process.env.PEAR_NATIVE_SCORM_COMMENT_SPM==="1";
+const collectionSPM=process.env.PEAR_NATIVE_SCORM_COLLECTION_SPM==="1"||commentSPM;
+const nonce=randomUUID(),lane=(commentSPM?"native-scorm-comment-collection:":collectionSPM?"native-scorm-collection:":"native-scorm:")+edition,checks=[];
 const check=(name,cond)=>{checks.push(name);console.log(`  ${cond?"PASS":"FAIL"} ${name}`);if(!cond)throw Error("Acceptance failed: "+name);};
 const fixture=spawn(process.execPath,["--import","tsx","scripts/native-scorm-fixture.ts"],{cwd:pearRoot,env:{...process.env,PEAR_NATIVE_NONCE:nonce},stdio:["ignore","pipe","pipe","ipc"]});
 let fixtureOutput="",fixtureError="",fixtureExit=null,fixtureClosed=false;
@@ -64,7 +66,7 @@ try {
  const target=await waitFor(async()=>(await tool('host_list_targets',{}))?.data?.targets?.find(t=>t.appId==='orchard-pear'&&t.documentId==='learning:demo:learner-a'),30000);
  check('real Tauri WebView binds the authenticated Pear workspace during SCORM playback',!!target);
  await waitMarker(/^COCONUT_SMOKE:ui-response:consent$/,15000); await heartbeat();
- const first=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=1&&value.checkpoints>=1?value:false;},60000);
+ const first=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=1&&value.checkpoints>=1&&(!collectionSPM||value.droppedACK)?value:false;},60000);
  check('real requested edition and actual WebView user agent are recorded',first.edition===edition&&typeof first.probes[0].userAgent==='string'&&first.probes[0].userAgent.length>0);
  console.log(JSON.stringify({platform:process.platform,edition,userAgent:first.probes[0].userAgent}));
  const isolated=probe=>['pearCookieDenied','pearStorageDenied','pearBridgeDenied','pearNativeDenied','noOwnBridge','nativeDenied','externalFetchDenied'].every(key=>probe[key]===true);
@@ -89,7 +91,11 @@ try {
  await command('resume');
  const resumed=await waitFor(async()=>{const value=await state();if(value.driverErrors.length)throw Error(value.driverErrors.join(';'));return value.probes.length>=2&&value.checkpoints>=2?value:false;},60000);
  check('native close/reopen resumes durable bookmark through licensed wrapper',resumed.probes[1].entry==='resume'&&resumed.probes[1].bookmark==='licensed-page'&&isolated(resumed.probes[1])&&dynamic(resumed.probes[1])&&resumed.calls.length===0&&resumed.pearCanaryCalls.length===0);
- if(edition!=='1.2'){
+ if(edition==='2004-4'&&!collectionSPM){
+  const shared=probe=>probe.sharedTargetID?.resumed===true&&probe.sharedTargetID.id==='urn:pear:native-shared-target'&&probe.sharedTargetID.idCode==='404'&&probe.sharedTargetID.preserved===true;
+  check('actual native XML shared target identity persists exact store through lost ACK and durable resume',shared(first.probes[0])&&shared(resumed.probes[1])&&resumed.sharedTargetStored===true);
+ }
+ if(edition!=='1.2'&&!collectionSPM){
   const expected=['type','timestamp','weighting','result','latency'];
   const reads=probe=>Array.isArray(probe.interactionReadErrors)&&probe.interactionReadErrors.length===expected.length&&probe.interactionReadErrors.every((value,index)=>value.field===expected[index]&&value.absentCode==='301'&&value.unsetCode==='403');
   const paths=['cmi.objectives.0.id','cmi.objectives.0.success_status','cmi.objectives.0.completion_status','cmi.objectives.0.progress_measure','cmi.objectives.0.description','cmi.objectives.0.score.scaled','cmi.objectives.0.score.raw','cmi.objectives.0.score.min','cmi.objectives.0.score.max','cmi.interactions.2.id','cmi.interactions.2.learner_response','cmi.interactions.0.objectives.0.id','cmi.interactions.0.correct_responses.0.pattern'];
@@ -103,12 +109,42 @@ try {
   check('actual native prior accepted response binding persists a legal type change after durable resume',resumed.probes[1].responseBindingCheckpoint?.committed===true&&resumed.probes[1].responseBindingCheckpoint.preserved===true);
   await waitFor(async()=>{const value=await state();return value.responseWriteCheckpoints>0?value:false;},30000);
   check('actual native first-checkpoint typed response provenance is accepted and survives exact retry/resume',first.probes[0].responseWriteCheckpoint?.committed===true&&first.probes[0].responseWriteCheckpoint.preserved===true&&resumed.probes[1].responseWriteCheckpoint?.resumed===true);
-  const uri=probe=>probe.uriAuthority?.resumed===true&&probe.uriAuthority.preserved===true&&probe.uriAuthority.count==='2'&&probe.uriAuthority.codes?.length===3&&probe.uriAuthority.codes.every(code=>code==='406');
+  const uri=probe=>probe.uriAuthority?.resumed===true&&probe.uriAuthority.preserved===true&&probe.uriAuthority.count==='2'&&probe.uriAuthority.codes?.length===(edition==='2004-2'?5:3)&&probe.uriAuthority.codes.every(code=>code==='406');
   check('actual native edition URI authority binding preserves identifiers and atomic refusal through durable resume',uri(first.probes[0])&&uri(resumed.probes[1]));
   check('actual native 5000 consecutive legal type writes compact before first durable save and preserve responses',first.probes[0].typeHistory?.writes===5000&&first.probes[0].typeHistory.preserved===true&&resumed.largestInteractionJournal>0&&resumed.largestInteractionJournal<=12);
   check('actual native consecutive learner and pattern response histories compact without losing original types',first.probes[0].responseHistory?.writes===10000&&first.probes[0].responseHistory.preserved===true&&resumed.largestInteractionJournal<=12);
+  const decimal=probe=>probe.decimalCapacity?.resumed===true&&probe.decimalCapacity.preserved===true&&JSON.stringify(probe.decimalCapacity.codes)===JSON.stringify(['406','406','407','407']);
+  check('actual native long decimal capacity and exact range refusal preserve authored values through retry/resume',decimal(first.probes[0])&&decimal(resumed.probes[1]));
+  const language=probe=>probe.languageRegistry?.resumed===true&&probe.languageRegistry.preserved===true&&JSON.stringify(probe.languageRegistry.codes)===JSON.stringify(Array(10).fill('406'));
+  check('actual native ISO primary language refusal preserves historical/local codes through retry/resume',language(first.probes[0])&&language(resumed.probes[1]));
+  const iana=probe=>probe.ianaLanguage?.resumed===true&&probe.ianaLanguage.preserved===true&&JSON.stringify(probe.ianaLanguage.codes)===JSON.stringify(Array(4).fill('406'));
+  check('actual native IANA prefix refusal preserves historical registration through retry/resume',iana(first.probes[0])&&iana(resumed.probes[1]));
+  const country=probe=>probe.reservedCountry?.resumed===true&&probe.reservedCountry.preserved===true&&JSON.stringify(probe.reservedCountry.codes)===JSON.stringify(Array(42).fill('406'));
+  check('actual native reserved country refusal preserves historical language through retry/resume',country(first.probes[0])&&country(resumed.probes[1]));
+  const assignedCountry=probe=>probe.countryRegistry?.resumed===true&&probe.countryRegistry.accepted===260&&probe.countryRegistry.preserved===true&&JSON.stringify(probe.countryRegistry.codes)===JSON.stringify(Array(4).fill('406'));
+  check('actual native ISO country membership preserves exact prior language through retry/resume',assignedCountry(first.probes[0])&&assignedCountry(resumed.probes[1]));
+  const digitCountry=probe=>probe.countryCharacters?.resumed===true&&probe.countryCharacters.preserved===true&&JSON.stringify(probe.countryCharacters.codes)===JSON.stringify(Array(620).fill('406'));
+  check('actual native mixed/digit first country refusal preserves exact language through retry/resume',digitCountry(first.probes[0])&&digitCountry(resumed.probes[1]));
+  const registeredSubcode=probe=>probe.ianaSubcodes?.resumed===true&&probe.ianaSubcodes.accepted===709&&probe.ianaSubcodes.preserved===true&&JSON.stringify(probe.ianaSubcodes.codes)===JSON.stringify(Array(8).fill('406'));
+  check('actual native IANA first-subcode membership preserves exact prior language through retry/resume',registeredSubcode(first.probes[0])&&registeredSubcode(resumed.probes[1]));
+  const singleton=probe=>probe.singletonLanguage?.resumed===true&&probe.singletonLanguage.preserved===true&&JSON.stringify(probe.singletonLanguage.codes)===JSON.stringify(Array(26).fill(edition==='2004-2'?'406':'0'));
+  check('actual native first one-letter legacy refusal retains contemporary/later language through retry/resume',singleton(first.probes[0])&&singleton(resumed.probes[1]));
+  const result=probe=>probe.resultDecimal?.resumed===true&&probe.resultDecimal.preserved===true&&JSON.stringify(probe.resultDecimal.codes)===JSON.stringify(['406','406','406','406']);
+  check('actual native long interaction result preserves exact text and atomic refusal through retry/resume',result(first.probes[0])&&result(resumed.probes[1]));
   const capacity=probe=>probe.checkpointCapacity?.count==='35'&&probe.checkpointCapacity.preserved===true;
   check('actual native checkpoint over544KiB persists exact Unicode records after lost ACK/retry/resume',resumed.largestCheckpointBytes>544*1024&&capacity(first.probes[0])&&capacity(resumed.probes[1]));
+ }
+ if(collectionSPM){
+  const collection=probe=>probe.collectionSPM?.interactions===250&&probe.collectionSPM.objectives===100&&probe.collectionSPM.nestedObjectives===2500&&probe.collectionSPM.patterns===2500&&probe.collectionSPM.preserved===true;
+  const stored=value=>value.collectionSPM===true&&value.collectionStored?.interactions===250&&value.collectionStored.objectives===100&&value.collectionStored.origins===250&&value.collectionStored.preserved===true;
+  check('actual native mandatory collection preserves 250 interactions/100 objectives/2500 IDs/2500 patterns through durable resume',collection(first.probes[0])&&collection(resumed.probes[1])&&stored(first)&&stored(resumed));
+  check('actual native mixed-type collection retains 3500 real journal entries and 250 server-derived original bindings',resumed.largestInteractionJournal===3500&&resumed.responseBindingCheckpoints>0&&resumed.responseWriteCheckpoints>0&&(commentSPM?resumed.largestCheckpointBytes>2*1024*1024&&resumed.largestCheckpointBytes<resumed.largestCheckpointLimit:resumed.largestCheckpointBytes>544*1024&&resumed.largestCheckpointBytes<2*1024*1024)&&resumed.proofs===0&&resumed.certificates===0);
+ }
+ if(commentSPM){
+  const comments=probe=>probe.learnerCommentSPM?.comments===250&&probe.learnerCommentSPM.charactersPerComment===4000&&probe.learnerCommentSPM.preserved===true;
+  check('actual native full Unicode learner comments remain exact in SQLite and the SCO through lost ACK, retry and human Close/resume',Number.isFinite(resumed.largestCheckpointLimit)&&comments(first.probes[0])&&comments(resumed.probes[1])&&[first,resumed].every(value=>value.commentSPM===true&&value.collectionStored?.comments?.count===250&&value.collectionStored.comments.preserved===true));
+  const lms=probe=>probe.lmsCommentSPM?.comments===100&&probe.lmsCommentSPM.charactersPerComment===4000&&probe.lmsCommentSPM.preserved===true&&probe.lmsCommentSPM.readonly===true;
+  check('actual native100 full LMS comments remain exact and readonly alongside learner comments/collection/journal through durable resume',lms(first.probes[0])&&lms(resumed.probes[1])&&resumed.largestCheckpointBytes>6097652&&[first,resumed].every(value=>value.collectionStored?.lmsComments?.count===100&&value.collectionStored.lmsComments.preserved===true));
  }
  await command('finish');
  const completed=await waitFor(async()=>{const value=await state();return value.proofs===1?value:false;},30000);
@@ -120,7 +156,7 @@ try {
  await waitFor(async()=>(await tool('host_list_targets',{}))?.data?.targets?.find(t=>t.documentId==='learning:demo:learner-b'),30000);
  const old=await mcp('host_call_tool',{...call,call:{...call.call,requestId:randomUUID()}});
  check('old native MCP pairing cannot read the SCORM source after identity change',old?.ok===false);
- await close(); console.log(JSON.stringify({shutdown,nativeExit:exitCode,fixtureExit,fixtureClosePhases:fixtureOutput.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g)??[]}));check('native SCORM fixture shuts down cleanly',exitCode===0&&fixtureExit===0&&!shutdown.nativeForced&&!shutdown.fixtureForced);
+ await close(); const databaseClose=fixtureOutput.match(/PEAR_NATIVE_FIXTURE_CLOSE:database-closed elapsedMs=\d+\.\d{3} databaseCloseMs=(\d+\.\d{3})/),fixtureDatabaseCloseMs=databaseClose?Number(databaseClose[1]):null; console.log(JSON.stringify({shutdown,nativeExit:exitCode,fixtureExit,fixtureClosePhases:fixtureOutput.match(/PEAR_NATIVE_FIXTURE_CLOSE:[a-z-]+/g)??[],fixtureCloseTimings:Array.from(fixtureOutput.matchAll(/PEAR_NATIVE_FIXTURE_CLOSE:([a-z-]+) elapsedMs=(\d+\.\d{3})/g),match=>({phase:match[1],elapsedMs:Number(match[2])})),fixtureDatabaseCloseMs,fixtureClosed,fixtureOutputBytes:Buffer.byteLength(fixtureOutput),fixtureErrorBytes:Buffer.byteLength(fixtureError)}));check('native SCORM fixture shuts down cleanly',exitCode===0&&fixtureExit===0&&!shutdown.nativeForced&&!shutdown.fixtureForced);
  console.log(`[${lane}] ${checks.length}/${checks.length} checks passed`);
 } catch(error) {console.error('['+lane+'] FAILED: '+error.message);
  const diagnostic=await state().catch(()=>null);if(diagnostic)console.error(JSON.stringify({edition:diagnostic.edition,driverErrors:diagnostic.driverErrors,contentRequests:diagnostic.contentRequests,probes:diagnostic.probes.length,sinkRequests:diagnostic.calls.length,navigationAttempts:diagnostic.navigationAttempts,navigationViolations:diagnostic.navigationViolations,pearCanaryRequests:diagnostic.pearCanaryCalls.length,dynamicProbes:diagnostic.probes.map(probe=>({redirectDenied:probe.redirectDenied,popupDenied:probe.popupDenied,serviceWorkerDenied:probe.serviceWorkerDenied,formAttempted:probe.formAttempted,egressDirectives:probe.egressDirectives,egressViolations:probe.egressViolations,mediaPlayback:probe.mediaPlayback,mediaError:probe.mediaError})),nativeSurfaces:diagnostic.probes.map(probe=>probe.nativeSurface),checkpoints:diagnostic.checkpoints,droppedACK:diagnostic.droppedACK,exactRetry:diagnostic.exactRetry,proofs:diagnostic.proofs}));console.error(stderr.slice(-2000));console.error(fixtureError.slice(-1000));await close();process.exitCode=1;}

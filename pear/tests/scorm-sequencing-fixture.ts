@@ -44,9 +44,9 @@ export function sequencingPackage(edition: SCORM2004Edition, manifest = sequenci
   ]);
 }
 
-export function collectionManifest(edition: SCORM2004Edition = '2004-4') {
+export function collectionManifest(edition: SCORM2004Edition = '2004-4', manifest = sequencingManifest(edition)) {
   const definitions: string[] = [];
-  const xml = sequencingManifest(edition).replace(/<s:sequencing>([\s\S]*?)<\/s:sequencing>/g, (_, body) => {
+  const xml = manifest.replace(/<s:sequencing>([\s\S]*?)<\/s:sequencing>/g, (_, body) => {
     const id = 'shared-' + definitions.length; definitions.push(`<s:sequencing ID="${id}">${body}</s:sequencing>`);
     return `<s:sequencing IDRef="${id}"/>`;
   });
@@ -84,3 +84,27 @@ export function systemSharedDataManifest() {return sharedDataManifest().replace(
 export function selectionManifest(edition: SCORM2004Edition = '2004-4', selectionTiming = 'once', randomizationTiming = 'once', selectCount = 1, reorderChildren = true) {
   return sequencingManifest(edition).replace(/(<s:controlMode[^>]*\/>)/, '$1' + `<s:randomizationControls selectionTiming="${selectionTiming}" randomizationTiming="${randomizationTiming}" selectCount="${selectCount}" reorderChildren="${reorderChildren}"/>`).replace(/(<p:title>Practice<\/p:title>)<s:sequencing>.*?<\/s:sequencing>/, '$1');
 }
+
+/** Original XML whitespace plus character references; numeric fields stay unchanged. */
+export function xmlBooleanManifest(xml: string) {return xml.replace(/="(true|false)"/g, (_, value) => '=" &#x9;' + (value === 'true' ? '1' : '0') + '&#xD;&#xA; "');}
+
+/** Numeric XML lexical spellings differ; their mathematical values stay fixed. */
+export function xmlNumericManifest(xml: string) {
+  return xml.replace(/(attemptLimit|selectCount|minimumCount|minimumPercent|measureThreshold|objectiveMeasureWeight|minProgressMeasure|progressWeight)="(\d+(?:\.\d+)?)"/g, (_, name, value) => name + '=" &#x9;+00' + value + '&#xD;&#xA; "')
+    .replace(/<s:minNormalizedMeasure>(\d+(?:\.\d+)?)<\/s:minNormalizedMeasure>/g, (_, value) => '<s:minNormalizedMeasure> &#x9;+00' + value + '&#xD;&#xA; </s:minNormalizedMeasure>');
+}
+
+/** IMS/ADL restricted token enumerations; opaque identifiers/string fields stay exact. */
+export function xmlTokenManifest(xml: string) {return xml.replace(/(conditionCombination|condition|operator|action|childActivitySet|selectionTiming|randomizationTiming|requiredForSatisfied|requiredForNotSatisfied|requiredForCompleted|requiredForIncomplete)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
+
+/** XML atomic dateTime/duration whitespace; admitted values and ceilings stay fixed. */
+export function xmlTimeManifest(xml: string) {return xml.replace(/(beginTimeLimit|endTimeLimit|attemptAbsoluteDurationLimit|attemptExperiencedDurationLimit|activityAbsoluteDurationLimit|activityExperiencedDurationLimit)="([^"]*)"/g, (_, name, value) => name + '=" &#x9;' + value + '&#xD;&#xA; "');}
+
+/** Named fourth-edition shared target anyURI outer XML whitespace. */
+export function xmlSharedTargetManifest(xml: string) {return xml.replace(/targetID="([^"]*)"/g, (_, id) => 'targetID=" &#x9;' + id + '&#xD;&#xA; "');}
+
+/** Manifest-local xs:ID/IDREF outer XML whitespace, not CP/RTE identifiers. */
+export function xmlCollectionIdsManifest(xml: string) {return xml.replace(/\b(ID|IDRef)="([^"]*)"/g, (_, name, id) => name + '=" &#x9;' + id + '&#xD;&#xA; "');}
+
+/** IMS/ADL objective anyURI names; CP and synchronous RTE identifiers stay exact. */
+export function xmlObjectiveIdsManifest(xml: string) {return xml.replace(/\b(objectiveID|targetObjectiveID|referencedObjective)="([^"]*)"/g, (_, name, id) => name + '=" &#x9;' + id + '&#xD;&#xA; "');}

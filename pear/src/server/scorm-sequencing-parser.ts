@@ -10,12 +10,23 @@ function children(el: Element) {const out: Element[] = []; for (let n = el.first
 function attrs(el: Element, names: string[]) {
   for (let i = 0; i < el.attributes.length; i++) {const a = el.attributes.item(i)!; if (a.namespaceURI === 'http://www.w3.org/2000/xmlns/') continue; if (a.namespaceURI || !names.includes(a.name)) fail();}
 }
-function bool(el: Element, name: string) {const v = el.getAttribute(name); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
-function number(el: Element, name: string, min: number, max: number) {const v = el.getAttribute(name); if (v === null) return undefined; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v) || Number(v) < min || Number(v) > max) fail(); return Number(v);}
+// Atomic XML tokens use XML whitespace only; Unicode spaces remain invalid.
+export function xmlAtomicToken(value: string | null) {return value?.replace(/^[\x20\x09\x0a\x0d]+|[\x20\x09\x0a\x0d]+$/g, '') ?? null;}
+function bool(el: Element, name: string) {const v = xmlAtomicToken(el.getAttribute(name)); if (v === null) return undefined; if (!['true', 'false', '1', '0'].includes(v)) fail(); return v === 'true' || v === '1';}
+/** All supported numeric bounds are integral; compare before floating conversion. */
+export function xmlNumber(value: string | null, min: number, max: number, integral = false) {
+  const v = xmlAtomicToken(value); if (v === null) return undefined;
+  const m = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/.exec(v);
+  if (!m || integral && v.includes('.')) fail();
+  const sign = m![1] === '-' ? -1 : 1, whole = sign * Number(m![2] ?? '0'), fractional = /[1-9]/.test(m![3] ?? m![4] ?? '');
+  if (whole < min || whole > max || fractional && (sign < 0 && whole <= min || sign > 0 && whole >= max)) fail();
+  return Number(v) || 0;
+}
+function number(el: Element, name: string, min: number, max: number, integral = false) {return xmlNumber(el.getAttribute(name), min, max, integral);}
 // Delivery windows require an explicit timezone so every host enforces the
 // same instant. Validate Gregorian dates before Date can normalize them.
 function calendarLimit(el: Element, name: string) {
-  const value = el.getAttribute(name); if (value === null) return undefined;
+  const value = xmlAtomicToken(el.getAttribute(name)); if (value === null) return undefined;
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
   if (!m) fail();
   const [year, month, day, hour, minute, second] = m!.slice(1, 7).map(Number);
@@ -53,7 +64,7 @@ export function parseSharedData(item: Element, edition: SCORMStandard) {
   if (!maps.length || maps.length > 64) fail();
   return maps.map(n => {
     if (n.namespaceURI !== cp || n.localName !== 'map' || children(n).length) fail(); attrs(n, ['targetID', 'readSharedData', 'writeSharedData']);
-    const targetID = n.getAttribute('targetID');
+    const targetID = xmlAtomicToken(n.getAttribute('targetID'));
     if (!targetID || targetID.length > 4000 || /\s|[\u0000-\u001f\u007f]/.test(targetID) || ids.has(targetID)) fail(); ids.add(targetID!);
     return {targetID: targetID!, readSharedData: bool(n, 'readSharedData') ?? true, writeSharedData: bool(n, 'writeSharedData') ?? false};
   });
@@ -64,13 +75,13 @@ function adlObjectives(el: Element, edition: SCORMStandard) {
   if (!list.length || list.length > 1024) fail();
   return list.map(n => {
     if (n.namespaceURI !== ADL || n.localName !== 'objective') fail(); attrs(n, ['objectiveID']);
-    const id = n.getAttribute('objectiveID'); if (!id || !id.trim() || id.length > 4000 || ids.has(id)) fail(); ids.add(id!);
+    const id = xmlAtomicToken(n.getAttribute('objectiveID')); if (!id || !id.trim() || id.length > 4000 || ids.has(id)) fail(); ids.add(id!);
     const mappings = children(n), targets = new Set<string>(); if (!mappings.length || mappings.length > 1024) fail();
     return {id, maps: mappings.map(m => {
       if (m.namespaceURI !== ADL || m.localName !== 'mapInfo' || children(m).length) fail();
       const read = ['readRawScore', 'readMinScore', 'readMaxScore', 'readCompletionStatus', 'readProgressMeasure'];
       const write = ['writeRawScore', 'writeMinScore', 'writeMaxScore', 'writeCompletionStatus', 'writeProgressMeasure'];
-      attrs(m, ['targetObjectiveID', ...read, ...write]); const target = m.getAttribute('targetObjectiveID');
+      attrs(m, ['targetObjectiveID', ...read, ...write]); const target = xmlAtomicToken(m.getAttribute('targetObjectiveID'));
       if (!target || !target.trim() || target.length > 4000 || targets.has(target)) fail(); targets.add(target!);
       return {targetObjectiveID: target, ...Object.fromEntries(read.map(k => [k, bool(m, k) ?? true])), ...Object.fromEntries(write.map(k => [k, bool(m, k) ?? false]))};
     })};
@@ -82,33 +93,33 @@ function rule(el: Element, kind: string) {
   attrs(el, []); const nodes = children(el), cs = nodes.find(n => n.localName === 'ruleConditions'), action = nodes.find(n => n.localName === 'ruleAction');
   if (nodes.length !== 2 || !cs || !action || nodes.some(n => n.namespaceURI !== SN)) fail();
   attrs(cs!, ['conditionCombination']); attrs(action!, ['action']);
-  const combination = cs!.getAttribute('conditionCombination') ?? 'all', value = action!.getAttribute('action');
+  const combination = xmlAtomicToken(cs!.getAttribute('conditionCombination')) ?? 'all', value = xmlAtomicToken(action!.getAttribute('action'));
   const actions = kind === 'preConditionRule' ? preActions : kind === 'exitConditionRule' ? ['exit'] : ['exitParent', 'exitAll', 'continue', 'previous', 'retry', 'retryAll'];
   if (!['all', 'any'].includes(combination) || !actions.includes(value ?? '')) fail();
   const list = children(cs!); if (!list.length || list.length > 64) fail();
   return {action: value, conditionCombination: combination, conditions: list.map(n => {
     if (n.namespaceURI !== SN || n.localName !== 'ruleCondition' || children(n).length) fail();
     attrs(n, ['condition', 'operator', 'referencedObjective', 'measureThreshold']);
-    const condition = n.getAttribute('condition'), operator = n.getAttribute('operator'), objective = n.getAttribute('referencedObjective'), threshold = number(n, 'measureThreshold', -1, 1);
-    if (!conditions.includes(condition ?? '') || operator && !['noOp', 'not'].includes(operator) || objective && objective.length > 4000) fail();
+    const condition = xmlAtomicToken(n.getAttribute('condition')), operator = xmlAtomicToken(n.getAttribute('operator')), objective = xmlAtomicToken(n.getAttribute('referencedObjective')), threshold = number(n, 'measureThreshold', -1, 1);
+    if (!conditions.includes(condition ?? '') || operator !== null && !['noOp', 'not'].includes(operator) || objective && objective.length > 4000) fail();
     return {condition, ...(operator === 'not' ? {operator} : {}), ...(objective ? {referencedObjective: objective} : {}), ...(threshold !== undefined ? {parameters: {threshold}} : {})};
   })};
 }
 function objective(el: Element, edition: SCORMStandard) {
   attrs(el, ['objectiveID', 'satisfiedByMeasure']);
-  const id = el.getAttribute('objectiveID') ?? ''; if (!id || id.length > 4000) fail();
+  const id = xmlAtomicToken(el.getAttribute('objectiveID')) ?? ''; if (!id || id.length > 4000) fail();
   const out: Record<string, any> = {objectiveID: id, satisfiedByMeasure: bool(el, 'satisfiedByMeasure') ?? false, mapInfo: []};
   for (const n of children(el)) {
     if (n.namespaceURI !== SN) fail();
     if (n.localName === 'minNormalizedMeasure') {
       if (out.minNormalizedMeasure !== undefined || children(n).length) fail(); attrs(n, []);
-      const value = n.textContent?.trim() ?? ''; if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) || Number(value) < -1 || Number(value) > 1) fail(); out.minNormalizedMeasure = Number(value);
+      out.minNormalizedMeasure = xmlNumber(n.textContent ?? '', -1, 1);
     } else if (n.localName === 'mapInfo') {
       // Fourth-edition score/completion/progress maps belong to adlseq:mapInfo,
       // not imsss:mapInfo. Keep the IMS namespace vocabulary schema-accurate.
       const names = ['readSatisfiedStatus', 'readNormalizedMeasure', 'writeSatisfiedStatus', 'writeNormalizedMeasure'];
       attrs(n, ['targetObjectiveID', ...names]); if (children(n).length) fail();
-      const target = n.getAttribute('targetObjectiveID'); if (!target || target.length > 4000 || out.mapInfo.some((m: any) => m.targetObjectiveID === target)) fail();
+      const target = xmlAtomicToken(n.getAttribute('targetObjectiveID')); if (!target || target.length > 4000 || out.mapInfo.some((m: any) => m.targetObjectiveID === target)) fail();
       out.mapInfo.push({targetObjectiveID: target, ...Object.fromEntries(names.filter(k => n.hasAttribute(k)).map(k => [k, bool(n, k)]))});
     } else fail();
   }
@@ -119,16 +130,16 @@ function rollup(el: Element) {
   const controls = {...Object.fromEntries(['rollupObjectiveSatisfied', 'rollupProgressCompletion'].filter(k => el.hasAttribute(k)).map(k => [k, bool(el, k)])), ...(el.hasAttribute('objectiveMeasureWeight') ? {objectiveMeasureWeight: number(el, 'objectiveMeasureWeight', 0, 1)} : {})};
   const rules = children(el).map(r => {
     if (r.namespaceURI !== SN || r.localName !== 'rollupRule') fail(); attrs(r, ['childActivitySet', 'minimumCount', 'minimumPercent']);
-    const consideration = r.getAttribute('childActivitySet') ?? 'all', minimumCount = number(r, 'minimumCount', 0, 10000), minimumPercent = number(r, 'minimumPercent', 0, 1);
-    if (!['all', 'any', 'none', 'atLeastCount', 'atLeastPercent'].includes(consideration) || minimumCount !== undefined && !Number.isInteger(minimumCount)) fail();
+    const consideration = xmlAtomicToken(r.getAttribute('childActivitySet')) ?? 'all', minimumCount = number(r, 'minimumCount', 0, 10000, true), minimumPercent = number(r, 'minimumPercent', 0, 1);
+    if (!['all', 'any', 'none', 'atLeastCount', 'atLeastPercent'].includes(consideration)) fail();
     const ns = children(r), cs = ns.find(n => n.localName === 'rollupConditions'), act = ns.find(n => n.localName === 'rollupAction');
     if (ns.length !== 2 || !cs || !act || ns.some(n => n.namespaceURI !== SN)) fail(); attrs(cs!, ['conditionCombination']); attrs(act!, ['action']);
-    const combination = cs!.getAttribute('conditionCombination') ?? 'all', action = act!.getAttribute('action');
+    const combination = xmlAtomicToken(cs!.getAttribute('conditionCombination')) ?? 'all', action = xmlAtomicToken(act!.getAttribute('action'));
     if (!['all', 'any'].includes(combination) || !['satisfied', 'notSatisfied', 'completed', 'incomplete'].includes(action ?? '')) fail();
     const list = children(cs!); if (!list.length || list.length > 64) fail();
     return {consideration, minimumCount, minimumPercent, action, conditionCombination: combination, conditions: list.map(n => {
       if (n.namespaceURI !== SN || n.localName !== 'rollupCondition' || children(n).length) fail(); attrs(n, ['condition', 'operator']);
-      const condition = n.getAttribute('condition'), operator = n.getAttribute('operator') ?? 'noOp';
+      const condition = xmlAtomicToken(n.getAttribute('condition')), operator = xmlAtomicToken(n.getAttribute('operator')) ?? 'noOp';
       if (!['satisfied', 'objectiveStatusKnown', 'objectiveMeasureKnown', 'completed', 'progressKnown', 'attempted', 'attemptLimitExceeded', 'notAttempted', 'always'].includes(condition ?? '') || !['noOp', 'not'].includes(operator)) fail(); return {condition, operator};
     })};
   });
@@ -139,7 +150,7 @@ export function parseSequencing(parent: Element, edition: SCORMStandard, collect
   const nodes = children(parent).filter(n => n.namespaceURI === SN && n.localName === 'sequencing');
   if (!nodes.length) return undefined; if (nodes.length !== 1 || edition === '1.2') fail();
   const el = nodes[0]; attrs(el, ['IDRef']);
-  const reference = el.getAttribute('IDRef');
+  const reference = xmlAtomicToken(el.getAttribute('IDRef'));
   const referenced = reference === null ? undefined : collections.get(reference);
   if (reference !== null && !referenced) fail();
   // IMS SS XML Binding 3.2: replace an entire top-level XML group, not
@@ -163,7 +174,7 @@ export function parseSequencingCollections(manifest: Element, edition: SCORMStan
   const ncName = new RegExp(`^[${start}][${start}0-9.\\-\\u00B7\\u0300-\\u036F\\u203F-\\u2040]*$`, 'u');
   for (const definition of definitions) {
     if (definition.namespaceURI !== SN || definition.localName !== 'sequencing') fail();
-    attrs(definition, ['ID']); const id = definition.getAttribute('ID');
+    attrs(definition, ['ID']); const id = xmlAtomicToken(definition.getAttribute('ID'));
     if (!id || id.length > 4000 || !ncName.test(id) || result.has(id)) fail();
     sequencingDefinition(children(definition), edition, false); result.set(id!, definition);
   }
@@ -183,7 +194,7 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
       else if (n.localName === 'rollupConsiderations') {
         const names = ['requiredForSatisfied', 'requiredForNotSatisfied', 'requiredForCompleted', 'requiredForIncomplete']; attrs(n, [...names, 'measureSatisfactionIfActive']);
         out.rollupConsiderations = {measureSatisfactionIfActive: bool(n, 'measureSatisfactionIfActive') ?? true};
-        for (const name of names) {const value = n.getAttribute(name) ?? 'always'; if (!['always', 'ifAttempted', 'ifNotSkipped', 'ifNotSuspended'].includes(value)) fail(); out.rollupConsiderations[name] = value;}
+        for (const name of names) {const value = xmlAtomicToken(n.getAttribute(name)) ?? 'always'; if (!['always', 'ifAttempted', 'ifNotSkipped', 'ifNotSuspended'].includes(value)) fail(); out.rollupConsiderations[name] = value;}
       } else fail();
       continue;
     }
@@ -192,16 +203,15 @@ function sequencingDefinition(nodes: Element[], edition: SCORMStandard, resolveO
       case 'deliveryControls': out.deliveryControls = flags(n, ['tracked', 'completionSetByContent', 'objectiveSetByContent']); break;
       case 'randomizationControls': {
         attrs(n, ['randomizationTiming', 'selectCount', 'reorderChildren', 'selectionTiming']);
-        const selectionTiming = n.getAttribute('selectionTiming') ?? 'never', randomizationTiming = n.getAttribute('randomizationTiming') ?? 'never';
+        const selectionTiming = xmlAtomicToken(n.getAttribute('selectionTiming')) ?? 'never', randomizationTiming = xmlAtomicToken(n.getAttribute('randomizationTiming')) ?? 'never';
         if (![selectionTiming, randomizationTiming].every(v => ['never', 'once', 'onEachNewAttempt'].includes(v))) fail();
-        if (n.hasAttribute('selectCount') && !/^[+-]?\d+$/.test(n.getAttribute('selectCount')!)) fail();
-        const selectCount = number(n, 'selectCount', 0, 2048); if (selectCount !== undefined && !Number.isInteger(selectCount)) fail();
+        const selectCount = number(n, 'selectCount', 0, 2048, true);
         out.sequencingControls = {...out.sequencingControls, selectionTiming, randomizationTiming, selectCount: selectCount ?? null, randomizeChildren: bool(n, 'reorderChildren') ?? false};
         break;
       }
       case 'limitConditions': {
-        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000); if (limit !== undefined) {if (!Number.isInteger(limit)) fail(); out.attemptLimit = limit;}
-        for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(n.getAttribute(key)!) + 'S';} catch {fail();}}
+        attrs(n, ['attemptLimit', 'beginTimeLimit', 'endTimeLimit', ...durationKeys]); const limit = number(n, 'attemptLimit', 0, 10000, true); if (limit !== undefined) out.attemptLimit = limit;
+        for (const key of durationKeys) if (n.hasAttribute(key)) {try {out[key] = 'PT' + durationSeconds(xmlAtomicToken(n.getAttribute(key))!) + 'S';} catch {fail();}}
         const begin = calendarLimit(n, 'beginTimeLimit'), end = calendarLimit(n, 'endTimeLimit');
         if (begin !== undefined) out.beginTimeLimit = begin; if (end !== undefined) out.endTimeLimit = end;
         if (begin !== undefined && end !== undefined && Date.parse(begin) > Date.parse(end)) fail();

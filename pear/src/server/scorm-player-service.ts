@@ -10,7 +10,7 @@ import {reject} from './errors.ts';
 import {scoEvidence, meetsSCORMPolicy} from './scorm-evidence.ts';
 import {scorm12Activities, playbackActivities, activityStates, activityAvailable} from './scorm-activities.ts';
 import {validateSCORM2004Checkpoint} from './scorm2004-validation.ts';
-import {scorm2004CheckpointBytes, scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
+import {scorm2004CheckpointLimit, scorm2004Seconds, scorm2004Time} from '../shared/scorm2004-runtime.ts';
 import {usesSequencing, sequencingTree, trustedSequencing, selectSCO, saveSequencing, deliveredSCO} from './scorm-sequencing.ts';
 import type {SCORMLearningBindings} from './scorm-learning-bindings.ts';
 import {loadSystemData, saveSystemData} from './scorm-system-data.ts';
@@ -119,7 +119,7 @@ export class SCORMPlayerService {
         const priorLaunch = this.db.prepare('SELECT sequence,initial_state FROM scorm_engine_launches WHERE attempt_id=? AND tenant=? AND sco_id=? AND sco_attempt_number=? ORDER BY rowid DESC LIMIT 1').get(registered.attemptId, p.tenant, profile.activity.id, scoAttempt) as any;
         const pendingResume = priorLaunch?.sequence === 0 && JSON.parse(priorLaunch.initial_state).entry === 'resume';
         for (const k of Object.keys(initialState)) delete initialState[k];
-        Object.assign(initialState, {learner_id: p.id, learner_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : suspended === profile.activity.id || previous.exit === 'suspend' || pendingResume ? 'resume' : '', total_time: scorm2004Time(sco.reported_seconds), launch_data: profile.activity.launchData ?? '', completion_threshold: profile.activity.completionThreshold ?? '', scaled_passing_score: profile.activity.sequencing?.primaryObjective?.satisfiedByMeasure ? String(profile.activity.sequencing.primaryObjective.minNormalizedMeasure ?? 1) : '', max_time_allowed: profile.activity.sequencing?.attemptAbsoluteDurationLimit ?? '', time_limit_action: profile.activity.timeLimitAction ?? 'continue,no message'});
+        Object.assign(initialState, {learner_id: p.id, learner_name: account.name, credit: args.mode === 'preview' ? 'no-credit' : 'credit', mode: args.mode === 'preview' ? 'browse' : 'normal', entry: sco.revision === 0 ? 'ab-initio' : suspended === profile.activity.id || previous.exit === 'suspend' || pendingResume ? 'resume' : '', total_time: scorm2004Time(sco.reported_seconds), launch_data: profile.activity.launchData ?? '', completion_threshold: profile.activity.completionThreshold ?? '', scaled_passing_score: profile.activity.sequencing?.primaryObjective?.satisfiedByMeasure ? (profile.activity.sequencing.primaryObjective.minNormalizedMeasure ?? 1).toLocaleString('en-US', {useGrouping: false, maximumSignificantDigits: 21}) : '', max_time_allowed: profile.activity.sequencing?.attemptAbsoluteDurationLimit ?? '', time_limit_action: profile.activity.timeLimitAction ?? 'continue,no message'});
       }
       if (engine) {
         // Use a fresh API communication session on the already selected activity tree.
@@ -261,7 +261,7 @@ export class SCORMPlayerService {
       if (c.launch.finished || a.sequence !== c.launch.sequence + 1 || a.revision !== c.sco.revision) reject('STALE_CONTEXT', 'Checkpoint revision or session changed');
       if (manifest.standard !== '1.2' && a.navigation !== undefined && typeof a.navigation !== 'string') reject('INVALID_ARGUMENT', 'Exact navigation request required');
       if (a.sharedData !== undefined && manifest.standard !== '2004-4') reject('INVALID_ARGUMENT', 'Shared data requires fourth edition');
-      if (manifest.standard !== '1.2' && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData, interactionWrites: a.interactionWrites})) > scorm2004CheckpointBytes) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
+      if (manifest.standard !== '1.2' && Buffer.byteLength(JSON.stringify({state: a.state, sharedData: a.sharedData, interactionWrites: a.interactionWrites})) > scorm2004CheckpointLimit(a.state)) reject('INVALID_ARGUMENT', 'Shared data checkpoint quota exceeded');
       const engine = usesSequencing(manifest) ? trustedSequencing(manifest, c.attempt.sequencing_state, {attemptId: c.attempt.id, sha256: c.registration.sha256}) : undefined;
       if (engine && deliveredSCO(engine, manifest)?.activity.id !== c.launch.sco_id) reject('STALE_CONTEXT', 'Sequencing has delivered a different SCO');
       if (engine) {loadSystemData(this.db, c.registration, manifest, engine); loadSystemObjectives(this.db, c.registration, manifest, engine);}

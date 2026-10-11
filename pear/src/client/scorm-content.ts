@@ -1,4 +1,4 @@
-import {createSCORM2004API, scorm2004CheckpointBytes} from '../shared/scorm2004-runtime.ts';
+import {createSCORM2004API, scorm2004CheckpointLimit} from '../shared/scorm2004-runtime.ts';
 import type {InteractionWrite} from '../shared/scorm-interaction-writes.ts';
 import {createSCORM12API} from '../shared/scorm-runtime.ts';
 
@@ -32,7 +32,7 @@ async function save() {
 }
 function checkpoint(state: Record<string, any>, finished: boolean, navigation?: string, sharedData?: Record<string, string>, interactionWrites?: InteractionWrite[]) {
   const snapshot = JSON.parse(JSON.stringify(state));
-  if (new TextEncoder().encode(JSON.stringify(config.standard === '1.2' ? snapshot : {state: snapshot, sharedData, interactionWrites})).byteLength > (config.standard === '1.2' ? 128 * 1024 : scorm2004CheckpointBytes) || queue.length >= 16) {failed = true; notify('Package checkpoint queue is full. Retry or reopen to reconcile.'); return false;}
+  if (new TextEncoder().encode(JSON.stringify(config.standard === '1.2' ? snapshot : {state: snapshot, sharedData, interactionWrites})).byteLength > (config.standard === '1.2' ? 128 * 1024 : scorm2004CheckpointLimit(snapshot)) || queue.length >= 16) {failed = true; notify('Package checkpoint queue is full. Retry or reopen to reconcile.'); return false;}
   queue.push({state: snapshot, finished, navigation, ...(sharedData && Object.keys(sharedData).length ? {sharedData: {...sharedData}} : {}), ...(interactionWrites !== undefined ? {interactionWrites: interactionWrites.map(([key,value])=>[key,value])} : {})});
   if (finished) active = false;
   void save(); return true;
