@@ -61,7 +61,7 @@ export class CMI5Service {
       return {packageId:id,sha256,state:'quarantined'};
     });
   }
-  private package(p: Principal, id: string) {const row=this.db.prepare('SELECT * FROM cmi5_packages WHERE id=? AND tenant=?').get(id,p.tenant) as any; if(!row) reject('FORBIDDEN','Same-tenant cmi5 package required'); return row;}
+  private package(p: Principal, id: string) {if(typeof id!=='string'||!uuid.test(id))cmi5Invalid('package UUID required');const row=this.db.prepare('SELECT * FROM cmi5_packages WHERE id=? AND tenant=?').get(id,p.tenant) as any; if(!row) reject('FORBIDDEN','Same-tenant cmi5 package required'); return row;}
   list(p: Principal, author=false, offset=0) {
     this.store.live(p,author); if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid page');
     const rows=this.db.prepare(`SELECT id,filename,sha256,state,manifest${author?',provenance,review_reason':''} FROM cmi5_packages WHERE tenant=? AND (?=1 OR state='published') ORDER BY created_at DESC,id`).all(p.tenant,author?1:0) as any[];
@@ -115,6 +115,7 @@ export class CMI5Service {
       if(!browser)reject('UNAUTHORIZED','Live browser session required');
       let registration:any;
       if(a.registrationId!==undefined) {
+        if(typeof a.registrationId!=='string'||!uuid.test(a.registrationId))cmi5Invalid('registration UUID required');
         registration=this.db.prepare('SELECT * FROM cmi5_registrations WHERE id=? AND tenant=? AND learner=? AND package_id=?').get(a.registrationId,p.tenant,p.id,pkg.id);
         if(!registration || registration.mode==='Browse'&&a.mode!=='Browse' || registration.mode!=='Browse'&&a.mode==='Browse')reject('FORBIDDEN','Own exact cmi5 registration required');
       }

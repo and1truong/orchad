@@ -61,7 +61,9 @@ cmi5/migration/authoring/invitation/SCORM learning lane passed all 60 cases.
 The first complete Pear run was 1,131 PASS / 4 FAIL because old downgrade fixtures
 left new cmi5 tables present; those failures are corrected by removing both
 schema-52 tables and its marker before the real upgrade. The corrected complete
-run and exact-head remote CI must be assessed separately; earlier failed runs
+Pear run passed all 1,135 existing cases, with no failed, cancelled or skipped
+cases (Node test concurrency 2); the independent cmi5 lane passed all 12 cases.
+Exact-head remote CI remains pending; earlier failed runs
 are not clean acceptance. Local Playwright 1.63/Chromium 151 mouse navigation
 after iframe interaction did not issue requests on two parent controls; their
 keyboard activation is the final tested journey. This is not native/platform

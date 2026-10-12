@@ -24,6 +24,7 @@ test('immutable quarantined imports, exact hash review, own tenant export and op
     assert.equal(s.cmi5.list(s.learner).items.length,0);assert.deepEqual(s.cmi5.export(s.admin,pkg.packageId).bytes,bytes);
     assert.throws(()=>s.cmi5.export(s.service.principal('outsider'),pkg.packageId));
     assert.throws(()=>s.launch(pkg.packageId),/Published/);
+    assert.throws(()=>s.cmi5.launch(s.learner,s.learnerLogin.browser,{...s.args(s.learner,false),packageId:{},auId:'urn:au:invalid',mode:'Normal'}),/UUID/);
     assert.throws(()=>s.cmi5.review(s.admin,{...s.args(),packageId:pkg.packageId,sha256:'wrong',action:'publish',reason:'Review'}));
     s.cmi5.review(s.admin,{...s.args(),packageId:pkg.packageId,sha256:pkg.sha256,action:'publish',reason:'Reviewed'});
     assert.equal(s.cmi5.list(s.learner).items.length,1);
