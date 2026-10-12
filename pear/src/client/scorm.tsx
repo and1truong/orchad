@@ -1,4 +1,5 @@
 import {EnginePackages} from "./scorm-engine.tsx";
+import {CMI5Packages} from './cmi5.tsx';
 import React,{useEffect,useRef,useState} from "react";
 import {request,type Session} from "./api.ts";
 import {translateUI as t} from "./i18n.ts";
@@ -66,5 +67,5 @@ export function PackageLearning(p:{session:Session;busy:boolean;run:(fn:()=>Prom
  {launch&&<><iframe style={{width:"100%",height:"28rem",border:"1px solid #ddd"}} ref={frame} key={launch.launchId} title={t("Isolated SCORM package")} sandbox="allow-scripts" src={launch.url}/><button disabled={p.busy||pending.current} onClick={()=>{currentLaunch.current=null;setLaunch(null);setStatus("");}}>{t("Close package")}</button></>}
  <button disabled={p.busy||offset===0} onClick={()=>setOffset(Math.max(0,offset-20))}>{t("Previous packages")}</button><button disabled={p.busy||data?.nextOffset==null} onClick={()=>setOffset(data.nextOffset)}>{t("Next packages")}</button>
  {!p.author&&<><button disabled={p.busy||recordOffset===0} onClick={()=>setRecordOffset(Math.max(0,recordOffset-20))}>{t("Previous package records")}</button><button disabled={p.busy||records?.nextOffset==null} onClick={()=>setRecordOffset(records.nextOffset)}>{t("Next package records")}</button></>}
- </section></>;
+ </section><CMI5Packages {...p}/></>;
 }

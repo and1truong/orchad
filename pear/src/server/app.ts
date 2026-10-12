@@ -1,4 +1,6 @@
 import {InvitationService, type InvitationMail} from "./invitations.ts";
+import {CMI5Service} from './cmi5.ts';
+import {createCMI5ContentHost, registerCMI5} from './cmi5-routes.ts';
 import {SCORMPackageService} from "./scorm-package-service.ts";
 import {registerSCORMEngine} from "./scorm-engine-routes.ts";
 import {SCORMLearningBindings} from './scorm-learning-bindings.ts';
@@ -55,6 +57,7 @@ export async function createApp(opts: {
   catalogFixture?: boolean;
   certificateFont?:Buffer;
   scormContent?: {origin: string; runtimeBundle: Buffer};
+  cmi5ContentOrigin?: string;
 }) {
   let certificateFontBytes=opts.certificateFont;
   if(!certificateFontBytes&&opts.developmentAuth){try{certificateFontBytes=readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");}catch{}}
@@ -63,6 +66,11 @@ export async function createApp(opts: {
   const scormEnabled = !!opts.identityFixture || !!opts.developmentAuth && ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
   if (opts.scormContent && !scormEnabled) throw Error("SCORM player requires reviewed loopback development fixtures");
   const scormOrigins = opts.scormContent ? contentHostOrigins(opts.origin, opts.scormContent.origin) : undefined;
+  if (opts.cmi5ContentOrigin && !scormEnabled) throw Error('cmi5 requires reviewed loopback development fixtures');
+  const cmi5Origins = opts.cmi5ContentOrigin ? contentHostOrigins(opts.origin, opts.cmi5ContentOrigin) : undefined;
+  if (cmi5Origins && scormOrigins && new URL(cmi5Origins.contentOrigin).host === new URL(scormOrigins.contentOrigin).host) throw Error('cmi5 and SCORM content require separate listeners');
+  const cmi5 = new CMI5Service(opts.db, opts.origin, cmi5Origins?.contentOrigin ?? 'http://localhost:4316');
+  const cmi5ContentApp = cmi5Origins ? createCMI5ContentHost(cmi5) : undefined;
   const learningService = new LearningService(opts.db,opts.origin,opts.catalogAdapters);
   const scormPlayer = opts.scormContent ? new SCORMPlayerService(opts.db, new SCORMLearningBindings(opts.db, learningService)) : undefined;
   const scormContentApp = scormOrigins && scormPlayer ? createSCORMContentHost({pearOrigin: opts.origin, contentOrigin: scormOrigins.contentOrigin, player: scormPlayer, runtimeBundle: opts.scormContent!.runtimeBundle}) : undefined;
@@ -125,7 +133,7 @@ export async function createApp(opts: {
         "Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' https: blob:; connect-src 'self'" +
           (opts.dev ? " ws:" : "") +
-          "; frame-src " + (scormOrigins ? scormOrigins.contentOrigin + " " + parsed.origin + "/api/scorm/launch/ " + parsed.origin + "/api/interactive/ blob:" : "'self'") + "; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+          "; frame-src " + (cmi5Origins ? cmi5Origins.contentOrigin + " " : "") + (scormOrigins ? scormOrigins.contentOrigin + " " + parsed.origin + "/api/scorm/launch/ " + parsed.origin + "/api/interactive/ blob:" : "'self'") + "; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       );
     if (req.url.startsWith("/api/")||(req.url.startsWith("/scim/")||req.url.startsWith("/integrations/"))) reply.header("Cache-Control", reply.getHeader("Cache-Control")==="private, no-store"?"private, no-store":"no-store");
   });
@@ -621,6 +629,8 @@ export async function createApp(opts: {
   });
   await registerProviderCatalog(app,providerCatalog,opts.origin,!!opts.catalogAdapters?.length);
   await registerSCORMEngine(app,new SCORMPackageService(opts.db),scormEnabled,req=>service.principal(req.session.principal),scormOrigins && scormPlayer ? {player: scormPlayer, contentOrigin: scormOrigins.contentOrigin} : undefined);
+  await registerCMI5(app,cmi5,!!cmi5ContentApp,req=>service.principal(req.session.principal));
+  if (cmi5ContentApp) app.addHook('onClose', async () => {await cmi5ContentApp.close();});
   if (scormContentApp) app.addHook('onClose', async () => {await scormContentApp.close();});
   await registerSCORM(app,service.scorm,opts.origin,!!opts.developmentAuth||!!opts.identityFixture,req=>service.principal(req.session.principal));
   await registerXAPI(app,service.xapi,opts.origin,!!opts.xapiEnabled,req=>service.principal(req.session.principal));
@@ -658,5 +668,5 @@ export async function createApp(opts: {
       );
     }
   }
-  return { app, service, outbox, providerCatalog, scormContentApp };
+  return { app, service, outbox, providerCatalog, scormContentApp, cmi5, cmi5ContentApp };
 }

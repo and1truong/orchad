@@ -4,10 +4,11 @@ import {createServer} from 'node:http';
 import {mkdtempSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {fixture, data} from './helpers.ts';
+import {fixture, data,cmi5SchemaRewind} from './helpers.ts';
 import {createApp} from '../src/server/app.ts';
 import {InvitationService} from '../src/server/invitations.ts';
 import {IdentityService} from '../src/server/identity.ts';
+import {CURRENT_SCHEMA_VERSION} from '../src/server/database.ts';
 import {startIdentityFixture} from './identity-fixture.ts';
 const origin = 'http://127.0.0.1:4314', base = {host: '127.0.0.1:4314', origin};
 const config = {issuer: 'https://identity.example', authorizationEndpoint: 'https://identity.example/auth', tokenEndpoint: 'https://identity.example/token', jwksUri: 'https://identity.example/keys', clientId: 'pear'};
@@ -142,10 +143,11 @@ test('schema-50 populated accounts, learning and ordinary OIDC transactions migr
   try {
     data(f.call('learner-a','learning_enroll',{courseId:'systems-basics'}));
     const accounts=f.db.prepare('SELECT * FROM accounts ORDER BY id').all(),enrollments=f.db.prepare('SELECT * FROM enrollments').all();
+    f.db.exec(cmi5SchemaRewind);
     f.db.exec('ALTER TABLE identity_transactions DROP COLUMN invitation_id; DROP TABLE user_invitations; DELETE FROM schema_version WHERE version=51');
     f.db.prepare('INSERT INTO identity_transactions(state_hash,binding_hash,nonce,verifier,expires,provider_hash) VALUES(?,?,?,?,?,?)').run('state','binding','nonce','verifier',Date.now()+300000,'provider');
     f.db.close();f=fixture(path);
-    assert.equal(f.db.prepare('SELECT max(version) n FROM schema_version').get()!.n,51);
+    assert.equal(f.db.prepare('SELECT max(version) n FROM schema_version').get()!.n,CURRENT_SCHEMA_VERSION);
     assert.deepEqual(f.db.prepare('SELECT * FROM accounts ORDER BY id').all(),accounts);
     assert.deepEqual(f.db.prepare('SELECT * FROM enrollments').all(),enrollments);
     assert.equal(f.db.prepare('SELECT invitation_id FROM identity_transactions').get()!.invitation_id,null);

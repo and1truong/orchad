@@ -20,7 +20,8 @@ const db = openDatabase(
 );
 const oidc:OIDCConfig|undefined=process.env.PEAR_OIDC_CONFIG?JSON.parse(process.env.PEAR_OIDC_CONFIG):undefined;
 const scormOrigin = process.env.PEAR_SCORM_CONTENT_ORIGIN;
-const { app, service, outbox, scormContentApp } = await createApp({
+const cmi5Origin = process.env.PEAR_CMI5_CONTENT_ORIGIN;
+const { app, service, outbox, scormContentApp, cmi5ContentApp } = await createApp({
   db,
   origin,
   dev,
@@ -34,11 +35,17 @@ const { app, service, outbox, scormContentApp } = await createApp({
   scimEnabled: process.env.PEAR_SCIM_ENABLED === "true",
   secureCookies: process.env.COOKIE_SECURE === "true",
   scormContent: scormOrigin ? {origin: scormOrigin, runtimeBundle: readFileSync(new URL('../../dist/scorm/runtime.js', import.meta.url))} : undefined,
+  cmi5ContentOrigin: cmi5Origin,
 });
 if (scormContentApp && scormOrigin) {
   if (!["127.0.0.1", "localhost", "::1"].includes(host)) throw Error('SCORM fixture player must bind loopback');
   const contentURL = new URL(scormOrigin);
   await scormContentApp.listen({port: Number(contentURL.port || 80), host});
+}
+if (cmi5ContentApp && cmi5Origin) {
+  if (!["127.0.0.1", "localhost", "::1"].includes(host)) throw Error('cmi5 content must bind loopback');
+  const contentURL = new URL(cmi5Origin);
+  await cmi5ContentApp.listen({port: Number(contentURL.port || (contentURL.protocol === 'https:' ? 443 : 80)), host});
 }
 await app.listen({ port, host });
 const assignmentTimer = setInterval(() => {

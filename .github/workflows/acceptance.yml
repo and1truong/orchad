@@ -204,6 +204,7 @@ jobs:
           npm run build
           npm test
           npx playwright install --with-deps chromium
+          npm run test:cmi5
           npm run test:e2e
           PEAR_E2E_PRODUCTION=1 npm run test:e2e
       - working-directory: mango

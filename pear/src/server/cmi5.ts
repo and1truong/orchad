@@ -1,0 +1,334 @@
+import {createHash, randomBytes, randomUUID} from 'node:crypto';
+import type {DatabaseSync} from 'node:sqlite';
+import type {Principal} from '../shared/model.ts';
+import {parseUniqueJSON} from '../shared/json-unique.ts';
+import {SCORMEngineStore} from './scorm-engine-store.ts';
+import {packageLimits, packagePath} from './scorm-package-reader.ts';
+import {scormResourceMime} from './scorm-package-service.ts';
+import {boundedPage, reject} from './errors.ts';
+import {cmi5Invalid, cmi5IRI, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
+
+export const cmi5Category = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
+export const cmi5MoveCategory = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
+export const cmi5Extension = 'https://w3id.org/xapi/cmi5/context/extensions/';
+const exp = 'http://adlnet.gov/expapi/verbs/', adl = 'https://w3id.org/xapi/adl/verbs/';
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const hash = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
+function stable(v: any): string {return Array.isArray(v) ? '[' + v.map(stable).join(',') + ']' : v && typeof v === 'object' ? '{' + Object.keys(v).sort().map(k => JSON.stringify(k)+':'+stable(v[k])).join(',') + '}' : JSON.stringify(v);}
+function object(v: any, keys: string[], required: string[] = []) {
+  if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).some(k => !keys.includes(k)) || required.some(k => !Object.hasOwn(v,k))) cmi5Invalid('unsupported or missing JSON property');
+}
+function timestamp(v: any) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(v) || !Number.isFinite(Date.parse(v)) || Date.parse(v)>Date.now()+300000 || Date.parse(v)<0) cmi5Invalid('valid UTC timestamp required');
+  const normalized = new Date(v).toISOString(); if (normalized.slice(0,19) !== v.slice(0,19)) cmi5Invalid('invalid calendar date'); return normalized;
+}
+function duration(v: any) {if (typeof v !== 'string' || !/^P(?=\d|T\d)(?:\d{1,6}D)?(?:T(?=\d)(?:\d{1,6}H)?(?:\d{1,6}M)?(?:\d{1,6}(?:\.\d{1,3})?S)?)?$/.test(v)) cmi5Invalid('bounded day/time duration required');}
+
+export class CMI5Service {
+  readonly store: SCORMEngineStore;
+  constructor(readonly db: DatabaseSync, readonly pearOrigin: string, readonly contentOrigin: string) {this.store = new SCORMEngineStore(db);}
+  private transaction<T>(fn: () => T): T {this.db.exec('BEGIN IMMEDIATE'); try {const result=fn(); this.db.exec('COMMIT'); return result;} catch(e) {this.db.exec('ROLLBACK'); throw e;}}
+  private audit(p: Principal, action: string, payload: object, doc = 'library:'+p.tenant) {
+    this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant,p.id,doc,action,JSON.stringify(payload),new Date().toISOString());
+    this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run(doc);
+  }
+  private command(p: Principal, a: any, action: string, payload: object, author: boolean, fn: () => any) {
+    return this.transaction(() => {
+      this.store.live(p,author);
+      if (a.confirmed !== true || typeof a.key !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(a.key) || !Number.isSafeInteger(a.revision) || a.revision < 0) cmi5Invalid('confirmed action, revision and operation key required');
+      const doc = author ? 'library:'+p.tenant : `learning:${p.tenant}:${p.id}`, fingerprint=hash(stable({action,...payload}));
+      const old=this.db.prepare('SELECT * FROM idempotency WHERE principal=? AND document_id=? AND key=?').get(p.id,doc,a.key) as any;
+      if (old) {if (old.payload!==fingerprint) reject('IDEMPOTENCY_CONFLICT','cmi5 operation changed'); return {...JSON.parse(old.result),recovered:true};}
+      if ((this.db.prepare('SELECT revision FROM workspaces WHERE id=?').get(doc) as any)?.revision!==a.revision) reject('STALE_CONTEXT','cmi5 context changed');
+      const result=fn(), {url,...receipt}=result;
+      this.audit(p,action,payload,doc);
+      // Launch URLs are capabilities. Receipts retain IDs for reconciliation, never tokens.
+      this.db.prepare('INSERT INTO idempotency VALUES(?,?,?,?,?)').run(p.id,doc,a.key,fingerprint,JSON.stringify(receipt));
+      return result;
+    });
+  }
+  async import(p: Principal, a: any, bytes: Buffer) {
+    this.store.live(p,true); object(a,['filename','provenance','confirmed','key','revision'],['filename','provenance']);
+    if (typeof a.filename !== 'string' || !/^[\p{L}\p{N} _.-]{1,115}\.zip$/u.test(a.filename) || typeof a.provenance !== 'string' || !a.provenance.trim() || a.provenance.length>500 || !Buffer.isBuffer(bytes) || !bytes.length || bytes.length>packageLimits.archive) cmi5Invalid('bounded ZIP and rights provenance required');
+    const sha256=hash(bytes), inspected=await inspectCMI5Package(bytes);
+    return this.command(p,a,'human_cmi5_import',{filename:a.filename,provenance:a.provenance.trim(),sha256},true,() => {
+      const used=this.db.prepare('SELECT COALESCE(SUM(length(archive)),0)+(SELECT COALESCE(SUM(length(bytes)),0) FROM cmi5_resources r JOIN cmi5_packages p ON p.id=r.package_id WHERE p.tenant=?) AS n FROM cmi5_packages WHERE tenant=?').get(p.tenant,p.tenant) as any;
+      const expanded=[...inspected.files.values()].reduce((n,b)=>n+b.length,0);
+      if (used.n+bytes.length+expanded>128*1024*1024) cmi5Invalid('tenant package quota reached');
+      const id=randomUUID();
+      this.db.prepare('INSERT INTO cmi5_packages(id,tenant,owner,filename,provenance,sha256,archive,manifest,created_at) VALUES(?,?,?,?,?,?,?,?,?)').run(id,p.tenant,p.id,a.filename,a.provenance.trim(),sha256,bytes,JSON.stringify(inspected.manifest),new Date().toISOString());
+      const insert=this.db.prepare('INSERT INTO cmi5_resources VALUES(?,?,?)'); for (const [path,data] of inspected.files) insert.run(id,path,data);
+      return {packageId:id,sha256,state:'quarantined'};
+    });
+  }
+  private package(p: Principal, id: string) {const row=this.db.prepare('SELECT * FROM cmi5_packages WHERE id=? AND tenant=?').get(id,p.tenant) as any; if(!row) reject('FORBIDDEN','Same-tenant cmi5 package required'); return row;}
+  list(p: Principal, author=false, offset=0) {
+    this.store.live(p,author); if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid page');
+    const rows=this.db.prepare(`SELECT id,filename,sha256,state,manifest${author?',provenance,review_reason':''} FROM cmi5_packages WHERE tenant=? AND (?=1 OR state='published') ORDER BY created_at DESC,id`).all(p.tenant,author?1:0) as any[];
+    return boundedPage(rows.map(({manifest,...row})=>{const m:CMI5Manifest=JSON.parse(manifest); return {...row,profile:m.profile,title:m.course.title,...this.activityPage(m,0)};}),offset);
+  }
+  private activityPage(m:CMI5Manifest,offset:number) {
+    const page=boundedPage(m.aus.map(au=>({id:au.id,title:au.title,moveOn:au.moveOn,launchMethod:au.launchMethod})),offset,10);
+    return {aus:page.items,auOffset:page.offset,nextAuOffset:page.nextOffset,auTotal:page.total};
+  }
+  activities(p:Principal,id:string,offset=0,author=false) {
+    this.store.live(p,author);if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid AU page');
+    const pkg=this.package(p,id);
+    if(!author&&pkg.state!=='published')reject('FORBIDDEN','Published cmi5 package required');
+    return this.activityPage(JSON.parse(pkg.manifest),offset);
+  }
+  review(p: Principal,a: any) {
+    object(a,['packageId','sha256','action','reason','confirmed','key','revision'],['packageId','sha256','action','reason']);
+    this.store.live(p,true); const pkg=this.package(p,a.packageId);
+    if(pkg.sha256!==a.sha256 || !['publish','retire','revoke'].includes(a.action) || typeof a.reason!=='string' || !a.reason.trim() || a.reason.length>300)cmi5Invalid('exact hash and review reason required');
+    return this.command(p,a,'human_cmi5_review',{packageId:pkg.id,sha256:pkg.sha256,action:a.action,reason:a.reason.trim()},true,()=>{
+      const current=this.package(p,pkg.id).state;
+      if(a.action==='publish'&&current!=='quarantined'||a.action==='retire'&&current!=='published'||a.action==='revoke'&&current==='revoked')cmi5Invalid('invalid package transition');
+      const state=a.action==='publish'?'published':a.action==='retire'?'retired':'revoked';
+      this.db.prepare('UPDATE cmi5_packages SET state=?,reviewer=?,review_reason=? WHERE id=?').run(state,p.id,a.reason.trim(),pkg.id);
+      if(state==='revoked')for(const s of this.db.prepare("SELECT s.id FROM cmi5_sessions s JOIN cmi5_registrations r ON r.id=s.registration_id WHERE r.package_id=? AND s.status IN('launched','initialized')").all(pkg.id) as any[])this.abandon(this.session(s.id,false));
+      return {packageId:pkg.id,state};
+    });
+  }
+  export(p:Principal,id:string) {this.store.live(p,true); const pkg=this.package(p,id); return {bytes:Buffer.from(pkg.archive),filename:pkg.filename};}
+  private session(id:string, live=true) {
+    const s=this.db.prepare(`SELECT s.*,r.tenant,r.learner,r.mode,r.actor,r.package_id,p.manifest,p.state AS package_state
+      FROM cmi5_sessions s JOIN cmi5_registrations r ON r.id=s.registration_id JOIN cmi5_packages p ON p.id=r.package_id WHERE s.id=?`).get(id) as any;
+    if(!s)reject('UNAUTHORIZED','cmi5 session unavailable');
+    s.data=JSON.parse(s.launch_data); s.au=(JSON.parse(s.manifest) as CMI5Manifest).aus.find(a=>a.id===s.au_id);
+    if(live) {
+      const account=this.db.prepare('SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1').get(s.learner,s.tenant) as any;
+      const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(s.browser_session,s.learner,s.auth_version,Date.now());
+      if(!account || account.auth_version!==s.auth_version || !browser || s.expires<=Date.now() || s.status==='abandoned' || s.package_state==='revoked' || s.package_state==='quarantined')reject('UNAUTHORIZED','cmi5 session revoked or expired');
+      this.store.live(account,s.mode==='Browse');
+    }
+    return s;
+  }
+  private actor(p:Principal) {return {objectType:'Agent',account:{homePage:this.pearOrigin,name:hash('cmi5:'+p.tenant+':'+p.id)}};}
+  launch(p:Principal,browserSession:string,a:any) {
+    object(a,['packageId','auId','registrationId','mode','confirmed','key','revision'],['packageId','auId','mode']);
+    if(!['Normal','Browse','Review'].includes(a.mode))cmi5Invalid('explicit launch mode required');
+    this.store.live(p,a.mode==='Browse'); const pkg=this.package(p,a.packageId), manifest:CMI5Manifest=JSON.parse(pkg.manifest), au=manifest.aus.find(v=>v.id===a.auId);
+    if(!au) cmi5Invalid('manifest AU required');
+    return this.command(p,a,'human_cmi5_launch',{packageId:pkg.id,auId:au.id,registrationId:a.registrationId??null,mode:a.mode},false,()=>{
+      const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(browserSession,p.id,p.auth_version,Date.now());
+      if(!browser)reject('UNAUTHORIZED','Live browser session required');
+      let registration:any;
+      if(a.registrationId!==undefined) {
+        registration=this.db.prepare('SELECT * FROM cmi5_registrations WHERE id=? AND tenant=? AND learner=? AND package_id=?').get(a.registrationId,p.tenant,p.id,pkg.id);
+        if(!registration || registration.mode==='Browse'&&a.mode!=='Browse' || registration.mode!=='Browse'&&a.mode==='Browse')reject('FORBIDDEN','Own exact cmi5 registration required');
+      }
+      const current=this.package(p,pkg.id).state;
+      if(current!=='published' && !(registration && current==='retired'))reject('FORBIDDEN','Published or pinned retired cmi5 package required');
+      if(!registration) {
+        if(Number((this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_registrations WHERE tenant=? AND learner=?').get(p.tenant,p.id) as any).n)>=200)cmi5Invalid('registration quota reached');
+        registration={id:randomUUID()};
+        this.db.prepare('INSERT INTO cmi5_registrations VALUES(?,?,?,?,?,?,?)').run(registration.id,pkg.id,p.tenant,p.id,a.mode,JSON.stringify(this.actor(p)),new Date().toISOString());
+      }
+      for(const old of this.db.prepare("SELECT id FROM cmi5_sessions WHERE registration_id=? AND status IN('launched','initialized')").all(registration.id) as any[])this.abandon(this.session(old.id,false));
+      const sessionId=randomUUID(), token=randomBytes(32).toString('base64url'), now=new Date().toISOString();
+      const contextTemplate={extensions:{[cmi5Extension+'sessionid']:sessionId},contextActivities:{grouping:[{id:au.id}]}};
+      const data={contextTemplate,launchMode:a.mode,moveOn:au.moveOn,...(au.masteryScore!==undefined?{masteryScore:au.masteryScore}:{}),...(au.launchParameters!==undefined?{launchParameters:au.launchParameters}:{}),...(au.entitlementKey!==undefined?{entitlementKey:{courseStructure:au.entitlementKey}}:{})};
+      this.db.prepare('INSERT INTO cmi5_sessions(id,registration_id,au_id,auth_version,browser_session,fetch_hash,launch_data,created_at,expires) VALUES(?,?,?,?,?,?,?,?,?)').run(sessionId,registration.id,au.id,p.auth_version,browserSession,hash(token),JSON.stringify(data),now,Date.now()+4*60*60*1000);
+      const s=this.session(sessionId), url=new URL(this.contentOrigin+'/cmi5/content/'+sessionId+'/files/'+au.href);
+      const plainURL=url.href;
+      for(const [key,value] of Object.entries({endpoint:this.contentOrigin+'/cmi5/xapi/',fetch:this.contentOrigin+'/cmi5/fetch/'+token,actor:s.actor,registration:registration.id,activityId:au.activityId}))url.searchParams.set(key,value);
+      this.lms(s,'launched',undefined,undefined,{[cmi5Extension+'launchmode']:a.mode,[cmi5Extension+'moveon']:au.moveOn,[cmi5Extension+'launchurl']:plainURL,...(au.masteryScore!==undefined?{[cmi5Extension+'masteryscore']:au.masteryScore}:{}),...(au.launchParameters!==undefined?{[cmi5Extension+'launchparameters']:au.launchParameters}:{})});
+      if(a.mode==='Normal')this.satisfaction(s);
+      return {sessionId,registrationId:registration.id,auId:au.id,launchMethod:au.launchMethod,url:url.href,officialLearningChanged:false};
+    });
+  }
+  fetch(token:string) {
+    return this.transaction(()=>{
+      const row=this.db.prepare('SELECT id FROM cmi5_sessions WHERE fetch_hash=?').get(hash(token)) as any;
+      if(!row)return {'error-code':'2','error-text':'Invalid launch capability'};
+      let s:any; try{s=this.session(row.id);}catch{return {'error-code':'1','error-text':'Session expired or revoked'};}
+      if(s.auth_hash || s.status==='terminated')return {'error-code':'1','error-text':'Token already returned or session expired'};
+      const auth=Buffer.from(s.id+':'+randomBytes(32).toString('base64url')).toString('base64');
+      this.db.prepare('UPDATE cmi5_sessions SET auth_hash=? WHERE id=?').run(hash(auth),s.id);
+      return {'auth-token':auth};
+    });
+  }
+  authenticate(header:string|undefined, statements=false) {
+    if(typeof header!=='string'||!/^Basic [A-Za-z0-9+/]+={0,2}$/.test(header))reject('UNAUTHORIZED','cmi5 Basic token required');
+    const row=this.db.prepare('SELECT id FROM cmi5_sessions WHERE auth_hash=?').get(hash(header.slice(6))) as any;
+    if(!row)reject('UNAUTHORIZED','cmi5 token unavailable'); const s=this.session(row.id);
+    if(s.status==='terminated' && (!statements || Date.now()>=s.terminated_at+5000))reject('UNAUTHORIZED','cmi5 session ended');
+    return s;
+  }
+  resource(sessionId:string,path:string) {
+    const s=this.session(sessionId);
+    if(s.status==='terminated' && Date.now()>=s.terminated_at+5000)reject('UNAUTHORIZED','cmi5 session ended');
+    packagePath(path); const file=this.db.prepare('SELECT bytes FROM cmi5_resources WHERE package_id=? AND path=?').get(s.package_id,path) as any;
+    if(!file)reject('NOT_FOUND','cmi5 resource unavailable'); return {bytes:Buffer.from(file.bytes),mime:scormResourceMime(path)};
+  }
+  private lms(s:any,verb:string,result?:object,node?:CMI5Node,extra:object={}) {
+    const context={...s.data.contextTemplate,registration:s.registration_id,extensions:{...s.data.contextTemplate.extensions,...extra},contextActivities:{grouping:[{id:node?.id??s.au.id}],category:[{id:cmi5Category}]}};
+    const statement={id:randomUUID(),actor:JSON.parse(s.actor),verb:{id:['launched'].includes(verb)?exp+verb:adl+verb},object:{objectType:'Activity',id:node?.activityId??s.au.activityId,...(node?{definition:{type:'https://w3id.org/xapi/cmi5/activitytype/'+(node.auIds.length&&node.id===(JSON.parse(s.manifest) as CMI5Manifest).course.id?'course':'block')}}:{})},context,timestamp:new Date().toISOString(),...(result?{result}:{})};
+    this.insert(s,statement,verb,true,'lms');
+  }
+  private insert(s:any,statement:any,verb:string,defined:boolean,source:'lms'|'au') {
+    if(Number((this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_statements WHERE registration_id=?').get(s.registration_id) as any).n)>=10000)cmi5Invalid('registration statement quota reached');
+    const now=new Date().toISOString();
+    this.db.prepare('INSERT INTO cmi5_statements(id,session_id,registration_id,au_id,verb,defined,source,timestamp,stored,payload_hash,statement) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(statement.id,s.id,s.registration_id,s.au_id,verb,defined?1:0,source,timestamp(statement.timestamp),now,hash(stable(statement)),JSON.stringify(statement));
+  }
+  private abandon(s:any) {
+    if(!['launched','initialized'].includes(s.status))return;
+    const last=this.db.prepare("SELECT MAX(timestamp) AS t FROM cmi5_statements WHERE session_id=? AND source='au'").get(s.id) as any;
+    this.lms(s,'abandoned',{duration:'PT'+Math.max(0,(Date.parse(last.t??s.created_at)-Date.parse(s.created_at))/1000)+'S'});
+    this.db.prepare("UPDATE cmi5_sessions SET status='abandoned' WHERE id=?").run(s.id);
+  }
+  private validate(s:any,input:any) {
+    object(input,['id','actor','verb','object','context','result','timestamp'],['id','actor','verb','object','context','timestamp']);
+    if(typeof input.id!=='string'||!uuid.test(input.id)||Buffer.byteLength(JSON.stringify(input))>16*1024)cmi5Invalid('UUID and ≤16 KiB statement required');
+    if(stable(input.actor)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Exact launch actor required');
+    object(input.verb,['id','display'],['id']); if(!cmi5IRI(input.verb.id))cmi5Invalid('verb IRI required');
+    object(input.object,['id','objectType','definition'],['id']); if(!cmi5IRI(input.object.id)||input.object.objectType!==undefined&&input.object.objectType!=='Activity')cmi5Invalid('Activity object required');
+    object(input.context,['registration','contextActivities','extensions'],['registration','contextActivities','extensions']);
+    const c=input.context; if(c.registration!==s.registration_id||c.extensions?.[cmi5Extension+'sessionid']!==s.id)reject('FORBIDDEN','Exact registration/session required');
+    object(c.contextActivities,['parent','grouping','category','other']);
+    for(const values of Object.values(c.contextActivities) as any[])if(!Array.isArray(values)||values.length>32||values.some((v:any)=>!v||!cmi5IRI(v.id)))cmi5Invalid('bounded context activity lists required');
+    if(!c.contextActivities.grouping?.some((v:any)=>v.id===s.au.id))reject('FORBIDDEN','Publisher grouping required');
+    if(!c.extensions || typeof c.extensions!=='object'||Array.isArray(c.extensions)||Object.keys(c.extensions).some(k=>!cmi5IRI(k)))cmi5Invalid('IRI extensions required');
+    const categories=c.contextActivities.category??[], defined=categories.some((v:any)=>v.id===cmi5Category), verb=input.verb.id.startsWith(exp)?input.verb.id.slice(exp.length):input.verb.id;
+    if(input.verb.id===exp+'voided')reject('FORBIDDEN','AU credentials cannot void statements');
+    const result=input.result??{}; object(result,['score','success','completion','duration','response','extensions']);
+    for(const k of ['success','completion'])if(result[k]!==undefined&&typeof result[k]!=='boolean')cmi5Invalid('Boolean result required');
+    if(result.duration!==undefined)duration(result.duration);
+    if(result.response!==undefined&&(typeof result.response!=='string'||result.response.length>4096))cmi5Invalid('bounded response required');
+    if(result.extensions!==undefined&&(!result.extensions||typeof result.extensions!=='object'||Array.isArray(result.extensions)||Object.keys(result.extensions).some(k=>!cmi5IRI(k))))cmi5Invalid('IRI result extensions required');
+    const progress=result.extensions?.['https://w3id.org/xapi/cmi5/result/extensions/progress']; if(progress!==undefined&&(!Number.isInteger(progress)||progress<0||progress>100))cmi5Invalid('progress must be 0–100');
+    if(result.score!==undefined) {
+      object(result.score,['scaled','raw','min','max']); const score=result.score;
+      if(!Object.keys(score).length||Object.values(score).some(v=>typeof v!=='number'||!Number.isFinite(v))||score.scaled!==undefined&&(score.scaled<(defined?0:-1)||score.scaled>1)||['raw','min','max'].some(k=>score[k]!==undefined&&defined&&!Number.isInteger(score[k]))||score.raw!==undefined&&(score.min===undefined||score.max===undefined||score.raw<score.min||score.raw>score.max)||score.min!==undefined&&score.max!==undefined&&score.min>score.max)cmi5Invalid('invalid score bounds');
+    }
+    if(defined) {
+      if(!['initialized','completed','passed','failed','terminated'].includes(verb)||input.verb.id!==exp+verb)cmi5Invalid('AU cannot issue LMS-only or unknown defined verbs');
+      if(input.object.id!==s.au.activityId)reject('FORBIDDEN','Exact AU activity required');
+      if(s.data.launchMode!=='Normal'&&!['initialized','terminated'].includes(verb))cmi5Invalid('Browse/Review cannot report satisfaction');
+      if(result.success!==(['passed','failed'].includes(verb)?verb==='passed':undefined)||result.completion!==(verb==='completed'?true:undefined)||result.score!==undefined&&!['passed','failed'].includes(verb))cmi5Invalid('defined verb/result mismatch');
+      if(['completed','passed','failed','terminated'].includes(verb))duration(result.duration);
+      const move=categories.some((v:any)=>v.id===cmi5MoveCategory); if(move!==['completed','passed','failed'].includes(verb))cmi5Invalid('moveOn category/result mismatch');
+      if(['passed','failed'].includes(verb)&&s.au.masteryScore!==undefined) {
+        if(c.extensions[cmi5Extension+'masteryscore']!==s.au.masteryScore)cmi5Invalid('masteryScore extension required');
+        if(result.score?.scaled!==undefined && (verb==='passed' ? result.score.scaled<s.au.masteryScore : result.score.scaled>=s.au.masteryScore))cmi5Invalid('score disagrees with masteryScore');
+      }
+    } else if(categories.some((v:any)=>v.id===cmi5MoveCategory))cmi5Invalid('allowed statements cannot assert moveOn');
+    const time=timestamp(input.timestamp); if(Date.parse(time)<Date.parse(s.created_at))cmi5Invalid('statement precedes launch');
+    return {statement:{...input,id:input.id.toLowerCase()},verb,defined,time};
+  }
+  write(header:string|undefined,body:any) {
+    return this.transaction(()=>{
+      const s=this.authenticate(header,true), batch=Array.isArray(body)?body:[body];
+      if(!batch.length||batch.length>20||Buffer.byteLength(JSON.stringify(batch))>64*1024)cmi5Invalid('1–20 bounded statements required');
+      const values=batch.map(v=>this.validate(s,v)), changed:string[]=[];
+      for(const v of values) {
+        const old=this.db.prepare('SELECT * FROM cmi5_statements WHERE id=?').get(v.statement.id) as any;
+        if(old) {if(old.session_id!==s.id)reject('FORBIDDEN','Statement ID unavailable');if(old.payload_hash!==hash(stable(v.statement)))reject('IDEMPOTENCY_CONFLICT','Statement payload changed');continue;}
+        if(Number((this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_statements WHERE registration_id=?').get(s.registration_id) as any).n)>=10000)cmi5Invalid('registration statement quota reached');
+        this.insert(s,v.statement,v.verb,v.defined,'au'); changed.push(v.statement.id);
+      }
+      // Validate the complete history by source timestamps, including delayed
+      // delivery during the five-second termination grace period. Equal times
+      // are legal; lifecycle verbs define their boundary order.
+      const history=this.db.prepare("SELECT * FROM cmi5_statements WHERE session_id=? AND source='au' ORDER BY timestamp,CASE WHEN defined=1 AND verb='initialized' THEN 0 WHEN defined=1 AND verb='terminated' THEN 2 ELSE 1 END,sequence").all(s.id) as any[];
+      const defined=history.filter(v=>v.defined), seen=new Set<string>();
+      for(const v of defined) {if(seen.has(v.verb))cmi5Invalid('duplicate defined verb');seen.add(v.verb);}
+      if(seen.has('passed')&&seen.has('failed')||history.length&&(!history[0].defined||history[0].verb!=='initialized')||seen.has('terminated')&&(!history.at(-1).defined||history.at(-1).verb!=='terminated'))cmi5Invalid('invalid AU lifecycle ordering');
+      const registration=this.db.prepare("SELECT s.* FROM cmi5_statements s WHERE registration_id=? AND au_id=? AND source='au' AND defined=1 ORDER BY timestamp,sequence").all(s.registration_id,s.au_id) as any[];
+      for(const v of ['completed','passed'])if(registration.filter(row=>row.verb===v).length>1)cmi5Invalid('duplicate registration outcome');
+      const passed=registration.find(v=>v.verb==='passed');if(passed&&registration.some(v=>v.verb==='failed'&&v.timestamp>passed.timestamp))cmi5Invalid('failed after registration passed');
+      const status=seen.has('terminated')?'terminated':seen.has('initialized')?'initialized':'launched';
+      this.db.prepare('UPDATE cmi5_sessions SET status=?,terminated_at=CASE WHEN ?=\'terminated\' THEN COALESCE(terminated_at,?) ELSE terminated_at END WHERE id=?').run(status,status,Date.now(),s.id);
+      if(changed.length) {
+        if(s.data.launchMode==='Normal')this.satisfaction(s);
+        const p=this.db.prepare('SELECT * FROM accounts WHERE id=?').get(s.learner) as unknown as Principal;
+        this.audit(p,'cmi5_statements',{sessionId:s.id,statementIds:changed},`learning:${s.tenant}:${s.learner}`);
+      }
+      return values.map(v=>v.statement.id);
+    });
+  }
+  private outcomes(registration:string,manifest:CMI5Manifest) {
+    const rows=this.db.prepare("SELECT au_id,verb,statement FROM cmi5_statements WHERE registration_id=? AND defined=1 AND source='au' ORDER BY timestamp,sequence").all(registration) as any[];
+    const groups=new Map<string,any[]>();for(const row of rows){const group=groups.get(row.au_id)??[];group.push(row);groups.set(row.au_id,group);}
+    return manifest.aus.map(au=>{
+      const evidence=groups.get(au.id)??[], completed=evidence.some(r=>r.verb==='completed'), passed=evidence.some(r=>r.verb==='passed');
+      const satisfied=au.moveOn==='NotApplicable'||au.moveOn==='Passed'&&passed||au.moveOn==='Completed'&&completed||au.moveOn==='CompletedAndPassed'&&completed&&passed||au.moveOn==='CompletedOrPassed'&&(completed||passed);
+      const last=evidence.filter(r=>['passed','failed','terminated'].includes(r.verb)).at(-1), score=evidence.filter(r=>JSON.parse(r.statement).result?.score).at(-1);
+      return {id:au.id,title:au.title,moveOn:au.moveOn,completed,passed,satisfied,success:evidence.some(r=>r.verb==='failed')&&!passed?false:passed?true:null,score:score?JSON.parse(score.statement).result.score:null,duration:last?JSON.parse(last.statement).result?.duration:null};
+    });
+  }
+  private satisfaction(s:any) {
+    const m:CMI5Manifest=JSON.parse(s.manifest), satisfied=new Set(this.outcomes(s.registration_id,m).filter(v=>v.satisfied).map(v=>v.id));
+    for(const node of [...m.blocks,m.course])if(node.auIds.every(id=>satisfied.has(id))) {
+      const existing=this.db.prepare("SELECT 1 FROM cmi5_statements WHERE registration_id=? AND source='lms' AND verb='satisfied' AND json_extract(statement,'$.object.id')=?").get(s.registration_id,node.activityId);
+      if(!existing)this.lms(s,'satisfied',undefined,node);
+    }
+  }
+  read(header:string|undefined,q:any) {
+    const s=this.authenticate(header,true); object(q,['statementId','registration','after','limit']);
+    if(q.registration!==undefined&&q.registration!==s.registration_id)reject('FORBIDDEN','Exact registration required');
+    if(q.statementId!==undefined) {
+      if(typeof q.statementId!=='string'||!uuid.test(q.statementId)||Object.keys(q).length!==1)cmi5Invalid('single UUID query required');
+      const row=this.db.prepare('SELECT * FROM cmi5_statements WHERE id=? AND registration_id=?').get(q.statementId.toLowerCase(),s.registration_id) as any;
+      if(!row)reject('NOT_FOUND','Scoped statement unavailable');return this.stored(row);
+    }
+    const after=Number(q.after??0),limit=Number(q.limit??20);if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>20)cmi5Invalid('invalid statement page');
+    const rows=this.db.prepare('SELECT * FROM cmi5_statements WHERE registration_id=? AND sequence>? ORDER BY sequence LIMIT ?').all(s.registration_id,after,limit+1) as any[];
+    const page=rows.slice(0,limit);return {statements:page.map(row=>this.stored(row)),more:rows.length>limit?'/cmi5/xapi/statements?after='+page.at(-1).sequence+'&limit='+limit:''};
+  }
+  evidence(p:Principal,registrationId:string,q:any,admin=false) {
+    this.report(p,registrationId,admin);object(q,['after','limit']);
+    const after=Number(q.after??0),limit=Number(q.limit??20);if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>20)cmi5Invalid('invalid evidence page');
+    const rows=this.db.prepare('SELECT * FROM cmi5_statements WHERE registration_id=? AND sequence>? ORDER BY sequence LIMIT ?').all(registrationId,after,limit+1) as any[];
+    const page=rows.slice(0,limit);return {statements:page.map(row=>this.stored(row)),nextAfter:rows.length>limit?page.at(-1).sequence:null};
+  }
+  private stored(row:any) {return {...JSON.parse(row.statement),stored:row.stored,version:'1.0.3',authority:{objectType:'Agent',account:{homePage:this.pearOrigin,name:row.source==='lms'?'pear-cmi5-lms':row.session_id}}};}
+  state(header:string|undefined,q:any,method:string,body:any,headers:any={}) {
+    const fn=()=>{
+      const s=this.authenticate(header);object(q,['activityId','agent','registration','stateId'],['activityId','agent','registration']);
+      let agent:any;try{agent=parseUniqueJSON(q.agent);}catch{cmi5Invalid('valid Agent query required');}
+      if(q.activityId!==s.au.activityId||q.registration!==s.registration_id||stable(agent)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Exact state scope required');
+      if(q.stateId!==undefined&&(typeof q.stateId!=='string'||!q.stateId||q.stateId.length>256))cmi5Invalid('bounded state ID required');
+      if(q.stateId==='LMS.LaunchData') {if(method!=='GET')reject('FORBIDDEN','LaunchData is read-only');return {body:s.data,etag:'"'+hash(s.launch_data)+'"',updated:s.created_at};}
+      if(!q.stateId) {
+        if(method!=='GET')cmi5Invalid('stateId required for mutation');
+        return {body:['LMS.LaunchData',...(this.db.prepare('SELECT state_id FROM cmi5_state WHERE registration_id=? AND au_id=? ORDER BY state_id').all(s.registration_id,s.au_id) as any[]).map(v=>v.state_id)]};
+      }
+      const row=this.db.prepare('SELECT * FROM cmi5_state WHERE registration_id=? AND au_id=? AND state_id=?').get(s.registration_id,s.au_id,q.stateId) as any;
+      if(method==='GET') {if(!row)reject('NOT_FOUND','State unavailable');return {body:JSON.parse(row.body),etag:row.etag,updated:row.updated_at};}
+      if(headers['if-match']!==undefined&&headers['if-match']!==row?.etag||headers['if-none-match']!==undefined&&(headers['if-none-match']!=='*'||!!row))return {preconditionFailed:true};
+      if(row&&!headers['if-match']&&!headers['if-none-match'])return {preconditionRequired:true};
+      if(method==='DELETE'){this.db.prepare('DELETE FROM cmi5_state WHERE registration_id=? AND au_id=? AND state_id=?').run(s.registration_id,s.au_id,q.stateId);return {};}
+      if(method==='POST') {if(!body||typeof body!=='object'||Array.isArray(body)||row&&(!JSON.parse(row.body)||typeof JSON.parse(row.body)!=='object'||Array.isArray(JSON.parse(row.body))))cmi5Invalid('POST state merge requires JSON objects');body={...(row?JSON.parse(row.body):{}),...body};}
+      const data=JSON.stringify(body);if(!data||Buffer.byteLength(data)>32*1024)cmi5Invalid('state document ≤32 KiB required');
+      const used=this.db.prepare('SELECT COUNT(*) AS n,COALESCE(SUM(length(CAST(body AS BLOB))),0) AS bytes FROM cmi5_state WHERE registration_id=?').get(s.registration_id) as any;
+      if(!row&&used.n>=128||used.bytes-Buffer.byteLength(row?.body??'')+Buffer.byteLength(data)>512*1024)cmi5Invalid('registration state quota reached');
+      const etag='"'+hash(data)+'"',updated=new Date().toISOString();this.db.prepare('INSERT INTO cmi5_state VALUES(?,?,?,?,?,?) ON CONFLICT(registration_id,au_id,state_id) DO UPDATE SET body=excluded.body,etag=excluded.etag,updated_at=excluded.updated_at').run(s.registration_id,s.au_id,q.stateId,data,etag,updated);
+      return {etag};
+    };
+    return method==='GET'?fn():this.transaction(fn);
+  }
+  profile(header:string|undefined,q:any) {
+    const s=this.authenticate(header);object(q,['agent','profileId'],['agent']);let agent:any;try{agent=parseUniqueJSON(q.agent);}catch{cmi5Invalid('valid Agent query required');}
+    if(stable(agent)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Own Agent required');
+    if(q.profileId===undefined)return ['cmi5LearnerPreferences'];if(q.profileId!=='cmi5LearnerPreferences')reject('NOT_FOUND','Profile unavailable');
+    const row=this.db.prepare('SELECT preferred_language FROM user_profiles WHERE user_id=?').get(s.learner) as any;
+    return {languagePreference:row?.preferred_language??'en'};
+  }
+  report(p:Principal,registrationId:string,admin=false) {
+    this.store.live(p,admin);const r=this.db.prepare(`SELECT r.*,p.manifest,p.state AS package_state FROM cmi5_registrations r JOIN cmi5_packages p ON p.id=r.package_id WHERE r.id=? AND r.tenant=? AND (?=1 OR r.learner=?)`).get(registrationId,p.tenant,admin?1:0,p.id) as any;
+    if(!r)reject('FORBIDDEN','Authorized cmi5 registration required');const m:CMI5Manifest=JSON.parse(r.manifest), aus=this.outcomes(r.id,m);
+    const sessions=this.db.prepare('SELECT id,au_id,status,created_at,expires FROM cmi5_sessions WHERE registration_id=? ORDER BY created_at DESC,id LIMIT 20').all(r.id) as any[];
+    const statementCount=(this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_statements WHERE registration_id=?').get(r.id) as any).n;
+    return {registrationId:r.id,packageId:r.package_id,title:m.course.title,mode:r.mode,packageState:r.package_state,aus,sessions,statementCount,satisfied:r.mode==='Normal'&&aus.every(a=>a.satisfied),officialLearningChanged:false};
+  }
+  registrations(p:Principal,admin=false,offset=0) {
+    this.store.live(p,admin);if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid registration page');
+    const rows=this.db.prepare(`SELECT r.id,r.learner,r.package_id,r.mode,p.manifest FROM cmi5_registrations r JOIN cmi5_packages p ON p.id=r.package_id WHERE r.tenant=? AND (?=1 OR r.learner=?) ORDER BY r.created_at DESC,r.id`).all(p.tenant,admin?1:0,p.id) as any[];
+    return boundedPage(rows.map(({manifest,...row})=>({...row,title:JSON.parse(manifest).course.title})),offset);
+  }
+  close(p:Principal,id:string) {
+    return this.transaction(()=>{this.store.live(p);const s=this.session(id,false);if(s.tenant!==p.tenant||s.learner!==p.id)reject('FORBIDDEN','Own cmi5 session required');this.abandon(s);return this.report(p,s.registration_id);});
+  }
+}
