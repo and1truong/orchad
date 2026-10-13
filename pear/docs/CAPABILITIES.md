@@ -256,6 +256,12 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-190 adds scoped Statement filters, stored-time ordering and snapshot
+pagination, exact/ids/canonical language-selected formats, validated Activity
+and interaction metadata and HTTP consistency headers. General document/query
+timestamps accept offsets; cmi5 source timestamps remain UTC. Multipart/object
+and exhaustive conformance, official bindings and production are subsequent work.
+
 #144 / ADR-189 adds byte-preserving binary/JSON State and scoped Agent/Activity
 Profiles, cross-registration document scopes, scoped Person/Activity metadata,
 SHA-1 ETags, HEAD/conditional writes and JSON POST merge. Populated schema-52

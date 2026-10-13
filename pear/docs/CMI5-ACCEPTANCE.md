@@ -1,5 +1,15 @@
 # cmi5 acceptance — #144
 
+ADR-190 adds stored-time Statement filters, default reverse/explicit ascending
+order, stable filtered snapshot pagination and exact/ids/canonical formats with
+Accept-Language. Activity/interaction/context metadata is validated before atomic
+acceptance; Consistent-Through/Last-Modified are exposed. Document/query timestamps
+also accept explicit offsets. Local evidence: 26 cmi5 cases, five built journeys
+and build/typecheck/vendor PASS. Schema-53 predecessor regression: all 1,135
+existing Pear cases PASS, zero failed/cancelled/skipped, concurrency 2. Multipart
+attachments, broader allowed objects and exhaustive grammar remain subsequent
+implementation work; no full LRS/cmi5/production gate is closed.
+
 ADR-189 adds binary and JSON State (with/without registration), general Agent
 and Activity Profiles, scoped Person/Activity metadata, byte-exact SHA-1 ETags,
 HEAD/conditional reads/writes, shallow JSON POST and durable schema-53 migration.

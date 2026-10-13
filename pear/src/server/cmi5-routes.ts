@@ -67,6 +67,7 @@ export function createCMI5ContentHost(service:CMI5Service) {
   app.addHook('preHandler',async(req,reply)=>{
     if(!req.url.startsWith('/cmi5/xapi/'))return;
     reply.header('X-Experience-API-Version','1.0.3');
+    if(req.url.startsWith('/cmi5/xapi/statements'))reply.header('X-Experience-API-Consistent-Through',new Date().toISOString());
     if(req.headers['x-experience-api-version']!=='1.0.3')reject('INVALID_ARGUMENT','xAPI 1.0.3 header required');
     service.authenticate(req.headers.authorization,req.url.startsWith('/cmi5/xapi/statements'));
   });
@@ -80,7 +81,7 @@ export function createCMI5ContentHost(service:CMI5Service) {
     return reply.type(file.mime).send(file.bytes);
   });
   app.get('/cmi5/xapi/about',async()=>({version:['1.0.3'],extensions:{'https://orchad.example/profiles/pear-cmi5-quartz/2':'cmi5 local and reviewed remote AU runtime; full LRS/cmi5 conformance and production remain open'}}));
-  app.get('/cmi5/xapi/statements',async(req)=>service.read(req.headers.authorization,req.query));
+  app.get('/cmi5/xapi/statements',async(req,reply)=>{const result=service.read(req.headers.authorization,req.query,req.headers['accept-language']);if(result.stored)reply.header('Last-Modified',new Date(result.stored).toUTCString());return result;});
   app.post('/cmi5/xapi/statements',async(req)=>{if(Object.keys(req.query as any).length)reject('INVALID_ARGUMENT','POST query unsupported');return service.write(req.headers.authorization,req.body);});
   app.put('/cmi5/xapi/statements',async(req,reply)=>{
     const q=req.query as any,b=req.body as any;

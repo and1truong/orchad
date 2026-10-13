@@ -8,6 +8,7 @@ import {scormResourceMime} from './scorm-package-service.ts';
 import {boundedPage, reject} from './errors.ts';
 import {cmi5Invalid, cmi5IRI, cmi5RemoteURL, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
 import {cmi5Document,documentRead,documentETag} from './cmi5-documents.ts';
+import {xapiObject as object,xapiActivity,xapiLanguageMap,xapiLanguage,xapiExtensions,xapiQueryTime,statementFormat} from './cmi5-xapi.ts';
 
 export const cmi5Category = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 export const cmi5MoveCategory = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
@@ -16,9 +17,6 @@ const exp = 'http://adlnet.gov/expapi/verbs/', adl = 'https://w3id.org/xapi/adl/
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const hash = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
 function stable(v: any): string {return Array.isArray(v) ? '[' + v.map(stable).join(',') + ']' : v && typeof v === 'object' ? '{' + Object.keys(v).sort().map(k => JSON.stringify(k)+':'+stable(v[k])).join(',') + '}' : JSON.stringify(v);}
-function object(v: any, keys: string[], required: string[] = []) {
-  if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).some(k => !keys.includes(k)) || required.some(k => !Object.hasOwn(v,k))) cmi5Invalid('unsupported or missing JSON property');
-}
 function timestamp(v: any) {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(v) || !Number.isFinite(Date.parse(v)) || Date.parse(v)>Date.now()+300000 || Date.parse(v)<0) cmi5Invalid('valid UTC timestamp required');
   const normalized = new Date(v).toISOString(); if (normalized.slice(0,19) !== v.slice(0,19)) cmi5Invalid('invalid calendar date'); return normalized;
@@ -203,25 +201,27 @@ export class CMI5Service {
     object(input,['id','actor','verb','object','context','result','timestamp'],['id','actor','verb','object','context','timestamp']);
     if(typeof input.id!=='string'||!uuid.test(input.id)||Buffer.byteLength(JSON.stringify(input))>16*1024)cmi5Invalid('UUID and ≤16 KiB statement required');
     if(stable(input.actor)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Exact launch actor required');
-    object(input.verb,['id','display'],['id']); if(!cmi5IRI(input.verb.id))cmi5Invalid('verb IRI required');
-    object(input.object,['id','objectType','definition'],['id']); if(!cmi5IRI(input.object.id)||input.object.objectType!==undefined&&input.object.objectType!=='Activity')cmi5Invalid('Activity object required');
-    object(input.context,['registration','contextActivities','extensions'],['registration','contextActivities','extensions']);
+    object(input.verb,['id','display'],['id']); if(!cmi5IRI(input.verb.id))cmi5Invalid('verb IRI required');if(input.verb.display!==undefined)xapiLanguageMap(input.verb.display);
+    xapiActivity(input.object);
+    object(input.context,['registration','contextActivities','extensions','language','revision','platform'],['registration','contextActivities','extensions']);
+    if(input.context.language!==undefined&&!xapiLanguage(input.context.language))cmi5Invalid('BCP 47 context language required');
+    for(const key of ['revision','platform'])if(input.context[key]!==undefined&&(typeof input.context[key]!=='string'||input.context[key].length>500))cmi5Invalid('bounded context metadata required');
     const c=input.context; if(c.registration!==s.registration_id||c.extensions?.[cmi5Extension+'sessionid']!==s.id)reject('FORBIDDEN','Exact registration/session required');
     object(c.contextActivities,['parent','grouping','category','other']);
-    for(const values of Object.values(c.contextActivities) as any[])if(!Array.isArray(values)||values.length>32||values.some((v:any)=>!v||!cmi5IRI(v.id)))cmi5Invalid('bounded context activity lists required');
+    for(const values of Object.values(c.contextActivities) as any[]){if(!Array.isArray(values)||values.length>32)cmi5Invalid('bounded context activity lists required');values.forEach(xapiActivity);}
     if(!c.contextActivities.grouping?.some((v:any)=>v.id===s.au.id))reject('FORBIDDEN','Publisher grouping required');
-    if(!c.extensions || typeof c.extensions!=='object'||Array.isArray(c.extensions)||Object.keys(c.extensions).some(k=>!cmi5IRI(k)))cmi5Invalid('IRI extensions required');
+    xapiExtensions(c.extensions);
     const categories=c.contextActivities.category??[], defined=categories.some((v:any)=>v.id===cmi5Category), verb=input.verb.id.startsWith(exp)?input.verb.id.slice(exp.length):input.verb.id;
     if(input.verb.id===exp+'voided')reject('FORBIDDEN','AU credentials cannot void statements');
     const result=input.result??{}; object(result,['score','success','completion','duration','response','extensions']);
     for(const k of ['success','completion'])if(result[k]!==undefined&&typeof result[k]!=='boolean')cmi5Invalid('Boolean result required');
     if(result.duration!==undefined)duration(result.duration);
     if(result.response!==undefined&&(typeof result.response!=='string'||result.response.length>4096))cmi5Invalid('bounded response required');
-    if(result.extensions!==undefined&&(!result.extensions||typeof result.extensions!=='object'||Array.isArray(result.extensions)||Object.keys(result.extensions).some(k=>!cmi5IRI(k))))cmi5Invalid('IRI result extensions required');
+    if(result.extensions!==undefined)xapiExtensions(result.extensions);
     const progress=result.extensions?.['https://w3id.org/xapi/cmi5/result/extensions/progress']; if(progress!==undefined&&(!Number.isInteger(progress)||progress<0||progress>100))cmi5Invalid('progress must be 0–100');
     if(result.score!==undefined) {
       object(result.score,['scaled','raw','min','max']); const score=result.score;
-      if(!Object.keys(score).length||Object.values(score).some(v=>typeof v!=='number'||!Number.isFinite(v))||score.scaled!==undefined&&(score.scaled<(defined?0:-1)||score.scaled>1)||['raw','min','max'].some(k=>score[k]!==undefined&&defined&&!Number.isInteger(score[k]))||score.raw!==undefined&&(score.min===undefined||score.max===undefined||score.raw<score.min||score.raw>score.max)||score.min!==undefined&&score.max!==undefined&&score.min>score.max)cmi5Invalid('invalid score bounds');
+      if(!Object.keys(score).length||Object.values(score).some(v=>typeof v!=='number'||!Number.isFinite(v))||score.scaled!==undefined&&(score.scaled<(defined?0:-1)||score.scaled>1)||['raw','min','max'].some(k=>score[k]!==undefined&&defined&&!Number.isInteger(score[k]))||score.raw!==undefined&&(defined&&(score.min===undefined||score.max===undefined)||score.min!==undefined&&score.raw<score.min||score.max!==undefined&&score.raw>score.max)||score.min!==undefined&&score.max!==undefined&&score.min>=score.max)cmi5Invalid('invalid score bounds');
     }
     if(defined) {
       if(!['initialized','completed','passed','failed','terminated'].includes(verb)||input.verb.id!==exp+verb)cmi5Invalid('AU cannot issue LMS-only or unknown defined verbs');
@@ -286,17 +286,44 @@ export class CMI5Service {
       if(!existing)this.lms(s,'satisfied',undefined,node);
     }
   }
-  read(header:string|undefined,q:any) {
-    const s=this.authenticate(header,true); object(q,['statementId','registration','after','limit']);
+  read(header:string|undefined,q:any,language?:string) {
+    const s=this.authenticate(header,true); object(q,['statementId','voidedStatementId','registration','agent','verb','activity','related_activities','related_agents','since','until','ascending','format','attachments','after','cursor','limit']);
     if(q.registration!==undefined&&q.registration!==s.registration_id)reject('FORBIDDEN','Exact registration required');
-    if(q.statementId!==undefined) {
-      if(typeof q.statementId!=='string'||!uuid.test(q.statementId)||Object.keys(q).length!==1)cmi5Invalid('single UUID query required');
-      const row=this.db.prepare('SELECT * FROM cmi5_statements WHERE id=? AND registration_id=?').get(q.statementId.toLowerCase(),s.registration_id) as any;
-      if(!row)reject('NOT_FOUND','Scoped statement unavailable');return this.stored(row);
+    const bool=(key:string)=>{if(q[key]!==undefined&&!['true','false'].includes(q[key]))cmi5Invalid('Boolean query must be true or false');return q[key]==='true';};
+    const ascending=q.ascending===undefined&&q.after!==undefined?true:bool('ascending'),related=bool('related_activities');bool('related_agents');
+    if(bool('attachments'))cmi5Invalid('multipart statement attachments are not implemented');
+    const format=q.format??'exact';if(!['exact','ids','canonical'].includes(format))cmi5Invalid('statement format invalid');
+    const present=(row:any)=>statementFormat(this.stored(row),format,language);
+    if(q.statementId!==undefined||q.voidedStatementId!==undefined) {
+      const id=q.statementId??q.voidedStatementId;
+      if(typeof id!=='string'||!uuid.test(id)||q.statementId!==undefined&&q.voidedStatementId!==undefined||Object.keys(q).some(k=>!['statementId','voidedStatementId','format','attachments'].includes(k)))cmi5Invalid('single UUID query required');
+      const row=q.voidedStatementId===undefined?this.db.prepare('SELECT * FROM cmi5_statements WHERE id=? AND registration_id=?').get(id.toLowerCase(),s.registration_id) as any:undefined;
+      if(!row)reject('NOT_FOUND','Scoped statement unavailable');return present(row);
     }
-    const after=Number(q.after??0),limit=Number(q.limit??20);if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>20)cmi5Invalid('invalid statement page');
-    const rows=this.db.prepare('SELECT * FROM cmi5_statements WHERE registration_id=? AND sequence>? ORDER BY sequence LIMIT ?').all(s.registration_id,after,limit+1) as any[];
-    const page=rows.slice(0,limit);return {statements:page.map(row=>this.stored(row)),more:rows.length>limit?'/cmi5/xapi/statements?after='+page.at(-1).sequence+'&limit='+limit:''};
+    if(q.agent!==undefined)this.agentQuery(s,q.agent);
+    for(const key of ['verb','activity'])if(q[key]!==undefined&&!cmi5IRI(q[key]))cmi5Invalid('IRI query required');
+    const since=xapiQueryTime(q.since),until=xapiQueryTime(q.until);
+    const integer=(v:any)=>typeof v==='number'?Number.isSafeInteger(v)&&v>=0:typeof v==='string'&&/^(0|[1-9]\d{0,9})$/.test(v);
+    if(!integer(q.after??0)||!integer(q.limit??0))cmi5Invalid('invalid statement page');
+    const after=Number(q.after??0),limit=Math.min(Number(q.limit??0)||20,20);
+    const max=Number((this.db.prepare('SELECT COALESCE(MAX(sequence),0) AS n FROM cmi5_statements WHERE registration_id=?').get(s.registration_id) as any).n);
+    let ceiling=max,lastTime:string|undefined,lastSequence:number|undefined;
+    const filter=hash(stable(Object.fromEntries(Object.entries(q).filter(([key])=>key!=='cursor').map(([key,value])=>[key,String(value)]))));
+    if(q.cursor!==undefined) {
+      let cursor:any;try{if(typeof q.cursor!=='string'||q.cursor.length>256||!/^[A-Za-z0-9_-]+$/.test(q.cursor))throw Error();cursor=parseUniqueJSON(Buffer.from(q.cursor,'base64url').toString('utf8'));}catch{cmi5Invalid('invalid statement cursor');}
+      if(!Array.isArray(cursor)||cursor.length!==5||cursor[0]!==filter||cursor[1]!==s.registration_id||!integer(cursor[2])||cursor[2]>max||typeof cursor[3]!=='string'||xapiQueryTime(cursor[3])!==cursor[3]||!integer(cursor[4])||cursor[4]>cursor[2])cmi5Invalid('statement cursor does not match query');
+      [,,ceiling,lastTime,lastSequence]=cursor;
+    }
+    const where=['registration_id=?','sequence<=?','sequence>?'],args:any[]=[s.registration_id,ceiling,after];
+    if(since){where.push('stored>?');args.push(since);}if(until){where.push('stored<=?');args.push(until);}
+    if(q.verb!==undefined){where.push("json_extract(statement,'$.verb.id')=?");args.push(q.verb);}
+    if(q.activity!==undefined){where.push("(json_extract(statement,'$.object.id')=?"+(related?" OR EXISTS(SELECT 1 FROM json_each(statement,'$.context.contextActivities') AS groups,json_each(groups.value) AS activity WHERE json_extract(activity.value,'$.id')=?)":"")+")");args.push(q.activity);if(related)args.push(q.activity);}
+    const direction=ascending?'ASC':'DESC',comparison=ascending?'>':'<';
+    if(lastTime!==undefined){where.push(`(stored${comparison}? OR stored=? AND sequence${comparison}?)`);args.push(lastTime,lastTime,lastSequence);}
+    const rows=this.db.prepare(`SELECT * FROM cmi5_statements WHERE ${where.join(' AND ')} ORDER BY stored ${direction},sequence ${direction} LIMIT ?`).all(...args,limit+1) as any[];
+    const page=rows.slice(0,limit),next=new URLSearchParams(q);next.delete('cursor');
+    if(rows.length>limit){const last=page.at(-1);next.set('cursor',Buffer.from(JSON.stringify([filter,s.registration_id,ceiling,last.stored,last.sequence])).toString('base64url'));}
+    return {statements:page.map(present),more:rows.length>limit?'/cmi5/xapi/statements?'+next:''};
   }
   evidence(p:Principal,registrationId:string,q:any,admin=false) {
     this.report(p,registrationId,admin);object(q,['after','limit']);

@@ -3,6 +3,7 @@ import type {DatabaseSync} from 'node:sqlite';
 import {parseUniqueJSON} from '../shared/json-unique.ts';
 import {cmi5Invalid} from './cmi5-package.ts';
 import {reject} from './errors.ts';
+import {xapiQueryTime} from './cmi5-xapi.ts';
 
 export const documentETag=(bytes:Buffer|string)=>'"'+createHash('sha1').update(bytes).digest('hex')+'"';
 const jsonType=(type:string)=>type.split(';')[0]!.trim().toLowerCase()==='application/json';
@@ -15,9 +16,7 @@ export function documentRead(body:any,type:string,etag:string,updated:string|und
   return {body,contentType:type,etag,updated,...(preconditionFailed?{preconditionFailed:true}:notModified?{notModified:true}:{})};
 }
 export function documentSince(value:unknown) {
-  if(value===undefined)return undefined;
-  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)||!Number.isFinite(Date.parse(value))||new Date(value).toISOString().slice(0,19)!==value.slice(0,19))cmi5Invalid('valid UTC document timestamp required');
-  return new Date(value).toISOString();
+  return xapiQueryTime(value);
 }
 
 // Shared HTTP document semantics for four real storage scopes. SQL identifiers
