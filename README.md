@@ -5,6 +5,14 @@ Collection of Agent App Bridge 0.1 POCs: `lime/` (Chrome MV3 host), `coconut/`
 portable agent client), `pear/` (independent learning app, issue #49). `acceptance/` holds the canonical interop scenario
 every POC executes — see `acceptance/README.md`.
 
+## Consumer releases
+
+Applications such as OMD can consume pinned Coconut desktop-kit, Bridge package
+and Lime extension/companion artifacts without copying this monorepo. See
+[release/README.md](release/README.md) for packaging, clean consumer checks and
+the draft prerelease workflow. These are preview integration inputs, not finished
+application installers.
+
 ## Shared contract
 
 The root `contract` file is the only hand-edited copy of the binding spec.
