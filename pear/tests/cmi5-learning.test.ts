@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {CURRENT_SCHEMA_VERSION} from '../src/server/database.ts';
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
@@ -66,8 +67,8 @@ test('bound binary State and an immutable completion proof survive SQLite reopen
 test('a genuinely populated schema-53 upgrade retains unbound registrations and binary State without inventing an official binding',async()=>{
   const dir=mkdtempSync(join(tmpdir(),'cmi5-schema53-')),path=join(dir,'db.sqlite');let f=await cmi5Fixture(path);try {
     const pkg=await f.publish(),launch=f.launch(pkg.packageId),r=f.runtime(launch),q={...r.query,stateId:'legacy-binary'};f.cmi5.state(r.header,q,'PUT',Buffer.from([0,255]),{'content-type':'application/octet-stream'});const registration=f.db.prepare('SELECT * FROM cmi5_registrations').get();
-    f.db.exec('DROP TABLE cmi5_completion_proofs; DROP TABLE cmi5_learning_bindings; DELETE FROM schema_version WHERE version=54');await f.close();f=await cmi5Fixture(path);
-    assert.deepEqual(f.db.prepare('SELECT * FROM cmi5_registrations').get(),registration);assert.deepEqual(f.cmi5.state(r.header,q,'GET',undefined).raw,Buffer.from([0,255]));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM cmi5_learning_bindings').get()!.n,0);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM cmi5_completion_proofs').get()!.n,0);assert.equal(f.db.prepare('SELECT MAX(version) AS n FROM schema_version').get()!.n,54);assert.deepEqual(f.db.prepare('PRAGMA foreign_key_check').all(),[]);
+    f.db.exec('DROP TABLE cmi5_attachments; DROP TABLE cmi5_completion_proofs; DROP TABLE cmi5_learning_bindings; DELETE FROM schema_version WHERE version>=54');await f.close();f=await cmi5Fixture(path);
+    assert.deepEqual(f.db.prepare('SELECT * FROM cmi5_registrations').get(),registration);assert.deepEqual(f.cmi5.state(r.header,q,'GET',undefined).raw,Buffer.from([0,255]));assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM cmi5_learning_bindings').get()!.n,0);assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM cmi5_completion_proofs').get()!.n,0);assert.equal(f.db.prepare('SELECT MAX(version) AS n FROM schema_version').get()!.n,CURRENT_SCHEMA_VERSION);assert.deepEqual(f.db.prepare('PRAGMA foreign_key_check').all(),[]);
   }finally{await f.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('a prior failed termination cannot authorize a new in-flight passing session before its own accepted termination',async()=>{

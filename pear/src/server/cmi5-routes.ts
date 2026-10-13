@@ -3,6 +3,7 @@ import {failure} from '@orchard/bridge-contract';
 import type {Principal} from '../shared/model.ts';
 import {parseUniqueJSON} from '../shared/json-unique.ts';
 import {CMI5Service} from './cmi5.ts';
+import {attachmentLimits,parseCMI5Multipart} from './cmi5-attachments.ts';
 import {contentHostOrigins} from './scorm-content-host.ts';
 import {packageLimits} from './scorm-package-reader.ts';
 import {DomainError, reject} from './errors.ts';
@@ -44,6 +45,7 @@ export function createCMI5ContentHost(service:CMI5Service) {
     try{done(null,!String(body)&&(req.url.startsWith('/cmi5/fetch/')||req.method==='DELETE')?undefined:parseUniqueJSON(String(body)));}catch{const e:any=Error('Invalid JSON');e.statusCode=400;done(e);}
   });
   app.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string'},(_req,body,done)=>done(null,body));
+  app.addContentTypeParser('multipart/mixed',{parseAs:'buffer',bodyLimit:attachmentLimits.transmission},(req,body,done)=>{try{done(null,parseCMI5Multipart(body as Buffer,req.headers['content-type']!));}catch(e){done(e as Error);}});
   app.addHook('onRequest',async(req,reply)=>{
     reply.header('Cache-Control','no-store').header('Referrer-Policy','no-referrer').header('X-Content-Type-Options','nosniff')
       .header('Cross-Origin-Resource-Policy','same-origin').header('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()')
@@ -83,12 +85,13 @@ export function createCMI5ContentHost(service:CMI5Service) {
     return reply.type(file.mime).send(file.bytes);
   });
   app.get('/cmi5/xapi/about',async()=>({version:['1.0.3'],extensions:{'https://orchad.example/profiles/pear-cmi5-quartz/2':'cmi5 local and reviewed remote AU runtime; full LRS/cmi5 conformance and production remain open'}}));
-  app.get('/cmi5/xapi/statements',async(req,reply)=>{const result=service.read(req.headers.authorization,req.query,req.headers['accept-language']);if(result.stored)reply.header('Last-Modified',new Date(result.stored).toUTCString());return result;});
-  app.post('/cmi5/xapi/statements',async(req)=>{if(Object.keys(req.query as any).length)reject('INVALID_ARGUMENT','POST query unsupported');return service.write(req.headers.authorization,req.body);});
-  app.put('/cmi5/xapi/statements',async(req,reply)=>{
-    const q=req.query as any,b=req.body as any;
+  app.get('/cmi5/xapi/statements',async(req,reply)=>{const result=service.read(req.headers.authorization,req.query,req.headers['accept-language']);if(result.stored)reply.header('Last-Modified',new Date(result.stored).toUTCString());if((req.query as any).attachments==='true'){const mixed=service.multipart(req.headers.authorization,result);return reply.type(mixed.contentType).send(mixed.bytes);}return result;});
+  const packet=(req:any)=>req.headers['content-type']?.split(';')[0]?.trim().toLowerCase()==='multipart/mixed'?req.body:{body:req.body,parts:undefined};
+  app.post('/cmi5/xapi/statements',{bodyLimit:attachmentLimits.transmission},async(req)=>{if(Object.keys(req.query as any).length)reject('INVALID_ARGUMENT','POST query unsupported');const p=packet(req);return service.write(req.headers.authorization,p.body,p.parts);});
+  app.put('/cmi5/xapi/statements',{bodyLimit:attachmentLimits.transmission},async(req,reply)=>{
+    const q=req.query as any,p=packet(req),b=p.body;
     if(Object.keys(q).length!==1||typeof q.statementId!=='string'||!b||Array.isArray(b)||b.id!==undefined&&(typeof b.id!=='string'||b.id.toLowerCase()!==q.statementId.toLowerCase()))reject('INVALID_ARGUMENT','Matching statementId required');
-    service.write(req.headers.authorization,{...b,id:q.statementId});return reply.code(204).send();
+    service.write(req.headers.authorization,{...b,id:q.statementId},p.parts);return reply.code(204).send();
   });
   registerCMI5Documents(app,service);
   app.get('/cmi5/xapi/agents',async(req)=>service.agent(req.headers.authorization,req.query));

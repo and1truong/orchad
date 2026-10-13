@@ -256,6 +256,12 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-193 adds bounded raw multipart Statement attachments with verified
+SHA-2, exact binary bytes, registration-bound immutable storage, conditional
+JSON/fileUrl transport, deduplication and transactional quota/audit protection.
+The actual remote browser round-trip uses the same scoped CORS/Basic credential.
+Broader allowed objects and exhaustive external conformance/production remain open.
+
 #144 / ADR-192 adds exact cmi5 course/item enrollment proofs with immutable
 package/policy pins and shared live prerequisite/audience/award/cycle/retake
 resolution. Accepted Normal termination plus every AU's moveOn gates official
