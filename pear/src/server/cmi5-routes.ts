@@ -16,6 +16,7 @@ export async function registerCMI5(app:FastifyInstance,service:CMI5Service,enabl
   app.get('/api/cmi5/packages',async(req,reply)=>{try{const q=req.query as any;return {...service.list(principal(req),q.author==='true',Number(q.offset??0)),runtimeEnabled:enabled};}catch(e){return error(e,reply);}});
   app.get('/api/cmi5/packages/:id/activities',async(req,reply)=>{try{const q=req.query as any;return service.activities(principal(req),(req.params as any).id,Number(q.offset??0),q.author==='true');}catch(e){return error(e,reply);}});
   app.get('/api/cmi5/registrations',async(req,reply)=>{try{const q=req.query as any;return service.registrations(principal(req),q.admin==='true',Number(q.offset??0));}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/learning-context',async(req,reply)=>{try{const {offset,...binding}=req.query as any;return {...service.learningContext(principal(req),binding,Number(offset??0)),runtimeEnabled:enabled};}catch(e){return error(e,reply);}});
   app.get('/api/cmi5/registrations/:id',async(req,reply)=>{try{return service.report(principal(req),(req.params as any).id,(req.query as any).admin==='true');}catch(e){return error(e,reply);}});
   app.get('/api/cmi5/registrations/:id/statements',async(req,reply)=>{try{const {admin,...q}=req.query as any;return service.evidence(principal(req),(req.params as any).id,q,admin==='true');}catch(e){return error(e,reply);}});
   app.post('/api/cmi5/review',{preHandler:guard},async(req,reply)=>{try{return service.review(principal(req),req.body);}catch(e){return error(e,reply);}});

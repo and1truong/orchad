@@ -1,4 +1,5 @@
 import {test} from 'node:test';
+import {CURRENT_SCHEMA_VERSION} from '../src/server/database.ts';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {mkdtempSync,rmSync} from 'node:fs';
@@ -67,6 +68,6 @@ test('real schema-52 migration preserves existing JSON State and converts its ET
     const pkg=await s.publish(),r=s.runtime(s.launch(pkg.packageId)),q={...r.query,stateId:'legacy'};s.cmi5.state(r.header,q,'PUT',{original:'Tiếng Việt'});
     const before=s.db.prepare('SELECT body,registration_id,au_id,state_id,updated_at FROM cmi5_state').get() as any,registrations=s.db.prepare('SELECT * FROM cmi5_registrations').all();
     s.db.exec('DROP TABLE cmi5_documents; ALTER TABLE cmi5_state DROP COLUMN bytes; ALTER TABLE cmi5_state DROP COLUMN content_type; DELETE FROM schema_version WHERE version=53');s.db.prepare('UPDATE cmi5_state SET etag=?').run('"'+createHash('sha256').update(before.body).digest('hex')+'"');
-    await s.close();s=await cmi5Fixture(path);assert.deepEqual(s.db.prepare('SELECT body,registration_id,au_id,state_id,updated_at FROM cmi5_state').get(),before);assert.deepEqual(s.db.prepare('SELECT * FROM cmi5_registrations').all(),registrations);assert.equal(s.cmi5.state(r.header,q,'GET',null).etag,etag(before.body));assert.equal(s.db.prepare('SELECT MAX(version) AS n FROM schema_version').get()!.n,53);
+    await s.close();s=await cmi5Fixture(path);assert.deepEqual(s.db.prepare('SELECT body,registration_id,au_id,state_id,updated_at FROM cmi5_state').get(),before);assert.deepEqual(s.db.prepare('SELECT * FROM cmi5_registrations').all(),registrations);assert.equal(s.cmi5.state(r.header,q,'GET',null).etag,etag(before.body));assert.equal(s.db.prepare('SELECT MAX(version) AS n FROM schema_version').get()!.n,CURRENT_SCHEMA_VERSION);
   }finally{await s.close();rmSync(dir,{recursive:true,force:true});}
 });

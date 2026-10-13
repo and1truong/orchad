@@ -4,7 +4,7 @@ import { readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createHash, randomBytes, scryptSync } from "node:crypto";
 import { courses } from "./seed.ts";
-export const CURRENT_SCHEMA_VERSION = 53;
+export const CURRENT_SCHEMA_VERSION = 54;
 export function openDatabase(path: string, seed = false) {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
@@ -363,6 +363,11 @@ export function openDatabase(path: string, seed = false) {
       for(const row of db.prepare('SELECT * FROM cmi5_state').all() as any[])update.run('"'+createHash('sha1').update(row.body).digest('hex')+'"',row.registration_id,row.au_id,row.state_id);
       db.exec("COMMIT");
     }catch(e){db.exec("ROLLBACK");db.close();throw e;}
+  }
+  if (!db.prepare("SELECT 1 FROM schema_version WHERE version=54").get()) {
+    db.exec("BEGIN IMMEDIATE");
+    try {db.exec(readFileSync(new URL("../../migrations/054.sql",import.meta.url),"utf8"));db.exec("COMMIT");}
+    catch(e){db.exec("ROLLBACK");db.close();throw e;}
   }
   if (seed) {
     db.exec("BEGIN IMMEDIATE");

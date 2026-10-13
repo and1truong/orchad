@@ -1,4 +1,5 @@
 import {SCORMReferenceEditor, SCORMLearningPlayer} from './scorm-learning.tsx';
+import {CMI5ReferenceEditor,CMI5LearningPlayer} from './cmi5-learning.tsx';
 import {translateUI} from "./i18n.ts";
 import { DiscoveryMetadataEditor } from "./discovery-metadata.tsx";
 import { StudyTimer } from "./study-timer.tsx";
@@ -160,6 +161,7 @@ export function ContentLibrary({
                     ...item,
                     kind: e.target.value as ContentItem["kind"],
                     scorm: undefined,
+                    cmi5: undefined,
                     captions: undefined,
                     assetId: undefined,
                     url: undefined,
@@ -173,10 +175,12 @@ export function ContentLibrary({
                 <option value="audio">{translateUI("Uploaded audio")}</option>
                 <option value="document">{translateUI("Uploaded PDF")}</option>
                 <option value="scorm">SCORM package</option>
+                <option value="cmi5">cmi5 package</option>
                 <option value="interactive">{translateUI("Interactive HTML")}</option>
               </select>
             </label>
             {item.kind === 'scorm' && <SCORMReferenceEditor session={session} value={item.scorm} onChange={scorm => setItem({...item, scorm})} />}
+            {item.kind==='cmi5'&&<CMI5ReferenceEditor session={session} value={item.cmi5} onChange={cmi5=>setItem({...item,cmi5})}/>}
             <label>{translateUI("Item text")}<textarea
                 required
                 maxLength={2500}
@@ -287,7 +291,7 @@ export function StandaloneReader({
           {translateUI(item.status === "completed" ? "Reading confirmed" : "Tracked · In progress")}
         </p>
       )}
-      {item.kind !== "scorm" && item.itemEnrollmentId && item.status !== "completed" && onComplete && (
+      {!['scorm','cmi5'].includes(item.kind) && item.itemEnrollmentId && item.status !== "completed" && onComplete && (
         <fieldset disabled={busy}>
           <legend>{translateUI("Confirm reading")}</legend>
           <label className="choice">
@@ -300,6 +304,7 @@ export function StandaloneReader({
         </fieldset>
       )}
       {item.kind === 'scorm' && item.itemEnrollmentId && scormRun && onSCORMSaved && <SCORMLearningPlayer key={item.itemEnrollmentId} session={session} binding={{itemEnrollmentId: item.itemEnrollmentId}} busy={busy} run={scormRun} onSaved={onSCORMSaved} />}
+      {item.kind==='cmi5'&&item.itemEnrollmentId&&scormRun&&onSCORMSaved&&<CMI5LearningPlayer key={item.itemEnrollmentId} session={session} binding={{itemEnrollmentId:item.itemEnrollmentId}} busy={busy} run={scormRun} onSaved={onSCORMSaved}/>}
       <UploadedMedia
         session={session}
         content={item}

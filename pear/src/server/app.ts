@@ -71,9 +71,9 @@ export async function createApp(opts: {
   const cmi5Origins = opts.cmi5ContentOrigin ? contentHostOrigins(opts.origin, opts.cmi5ContentOrigin) : undefined;
   if (cmi5Origins && scormOrigins && new URL(cmi5Origins.contentOrigin).host === new URL(scormOrigins.contentOrigin).host) throw Error('cmi5 and SCORM content require separate listeners');
   if(opts.cmi5RemoteOrigins?.length&&!cmi5Origins)throw Error('cmi5 remote origins require a configured content listener');
-  const cmi5 = new CMI5Service(opts.db, opts.origin, cmi5Origins?.contentOrigin ?? 'http://localhost:4316',opts.cmi5RemoteOrigins);
-  const cmi5ContentApp = cmi5Origins ? createCMI5ContentHost(cmi5) : undefined;
   const learningService = new LearningService(opts.db,opts.origin,opts.catalogAdapters);
+  const cmi5 = new CMI5Service(opts.db, opts.origin, cmi5Origins?.contentOrigin ?? 'http://localhost:4316',opts.cmi5RemoteOrigins,learningService);
+  const cmi5ContentApp = cmi5Origins ? createCMI5ContentHost(cmi5) : undefined;
   const scormPlayer = opts.scormContent ? new SCORMPlayerService(opts.db, new SCORMLearningBindings(opts.db, learningService)) : undefined;
   const scormContentApp = scormOrigins && scormPlayer ? createSCORMContentHost({pearOrigin: opts.origin, contentOrigin: scormOrigins.contentOrigin, player: scormPlayer, runtimeBundle: opts.scormContent!.runtimeBundle}) : undefined;
   if (parsed.origin !== opts.origin || parsed.username || parsed.password)

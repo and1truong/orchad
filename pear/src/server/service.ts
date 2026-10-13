@@ -228,15 +228,22 @@ export class LearningService {
     return e;
   }
   scormCourseContext(p: Principal, enrollmentId: string, lessonId: string) {
+    return this.packageCourseContext(p,enrollmentId,lessonId,'scorm');
+  }
+  cmi5CourseContext(p: Principal, enrollmentId: string, lessonId: string) {
+    return this.packageCourseContext(p,enrollmentId,lessonId,'cmi5');
+  }
+  private packageCourseContext<K extends 'scorm'|'cmi5'>(p:Principal,enrollmentId:string,lessonId:string,kind:K) {
     this.resourceAccess(p, {requestId: 'scorm', documentId: this.personal(p), toolName: 'human_complete_lesson', arguments: {enrollmentId, lessonId}, expectedRevision: null, idempotencyKey: null});
     const e = this.enrollment(p, enrollmentId), v = this.version(e.course_id, e.version), l = v.lessons.find(l => l.id === lessonId);
     new ContentAccess(this.db).current(p, 'course', e.course_id);
     if (l?.contentRef) new ContentAccess(this.db).current(p, 'item', l.contentRef.itemId);
-    if (!l || l.kind !== 'scorm' || !l.scorm) reject('FORBIDDEN', 'Exact enrolled SCORM lesson required');
+    if (!l || l.kind !== kind || !l[kind]) reject('FORBIDDEN', 'Exact enrolled '+(kind==='scorm'?'SCORM':'cmi5')+' lesson required');
     if (requiredLessonIds(v, l).some(id => !JSON.parse(e.completed_lessons).includes(id))) reject('FORBIDDEN', 'Complete prerequisite lessons first');
     const award = e.award_binding_id ? this.db.prepare('SELECT award_enrollment_id,criterion_path FROM award_course_bindings WHERE id=?').get(e.award_binding_id) as any : null;
-    return {bindingKey: 'course:' + e.id + ':' + l.id, reference: l.scorm, courseEnrollmentId: e.id, lessonId: l.id,
-      context: {enrollmentId: e.id, courseId: e.course_id, version: e.version, assignmentCycleId: e.assignment_cycle_id ?? null, awardBindingId: e.award_binding_id ?? null, awardEnrollmentId: award?.award_enrollment_id ?? null, criterionPath: award?.criterion_path ?? null, reference: l.scorm}};
+    const reference=l[kind] as NonNullable<Lesson[K]>;
+    return {bindingKey: 'course:' + e.id + ':' + l.id, reference, courseEnrollmentId: e.id, lessonId: l.id,
+      context: {enrollmentId: e.id, courseId: e.course_id, version: e.version, assignmentCycleId: e.assignment_cycle_id ?? null, awardBindingId: e.award_binding_id ?? null, awardEnrollmentId: award?.award_enrollment_id ?? null, criterionPath: award?.criterion_path ?? null, reference}};
   }
   private attempt(p: Principal, id: string) {
     const a = this.db
@@ -564,6 +571,7 @@ export class LearningService {
       completed_lessons: decode(e.completed_lessons),
       certificateId: row?.id ?? null,
       scormCompletions: this.db.prepare('SELECT b.lesson_id AS lessonId,r.package_id AS packageId,r.version,v.sha256,p.projected_at AS completedAt FROM scorm_completion_proofs p JOIN scorm_learning_bindings b ON b.registration_id=p.registration_id AND b.tenant=p.tenant JOIN scorm_registrations r ON r.id=p.registration_id AND r.tenant=p.tenant JOIN scorm_engine_versions v ON v.package_id=r.package_id AND v.version=r.version AND v.tenant=r.tenant WHERE b.course_enrollment_id=? AND p.tenant=? AND r.learner=?').all(e.id,e.tenant,e.learner),
+      cmi5Completions: this.db.prepare('SELECT b.lesson_id AS lessonId,r.package_id AS packageId,k.sha256,p.projected_at AS completedAt FROM cmi5_completion_proofs p JOIN cmi5_learning_bindings b ON b.registration_id=p.registration_id AND b.tenant=p.tenant JOIN cmi5_registrations r ON r.id=p.registration_id AND r.tenant=p.tenant JOIN cmi5_packages k ON k.id=r.package_id WHERE b.course_enrollment_id=? AND p.tenant=? AND r.learner=?').all(e.id,e.tenant,e.learner),
       overdue:
         e.status !== "completed" &&
         !!e.due_date &&
@@ -742,6 +750,7 @@ export class LearningService {
           title: l.title,
           kind: l.kind,
           ...(source === 'human' && l.scorm ? {scorm: l.scorm} : {}),
+          ...(source === 'human' && l.cmi5 ? {cmi5:l.cmi5} : {}),
           text: l.text,
           submission: source === "human" ? (l.submission ?? null) : null,
           sessions: source === "human" ? (l.sessions?.map(s=>this.blended.learnerSession(e,s)) ?? null) : null,
@@ -890,8 +899,14 @@ export class LearningService {
   }
   private validateMedia(
     p: Principal,
-    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId" | "captions" | "scorm">,
+    l: Pick<Lesson, "kind" | "url" | "transcript" | "assetId" | "captions" | "scorm" | "cmi5">,
   ) {
+    if(l.kind==='cmi5') {
+      const ref=l.cmi5;
+      if(!ref||l.scorm||l.assetId||l.url||l.captions||!this.db.prepare("SELECT 1 FROM cmi5_packages WHERE id=? AND tenant=? AND sha256=? AND state='published'").get(ref.packageId,p.tenant,ref.sha256))reject('INVALID_ARGUMENT','Published exact cmi5 package reference required');
+      return;
+    }
+    if(l.cmi5)reject('INVALID_ARGUMENT','cmi5 reference requires cmi5 content');
     if (l.kind === 'scorm') {
       const ref = l.scorm;
       if (!ref || l.assetId || l.url || l.captions || !this.db.prepare("SELECT 1 FROM scorm_engine_versions WHERE package_id=? AND version=? AND tenant=? AND sha256=? AND state='published'").get(ref.packageId,ref.version,p.tenant,ref.sha256)) reject('INVALID_ARGUMENT','Published exact SCORM package reference required');
@@ -972,6 +987,8 @@ export class LearningService {
       l.kind = item.kind;
       delete l.scorm;
       if (item.scorm) l.scorm = structuredClone(item.scorm);
+      delete l.cmi5;
+      if(item.cmi5)l.cmi5=structuredClone(item.cmi5);
       delete l.assetId;
       if (item.assetId) l.assetId = item.assetId;
       delete l.captions;
@@ -982,7 +999,7 @@ export class LearningService {
       if (item.transcript) l.transcript = item.transcript;
       c.aiProcessingAllowed = c.aiProcessingAllowed && item.aiProcessingAllowed;
     }
-    c.completionPolicy = c.lessons.some(l => l.kind === 'scorm') ? 'scorm_evidence_and_quiz' : c.lessons.some((l) =>
+    c.completionPolicy = c.lessons.some(l=>l.kind==='cmi5')?'cmi5_and_quiz':c.lessons.some(l => l.kind === 'scorm') ? 'scorm_evidence_and_quiz' : c.lessons.some((l) =>
       ["submission", "event"].includes(l.kind),
     )
       ? "human_attestation_review_and_quiz"
@@ -1215,10 +1232,10 @@ export class LearningService {
           v = this.version(e.course_id, e.version),
           l = v.lessons.find((l) => l.id === a.lessonId);
         if (!l) reject("NOT_FOUND", "Lesson unavailable");
-        if (["submission", "event", "scorm"].includes(l.kind))
+        if (["submission", "event", "scorm", "cmi5"].includes(l.kind))
           reject(
             "FORBIDDEN",
-            "Completion requires authorized review or accepted SCORM evidence",
+            "Completion requires authorized review or accepted SCORM evidence or cmi5 evidence",
           );
         const completed = decode(e.completed_lessons);
         if (requiredLessonIds(v, l).some((id) => !completed.includes(id)))

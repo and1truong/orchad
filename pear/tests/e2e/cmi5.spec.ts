@@ -1,7 +1,8 @@
 import {test,expect,type Page} from '@playwright/test';
 import {resolve} from 'node:path';
 import {mkdirSync,readFileSync} from 'node:fs';
-import {fixture} from '../helpers.ts';
+import {fixture,data} from '../helpers.ts';
+import {courses} from '../../src/server/seed.ts';
 import {createApp} from '../../src/server/app.ts';
 import {cmi5XML,cmi5ZIP} from '../cmi5-fixture.ts';
 import {standaloneCMI5} from '../cmi5-packaging-fixture.ts';
@@ -98,5 +99,17 @@ test('built admin waives two AUs and the learner sees durable reasons and a Revi
     await expect(region.getByLabel('cmi5 report')).toContainText('Waived: Equivalent Outside Activity');await expect(region.getByRole('button',{name:'Waive Introduction',exact:true})).toHaveCount(0);
     await region.getByLabel("I consent to this cmi5 activity's reported tracking.",{exact:true}).check();await region.getByRole('button',{name:'Review Introduction',exact:true}).click();const frame=page.frameLocator('iframe[title="cmi5 activity"]');await expect(frame.getByRole('status')).toHaveText('Ready');await frame.getByRole('button',{name:'Complete activity',exact:true}).click();await expect(frame.getByRole('status')).toHaveText('Statement rejected: 400');
     expect(s.db.prepare("SELECT COUNT(*) AS n FROM cmi5_statements WHERE source='au' AND verb='completed'").get()!.n).toBe(0);expect(s.db.prepare("SELECT COUNT(*) AS n FROM cmi5_statements WHERE source='lms' AND verb='waived'").get()!.n).toBe(2);expect(s.db.prepare('SELECT COUNT(*) AS n FROM certificates').get()!.n).toBe(0);
+  }finally{await page.close();await s.close();}
+});
+test('built enrolled cmi5 AUs project one exact lesson proof and the learner must still pass the real Pear quiz for a certificate',async({page})=>{
+  const s=await setup(4446);try {
+    const pkg=await s.publish(),course={...structuredClone(courses['learning-vi']),title:'Original cmi5 enrolled course',lessons:[{id:'package',title:'Original cmi5 package lesson',text:'Complete the original AUs',kind:'cmi5',prerequisiteIds:[],cmi5:{packageId:pkg.packageId,sha256:pkg.sha256,allowWaivers:false}}]};
+    data(s.call('editor','learning_update_course',{courseId:'learning-vi',course}));data(s.call('editor','learning_publish_course',{courseId:'learning-vi'}));const enrollment=data(s.call('learner-a','learning_enroll',{courseId:'learning-vi'}));
+    await login(page,s.origin,'learner-a');await page.getByRole('button',{name:'My learning',exact:true}).click();await page.locator('.learning-row').filter({has:page.getByRole('heading',{name:course.title,exact:true})}).getByRole('button',{name:'Continue learning',exact:true}).click();
+    const player=page.getByRole('region',{name:'Enrolled cmi5 player',exact:true}),frame=page.frameLocator('iframe[title="Enrolled cmi5 activity"]');await expect(page.getByRole('button',{name:'I have studied this lesson',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'Start assessment',exact:true})).toBeDisabled();
+    await player.getByLabel('I consent to cmi5 progress tracking for this enrollment.',{exact:true}).check();await player.getByRole('button',{name:'Play or resume Introduction',exact:true}).click();await expect(frame.getByRole('status')).toHaveText('Ready');await frame.getByRole('button',{name:'Complete activity',exact:true}).click();await expect(frame.getByRole('status')).toHaveText('Saved and terminated');expect(s.db.prepare('SELECT COUNT(*) AS n FROM cmi5_completion_proofs').get()!.n).toBe(0);
+    await player.getByRole('button',{name:'Close enrolled cmi5 activity',exact:true}).press('Enter');await player.getByRole('button',{name:'Play or resume Practice',exact:true}).press('Enter');await expect(frame.getByRole('status')).toHaveText('Ready');await frame.getByRole('button',{name:'Complete activity',exact:true}).click();await expect(frame.getByRole('status')).toHaveText('Saved and terminated');await expect(player).toContainText('cmi5 completion accepted.');
+    await player.getByRole('button',{name:'Close enrolled cmi5 activity',exact:true}).press('Enter');expect(s.db.prepare('SELECT COUNT(*) AS n FROM cmi5_completion_proofs').get()!.n).toBe(1);expect(s.db.prepare('SELECT COUNT(*) AS n FROM certificates').get()!.n).toBe(0);await page.getByRole('button',{name:'Start assessment',exact:true}).press('Enter');await page.getByRole('radio',{name:/Tự giải thích rồi đối chiếu/}).check();await page.getByRole('button',{name:'Confirm and submit my answers',exact:true}).click();
+    await expect.poll(()=>s.db.prepare('SELECT COUNT(*) AS n FROM certificates').get()!.n).toBe(1);expect(JSON.parse(String(s.db.prepare('SELECT completed_lessons FROM enrollments WHERE id=?').get(enrollment.enrollmentId)!.completed_lessons))).toEqual(['package']);
   }finally{await page.close();await s.close();}
 });

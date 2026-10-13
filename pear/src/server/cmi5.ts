@@ -2,6 +2,8 @@ import {createHash, randomBytes, randomUUID} from 'node:crypto';
 import type {DatabaseSync} from 'node:sqlite';
 import type {Principal} from '../shared/model.ts';
 import {cmi5WaiverReasons} from '../shared/cmi5.ts';
+import {CMI5LearningBindings} from './cmi5-learning-bindings.ts';
+import type {LearningService} from './service.ts';
 import {parseUniqueJSON} from '../shared/json-unique.ts';
 import {SCORMEngineStore} from './scorm-engine-store.ts';
 import {packageLimits, packagePath} from './scorm-package-reader.ts';
@@ -27,8 +29,10 @@ function duration(v: any) {if (typeof v !== 'string' || !/^P(?=\d|T\d)(?:\d{1,6}
 export class CMI5Service {
   readonly store: SCORMEngineStore;
   readonly remoteOrigins: readonly string[];
-  constructor(readonly db: DatabaseSync, readonly pearOrigin: string, readonly contentOrigin: string, remoteOrigins:string[] = []) {
+  readonly bindings?:CMI5LearningBindings;
+  constructor(readonly db: DatabaseSync, readonly pearOrigin: string, readonly contentOrigin: string, remoteOrigins:string[] = [],learning?:LearningService) {
     this.store = new SCORMEngineStore(db);
+    if(learning)this.bindings=new CMI5LearningBindings(db,learning);
     if(!Array.isArray(remoteOrigins)||remoteOrigins.length>20)throw Error('At most 20 reviewed cmi5 remote origins required');
     this.remoteOrigins=Object.freeze(remoteOrigins.map(origin=>{
       if(typeof origin!=='string')throw Error('Canonical cmi5 remote origin required');
@@ -118,24 +122,35 @@ export class CMI5Service {
       const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(s.browser_session,s.learner,s.auth_version,Date.now());
       if(!account || account.auth_version!==s.auth_version || !browser || s.expires<=Date.now() || s.status==='abandoned' || s.package_state==='revoked' || s.package_state==='quarantined')reject('UNAUTHORIZED','cmi5 session revoked or expired');
       this.store.live(account,s.mode==='Browse');
+      this.learningGuard(account,s.registration_id);
     }
     return s;
   }
   private actor(p:Principal) {return {objectType:'Agent',account:{homePage:this.pearOrigin,name:hash('cmi5:'+p.tenant+':'+p.id)}};}
+  private learningGuard(p:Principal,id:string) {
+    if(!this.bindings&&this.db.prepare('SELECT 1 FROM cmi5_learning_bindings WHERE registration_id=?').get(id))reject('FORBIDDEN','cmi5 learning authorization adapter required');
+    return this.bindings?.guard(p,id);
+  }
   launch(p:Principal,browserSession:string,a:any) {
-    object(a,['packageId','auId','registrationId','mode','confirmed','key','revision'],['packageId','auId','mode']);
+    object(a,['packageId','auId','registrationId','mode','binding','confirmed','key','revision'],['packageId','auId','mode']);
     if(!['Normal','Browse','Review'].includes(a.mode))cmi5Invalid('explicit launch mode required');
     this.store.live(p,a.mode==='Browse'); const pkg=this.package(p,a.packageId), manifest:CMI5Manifest=JSON.parse(pkg.manifest), au=manifest.aus.find(v=>v.id===a.auId);
     if(!au) cmi5Invalid('manifest AU required');
     if(au.remote&&!this.remoteOrigins.includes(new URL(au.href).origin))reject('FORBIDDEN','Remote AU launch requires reviewed origin configuration');
-    return this.command(p,a,'human_cmi5_launch',{packageId:pkg.id,auId:au.id,registrationId:a.registrationId??null,mode:a.mode},false,()=>{
+    const binding=a.binding===undefined?undefined:this.bindings?.resolve(p,a.binding);
+    if(a.binding!==undefined&&!binding)reject('FORBIDDEN','cmi5 learning bindings are unavailable');
+    if(binding){if(a.mode==='Browse')reject('FORBIDDEN','Browse cannot bind official learning');this.bindings!.validate(p,binding,pkg.id);}
+    return this.command(p,a,'human_cmi5_launch',{packageId:pkg.id,auId:au.id,registrationId:a.registrationId??null,mode:a.mode,binding:a.binding??null},false,()=>{
       const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(browserSession,p.id,p.auth_version,Date.now());
       if(!browser)reject('UNAUTHORIZED','Live browser session required');
       let registration:any;
-      if(a.registrationId!==undefined) {
-        if(typeof a.registrationId!=='string'||!uuid.test(a.registrationId))cmi5Invalid('registration UUID required');
-        registration=this.db.prepare('SELECT * FROM cmi5_registrations WHERE id=? AND tenant=? AND learner=? AND package_id=?').get(a.registrationId,p.tenant,p.id,pkg.id);
+      const registrationId=a.registrationId??(binding?this.bindings!.find(p,binding)?.registration_id:undefined);
+      if(registrationId!==undefined) {
+        if(typeof registrationId!=='string'||!uuid.test(registrationId))cmi5Invalid('registration UUID required');
+        registration=this.db.prepare('SELECT * FROM cmi5_registrations WHERE id=? AND tenant=? AND learner=? AND package_id=?').get(registrationId,p.tenant,p.id,pkg.id);
         if(!registration || registration.mode==='Browse'&&a.mode!=='Browse' || registration.mode!=='Browse'&&a.mode==='Browse')reject('FORBIDDEN','Own exact cmi5 registration required');
+        const bound=this.learningGuard(p,registration.id);
+        if(binding&&(!bound||bound.bindingKey!==binding.bindingKey))reject('FORBIDDEN','Exact cmi5 enrollment binding required');
       }
       const current=this.package(p,pkg.id).state;
       if(current!=='published' && !(registration && current==='retired'))reject('FORBIDDEN','Published or pinned retired cmi5 package required');
@@ -143,7 +158,8 @@ export class CMI5Service {
       if(!registration) {
         if(Number((this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_registrations WHERE tenant=? AND learner=?').get(p.tenant,p.id) as any).n)>=200)cmi5Invalid('registration quota reached');
         registration={id:randomUUID()};
-        this.db.prepare('INSERT INTO cmi5_registrations VALUES(?,?,?,?,?,?,?)').run(registration.id,pkg.id,p.tenant,p.id,a.mode,JSON.stringify(this.actor(p)),new Date().toISOString());
+        this.db.prepare('INSERT INTO cmi5_registrations VALUES(?,?,?,?,?,?,?)').run(registration.id,pkg.id,p.tenant,p.id,binding?'Normal':a.mode,JSON.stringify(this.actor(p)),new Date().toISOString());
+        if(binding)this.bindings!.attach(p,registration.id,binding);
       }
       for(const old of this.db.prepare("SELECT id FROM cmi5_sessions WHERE registration_id=? AND status IN('launched','initialized')").all(registration.id) as any[])this.abandon(this.session(old.id,false));
       const sessionId=randomUUID(), token=randomBytes(32).toString('base64url'), now=new Date().toISOString();
@@ -264,8 +280,8 @@ export class CMI5Service {
       const status=seen.has('terminated')?'terminated':seen.has('initialized')?'initialized':'launched';
       this.db.prepare('UPDATE cmi5_sessions SET status=?,terminated_at=CASE WHEN ?=\'terminated\' THEN COALESCE(terminated_at,?) ELSE terminated_at END WHERE id=?').run(status,status,Date.now(),s.id);
       if(changed.length) {
-        if(s.data.launchMode==='Normal')this.satisfaction(s);
         const p=this.db.prepare('SELECT * FROM accounts WHERE id=?').get(s.learner) as unknown as Principal;
+        if(s.data.launchMode==='Normal'){this.satisfaction(s);this.bindings?.project(p,s,this.outcomes(s.registration_id,JSON.parse(s.manifest)));}
         this.audit(p,'cmi5_statements',{sessionId:s.id,statementIds:changed},`learning:${s.tenant}:${s.learner}`);
       }
       return values.map(v=>v.statement.id);
@@ -389,12 +405,13 @@ export class CMI5Service {
       if(outcome.waived||outcome.satisfied)cmi5Invalid('AU is already waived or satisfied');
       const r=this.db.prepare('SELECT * FROM cmi5_registrations WHERE id=?').get(a.registrationId) as any,learner=this.db.prepare('SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1').get(r.learner,r.tenant) as any;
       if(!learner)reject('FORBIDDEN','Active registration learner required');
+      const bound=this.learningGuard(learner,r.id);if(bound&&!bound.reference.allowWaivers)reject('FORBIDDEN','Enrolled cmi5 policy does not permit waivers');
       for(const active of this.db.prepare("SELECT id FROM cmi5_sessions WHERE registration_id=? AND au_id=? AND status IN('launched','initialized')").all(r.id,a.auId) as any[])this.abandon(this.session(active.id,false));
       const id=randomUUID(),now=new Date().toISOString(),data={contextTemplate:{extensions:{[cmi5Extension+'sessionid']:id},contextActivities:{grouping:[{id:a.auId}]}},launchMode:'Normal'};
       // A dedicated expired LMS session satisfies Quartz 9.3.7 without minting
       // a fetch/Basic capability or pretending that the learner launched an AU.
       this.db.prepare("INSERT INTO cmi5_sessions(id,registration_id,au_id,auth_version,browser_session,fetch_hash,launch_data,status,created_at,expires,terminated_at) VALUES(?,?,?,?,?,?,?,'terminated',?,0,?)").run(id,r.id,a.auId,learner.auth_version,'','waived:'+id,JSON.stringify(data),now,Date.now());
-      const s=this.session(id,false);this.lms(s,'waived',{extensions:{'https://w3id.org/xapi/cmi5/result/extensions/reason':a.reason}});this.satisfaction(s);
+      const s=this.session(id,false);this.lms(s,'waived',{extensions:{'https://w3id.org/xapi/cmi5/result/extensions/reason':a.reason}});this.satisfaction(s);this.bindings?.project(learner,s,this.outcomes(r.id,JSON.parse(s.manifest)));
       this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run(`learning:${r.tenant}:${r.learner}`);
       return {...this.report(p,r.id,true),sessionId:id};
     });
@@ -404,7 +421,13 @@ export class CMI5Service {
     if(!r)reject('FORBIDDEN','Authorized cmi5 registration required');const m:CMI5Manifest=JSON.parse(r.manifest), aus=this.outcomes(r.id,m);
     const sessions=this.db.prepare("SELECT id,au_id,status,created_at,expires,EXISTS(SELECT 1 FROM cmi5_statements WHERE session_id=cmi5_sessions.id AND source='lms' AND verb='waived') AS waiver FROM cmi5_sessions WHERE registration_id=? ORDER BY created_at DESC,id LIMIT 20").all(r.id) as any[];
     const statementCount=(this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_statements WHERE registration_id=?').get(r.id) as any).n;
-    return {registrationId:r.id,packageId:r.package_id,title:m.course.title,mode:r.mode,packageState:r.package_state,aus,sessions:sessions.map(row=>({...row})),statementCount,satisfied:r.mode==='Normal'&&aus.every(a=>a.satisfied),officialLearningChanged:false};
+    const binding=this.db.prepare('SELECT context,course_enrollment_id FROM cmi5_learning_bindings WHERE registration_id=?').get(r.id) as any;
+    return {registrationId:r.id,packageId:r.package_id,title:m.course.title,mode:r.mode,packageState:r.package_state,aus,sessions:sessions.map(row=>({...row})),statementCount,satisfied:r.mode==='Normal'&&aus.every(a=>a.satisfied),learningBound:!!binding,learningKind:binding?(binding.course_enrollment_id?'course':'item'):null,waiverAllowed:!binding||JSON.parse(binding.context).reference.allowWaivers,officialLearningChanged:!!this.db.prepare('SELECT 1 FROM cmi5_completion_proofs WHERE registration_id=?').get(r.id)};
+  }
+  learningContext(p:Principal,a:any,offset=0) {
+    this.store.live(p);if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid AU page');if(!this.bindings)reject('FORBIDDEN','cmi5 learning bindings are unavailable');
+    const c=this.bindings.resolve(p,a);this.bindings.validate(p,c,c.reference.packageId);const pkg=this.package(p,c.reference.packageId),existing=this.bindings.find(p,c);
+    return {packageId:pkg.id,sha256:pkg.sha256,title:JSON.parse(pkg.manifest).course.title,allowWaivers:c.reference.allowWaivers,...this.activityPage(JSON.parse(pkg.manifest),offset),registrationId:existing?.registration_id??null,completed:existing?this.bindings.completed(existing.registration_id):false};
   }
   registrations(p:Principal,admin=false,offset=0) {
     this.store.live(p,admin);if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid registration page');

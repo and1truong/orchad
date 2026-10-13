@@ -256,6 +256,14 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-192 adds exact cmi5 course/item enrollment proofs with immutable
+package/policy pins and shared live prerequisite/audience/award/cycle/retake
+resolution. Accepted Normal termination plus every AU's moveOn gates official
+completion; permitted human waivers remain distinct from reported outcomes.
+Course quiz/certificate rules are preserved. The built enrolled journey issues
+one package proof before the real quiz certificate. Partner mappings, exhaustive
+LRS/cmi5 and external production/platform evidence remain open.
+
 #144 / ADR-191 adds human administrative waivers with explicit reason/confirmation,
 CAS/receipt/audit rollback, dedicated capability-free LMS sessions and durable
 learner reports. Waived AUs reopen in Review mode within the registration, and

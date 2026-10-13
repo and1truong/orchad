@@ -1,5 +1,14 @@
 # cmi5 acceptance — #144
 
+ADR-192 adds exact cmi5 lesson/item enrollment bindings, immutable published
+package/policy pins and completion proofs, shared live prerequisite/audience/
+award/cycle/successor checks, transactional official ledger projection and a
+built enrolled player. Practice and Review stay unofficial. Waivers require the
+authored opt-in policy; otherwise the API rejects them. Local evidence: 39 cmi5
+cases, seven built journeys, build/typecheck/vendor and all 1,135 existing Pear
+cases PASS. The actual browser still requires the Pear quiz after both AUs before
+issuing a certificate. External partner/conformance/production remain open.
+
 ADR-191 adds confirmed administrative AU waivers, dedicated capability-free LMS
 sessions, required reason evidence, atomic audit/receipt/revocation/rollup and a
 built admin/learner Review journey. Waivers remain distinct from AU completion,
