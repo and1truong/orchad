@@ -11,6 +11,7 @@ import {scormResourceMime} from './scorm-package-service.ts';
 import {boundedPage, reject} from './errors.ts';
 import {cmi5Invalid, cmi5IRI, cmi5RemoteURL, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
 import {cmi5Document,documentRead,documentETag} from './cmi5-documents.ts';
+import {validateAttachments,saveCMI5Attachments,encodeCMI5Multipart,type AttachmentParts} from './cmi5-attachments.ts';
 import {xapiObject as object,xapiActivity,xapiLanguageMap,xapiLanguage,xapiExtensions,xapiQueryTime,statementFormat} from './cmi5-xapi.ts';
 
 export const cmi5Category = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
@@ -216,7 +217,8 @@ export class CMI5Service {
     this.db.prepare("UPDATE cmi5_sessions SET status='abandoned' WHERE id=?").run(s.id);
   }
   private validate(s:any,input:any) {
-    object(input,['id','actor','verb','object','context','result','timestamp'],['id','actor','verb','object','context','timestamp']);
+    object(input,['id','actor','verb','object','context','result','timestamp','attachments'],['id','actor','verb','object','context','timestamp']);
+    validateAttachments(input.attachments);
     if(typeof input.id!=='string'||!uuid.test(input.id)||Buffer.byteLength(JSON.stringify(input))>16*1024)cmi5Invalid('UUID and ≤16 KiB statement required');
     if(stable(input.actor)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Exact launch actor required');
     object(input.verb,['id','display'],['id']); if(!cmi5IRI(input.verb.id))cmi5Invalid('verb IRI required');if(input.verb.display!==undefined)xapiLanguageMap(input.verb.display);
@@ -256,11 +258,12 @@ export class CMI5Service {
     const time=timestamp(input.timestamp); if(Date.parse(time)<Date.parse(s.created_at))cmi5Invalid('statement precedes launch');
     return {statement:{...input,id:input.id.toLowerCase()},verb,defined,time};
   }
-  write(header:string|undefined,body:any) {
+  write(header:string|undefined,body:any,parts?:AttachmentParts) {
     return this.transaction(()=>{
       const s=this.authenticate(header,true), batch=Array.isArray(body)?body:[body];
       if(!batch.length||batch.length>20||Buffer.byteLength(JSON.stringify(batch))>64*1024)cmi5Invalid('1–20 bounded statements required');
       const values=batch.map(v=>this.validate(s,v)), changed:string[]=[];
+      const added=saveCMI5Attachments(this.db,s,values.flatMap(v=>v.statement.attachments??[]),parts);
       for(const v of values) {
         const old=this.db.prepare('SELECT * FROM cmi5_statements WHERE id=?').get(v.statement.id) as any;
         if(old) {if(old.session_id!==s.id)reject('FORBIDDEN','Statement ID unavailable');if(old.payload_hash!==hash(stable(v.statement)))reject('IDEMPOTENCY_CONFLICT','Statement payload changed');continue;}
@@ -279,10 +282,10 @@ export class CMI5Service {
       const passed=registration.find(v=>v.verb==='passed');if(passed&&registration.some(v=>v.verb==='failed'&&v.timestamp>passed.timestamp))cmi5Invalid('failed after registration passed');
       const status=seen.has('terminated')?'terminated':seen.has('initialized')?'initialized':'launched';
       this.db.prepare('UPDATE cmi5_sessions SET status=?,terminated_at=CASE WHEN ?=\'terminated\' THEN COALESCE(terminated_at,?) ELSE terminated_at END WHERE id=?').run(status,status,Date.now(),s.id);
-      if(changed.length) {
+      if(changed.length||added.length) {
         const p=this.db.prepare('SELECT * FROM accounts WHERE id=?').get(s.learner) as unknown as Principal;
         if(s.data.launchMode==='Normal'){this.satisfaction(s);this.bindings?.project(p,s,this.outcomes(s.registration_id,JSON.parse(s.manifest)));}
-        this.audit(p,'cmi5_statements',{sessionId:s.id,statementIds:changed},`learning:${s.tenant}:${s.learner}`);
+        this.audit(p,'cmi5_statements',{sessionId:s.id,statementIds:changed,...(added.length?{attachmentHashes:added}:{})},`learning:${s.tenant}:${s.learner}`);
       }
       return values.map(v=>v.statement.id);
     });
@@ -310,7 +313,7 @@ export class CMI5Service {
     if(q.registration!==undefined&&q.registration!==s.registration_id)reject('FORBIDDEN','Exact registration required');
     const bool=(key:string)=>{if(q[key]!==undefined&&!['true','false'].includes(q[key]))cmi5Invalid('Boolean query must be true or false');return q[key]==='true';};
     const ascending=q.ascending===undefined&&q.after!==undefined?true:bool('ascending'),related=bool('related_activities');bool('related_agents');
-    if(bool('attachments'))cmi5Invalid('multipart statement attachments are not implemented');
+    bool('attachments');
     const format=q.format??'exact';if(!['exact','ids','canonical'].includes(format))cmi5Invalid('statement format invalid');
     const present=(row:any)=>statementFormat(this.stored(row),format,language);
     if(q.statementId!==undefined||q.voidedStatementId!==undefined) {
@@ -349,6 +352,12 @@ export class CMI5Service {
     const after=Number(q.after??0),limit=Number(q.limit??20);if(!Number.isSafeInteger(after)||after<0||!Number.isSafeInteger(limit)||limit<1||limit>20)cmi5Invalid('invalid evidence page');
     const rows=this.db.prepare('SELECT * FROM cmi5_statements WHERE registration_id=? AND sequence>? ORDER BY sequence LIMIT ?').all(registrationId,after,limit+1) as any[];
     const page=rows.slice(0,limit);return {statements:page.map(row=>this.stored(row)),nextAfter:rows.length>limit?page.at(-1).sequence:null};
+  }
+  multipart(header:string|undefined,result:any) {
+    const s=this.authenticate(header,true),parts:AttachmentParts=new Map(),metadata=new Map<string,any[]>();
+    for(const statement of result.statements??[result])for(const a of statement.attachments??[]){const hash=a.sha2.toLowerCase(),group=metadata.get(hash)??[];group.push(a);metadata.set(hash,group);}
+    for(const [hash,group] of metadata){const row=this.db.prepare('SELECT bytes FROM cmi5_attachments WHERE registration_id=? AND sha2=?').get(s.registration_id,hash) as any;if(row)parts.set(hash,{bytes:Buffer.from(row.bytes),...(group.every(a=>a.contentType===group[0].contentType)?{contentType:group[0].contentType}:{})});}
+    return encodeCMI5Multipart(result,parts);
   }
   private stored(row:any) {return {...JSON.parse(row.statement),stored:row.stored,version:'1.0.3',authority:{objectType:'Agent',account:{homePage:this.pearOrigin,name:row.source==='lms'?'pear-cmi5-lms':row.session_id}}};}
   private agentQuery(s:any,value:any) {

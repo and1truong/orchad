@@ -1,5 +1,12 @@
 # cmi5 acceptance — #144
 
+ADR-193 adds scoped raw multipart POST/PUT/GET attachments, SHA-256/384/512,
+immutable registration-bound bytes, JSON fileUrl metadata, quota/dedup/retry and
+atomic rollback. Local evidence: 43 cmi5 cases, seven built journeys (including
+actual remote browser MIME/CORS/bytes) and build/typecheck/vendor PASS. The
+bounded MIME profile and remaining conformance limits are documented in ADR-193;
+broader allowed statement objects remain the next implementation slice.
+
 ADR-192 adds exact cmi5 lesson/item enrollment bindings, immutable published
 package/policy pins and completion proofs, shared live prerequisite/audience/
 award/cycle/successor checks, transactional official ledger projection and a
