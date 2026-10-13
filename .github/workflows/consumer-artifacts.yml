@@ -1,0 +1,66 @@
+name: consumer-artifacts
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['orchard-v*']
+permissions:
+  contents: read
+jobs:
+  acceptance:
+    if: startsWith(github.ref, 'refs/tags/orchard-v')
+    uses: ./.github/workflows/acceptance.yml
+  artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf zip unzip
+      - name: Install locked producer dependencies
+        run: |
+          for directory in packages/bridge-contract mango packages/agent-durable coconut lime; do
+            (cd "$directory" && npm ci)
+          done
+      - name: Package versioned consumer artifacts
+        run: node release/package.mjs
+      - name: Verify checksums and build outside the source checkout
+        id: consumer
+        run: node release/check.mjs release/artifacts --keep
+      - name: Compile and test the extracted native host
+        working-directory: ${{ steps.consumer.outputs.desktop_kit }}/src-tauri
+        run: |
+          cargo test --locked
+          cargo build --release --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orchard-consumer-artifacts
+          path: release/artifacts/
+          if-no-files-found: error
+          retention-days: 7
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/orchard-v')
+    needs: [acceptance, artifacts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: orchard-consumer-artifacts
+          path: release/artifacts
+      - name: Create a draft preview release from the checked assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          sha256sum --check SHA256SUMS
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease \
+            --title "Orchard $RELEASE_TAG (preview)" --notes-file ../../release/README.md ./*
+        working-directory: release/artifacts
