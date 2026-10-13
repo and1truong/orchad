@@ -256,6 +256,47 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-192 adds exact cmi5 course/item enrollment proofs with immutable
+package/policy pins and shared live prerequisite/audience/award/cycle/retake
+resolution. Accepted Normal termination plus every AU's moveOn gates official
+completion; permitted human waivers remain distinct from reported outcomes.
+Course quiz/certificate rules are preserved. The built enrolled journey issues
+one package proof before the real quiz certificate. Partner mappings, exhaustive
+LRS/cmi5 and external production/platform evidence remain open.
+
+#144 / ADR-191 adds human administrative waivers with explicit reason/confirmation,
+CAS/receipt/audit rollback, dedicated capability-free LMS sessions and durable
+learner reports. Waived AUs reopen in Review mode within the registration, and
+retain distinct reported completion/pass/score. This does not grant official
+credit or close external conformance/production gates.
+
+#144 / ADR-190 adds scoped Statement filters, stored-time ordering and snapshot
+pagination, exact/ids/canonical language-selected formats, validated Activity
+and interaction metadata and HTTP consistency headers. General document/query
+timestamps accept offsets; cmi5 source timestamps remain UTC. Multipart/object
+and exhaustive conformance, official bindings and production are subsequent work.
+
+#144 / ADR-189 adds byte-preserving binary/JSON State and scoped Agent/Activity
+Profiles, cross-registration document scopes, scoped Person/Activity metadata,
+SHA-1 ETags, HEAD/conditional writes and JSON POST merge. Populated schema-52
+State migrates without losing registration identity. Actual browser CORS checks
+include binary Profile bytes and exposed ETag/304. Statement interoperability,
+official bindings and external production/conformance remain subsequent work.
+
+#144 / ADR-188 adds remote AU launch from reviewed immutable XML/ZIP metadata.
+Server-configured exact origins and per-session CORS/fetch/Basic authorization
+prevent cross-origin credential reuse; current configuration revocation closes
+existing capabilities. A real browser AU at a separate origin initializes,
+reports results and terminates into its scoped Pear report. Full LRS, official
+bindings, commercial/native and production evidence remain subsequent work.
+
+#144 / ADR-187 supplements independent cmi5 support with immutable standalone XML
+and ZIP32/ZIP64 imports, mixed local/remote AU metadata, safe extension positions
+and typed export. ZIP64 fixtures pass an independent Python CRC/read check and
+the real runtime quotas. Remote execution, general LRS, official bindings and
+production/platform conformance remain subsequent work; original SCORM profiles
+are unchanged.
+
 Independent cmi5 follow-up #144 / ADR-186 adds `pear-cmi5-quartz-local/1`: reviewed immutable local-AU ZIP import/export, namespace-aware course/block/AU handling, encoded launch and protected LaunchData, single-use fetch/Basic session credentials, defined/allowed xAPI statements with durable UUID reconciliation, JSON State/ETags/preferences, registration/session lifecycle, five moveOn policies and scoped learner/admin results. AUs speak cmi5 directly; the SCORM adapters and restricted ADR-025 client profile remain separate. Results do not grant official Pear credit. [CMI5-ACCEPTANCE.md](CMI5-ACCEPTANCE.md) maps the independent checks and open requirements. Standalone XML/remote/commercial content, full XSD/LRS/cmi5 conformance, official bindings and production remain OPEN/BLOCKED; no external conformance or production gate is closed.
 
 S1–S8 (#134–#141) are merged into main `f7d30b45f968dbaf52199cb35021d7aee6cc5600`, tree `159d24bd1178633d82f15cc7ee34bcf89538bf7e`; [main acceptance 37675973833](https://github.com/and1truong/orchad/actions/runs/37675973833) passed all eight jobs. Integrated pre-merge evidence at the same tree includes 445 domain tests, 90 dev + 90 built journeys, actual unpacked Lime SCORM 1/1 and real Linux Tauri/WebKit SCORM 9/9. See ADR-075–082 and SCORM-SUPPORT-MATRIX.md.

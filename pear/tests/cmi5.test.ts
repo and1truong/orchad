@@ -13,7 +13,7 @@ test('cmi5 root namespace, nested blocks, objectives and launch metadata are par
   assert.equal(manifest.profile,'pear-cmi5-quartz-local/1');assert.equal(manifest.aus.length,2);assert.equal(manifest.blocks.length,1);assert.equal(files.size,4);
   assert.equal(manifest.aus[0]!.launchParameters,'lesson=1');assert.equal(manifest.aus[0]!.masteryScore,0.75);assert.deepEqual(manifest.course.auIds,manifest.blocks[0]!.auIds);
   for(const node of [manifest.course,...manifest.blocks,...manifest.aus])assert.notEqual(node.activityId,node.id);
-  for(const xml of [cmi5XML().replace('courseStructure','manifest'),cmi5XML().replace('https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd','urn:wrong'),cmi5XML().replace('moveOn="Completed"','moveOn="Unknown"'),cmi5XML().replace('0.75','1.1'),cmi5XML().replace('lessons/intro.html?theme=blue#start','../outside.html'),cmi5XML().replace('lessons/intro.html?theme=blue#start','https://remote.test/au.html'),cmi5XML().replace('theme=blue','actor=forged'),cmi5XML().replace('idref="https://content.example.test/objective"','idref="urn:missing"'),cmi5XML().replace('https://content.example.test/au/practice','https://content.example.test/au/intro'), '<!DOCTYPE courseStructure [<!ENTITY x SYSTEM "file:///etc/passwd">]>'+cmi5XML()])await assert.rejects(()=>inspectCMI5Package(cmi5ZIP(xml)));
+  for(const xml of [cmi5XML().replace('courseStructure','manifest'),cmi5XML().replace('https://w3id.org/xapi/profiles/cmi5/v1/CourseStructure.xsd','urn:wrong'),cmi5XML().replace('moveOn="Completed"','moveOn="Unknown"'),cmi5XML().replace('0.75','1.1'),cmi5XML().replace('lessons/intro.html?theme=blue#start','../outside.html'),cmi5XML().replace('lessons/intro.html?theme=blue#start','http://remote.test/au.html'),cmi5XML().replace('theme=blue','actor=forged'),cmi5XML().replace('idref="https://content.example.test/objective"','idref="urn:missing"'),cmi5XML().replace('https://content.example.test/au/practice','https://content.example.test/au/intro'), '<!DOCTYPE courseStructure [<!ENTITY x SYSTEM "file:///etc/passwd">]>'+cmi5XML()])await assert.rejects(()=>inspectCMI5Package(cmi5ZIP(xml)));
 });
 test('immutable quarantined imports, exact hash review, own tenant export and operation receipts preserve authorization',async()=>{
   const s=await cmi5Fixture();try {
@@ -91,7 +91,7 @@ test('JSON State PUT/POST/DELETE ETags and registration/AU isolation survive a p
   try {
     const pkg=await s.publish(),launch=s.launch(pkg.packageId),r=s.runtime(launch),q={...r.query,stateId:'bookmark'};
     const first=s.cmi5.state(r.header,q,'PUT',{page:2},{'if-none-match':'*'});assert.ok(first.etag);
-    assert.equal(s.cmi5.state(r.header,q,'PUT',{page:3}).preconditionRequired,true);assert.equal(s.cmi5.state(r.header,q,'PUT',{page:3},{'if-match':'wrong'}).preconditionFailed,true);
+    assert.equal(s.cmi5.state(r.header,q,'PUT',{page:2}).etag,first.etag);assert.equal(s.cmi5.state(r.header,q,'PUT',{page:3},{'if-match':'wrong'}).preconditionFailed,true);
     const merged=s.cmi5.state(r.header,q,'POST',{note:'Original'},{'if-match':first.etag});assert.notEqual(first.etag,merged.etag);assert.deepEqual(s.cmi5.state(r.header,q,'GET',null).body,{page:2,note:'Original'});
     s.cmi5.write(r.header,r.statement('initialized'));const saved=r.statement('completed',{completion:true,duration:'PT1M'});s.cmi5.write(r.header,saved);
     await s.close();s=await cmi5Fixture(path);

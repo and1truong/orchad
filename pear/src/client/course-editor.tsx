@@ -307,6 +307,7 @@ export function CourseEditor({
                           delete next.assetId;
                           if (content.assetId) next.assetId = content.assetId;
                           delete next.scorm;
+                          delete next.cmi5;
                           delete next.captions;
                           if(content.captions)next.captions=structuredClone(content.captions);
                           delete next.transcript;
@@ -371,6 +372,7 @@ export function CourseEditor({
                         updateLesson(l.id, (next) => {
                           next.kind = e.target.value as Lesson["kind"];
                           delete next.scorm;
+                          delete next.cmi5;
                           delete next.captions;
                           delete next.assetId;
                           delete next.url;
@@ -393,6 +395,7 @@ export function CourseEditor({
                       <option value="link">{translateUI("HTTPS link")}</option>
                       <option value="submission">{translateUI("Assignment submission")}</option>
                       <option value="scorm">SCORM package</option>
+                      <option value="cmi5">cmi5 package</option>
                       <option value="event">{translateUI("Instructor-led event")}</option>
                       {["audio", "document", "interactive"].includes(
                         l.kind,

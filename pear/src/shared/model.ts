@@ -34,8 +34,10 @@ export interface Principal {
 }
 export interface CaptionTrack { assetId:string; language:"en"|"vi"; label:string; }
 export interface SCORMReference {packageId: string; version: number; sha256: string; completion: 'completed_or_passed' | 'passed'; minimumScore?: number;}
+export interface CMI5Reference {packageId:string;sha256:string;allowWaivers:boolean;}
 export interface Lesson {
   scorm?: SCORMReference;
+  cmi5?: CMI5Reference;
   captions?: CaptionTrack[];
   id: string;
   title: string;
@@ -48,6 +50,7 @@ export interface Lesson {
     | "document"
     | "interactive"
     | "scorm"
+    | "cmi5"
     | "submission"
     | "event";
   assetId?: string;
@@ -60,6 +63,7 @@ export interface Lesson {
 }
 export interface ContentItem {
   scorm?: SCORMReference;
+  cmi5?: CMI5Reference;
   access?: "tenant" | "author" | "groups";
   groupIds?: string[];
   captions?: CaptionTrack[];
@@ -119,7 +123,8 @@ export interface Course {
   completionPolicy:
     | "human_attestation_and_quiz"
     | "human_attestation_review_and_quiz"
-    | "scorm_evidence_and_quiz";
+    | "scorm_evidence_and_quiz"
+    | "cmi5_and_quiz";
   lessons: Lesson[];
   modules?: CourseModule[];
   quiz: {

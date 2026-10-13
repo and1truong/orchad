@@ -36,6 +36,7 @@ const { app, service, outbox, scormContentApp, cmi5ContentApp } = await createAp
   secureCookies: process.env.COOKIE_SECURE === "true",
   scormContent: scormOrigin ? {origin: scormOrigin, runtimeBundle: readFileSync(new URL('../../dist/scorm/runtime.js', import.meta.url))} : undefined,
   cmi5ContentOrigin: cmi5Origin,
+  cmi5RemoteOrigins: process.env.PEAR_CMI5_REMOTE_ORIGINS ? JSON.parse(process.env.PEAR_CMI5_REMOTE_ORIGINS) : undefined,
 });
 if (scormContentApp && scormOrigin) {
   if (!["127.0.0.1", "localhost", "::1"].includes(host)) throw Error('SCORM fixture player must bind loopback');

@@ -32,14 +32,21 @@ await send('initialized');document.getElementById('status').textContent='Ready';
 ready=start().catch(e=>{document.getElementById('status').textContent=e.message;throw e;});
 document.getElementById('complete').onclick=async()=>{try{await ready;await send('completed',{completion:true,duration:'PT1M'});if(launchData.masteryScore!==undefined)await send('passed',{success:true,duration:'PT1M',score:{scaled:0.9,raw:90,min:0,max:100}});await send('terminated',{duration:'PT1M'});document.getElementById('status').textContent='Saved and terminated';}catch(e){document.getElementById('status').textContent=e.message;}};
 document.getElementById('save').onclick=async()=>{try{await ready;const r=await fetch(endpoint+'activities/state?'+scope+'&stateId=bookmark',{method:'PUT',headers:{...headers,'If-None-Match':'*'},body:JSON.stringify({page:2})});if(!r.ok)throw Error('Save rejected');document.getElementById('status').textContent='Bookmark saved';}catch(e){document.getElementById('status').textContent=e.message;}};
-document.getElementById('restore').onclick=async()=>{try{await ready;const r=await fetch(endpoint+'activities/state?'+scope+'&stateId=bookmark',{headers});if(!r.ok)throw Error('No bookmark');document.getElementById('status').textContent='Restored page '+(await r.json()).page;}catch(e){document.getElementById('status').textContent=e.message;}};`;
+document.getElementById('restore').onclick=async()=>{try{await ready;const r=await fetch(endpoint+'activities/state?'+scope+'&stateId=bookmark',{headers});if(!r.ok)throw Error('No bookmark');document.getElementById('status').textContent='Restored page '+(await r.json()).page;}catch(e){document.getElementById('status').textContent=e.message;}};
+if(document.getElementById('binary'))document.getElementById('binary').onclick=async()=>{try{await ready;
+const url=endpoint+'activities/profile?'+new URLSearchParams({activityId,profileId:'binary-browser'}),bytes=new Uint8Array([0,255,128,13,10]);
+const put=await fetch(url,{method:'PUT',headers:{...headers,'Content-Type':'application/octet-stream','If-None-Match':'*'},body:bytes});if(put.status!==204)throw Error('Binary save rejected');
+const get=await fetch(url,{headers}),stored=new Uint8Array(await get.arrayBuffer()),etag=get.headers.get('etag');
+if(!get.ok||stored.join(',')!==bytes.join(',')||!etag||!/^"[0-9a-f]{40}"$/.test(etag))throw Error('Binary or CORS metadata lost');
+const unchanged=await fetch(url,{headers:{...headers,'If-None-Match':etag}});if(unchanged.status!==304)throw Error('Conditional read rejected');
+document.getElementById('status').textContent='Binary profile restored';}catch(e){document.getElementById('status').textContent=e.message;}};`;
 export function cmi5ZIP(xml=cmi5XML()) {
   const html=(name:string)=>Buffer.from(`<!doctype html><html><head><meta charset="utf-8"></head><body><h1>${name}</h1><p id="status" role="status">Loading</p><button id="complete">Complete activity</button><button id="save">Save bookmark</button><button id="restore">Restore bookmark</button><script src="../au.js"></script></body></html>`);
   return zip([{name:'cmi5.xml',data:Buffer.from(xml),method:8},{name:'lessons/intro.html',data:html('Introduction'),method:8},{name:'lessons/practice.html',data:html('Practice'),method:8},{name:'au.js',data:Buffer.from(cmi5Script),method:8}]);
 }
-export async function cmi5Fixture(path?:string) {
+export async function cmi5Fixture(path?:string,remoteOrigins:string[] = []) {
   const f=fixture(path),origin='http://127.0.0.1:4390',contentOrigin='http://localhost:4391';
-  const {app,cmi5,cmi5ContentApp}=await createApp({db:f.db,origin,developmentAuth:true,cmi5ContentOrigin:contentOrigin});
+  const {app,cmi5,cmi5ContentApp}=await createApp({db:f.db,origin,developmentAuth:true,cmi5ContentOrigin:contentOrigin,cmi5RemoteOrigins:remoteOrigins});
   async function login(user:string) {
     const response=await app.inject({method:'POST',url:'/api/login',headers:{host:'127.0.0.1:4390',origin},payload:{username:user,password:user+'-dev'}});
     const cookie=String(response.headers['set-cookie']).split(';')[0]!;

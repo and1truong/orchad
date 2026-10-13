@@ -1,4 +1,5 @@
 import {SCORMReferenceEditor} from './scorm-learning.tsx';
+import {CMI5ReferenceEditor} from './cmi5-learning.tsx';
 import type {Session} from './api.ts';
 import {translateUI} from "./i18n.ts";
 import React from "react";
@@ -26,6 +27,7 @@ export function LessonSettings({
   onChange: (patch: Partial<Lesson>) => void;
 }) {
   if (lesson.kind === 'scorm' && session) return <SCORMReferenceEditor session={session} value={lesson.scorm} onChange={scorm => onChange({scorm})} />;
+  if(lesson.kind==='cmi5'&&session)return <CMI5ReferenceEditor session={session} value={lesson.cmi5} onChange={cmi5=>onChange({cmi5})}/>;
   if (lesson.kind === "submission")
     return (
       <fieldset>

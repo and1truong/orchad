@@ -42,6 +42,7 @@ import {
 } from "./programs.ts";
 export const captionSchema = array(object({assetId:string(64),language:enumeration("en","vi"),label:string(80)}),2,1);
 export const scormReferenceSchema = object({packageId:string(64),version:integer(100000,1),sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},completion:enumeration('completed_or_passed','passed'),minimumScore:integer(100)},['packageId','version','sha256','completion']);
+export const cmi5ReferenceSchema=object({packageId:string(64),sha256:{type:'string',pattern:'^[a-f0-9]{64}$'},allowWaivers:{type:'boolean'}},['packageId','sha256','allowWaivers']);
 const lesson = object(
   {
     id: string(64),
@@ -55,11 +56,13 @@ const lesson = object(
       "document",
       "interactive",
       "scorm",
+      "cmi5",
       "submission",
       "event",
     ),
     captions: captionSchema,
     scorm: scormReferenceSchema,
+    cmi5: cmi5ReferenceSchema,
     assetId: string(64),
     submission: submissionSchema,
     sessions: sessionsSchema,
@@ -89,9 +92,11 @@ export const itemSchema = object(
       "document",
       "interactive",
       "scorm",
+      "cmi5",
     ),
     captions: captionSchema,
     scorm: scormReferenceSchema,
+    cmi5: cmi5ReferenceSchema,
     assetId: string(64),
     text: string(2500),
     url: { type: "string", maxLength: 2048 },
@@ -125,6 +130,7 @@ const courseProperties = {
     "human_attestation_and_quiz",
     "human_attestation_review_and_quiz",
     "scorm_evidence_and_quiz",
+    "cmi5_and_quiz",
   ),
   lessons: array(lesson, 8, 1),
   modules: array(

@@ -16,11 +16,16 @@ export class StandaloneService {
     return e;
   }
   scormContext(p: Principal, id: string) {
+    return this.packageContext(p,id,'scorm');
+  }
+  cmi5Context(p:Principal,id:string){return this.packageContext(p,id,'cmi5');}
+  private packageContext<K extends 'scorm'|'cmi5'>(p:Principal,id:string,kind:K) {
     const e = this.enrollment(p, id), item = JSON.parse(e.content) as ContentItem;
     new ContentAccess(this.db).current(p, 'item', e.item_id);
-    if (item.kind !== 'scorm' || !item.scorm) reject('FORBIDDEN', 'Exact enrolled SCORM item required');
+    if (item.kind !== kind || !item[kind]) reject('FORBIDDEN', 'Exact enrolled '+(kind==='scorm'?'SCORM':'cmi5')+' item required');
     if (this.db.prepare('SELECT 1 FROM item_enrollments WHERE retake_of=?').get(e.id)) reject('FORBIDDEN', 'Continue the current standalone successor');
-    return {bindingKey: 'item:' + e.id, reference: item.scorm, itemEnrollmentId: e.id, context: {itemEnrollmentId: e.id, itemId: e.item_id, version: e.version, reference: item.scorm}};
+    const reference=item[kind] as NonNullable<ContentItem[K]>;
+    return {bindingKey: 'item:' + e.id, reference, itemEnrollmentId: e.id, context: {itemEnrollmentId: e.id, itemId: e.item_id, version: e.version, reference}};
   }
   private published(p: Principal, a: any, live = true) {
     const item = this.db
@@ -46,6 +51,7 @@ export class StandaloneService {
   private retake(p:Principal,a:any){
     const e=this.enrollment(p,a.itemEnrollmentId);
     new ContentAccess(this.db).scormNew(p,JSON.parse(e.content).scorm);
+    new ContentAccess(this.db).cmi5New(p,JSON.parse(e.content).cmi5);
     if(!e.completed_at)reject("FORBIDDEN","Completed own standalone reading required");
     if(a.version!==e.version)reject("STALE_CONTEXT","Standalone retake version changed; review again");
     this.published(p,{itemId:e.item_id,version:e.version});return e;
@@ -71,7 +77,7 @@ export class StandaloneService {
       status: e.completed_at ? "completed" : "in_progress",
       enrolledAt: e.enrolled_at,
       completedAt: e.completed_at,
-      completionPolicy: item.kind === 'scorm' ? 'accepted_scorm_evidence' : "learner_confirmed_reading",
+      completionPolicy: item.kind==='cmi5'?'accepted_cmi5_evidence':item.kind === 'scorm' ? 'accepted_scorm_evidence' : "learner_confirmed_reading",
       certificateAvailable: false,
     };
   }
@@ -122,6 +128,7 @@ export class StandaloneService {
       if(existing)return {itemEnrollmentId:existing.id,version:existing.version,status:existing.completed_at?"completed":"in_progress"};
       const selected = this.db.prepare('SELECT content FROM content_item_versions WHERE item_id=? AND version=?').get(item.id,version) as any;
       new ContentAccess(this.db).scormNew(p,JSON.parse(selected.content).scorm);
+      new ContentAccess(this.db).cmi5New(p,JSON.parse(selected.content).cmi5);
       const id=randomUUID();
       this.db
         .prepare(
@@ -140,7 +147,8 @@ export class StandaloneService {
       };
     }
     const e = this.enrollment(p, a.itemEnrollmentId);
-    if (JSON.parse(e.content).kind === 'scorm') reject('FORBIDDEN', 'SCORM items require accepted engine evidence');
+    const kind=JSON.parse(e.content).kind;
+    if (['scorm','cmi5'].includes(kind)) reject('FORBIDDEN',kind==='scorm'?'SCORM items require accepted engine evidence':'cmi5 items require accepted runtime evidence');
     if (!e.completed_at)
       this.db
         .prepare(

@@ -1,5 +1,50 @@
 # cmi5 acceptance — #144
 
+ADR-192 adds exact cmi5 lesson/item enrollment bindings, immutable published
+package/policy pins and completion proofs, shared live prerequisite/audience/
+award/cycle/successor checks, transactional official ledger projection and a
+built enrolled player. Practice and Review stay unofficial. Waivers require the
+authored opt-in policy; otherwise the API rejects them. Local evidence: 39 cmi5
+cases, seven built journeys, build/typecheck/vendor and all 1,135 existing Pear
+cases PASS. The actual browser still requires the Pear quiz after both AUs before
+issuing a certificate. External partner/conformance/production remain open.
+
+ADR-191 adds confirmed administrative AU waivers, dedicated capability-free LMS
+sessions, required reason evidence, atomic audit/receipt/revocation/rollup and a
+built admin/learner Review journey. Waivers remain distinct from AU completion,
+pass and official credit. Local evidence: 29 cmi5 cases, six built journeys and
+build/typecheck/vendor PASS. Official bindings and external gates remain open.
+
+ADR-190 adds stored-time Statement filters, default reverse/explicit ascending
+order, stable filtered snapshot pagination and exact/ids/canonical formats with
+Accept-Language. Activity/interaction/context metadata is validated before atomic
+acceptance; Consistent-Through/Last-Modified are exposed. Document/query timestamps
+also accept explicit offsets. Local evidence: 26 cmi5 cases, five built journeys
+and build/typecheck/vendor PASS. Schema-53 predecessor regression: all 1,135
+existing Pear cases PASS, zero failed/cancelled/skipped, concurrency 2. Multipart
+attachments, broader allowed objects and exhaustive grammar remain subsequent
+implementation work; no full LRS/cmi5/production gate is closed.
+
+ADR-189 adds binary and JSON State (with/without registration), general Agent
+and Activity Profiles, scoped Person/Activity metadata, byte-exact SHA-1 ETags,
+HEAD/conditional reads/writes, shallow JSON POST and durable schema-53 migration.
+23 cmi5 cases and five built Chromium journeys PASS locally; the remote AU also
+round-trips binary Profile bytes and ETag/304 through actual browser CORS.
+State timestamps in this slice accept UTC. Broader Statement interoperability,
+official bindings and external conformance/production remain subsequent work.
+
+ADR-188 adds actual remote-AU launch with exact server-reviewed origins,
+session-bound fetch/Basic CORS, constrained preflight, live config revocation and
+retained evidence. `cmi5-remote.test.ts` and the actual two-origin browser AU
+journey supplement packaging evidence: 18 cmi5 cases and five built journeys
+PASS locally. Public deployment/commercial/native evidence remains separate.
+
+ADR-187 adds standalone XML import/export and mixed local/remote AU metadata,
+plus independently checked ZIP64 fixtures. Remote launch is deliberately handled
+in its successor, with reviewed origin configuration and session CORS. New
+evidence is `cmi5-packaging.test.ts` and the built standalone-XML browser case.
+Original ADR-186 scope/evidence below is retained as historical baseline.
+
 Profile: `pear-cmi5-quartz-local/1`, Quartz 1st Edition, xAPI 1.0.3. This evidence
 belongs to cmi5; ADR-025 xAPI and #133 SCORM evidence do not close its gates.
 

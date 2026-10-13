@@ -1,5 +1,6 @@
 import {Invitations} from "./invitations.tsx";
 import {SCORMLearningPlayer} from './scorm-learning.tsx';
+import {CMI5LearningPlayer} from './cmi5-learning.tsx';
 import {CourseFreshRestart} from "./course-restart.tsx";
 import {AssignedQuizReview,AssignedQuizCoordinator} from "./assigned-quiz.tsx";
 import {QuizUpgrade} from "./quiz-upgrade.tsx";
@@ -995,6 +996,7 @@ function App() {
                   <>
                     <h3>{lesson.title}</h3>
                     <p className="lesson-text">{lesson.text}</p>
+                    {lesson.kind==='cmi5'&&<CMI5LearningPlayer key={session.sessionEpoch+':'+active.id+':'+lesson.id} session={session} binding={{enrollmentId:active.id,lessonId:lesson.id}} busy={busy} run={run} onSaved={async()=>{const value=await op('learning_get_lesson',{enrollmentId:active.id,lessonId:lesson.id});if(sessionRef.current===session&&docRef.current===doc){setLesson(value);setTick(n=>n+1);}}}/>}
                     {lesson.kind === 'scorm' && <SCORMLearningPlayer key={session.sessionEpoch + ':' + active.id + ':' + lesson.id} session={session} binding={{enrollmentId: active.id, lessonId: lesson.id}} busy={busy} run={run} onSaved={async () => {
                       const value = await op('learning_get_lesson', {enrollmentId: active.id, lessonId: lesson.id});
                       if (sessionRef.current === session && docRef.current === doc) {setLesson(value); setTick(n => n + 1);}
@@ -1035,13 +1037,13 @@ function App() {
                     <p className="muted">
                       {["submission", "event"].includes(lesson.kind)
                         ? "Completion policy: authorized human review or attendance, followed by a passing quiz."
-                        : lesson.kind === "scorm" ? "Completion policy: accepted SCORM evidence, followed by a passing quiz." : "Completion policy: personal acknowledgement plus a passing quiz."}
+                        : lesson.kind==='cmi5'?"Completion policy: accepted cmi5 evidence, followed by a passing quiz.":lesson.kind === "scorm" ? "Completion policy: accepted SCORM evidence, followed by a passing quiz." : "Completion policy: personal acknowledgement plus a passing quiz."}
                     </p>
                     <button
                       disabled={
                         busy ||
                         lesson.completed ||
-                        ["submission", "event", "scorm"].includes(lesson.kind) ||
+                        ["submission", "event", "scorm", "cmi5"].includes(lesson.kind) ||
                         active.assignment_state !== "active"
                       }
                       onClick={() =>
