@@ -256,6 +256,13 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-189 adds byte-preserving binary/JSON State and scoped Agent/Activity
+Profiles, cross-registration document scopes, scoped Person/Activity metadata,
+SHA-1 ETags, HEAD/conditional writes and JSON POST merge. Populated schema-52
+State migrates without losing registration identity. Actual browser CORS checks
+include binary Profile bytes and exposed ETag/304. Statement interoperability,
+official bindings and external production/conformance remain subsequent work.
+
 #144 / ADR-188 adds remote AU launch from reviewed immutable XML/ZIP metadata.
 Server-configured exact origins and per-session CORS/fetch/Basic authorization
 prevent cross-origin credential reuse; current configuration revocation closes

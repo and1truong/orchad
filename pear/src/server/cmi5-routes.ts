@@ -87,15 +87,29 @@ export function createCMI5ContentHost(service:CMI5Service) {
     if(Object.keys(q).length!==1||typeof q.statementId!=='string'||!b||Array.isArray(b)||b.id!==undefined&&(typeof b.id!=='string'||b.id.toLowerCase()!==q.statementId.toLowerCase()))reject('INVALID_ARGUMENT','Matching statementId required');
     service.write(req.headers.authorization,{...b,id:q.statementId});return reply.code(204).send();
   });
-  for(const method of ['GET','PUT','POST','DELETE'] as const)app.route({method,url:'/cmi5/xapi/activities/state',handler:async(req,reply)=>{
-    if(['PUT','POST'].includes(req.method)&&!req.headers['content-type']?.startsWith('application/json'))reject('INVALID_ARGUMENT','JSON state profile required');
-    const v=service.state(req.headers.authorization,req.query,req.method,req.body,req.headers);
-    if(v.preconditionFailed)return reply.code(412).send({error:'State precondition failed'});
-    if(v.preconditionRequired)return reply.code(409).send({error:'State ETag precondition required'});
-    if(v.etag)reply.header('ETag',v.etag);if(v.updated)reply.header('Last-Modified',new Date(v.updated).toUTCString());
-    if(req.method==='GET')return reply.send(v.body);return reply.code(204).send();
-  }});
-  app.get('/cmi5/xapi/agents/profile',async(req)=>service.profile(req.headers.authorization,req.query));
-  for(const method of ['PUT','POST','DELETE'] as const)app.route({method,url:'/cmi5/xapi/agents/profile',handler:async()=>reject('FORBIDDEN','LMS learner preferences are read-only')});
+  registerCMI5Documents(app,service);
+  app.get('/cmi5/xapi/agents',async(req)=>service.agent(req.headers.authorization,req.query));
+  app.get('/cmi5/xapi/activities',async(req)=>service.activity(req.headers.authorization,req.query));
   return app;
+}
+
+function registerCMI5Documents(app:FastifyInstance,service:CMI5Service) {
+  // Registration is awaited by Fastify readiness, including the inherited
+  // Host/Origin/Basic/version hooks from the cookie-free listener.
+  app.register(async documents=>{
+    documents.removeContentTypeParser('application/json');documents.removeContentTypeParser('text/plain');
+    documents.addContentTypeParser('*',{parseAs:'buffer',bodyLimit:32*1024},(_req,body,done)=>done(null,body));
+    for(const [path,kind] of [['activities/state','state'],['agents/profile','agent'],['activities/profile','activity']] as const) {
+      for(const method of ['GET','HEAD','PUT','POST','DELETE'] as const)documents.route({method,url:'/cmi5/xapi/'+path,exposeHeadRoute:false,handler:async(req,reply)=>{
+        const v=kind==='state'?service.state(req.headers.authorization,req.query,req.method,req.body,req.headers):service.documentProfile(req.headers.authorization,req.query,kind,req.method,req.body,req.headers);
+        if(v.contentType)reply.type(v.contentType);if(v.etag)reply.header('ETag',v.etag);if(v.updated)reply.header('Last-Modified',new Date(v.updated).toUTCString());
+        if(v.preconditionFailed)return reply.code(412).send({error:'Document precondition failed'});
+        if(v.preconditionRequired)return reply.code(409).send({error:'Read the current document and provide its ETag in If-Match'});
+        if(v.notModified)return reply.code(304).send();
+        if(req.method==='HEAD')return reply.code(200).send();
+        if(req.method==='GET')return reply.type(v.contentType??'application/json').send(v.raw??v.body);
+        return reply.code(204).send();
+      }});
+    }
+  });
 }

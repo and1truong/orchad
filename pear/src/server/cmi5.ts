@@ -7,6 +7,7 @@ import {packageLimits, packagePath} from './scorm-package-reader.ts';
 import {scormResourceMime} from './scorm-package-service.ts';
 import {boundedPage, reject} from './errors.ts';
 import {cmi5Invalid, cmi5IRI, cmi5RemoteURL, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
+import {cmi5Document,documentRead,documentETag} from './cmi5-documents.ts';
 
 export const cmi5Category = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 export const cmi5MoveCategory = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
@@ -304,37 +305,49 @@ export class CMI5Service {
     const page=rows.slice(0,limit);return {statements:page.map(row=>this.stored(row)),nextAfter:rows.length>limit?page.at(-1).sequence:null};
   }
   private stored(row:any) {return {...JSON.parse(row.statement),stored:row.stored,version:'1.0.3',authority:{objectType:'Agent',account:{homePage:this.pearOrigin,name:row.source==='lms'?'pear-cmi5-lms':row.session_id}}};}
+  private agentQuery(s:any,value:any) {
+    let agent:any;try{agent=parseUniqueJSON(value);}catch{cmi5Invalid('valid Agent query required');}
+    object(agent,['objectType','name','account'],['account']);
+    if(agent.name!==undefined&&(typeof agent.name!=='string'||agent.name.length>500))cmi5Invalid('bounded Agent display name required');
+    if(agent.objectType!==undefined&&agent.objectType!=='Agent'||stable(agent.account)!==stable(JSON.parse(s.actor).account))reject('FORBIDDEN','Own launch Agent required');
+    return agent;
+  }
   state(header:string|undefined,q:any,method:string,body:any,headers:any={}) {
     const fn=()=>{
-      const s=this.authenticate(header);object(q,['activityId','agent','registration','stateId'],['activityId','agent','registration']);
-      let agent:any;try{agent=parseUniqueJSON(q.agent);}catch{cmi5Invalid('valid Agent query required');}
-      if(q.activityId!==s.au.activityId||q.registration!==s.registration_id||stable(agent)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Exact state scope required');
-      if(q.stateId!==undefined&&(typeof q.stateId!=='string'||!q.stateId||q.stateId.length>256))cmi5Invalid('bounded state ID required');
-      if(q.stateId==='LMS.LaunchData') {if(method!=='GET')reject('FORBIDDEN','LaunchData is read-only');return {body:s.data,etag:'"'+hash(s.launch_data)+'"',updated:s.created_at};}
-      if(!q.stateId) {
-        if(method!=='GET')cmi5Invalid('stateId required for mutation');
-        return {body:['LMS.LaunchData',...(this.db.prepare('SELECT state_id FROM cmi5_state WHERE registration_id=? AND au_id=? ORDER BY state_id').all(s.registration_id,s.au_id) as any[]).map(v=>v.state_id)]};
+      const s=this.authenticate(header);object(q,['activityId','agent','registration','stateId','since'],['activityId','agent']);this.agentQuery(s,q.agent);
+      if(q.activityId!==s.au.activityId||q.registration!==undefined&&q.registration!==s.registration_id)reject('FORBIDDEN','Exact state scope required');
+      if(q.since!==undefined&&(q.stateId!==undefined||!['GET','HEAD'].includes(method)))cmi5Invalid('since requires a document list read');
+      const scoped=q.registration!==undefined;
+      if(q.stateId==='LMS.LaunchData'&&scoped) {
+        if(!['GET','HEAD'].includes(method))reject('FORBIDDEN','LaunchData is read-only');
+        return documentRead(s.data,'application/json',documentETag(s.launch_data),s.created_at,headers);
       }
-      const row=this.db.prepare('SELECT * FROM cmi5_state WHERE registration_id=? AND au_id=? AND state_id=?').get(s.registration_id,s.au_id,q.stateId) as any;
-      if(method==='GET') {if(!row)reject('NOT_FOUND','State unavailable');return {body:JSON.parse(row.body),etag:row.etag,updated:row.updated_at};}
-      if(headers['if-match']!==undefined&&headers['if-match']!==row?.etag||headers['if-none-match']!==undefined&&(headers['if-none-match']!=='*'||!!row))return {preconditionFailed:true};
-      if(row&&!headers['if-match']&&!headers['if-none-match'])return {preconditionRequired:true};
-      if(method==='DELETE'){this.db.prepare('DELETE FROM cmi5_state WHERE registration_id=? AND au_id=? AND state_id=?').run(s.registration_id,s.au_id,q.stateId);return {};}
-      if(method==='POST') {if(!body||typeof body!=='object'||Array.isArray(body)||row&&(!JSON.parse(row.body)||typeof JSON.parse(row.body)!=='object'||Array.isArray(JSON.parse(row.body))))cmi5Invalid('POST state merge requires JSON objects');body={...(row?JSON.parse(row.body):{}),...body};}
-      const data=JSON.stringify(body);if(!data||Buffer.byteLength(data)>32*1024)cmi5Invalid('state document ≤32 KiB required');
-      const used=this.db.prepare('SELECT COUNT(*) AS n,COALESCE(SUM(length(CAST(body AS BLOB))),0) AS bytes FROM cmi5_state WHERE registration_id=?').get(s.registration_id) as any;
-      if(!row&&used.n>=128||used.bytes-Buffer.byteLength(row?.body??'')+Buffer.byteLength(data)>512*1024)cmi5Invalid('registration state quota reached');
-      const etag='"'+hash(data)+'"',updated=new Date().toISOString();this.db.prepare('INSERT INTO cmi5_state VALUES(?,?,?,?,?,?) ON CONFLICT(registration_id,au_id,state_id) DO UPDATE SET body=excluded.body,etag=excluded.etag,updated_at=excluded.updated_at').run(s.registration_id,s.au_id,q.stateId,data,etag,updated);
-      return {etag};
+      return cmi5Document(this.db,scoped?'state':'global-state',s,q.stateId,q.since,method,body,headers,scoped?[{id:'LMS.LaunchData',updated:s.created_at}]:[]);
     };
-    return method==='GET'?fn():this.transaction(fn);
+    return ['GET','HEAD'].includes(method)?fn():this.transaction(fn);
   }
-  profile(header:string|undefined,q:any) {
-    const s=this.authenticate(header);object(q,['agent','profileId'],['agent']);let agent:any;try{agent=parseUniqueJSON(q.agent);}catch{cmi5Invalid('valid Agent query required');}
-    if(stable(agent)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Own Agent required');
-    if(q.profileId===undefined)return ['cmi5LearnerPreferences'];if(q.profileId!=='cmi5LearnerPreferences')reject('NOT_FOUND','Profile unavailable');
-    const row=this.db.prepare('SELECT preferred_language FROM user_profiles WHERE user_id=?').get(s.learner) as any;
-    return {languagePreference:row?.preferred_language??'en'};
+  documentProfile(header:string|undefined,q:any,kind:'agent'|'activity',method:string,body:any,headers:any={}) {
+    const fn=()=>{
+      const s=this.authenticate(header);object(q,kind==='agent'?['agent','profileId','since']:['activityId','profileId','since'],kind==='agent'?['agent']:['activityId']);
+      if(kind==='agent')this.agentQuery(s,q.agent);else if(q.activityId!==s.au.activityId)reject('FORBIDDEN','Exact AU Activity required');
+      if(q.since!==undefined&&(q.profileId!==undefined||!['GET','HEAD'].includes(method)))cmi5Invalid('since requires a profile list read');
+      const row=kind==='agent'?this.db.prepare('SELECT preferred_language,created_at FROM user_profiles WHERE user_id=?').get(s.learner) as any:undefined;
+      if(kind==='agent'&&q.profileId==='cmi5LearnerPreferences') {
+        if(!['GET','HEAD'].includes(method))reject('FORBIDDEN','LMS learner preferences are read-only');
+        const preferences={languagePreference:row?.preferred_language??'en'};
+        return documentRead(preferences,'application/json',documentETag(JSON.stringify(preferences)),row?.created_at,headers);
+      }
+      return cmi5Document(this.db,kind,s,q.profileId,q.since,method,body,headers,kind==='agent'?[{id:'cmi5LearnerPreferences',updated:row?.created_at??'1970-01-01T00:00:00.000Z'}]:[]);
+    };
+    return ['GET','HEAD'].includes(method)?fn():this.transaction(fn);
+  }
+  profile(header:string|undefined,q:any) {return this.documentProfile(header,q,'agent','GET',undefined).body;}
+  agent(header:string|undefined,q:any) {
+    const s=this.authenticate(header);object(q,['agent'],['agent']);this.agentQuery(s,q.agent);return {objectType:'Person',account:[JSON.parse(s.actor).account]};
+  }
+  activity(header:string|undefined,q:any) {
+    const s=this.authenticate(header);object(q,['activityId'],['activityId']);if(q.activityId!==s.au.activityId)reject('FORBIDDEN','Exact AU Activity required');
+    return {objectType:'Activity',id:s.au.activityId,definition:{name:s.au.names,description:s.au.descriptions,...(s.au.activityType?{type:s.au.activityType}:{})}};
   }
   report(p:Principal,registrationId:string,admin=false) {
     this.store.live(p,admin);const r=this.db.prepare(`SELECT r.*,p.manifest,p.state AS package_state FROM cmi5_registrations r JOIN cmi5_packages p ON p.id=r.package_id WHERE r.id=? AND r.tenant=? AND (?=1 OR r.learner=?)`).get(registrationId,p.tenant,admin?1:0,p.id) as any;

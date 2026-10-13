@@ -1,5 +1,13 @@
 # cmi5 acceptance — #144
 
+ADR-189 adds binary and JSON State (with/without registration), general Agent
+and Activity Profiles, scoped Person/Activity metadata, byte-exact SHA-1 ETags,
+HEAD/conditional reads/writes, shallow JSON POST and durable schema-53 migration.
+23 cmi5 cases and five built Chromium journeys PASS locally; the remote AU also
+round-trips binary Profile bytes and ETag/304 through actual browser CORS.
+State timestamps in this slice accept UTC. Broader Statement interoperability,
+official bindings and external conformance/production remain subsequent work.
+
 ADR-188 adds actual remote-AU launch with exact server-reviewed origins,
 session-bound fetch/Basic CORS, constrained preflight, live config revocation and
 retained evidence. `cmi5-remote.test.ts` and the actual two-origin browser AU

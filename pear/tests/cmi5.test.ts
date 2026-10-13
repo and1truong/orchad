@@ -91,7 +91,7 @@ test('JSON State PUT/POST/DELETE ETags and registration/AU isolation survive a p
   try {
     const pkg=await s.publish(),launch=s.launch(pkg.packageId),r=s.runtime(launch),q={...r.query,stateId:'bookmark'};
     const first=s.cmi5.state(r.header,q,'PUT',{page:2},{'if-none-match':'*'});assert.ok(first.etag);
-    assert.equal(s.cmi5.state(r.header,q,'PUT',{page:3}).preconditionRequired,true);assert.equal(s.cmi5.state(r.header,q,'PUT',{page:3},{'if-match':'wrong'}).preconditionFailed,true);
+    assert.equal(s.cmi5.state(r.header,q,'PUT',{page:2}).etag,first.etag);assert.equal(s.cmi5.state(r.header,q,'PUT',{page:3},{'if-match':'wrong'}).preconditionFailed,true);
     const merged=s.cmi5.state(r.header,q,'POST',{note:'Original'},{'if-match':first.etag});assert.notEqual(first.etag,merged.etag);assert.deepEqual(s.cmi5.state(r.header,q,'GET',null).body,{page:2,note:'Original'});
     s.cmi5.write(r.header,r.statement('initialized'));const saved=r.statement('completed',{completion:true,duration:'PT1M'});s.cmi5.write(r.header,saved);
     await s.close();s=await cmi5Fixture(path);
