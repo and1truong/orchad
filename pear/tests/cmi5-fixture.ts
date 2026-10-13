@@ -37,9 +37,9 @@ export function cmi5ZIP(xml=cmi5XML()) {
   const html=(name:string)=>Buffer.from(`<!doctype html><html><head><meta charset="utf-8"></head><body><h1>${name}</h1><p id="status" role="status">Loading</p><button id="complete">Complete activity</button><button id="save">Save bookmark</button><button id="restore">Restore bookmark</button><script src="../au.js"></script></body></html>`);
   return zip([{name:'cmi5.xml',data:Buffer.from(xml),method:8},{name:'lessons/intro.html',data:html('Introduction'),method:8},{name:'lessons/practice.html',data:html('Practice'),method:8},{name:'au.js',data:Buffer.from(cmi5Script),method:8}]);
 }
-export async function cmi5Fixture(path?:string) {
+export async function cmi5Fixture(path?:string,remoteOrigins:string[] = []) {
   const f=fixture(path),origin='http://127.0.0.1:4390',contentOrigin='http://localhost:4391';
-  const {app,cmi5,cmi5ContentApp}=await createApp({db:f.db,origin,developmentAuth:true,cmi5ContentOrigin:contentOrigin});
+  const {app,cmi5,cmi5ContentApp}=await createApp({db:f.db,origin,developmentAuth:true,cmi5ContentOrigin:contentOrigin,cmi5RemoteOrigins:remoteOrigins});
   async function login(user:string) {
     const response=await app.inject({method:'POST',url:'/api/login',headers:{host:'127.0.0.1:4390',origin},payload:{username:user,password:user+'-dev'}});
     const cookie=String(response.headers['set-cookie']).split(';')[0]!;

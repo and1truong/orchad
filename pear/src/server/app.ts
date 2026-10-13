@@ -58,6 +58,7 @@ export async function createApp(opts: {
   certificateFont?:Buffer;
   scormContent?: {origin: string; runtimeBundle: Buffer};
   cmi5ContentOrigin?: string;
+  cmi5RemoteOrigins?: string[];
 }) {
   let certificateFontBytes=opts.certificateFont;
   if(!certificateFontBytes&&opts.developmentAuth){try{certificateFontBytes=readFileSync("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf");}catch{}}
@@ -69,7 +70,8 @@ export async function createApp(opts: {
   if (opts.cmi5ContentOrigin && !scormEnabled) throw Error('cmi5 requires reviewed loopback development fixtures');
   const cmi5Origins = opts.cmi5ContentOrigin ? contentHostOrigins(opts.origin, opts.cmi5ContentOrigin) : undefined;
   if (cmi5Origins && scormOrigins && new URL(cmi5Origins.contentOrigin).host === new URL(scormOrigins.contentOrigin).host) throw Error('cmi5 and SCORM content require separate listeners');
-  const cmi5 = new CMI5Service(opts.db, opts.origin, cmi5Origins?.contentOrigin ?? 'http://localhost:4316');
+  if(opts.cmi5RemoteOrigins?.length&&!cmi5Origins)throw Error('cmi5 remote origins require a configured content listener');
+  const cmi5 = new CMI5Service(opts.db, opts.origin, cmi5Origins?.contentOrigin ?? 'http://localhost:4316',opts.cmi5RemoteOrigins);
   const cmi5ContentApp = cmi5Origins ? createCMI5ContentHost(cmi5) : undefined;
   const learningService = new LearningService(opts.db,opts.origin,opts.catalogAdapters);
   const scormPlayer = opts.scormContent ? new SCORMPlayerService(opts.db, new SCORMLearningBindings(opts.db, learningService)) : undefined;

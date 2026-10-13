@@ -1,5 +1,11 @@
 # cmi5 acceptance — #144
 
+ADR-188 adds actual remote-AU launch with exact server-reviewed origins,
+session-bound fetch/Basic CORS, constrained preflight, live config revocation and
+retained evidence. `cmi5-remote.test.ts` and the actual two-origin browser AU
+journey supplement packaging evidence: 18 cmi5 cases and five built journeys
+PASS locally. Public deployment/commercial/native evidence remains separate.
+
 ADR-187 adds standalone XML import/export and mixed local/remote AU metadata,
 plus independently checked ZIP64 fixtures. Remote launch is deliberately handled
 in its successor, with reviewed origin configuration and session CORS. New

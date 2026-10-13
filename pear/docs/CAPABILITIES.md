@@ -256,6 +256,13 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-188 adds remote AU launch from reviewed immutable XML/ZIP metadata.
+Server-configured exact origins and per-session CORS/fetch/Basic authorization
+prevent cross-origin credential reuse; current configuration revocation closes
+existing capabilities. A real browser AU at a separate origin initializes,
+reports results and terminates into its scoped Pear report. Full LRS, official
+bindings, commercial/native and production evidence remain subsequent work.
+
 #144 / ADR-187 supplements independent cmi5 support with immutable standalone XML
 and ZIP32/ZIP64 imports, mixed local/remote AU metadata, safe extension positions
 and typed export. ZIP64 fixtures pass an independent Python CRC/read check and

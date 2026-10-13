@@ -5,13 +5,15 @@ import {fixture} from '../helpers.ts';
 import {createApp} from '../../src/server/app.ts';
 import {cmi5XML,cmi5ZIP} from '../cmi5-fixture.ts';
 import {standaloneCMI5} from '../cmi5-packaging-fixture.ts';
+import Fastify from 'fastify';
+import {cmi5Script} from '../cmi5-fixture.ts';
 
 async function login(page:Page,origin:string,user:string) {
   await page.goto(origin);await page.getByLabel('Account',{exact:true}).fill(user);await page.getByLabel('Password',{exact:true}).fill(user+'-dev');await page.getByRole('button',{name:'Sign in',exact:true}).click();
 }
-async function setup(port:number) {
+async function setup(port:number,remoteOrigins:string[] = []) {
   const f=fixture(),origin='http://127.0.0.1:'+port,contentOrigin='http://localhost:'+(port+1);
-  const runtime=await createApp({db:f.db,origin,developmentAuth:true,cmi5ContentOrigin:contentOrigin,staticRoot:resolve('dist')});
+  const runtime=await createApp({db:f.db,origin,developmentAuth:true,cmi5ContentOrigin:contentOrigin,cmi5RemoteOrigins:remoteOrigins,staticRoot:resolve('dist')});
   await runtime.app.listen({host:'127.0.0.1',port});await runtime.cmi5ContentApp!.listen({host:'127.0.0.1',port:port+1});
   function publish(xml=cmi5XML()) {
     const p=f.service.principal('admin'),args=()=>({confirmed:true,key:crypto.randomUUID(),revision:f.service.context('admin','library:demo').revision});
@@ -68,4 +70,17 @@ test('built administration imports and exports standalone XML without losing its
     const download=page.waitForEvent('download');await region.getByRole('button',{name:'Export original cmi5 package',exact:true}).click();expect(readFileSync((await (await download).path())!)).toEqual(bytes);
     await expect(region.getByRole('button',{name:'Preview Introduction',exact:true})).toBeDisabled();
   }finally{await page.close();await s.close();}
+});
+test('actual remote AU uses browser CORS to fetch credentials, initialize, save and terminate into a scoped Pear report',async({page})=>{
+  const remoteOrigin='http://localhost:4440',remote=Fastify(),s=await setup(4442,[remoteOrigin]);let popup:Page|undefined;
+  remote.get('/au.js',async(_req,reply)=>reply.type('text/javascript').send(cmi5Script));
+  remote.get('/lessons/:name',async(_req,reply)=>reply.type('text/html').send('<!doctype html><h1>Original remote AU</h1><p id="status" role="status">Loading</p><button id="complete">Complete activity</button><button id="save">Save bookmark</button><button id="restore">Restore bookmark</button><script src="/au.js"></script>'));
+  try {
+    await remote.listen({host:'127.0.0.1',port:4440});const p=s.service.principal('admin'),args=()=>({confirmed:true,key:crypto.randomUUID(),revision:s.service.context('admin','library:demo').revision});
+    const pkg=await s.cmi5.import(p,{...args(),filename:'remote.xml',provenance:'Original remote HTTP fixture'},Buffer.from(standaloneCMI5(remoteOrigin)));s.cmi5.review(p,{...args(),packageId:pkg.packageId,sha256:pkg.sha256,action:'publish',reason:'Reviewed own remote server and exact origin'});
+    await login(page,s.origin,'learner-a');await page.getByRole('button',{name:'Imported packages',exact:true}).click();const region=page.getByRole('region',{name:'cmi5 packages',exact:true});await region.getByLabel("I consent to this cmi5 activity's reported tracking.",{exact:true}).check();await region.getByRole('button',{name:'Start Introduction',exact:true}).click();
+    const opened=page.waitForEvent('popup');await region.getByRole('link',{name:'Open cmi5 activity in a new window',exact:true}).click();popup=await opened;await expect(popup.getByRole('status')).toHaveText('Ready');expect(new URL(popup.url()).origin).toBe(remoteOrigin);
+    await popup.getByRole('button',{name:'Complete activity',exact:true}).click();await expect(popup.getByRole('status')).toHaveText('Saved and terminated');await expect(region.getByLabel('cmi5 report')).toContainText('Introduction · Completed: true · Passed: true · Satisfied: true');
+    expect(await popup.evaluate(()=>window.opener===null)).toBe(true);expect(s.db.prepare('SELECT COUNT(*) AS n FROM certificates').get()!.n).toBe(0);
+  }finally{if(popup)await popup.close();await page.close();remote.server.closeAllConnections();await remote.close();await s.close();}
 });

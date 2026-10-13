@@ -6,7 +6,7 @@ import {SCORMEngineStore} from './scorm-engine-store.ts';
 import {packageLimits, packagePath} from './scorm-package-reader.ts';
 import {scormResourceMime} from './scorm-package-service.ts';
 import {boundedPage, reject} from './errors.ts';
-import {cmi5Invalid, cmi5IRI, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
+import {cmi5Invalid, cmi5IRI, cmi5RemoteURL, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
 
 export const cmi5Category = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 export const cmi5MoveCategory = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
@@ -26,7 +26,23 @@ function duration(v: any) {if (typeof v !== 'string' || !/^P(?=\d|T\d)(?:\d{1,6}
 
 export class CMI5Service {
   readonly store: SCORMEngineStore;
-  constructor(readonly db: DatabaseSync, readonly pearOrigin: string, readonly contentOrigin: string) {this.store = new SCORMEngineStore(db);}
+  readonly remoteOrigins: readonly string[];
+  constructor(readonly db: DatabaseSync, readonly pearOrigin: string, readonly contentOrigin: string, remoteOrigins:string[] = []) {
+    this.store = new SCORMEngineStore(db);
+    if(!Array.isArray(remoteOrigins)||remoteOrigins.length>20)throw Error('At most 20 reviewed cmi5 remote origins required');
+    this.remoteOrigins=Object.freeze(remoteOrigins.map(origin=>{
+      if(typeof origin!=='string')throw Error('Canonical cmi5 remote origin required');
+      const url=new URL(cmi5RemoteURL(origin));
+      if(url.origin!==origin||url.hostname===new URL(pearOrigin).hostname||origin===contentOrigin)throw Error('cmi5 remote origin must be canonical and separate from Pear cookies/content');
+      return origin;
+    }));
+  }
+  sessionOrigin(s:any) {return s.au.remote ? new URL(s.au.href).origin : this.contentOrigin;}
+  fetchOrigin(token:string) {
+    const row=this.db.prepare('SELECT id FROM cmi5_sessions WHERE fetch_hash=?').get(hash(token)) as any;
+    if(!row)return undefined;const s=this.session(row.id,false),origin=this.sessionOrigin(s);
+    return !s.au.remote||this.remoteOrigins.includes(origin)?origin:undefined;
+  }
   private transaction<T>(fn: () => T): T {this.db.exec('BEGIN IMMEDIATE'); try {const result=fn(); this.db.exec('COMMIT'); return result;} catch(e) {this.db.exec('ROLLBACK'); throw e;}}
   private audit(p: Principal, action: string, payload: object, doc = 'library:'+p.tenant) {
     this.db.prepare('INSERT INTO audit(tenant,principal,document_id,tool,arguments,created_at) VALUES(?,?,?,?,?,?)').run(p.tenant,p.id,doc,action,JSON.stringify(payload),new Date().toISOString());
@@ -68,7 +84,7 @@ export class CMI5Service {
     return boundedPage(rows.map(({manifest,...row})=>{const m:CMI5Manifest=JSON.parse(manifest); return {...row,profile:m.profile,title:m.course.title,...this.activityPage(m,0)};}),offset);
   }
   private activityPage(m:CMI5Manifest,offset:number) {
-    const page=boundedPage(m.aus.map(au=>({id:au.id,title:au.title,moveOn:au.moveOn,launchMethod:au.launchMethod,playbackSupported:!au.remote})),offset,10);
+    const page=boundedPage(m.aus.map(au=>({id:au.id,title:au.title,moveOn:au.moveOn,launchMethod:au.launchMethod,remoteOrigin:au.remote?new URL(au.href).origin:null,playbackSupported:!au.remote||this.remoteOrigins.includes(new URL(au.href).origin)})),offset,10);
     return {aus:page.items,auOffset:page.offset,nextAuOffset:page.nextOffset,auTotal:page.total};
   }
   activities(p:Principal,id:string,offset=0,author=false) {
@@ -97,6 +113,7 @@ export class CMI5Service {
     if(!s)reject('UNAUTHORIZED','cmi5 session unavailable');
     s.data=JSON.parse(s.launch_data); s.au=(JSON.parse(s.manifest) as CMI5Manifest).aus.find(a=>a.id===s.au_id);
     if(live) {
+      if(s.au.remote&&!this.remoteOrigins.includes(this.sessionOrigin(s)))reject('UNAUTHORIZED','Remote AU origin configuration was revoked');
       const account=this.db.prepare('SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1').get(s.learner,s.tenant) as any;
       const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(s.browser_session,s.learner,s.auth_version,Date.now());
       if(!account || account.auth_version!==s.auth_version || !browser || s.expires<=Date.now() || s.status==='abandoned' || s.package_state==='revoked' || s.package_state==='quarantined')reject('UNAUTHORIZED','cmi5 session revoked or expired');
@@ -110,7 +127,7 @@ export class CMI5Service {
     if(!['Normal','Browse','Review'].includes(a.mode))cmi5Invalid('explicit launch mode required');
     this.store.live(p,a.mode==='Browse'); const pkg=this.package(p,a.packageId), manifest:CMI5Manifest=JSON.parse(pkg.manifest), au=manifest.aus.find(v=>v.id===a.auId);
     if(!au) cmi5Invalid('manifest AU required');
-    if(au.remote)reject('FORBIDDEN','Remote AU launch requires reviewed origin configuration');
+    if(au.remote&&!this.remoteOrigins.includes(new URL(au.href).origin))reject('FORBIDDEN','Remote AU launch requires reviewed origin configuration');
     return this.command(p,a,'human_cmi5_launch',{packageId:pkg.id,auId:au.id,registrationId:a.registrationId??null,mode:a.mode},false,()=>{
       const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(browserSession,p.id,p.auth_version,Date.now());
       if(!browser)reject('UNAUTHORIZED','Live browser session required');
@@ -132,12 +149,12 @@ export class CMI5Service {
       const contextTemplate={extensions:{[cmi5Extension+'sessionid']:sessionId},contextActivities:{grouping:[{id:au.id}]}};
       const data={contextTemplate,launchMode:a.mode,moveOn:au.moveOn,...(au.masteryScore!==undefined?{masteryScore:au.masteryScore}:{}),...(au.launchParameters!==undefined?{launchParameters:au.launchParameters}:{}),...(au.entitlementKey!==undefined?{entitlementKey:{courseStructure:au.entitlementKey}}:{})};
       this.db.prepare('INSERT INTO cmi5_sessions(id,registration_id,au_id,auth_version,browser_session,fetch_hash,launch_data,created_at,expires) VALUES(?,?,?,?,?,?,?,?,?)').run(sessionId,registration.id,au.id,p.auth_version,browserSession,hash(token),JSON.stringify(data),now,Date.now()+4*60*60*1000);
-      const s=this.session(sessionId), url=new URL(this.contentOrigin+'/cmi5/content/'+sessionId+'/files/'+au.href);
+      const s=this.session(sessionId), url=new URL(au.remote ? au.href : this.contentOrigin+'/cmi5/content/'+sessionId+'/files/'+au.href);
       const plainURL=url.href;
       for(const [key,value] of Object.entries({endpoint:this.contentOrigin+'/cmi5/xapi/',fetch:this.contentOrigin+'/cmi5/fetch/'+token,actor:s.actor,registration:registration.id,activityId:au.activityId}))url.searchParams.set(key,value);
       this.lms(s,'launched',undefined,undefined,{[cmi5Extension+'launchmode']:a.mode,[cmi5Extension+'moveon']:au.moveOn,[cmi5Extension+'launchurl']:plainURL,...(au.masteryScore!==undefined?{[cmi5Extension+'masteryscore']:au.masteryScore}:{}),...(au.launchParameters!==undefined?{[cmi5Extension+'launchparameters']:au.launchParameters}:{})});
       if(a.mode==='Normal')this.satisfaction(s);
-      return {sessionId,registrationId:registration.id,auId:au.id,launchMethod:au.launchMethod,url:url.href,officialLearningChanged:false};
+      return {sessionId,registrationId:registration.id,auId:au.id,launchMethod:au.remote?'OwnWindow':au.launchMethod,url:url.href,officialLearningChanged:false};
     });
   }
   fetch(token:string) {
@@ -160,6 +177,7 @@ export class CMI5Service {
   }
   resource(sessionId:string,path:string) {
     const s=this.session(sessionId);
+    if(s.au.remote)reject('FORBIDDEN','Remote AUs cannot read local package resources');
     if(s.status==='terminated' && Date.now()>=s.terminated_at+5000)reject('UNAUTHORIZED','cmi5 session ended');
     packagePath(path); const file=this.db.prepare('SELECT bytes FROM cmi5_resources WHERE package_id=? AND path=?').get(s.package_id,path) as any;
     if(!file)reject('NOT_FOUND','cmi5 resource unavailable'); return {bytes:Buffer.from(file.bytes),mime:scormResourceMime(path)};
