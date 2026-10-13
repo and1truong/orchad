@@ -1,0 +1,86 @@
+import Fastify, {type FastifyInstance} from 'fastify';
+import {failure} from '@orchard/bridge-contract';
+import type {Principal} from '../shared/model.ts';
+import {parseUniqueJSON} from '../shared/json-unique.ts';
+import {CMI5Service} from './cmi5.ts';
+import {contentHostOrigins} from './scorm-content-host.ts';
+import {packageLimits} from './scorm-package-reader.ts';
+import {DomainError, reject} from './errors.ts';
+
+function error(e:any,reply:any) {
+  const code=e instanceof DomainError?e.code:'INTERNAL';
+  return reply.code(code==='UNAUTHORIZED'?401:code==='FORBIDDEN'?403:code==='NOT_FOUND'?404:code==='STALE_CONTEXT'||code==='IDEMPOTENCY_CONFLICT'?409:code==='INTERNAL'?500:400).send(failure(code,code==='INTERNAL'?'cmi5 request failed':e.message));
+}
+export async function registerCMI5(app:FastifyInstance,service:CMI5Service,enabled:boolean,principal:(req:any)=>Principal) {
+  const guard=async(_req:any,reply:any)=>{if(!enabled)return reply.code(403).send(failure('FORBIDDEN','cmi5 requires reviewed loopback content configuration'));};
+  app.get('/api/cmi5/packages',async(req,reply)=>{try{const q=req.query as any;return {...service.list(principal(req),q.author==='true',Number(q.offset??0)),runtimeEnabled:enabled};}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/packages/:id/activities',async(req,reply)=>{try{const q=req.query as any;return service.activities(principal(req),(req.params as any).id,Number(q.offset??0),q.author==='true');}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/registrations',async(req,reply)=>{try{const q=req.query as any;return service.registrations(principal(req),q.admin==='true',Number(q.offset??0));}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/registrations/:id',async(req,reply)=>{try{return service.report(principal(req),(req.params as any).id,(req.query as any).admin==='true');}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/registrations/:id/statements',async(req,reply)=>{try{const {admin,...q}=req.query as any;return service.evidence(principal(req),(req.params as any).id,q,admin==='true');}catch(e){return error(e,reply);}});
+  app.post('/api/cmi5/review',{preHandler:guard},async(req,reply)=>{try{return service.review(principal(req),req.body);}catch(e){return error(e,reply);}});
+  app.post('/api/cmi5/launch',{preHandler:guard},async(req,reply)=>{try{return service.launch(principal(req),(req as any).session.token_hash,req.body);}catch(e){return error(e,reply);}});
+  app.post('/api/cmi5/sessions/:id/close',{preHandler:guard},async(req,reply)=>{try{return service.close(principal(req),(req.params as any).id);}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/packages/:id/export',async(req,reply)=>{try{const v=service.export(principal(req),(req.params as any).id);return reply.type('application/zip').header('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(v.filename)).send(v.bytes);}catch(e){return error(e,reply);}});
+  await app.register(async scoped=>{
+    scoped.addContentTypeParser('application/zip',{parseAs:'buffer',bodyLimit:packageLimits.archive},(_req,body,done)=>done(null,body));
+    scoped.post('/api/cmi5/import',{preHandler:guard,bodyLimit:packageLimits.archive},async(req,reply)=>{try{const q=req.query as any;return reply.code(201).send(await service.import(principal(req),{...q,confirmed:q.confirmed==='true',revision:Number(q.revision)},req.body as Buffer));}catch(e){return error(e,reply);}});
+  });
+}
+
+export function createCMI5ContentHost(service:CMI5Service) {
+  const origins=contentHostOrigins(service.pearOrigin,service.contentOrigin);
+  if([origins.pearOrigin,origins.contentOrigin].some(o=>!['localhost','127.0.0.1','[::1]'].includes(new URL(o).hostname)))throw Error('cmi5 executable content requires reviewed loopback hosts');
+  const app=Fastify({logger:false,bodyLimit:64*1024,trustProxy:false});
+  app.setErrorHandler((e:any,_req,reply)=>{
+    if(e.statusCode===400||e.statusCode===413)return reply.code(e.statusCode).send(failure('INVALID_ARGUMENT','Invalid cmi5 body'));
+    return error(e,reply);
+  });
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json',{parseAs:'string'},(req,body,done)=>{
+    try{done(null,!String(body)&&(req.url.startsWith('/cmi5/fetch/')||req.method==='DELETE')?undefined:parseUniqueJSON(String(body)));}catch{const e:any=Error('Invalid JSON');e.statusCode=400;done(e);}
+  });
+  app.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string'},(_req,body,done)=>done(null,body));
+  app.addHook('onRequest',async(req,reply)=>{
+    reply.header('Cache-Control','no-store').header('Referrer-Policy','no-referrer').header('X-Content-Type-Options','nosniff')
+      .header('Cross-Origin-Resource-Policy','same-origin').header('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()')
+      .header('Content-Security-Policy',"default-src 'none'; frame-ancestors "+origins.pearOrigin);
+    if(req.headers.host!==origins.contentHost)reject('FORBIDDEN','Content Host mismatch');
+    if(req.headers.cookie)reject('FORBIDDEN','Content host does not accept browser cookies');
+    if(req.headers.origin!==undefined&&req.headers.origin!==origins.contentOrigin)reject('FORBIDDEN','Content Origin mismatch');
+    if(!['GET','HEAD'].includes(req.method)&&req.headers.origin!==origins.contentOrigin)reject('FORBIDDEN','Same-origin AU request required');
+    if(!req.url.startsWith('/cmi5/xapi/')&&req.headers.authorization)reject('FORBIDDEN','Application credentials are not accepted');
+  });
+  app.addHook('preHandler',async(req,reply)=>{
+    if(!req.url.startsWith('/cmi5/xapi/'))return;
+    reply.header('X-Experience-API-Version','1.0.3');
+    if(req.headers['x-experience-api-version']!=='1.0.3')reject('INVALID_ARGUMENT','xAPI 1.0.3 header required');
+    service.authenticate(req.headers.authorization,req.url.startsWith('/cmi5/xapi/statements'));
+  });
+  app.get('/health',async()=>({service:'pear-cmi5-content',profile:'pear-cmi5-quartz-local/1'}));
+  app.post('/cmi5/fetch/:token',async(req)=>service.fetch((req.params as any).token));
+  app.get('/cmi5/content/:sessionId/files/*',async(req,reply)=>{
+    const a=req.params as any, file=service.resource(a.sessionId,a['*']);
+    reply.header('Content-Security-Policy',"sandbox allow-scripts allow-same-origin; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; worker-src 'none'; frame-src 'self'; frame-ancestors "+origins.pearOrigin+' '+origins.contentOrigin+"; base-uri 'self'; form-action 'none'");
+    return reply.type(file.mime).send(file.bytes);
+  });
+  app.get('/cmi5/xapi/about',async()=>({version:['1.0.3'],extensions:{'https://orchad.example/profiles/pear-cmi5-quartz-local/1':'Restricted local-AU cmi5 runtime; full LRS/cmi5 conformance and production remain open'}}));
+  app.get('/cmi5/xapi/statements',async(req)=>service.read(req.headers.authorization,req.query));
+  app.post('/cmi5/xapi/statements',async(req)=>{if(Object.keys(req.query as any).length)reject('INVALID_ARGUMENT','POST query unsupported');return service.write(req.headers.authorization,req.body);});
+  app.put('/cmi5/xapi/statements',async(req,reply)=>{
+    const q=req.query as any,b=req.body as any;
+    if(Object.keys(q).length!==1||typeof q.statementId!=='string'||!b||Array.isArray(b)||b.id!==undefined&&(typeof b.id!=='string'||b.id.toLowerCase()!==q.statementId.toLowerCase()))reject('INVALID_ARGUMENT','Matching statementId required');
+    service.write(req.headers.authorization,{...b,id:q.statementId});return reply.code(204).send();
+  });
+  for(const method of ['GET','PUT','POST','DELETE'] as const)app.route({method,url:'/cmi5/xapi/activities/state',handler:async(req,reply)=>{
+    if(['PUT','POST'].includes(req.method)&&!req.headers['content-type']?.startsWith('application/json'))reject('INVALID_ARGUMENT','JSON state profile required');
+    const v=service.state(req.headers.authorization,req.query,req.method,req.body,req.headers);
+    if(v.preconditionFailed)return reply.code(412).send({error:'State precondition failed'});
+    if(v.preconditionRequired)return reply.code(409).send({error:'State ETag precondition required'});
+    if(v.etag)reply.header('ETag',v.etag);if(v.updated)reply.header('Last-Modified',new Date(v.updated).toUTCString());
+    if(req.method==='GET')return reply.send(v.body);return reply.code(204).send();
+  }});
+  app.get('/cmi5/xapi/agents/profile',async(req)=>service.profile(req.headers.authorization,req.query));
+  for(const method of ['PUT','POST','DELETE'] as const)app.route({method,url:'/cmi5/xapi/agents/profile',handler:async()=>reject('FORBIDDEN','LMS learner preferences are read-only')});
+  return app;
+}

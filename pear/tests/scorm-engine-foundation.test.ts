@@ -4,7 +4,7 @@ import {mkdtempSync, rmSync, readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import Scorm2004API from 'scorm-again/scorm2004';
-import {fixture} from './helpers.ts';
+import {fixture,cmi5SchemaRewind} from './helpers.ts';
 import {scormFixture} from './scorm-fixture.ts';
 import {openDatabase} from '../src/server/database.ts';
 import {SCORMEngineStore} from '../src/server/scorm-engine-store.ts';
@@ -88,6 +88,7 @@ test('populated v42 migration/reopen preserves legacy package status without off
     const launch = legacy.start();
     const before = legacy.db.prepare('SELECT * FROM scorm_records').get();
     // The legacy fixture uses openDatabase, so rewind only the new empty schema to simulate populated v42.
+    legacy.db.exec(cmi5SchemaRewind);
     legacy.db.exec('ALTER TABLE identity_transactions DROP COLUMN invitation_id; DROP TABLE user_invitations; DROP TABLE scorm_system_objectives; DROP TABLE scorm_system_data; DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; DROP TABLE scorm_engine_checkpoints; DROP TABLE scorm_engine_launches; DROP TABLE scorm_import_jobs; DROP TABLE scorm_sco_attempts; DROP TABLE scorm_engine_attempts; DROP TABLE scorm_registrations; DROP TABLE scorm_engine_resources; DROP TABLE scorm_engine_versions; DROP TABLE scorm_engine_packages; DROP INDEX accounts_id_tenant; DELETE FROM schema_version WHERE version>=43');
     legacy.db.close();
     const db = openDatabase(path);

@@ -31,6 +31,7 @@ An explicit loopback built demo uses `PEAR_DEVELOPMENT_AUTH=true npm start`. Syn
 Binary uploads and the SCORM sandbox profile remain subject to explicit development/identity-fixture gates and production scanning/storage policy. The inline SCORM profile is `pear-scorm12-inline/1`, not general SCORM/LRS conformance. Its reported CMI activity stays separate from official course completion.
 
 ## Test lanes
+- `npm run test:cmi5`: independent cmi5 Quartz local-AU packaging, session, xAPI/State and reporting checks; `npm run test:cmi5:browser` exercises built import/review, bookmark resume, lost statement ACK and OwnWindow. Configure `PEAR_CMI5_CONTENT_ORIGIN=http://localhost:4316` for the explicit loopback demo. See [ADR-186](docs/ADR-186-cmi5-quartz-local-runtime.md) and [cmi5 acceptance](docs/CMI5-ACCEPTANCE.md). cmi5 results stay separate from official credit; full LRS/cmi5 conformance and production remain open.
 - `npm test`: deterministic domain/SQLite, migration and real HTTP/security regressions. No model or paid provider.
 - `npm run typecheck` / `npm run build`: independent production source checks.
 - `npm run test:e2e`: human/admin/responsive browser journeys. Install Chromium with `npx playwright install chromium`.

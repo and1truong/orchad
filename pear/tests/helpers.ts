@@ -56,3 +56,6 @@ export function data(r: Result): any {
   if (!r.ok) throw new Error(JSON.stringify(r));
   return r.data;
 }
+// Only for fixtures simulating a populated pre-cmi5 database. Remove both the
+// empty tables and their marker before exercising the real upgrade path.
+export const cmi5SchemaRewind = 'DROP TABLE cmi5_state; DROP TABLE cmi5_statements; DROP TABLE cmi5_sessions; DROP TABLE cmi5_registrations; DROP TABLE cmi5_resources; DROP TABLE cmi5_packages; DELETE FROM schema_version WHERE version=52;';

@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {scormLearningFixture} from './scorm-learning-fixture.ts';
 import {multiFilePackage, multiFileManifest} from './scorm-package-fixture.ts';
-import {fixture, data} from './helpers.ts';
+import {fixture, data,cmi5SchemaRewind} from './helpers.ts';
 import {prerequisite} from '../src/server/scorm-activities.ts';
 import {SCORMPlayerService} from '../src/server/scorm-player-service.ts';
 import {SCORMLearningBindings} from '../src/server/scorm-learning-bindings.ts';
@@ -225,6 +225,7 @@ test('populated v45 upgrade preserves accepted practice CMI and registration, wi
   const dir = mkdtempSync(join(tmpdir(), 'pear-scorm-v45-')), path = join(dir, 'pear.sqlite'), f = await scormLearningFixture(path);
   const launch = f.launch(undefined, 'intro'); f.checkpoint(launch, 'passed', '90', false);
   const state = f.db.prepare('SELECT runtime_state,revision,reported_seconds FROM scorm_sco_attempts').get(), registrations = f.db.prepare('SELECT * FROM scorm_registrations').all();
+  f.db.exec(cmi5SchemaRewind);
   f.db.exec('DROP TRIGGER scorm_engine_resource_no_delete; DROP TRIGGER scorm_engine_resource_finalized_insert; ALTER TABLE identity_transactions DROP COLUMN invitation_id; DROP TABLE user_invitations; DROP TABLE scorm_system_objectives; DROP TABLE scorm_system_data; DROP TABLE scorm_completion_proofs; DROP TABLE scorm_learning_bindings; DROP INDEX scorm_enrollment_tenant; DROP INDEX scorm_item_enrollment_tenant; ALTER TABLE scorm_sco_attempts DROP COLUMN finished; ALTER TABLE scorm_engine_launches DROP COLUMN sco_attempt_number; DELETE FROM schema_version WHERE version>=46'); f.db.close();
   const reopened = fixture(path);
   try {

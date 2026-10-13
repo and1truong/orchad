@@ -6,7 +6,7 @@ import {multiFilePackage} from './scorm-package-fixture.ts';
 import {sharedDataManifest} from './scorm-sequencing-fixture.ts';
 import {sequenceCheckpoint} from './scorm-checkpoint-fixture.ts';
 import {createSCORM2004API} from '../src/shared/scorm2004-runtime.ts';
-import {data} from './helpers.ts';
+import {data,cmi5SchemaRewind} from './helpers.ts';
 
 const globalManifest = () => sharedDataManifest().replace('runtime:sharedDataGlobalToSystem="false"', '');
 async function readerPackage(f: Awaited<ReturnType<typeof scormLearningFixture>>) {
@@ -113,6 +113,7 @@ test('schema-49 migration preserves populated schema-48 local working data witho
   const f = await scormLearningFixture(path, multiFilePackage('2004-4', sharedDataManifest())), launch = f.launch(f.enroll());
   f.player.checkpoint(launch.token, sequenceCheckpoint(f, launch, {'adl.data.0.store': 'legacy-local-notes', 'cmi.location': 'legacy-bookmark', 'cmi.session_time': 'PT20S'}, false));
   const attempts = f.db.prepare('SELECT * FROM scorm_engine_attempts').all(), scos = f.db.prepare('SELECT * FROM scorm_sco_attempts').all(), resources = f.db.prepare('SELECT * FROM scorm_engine_resources ORDER BY path').all();
+  f.db.exec(cmi5SchemaRewind);
   f.db.exec('ALTER TABLE identity_transactions DROP COLUMN invitation_id; DROP TABLE user_invitations; DROP TRIGGER scorm_system_data_identity; DROP TABLE scorm_system_objectives; DROP TABLE scorm_system_data; DELETE FROM schema_version WHERE version>=49'); f.db.close();
   const db = openDatabase(path);
   try {
