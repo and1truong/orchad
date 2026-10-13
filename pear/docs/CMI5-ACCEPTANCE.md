@@ -1,5 +1,11 @@
 # cmi5 acceptance — #144
 
+ADR-187 adds standalone XML import/export and mixed local/remote AU metadata,
+plus independently checked ZIP64 fixtures. Remote launch is deliberately handled
+in its successor, with reviewed origin configuration and session CORS. New
+evidence is `cmi5-packaging.test.ts` and the built standalone-XML browser case.
+Original ADR-186 scope/evidence below is retained as historical baseline.
+
 Profile: `pear-cmi5-quartz-local/1`, Quartz 1st Edition, xAPI 1.0.3. This evidence
 belongs to cmi5; ADR-025 xAPI and #133 SCORM evidence do not close its gates.
 

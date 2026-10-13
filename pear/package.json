@@ -34,7 +34,7 @@
     "predev": "node scripts/patch-scorm-logging.mjs",
     "prestart": "node scripts/patch-scorm-logging.mjs",
     "test:scorm:side-panel": "PEAR_SCORM_HOST_LANE=1 playwright test -c playwright.scorm.config.ts scorm-side-panel.host.spec.ts",
-    "test:cmi5": "node --import tsx --test --test-isolation=none tests/cmi5.test.ts",
+    "test:cmi5": "node --import tsx --test --test-isolation=none tests/cmi5.test.ts tests/cmi5-packaging.test.ts",
     "test:cmi5:browser": "playwright test cmi5.spec.ts"
   },
   "dependencies": {

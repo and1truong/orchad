@@ -21,10 +21,11 @@ export async function registerCMI5(app:FastifyInstance,service:CMI5Service,enabl
   app.post('/api/cmi5/review',{preHandler:guard},async(req,reply)=>{try{return service.review(principal(req),req.body);}catch(e){return error(e,reply);}});
   app.post('/api/cmi5/launch',{preHandler:guard},async(req,reply)=>{try{return service.launch(principal(req),(req as any).session.token_hash,req.body);}catch(e){return error(e,reply);}});
   app.post('/api/cmi5/sessions/:id/close',{preHandler:guard},async(req,reply)=>{try{return service.close(principal(req),(req.params as any).id);}catch(e){return error(e,reply);}});
-  app.get('/api/cmi5/packages/:id/export',async(req,reply)=>{try{const v=service.export(principal(req),(req.params as any).id);return reply.type('application/zip').header('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(v.filename)).send(v.bytes);}catch(e){return error(e,reply);}});
+  app.get('/api/cmi5/packages/:id/export',async(req,reply)=>{try{const v=service.export(principal(req),(req.params as any).id);return reply.type(v.mime).header('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(v.filename)).send(v.bytes);}catch(e){return error(e,reply);}});
   await app.register(async scoped=>{
     scoped.addContentTypeParser('application/zip',{parseAs:'buffer',bodyLimit:packageLimits.archive},(_req,body,done)=>done(null,body));
-    scoped.post('/api/cmi5/import',{preHandler:guard,bodyLimit:packageLimits.archive},async(req,reply)=>{try{const q=req.query as any;return reply.code(201).send(await service.import(principal(req),{...q,confirmed:q.confirmed==='true',revision:Number(q.revision)},req.body as Buffer));}catch(e){return error(e,reply);}});
+    scoped.addContentTypeParser(['application/xml','text/xml'],{parseAs:'buffer',bodyLimit:packageLimits.manifest},(_req,body,done)=>done(null,body));
+    scoped.post('/api/cmi5/import',{preHandler:guard,bodyLimit:packageLimits.archive},async(req,reply)=>{try{const q=req.query as any,mime=req.headers['content-type']?.split(';')[0];if(typeof q.filename !== 'string' || (q.filename.endsWith('.xml') ? !['application/xml','text/xml'].includes(mime??'') : mime !== 'application/zip'))reject('INVALID_ARGUMENT','Import media type must match ZIP/XML filename');return reply.code(201).send(await service.import(principal(req),{...q,confirmed:q.confirmed==='true',revision:Number(q.revision)},req.body as Buffer));}catch(e){return error(e,reply);}});
   });
 }
 

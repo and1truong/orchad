@@ -4,6 +4,7 @@ import {mkdirSync,readFileSync} from 'node:fs';
 import {fixture} from '../helpers.ts';
 import {createApp} from '../../src/server/app.ts';
 import {cmi5XML,cmi5ZIP} from '../cmi5-fixture.ts';
+import {standaloneCMI5} from '../cmi5-packaging-fixture.ts';
 
 async function login(page:Page,origin:string,user:string) {
   await page.goto(origin);await page.getByLabel('Account',{exact:true}).fill(user);await page.getByLabel('Password',{exact:true}).fill(user+'-dev');await page.getByRole('button',{name:'Sign in',exact:true}).click();
@@ -23,11 +24,11 @@ async function setup(port:number) {
 test('built admin imports, reviews, exports and revokes the exact cmi5 ZIP',async({page})=>{
   const s=await setup(4392),bytes=cmi5ZIP();try {
     await login(page,s.origin,'admin');await page.getByRole('button',{name:'Administration',exact:true}).click();const region=page.getByRole('region',{name:'cmi5 packages',exact:true});
-    await region.getByLabel('cmi5 ZIP',{exact:true}).setInputFiles({name:'original-cmi5.zip',mimeType:'application/zip',buffer:bytes});
+    await region.getByLabel('cmi5 ZIP or XML',{exact:true}).setInputFiles({name:'original-cmi5.zip',mimeType:'application/zip',buffer:bytes});
     await region.getByLabel('cmi5 content rights and provenance',{exact:true}).fill('Self-authored original source');await region.getByLabel('I confirm cmi5 content rights and will review the exact package.',{exact:true}).check();
     await region.getByRole('button',{name:'Import cmi5 package',exact:true}).click();await expect(region.getByRole('article')).toContainText('quarantined');
     await region.getByLabel('cmi5 review reason',{exact:true}).fill('Reviewed exact source code, hash and rights');await region.getByRole('button',{name:'Publish reviewed cmi5 package',exact:true}).click();await expect(region.getByRole('article')).toContainText('published');
-    const download=page.waitForEvent('download');await region.getByRole('button',{name:'Export original cmi5 ZIP',exact:true}).click();expect(readFileSync((await (await download).path())!)).toEqual(bytes);
+    const download=page.waitForEvent('download');await region.getByRole('button',{name:'Export original cmi5 package',exact:true}).click();expect(readFileSync((await (await download).path())!)).toEqual(bytes);
     await region.getByRole('button',{name:'Revoke cmi5 package',exact:true}).click();await expect(region.getByRole('article')).toContainText('revoked');
     mkdirSync('artifacts/cmi5',{recursive:true});await region.screenshot({path:'artifacts/cmi5/admin.png'});
   }finally{await page.close();await s.close();}
@@ -58,4 +59,13 @@ test('OwnWindow cmi5 AU runs in a separate browser window and logout revokes its
     const opened=page.waitForEvent('popup');await region.getByRole('link',{name:'Open cmi5 activity in a new window',exact:true}).click();popup=await opened;await expect(popup.getByRole('status')).toHaveText('Ready');expect(await popup.evaluate(()=>window.opener===null)).toBe(true);
     await page.getByRole('button',{name:'Sign out',exact:true}).click();await popup.getByRole('button',{name:'Save bookmark',exact:true}).click();await expect(popup.getByRole('status')).toHaveText('Save rejected');
   }finally{if(popup)await popup.close();await page.close();await s.close();}
+});
+test('built administration imports and exports standalone XML without losing its immutable source',async({page})=>{
+  const s=await setup(4398),bytes=Buffer.from(standaloneCMI5());try {
+    await login(page,s.origin,'admin');await page.getByRole('button',{name:'Administration',exact:true}).click();const region=page.getByRole('region',{name:'cmi5 packages',exact:true});
+    await region.getByLabel('cmi5 ZIP or XML',{exact:true}).setInputFiles({name:'original.xml',mimeType:'application/xml',buffer:bytes});await region.getByLabel('cmi5 content rights and provenance',{exact:true}).fill('Original standalone XML');await region.getByLabel('I confirm cmi5 content rights and will review the exact package.',{exact:true}).check();
+    await region.getByRole('button',{name:'Import cmi5 package',exact:true}).click();await expect(region.getByRole('article')).toContainText('quarantined');await region.getByLabel('cmi5 review reason',{exact:true}).fill('Reviewed XML and AU destinations');await region.getByRole('button',{name:'Publish reviewed cmi5 package',exact:true}).click();await expect(region.getByRole('article')).toContainText('published');
+    const download=page.waitForEvent('download');await region.getByRole('button',{name:'Export original cmi5 package',exact:true}).click();expect(readFileSync((await (await download).path())!)).toEqual(bytes);
+    await expect(region.getByRole('button',{name:'Preview Introduction',exact:true})).toBeDisabled();
+  }finally{await page.close();await s.close();}
 });

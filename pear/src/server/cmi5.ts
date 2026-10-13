@@ -49,8 +49,8 @@ export class CMI5Service {
   }
   async import(p: Principal, a: any, bytes: Buffer) {
     this.store.live(p,true); object(a,['filename','provenance','confirmed','key','revision'],['filename','provenance']);
-    if (typeof a.filename !== 'string' || !/^[\p{L}\p{N} _.-]{1,115}\.zip$/u.test(a.filename) || typeof a.provenance !== 'string' || !a.provenance.trim() || a.provenance.length>500 || !Buffer.isBuffer(bytes) || !bytes.length || bytes.length>packageLimits.archive) cmi5Invalid('bounded ZIP and rights provenance required');
-    const sha256=hash(bytes), inspected=await inspectCMI5Package(bytes);
+    if (typeof a.filename !== 'string' || !/^[\p{L}\p{N} _.-]{1,115}\.(zip|xml)$/u.test(a.filename) || typeof a.provenance !== 'string' || !a.provenance.trim() || a.provenance.length>500 || !Buffer.isBuffer(bytes) || !bytes.length || bytes.length>packageLimits.archive) cmi5Invalid('bounded ZIP/XML and rights provenance required');
+    const sha256=hash(bytes), inspected=await inspectCMI5Package(bytes,a.filename.endsWith('.xml') ? 'xml' : 'zip');
     return this.command(p,a,'human_cmi5_import',{filename:a.filename,provenance:a.provenance.trim(),sha256},true,() => {
       const used=this.db.prepare('SELECT COALESCE(SUM(length(archive)),0)+(SELECT COALESCE(SUM(length(bytes)),0) FROM cmi5_resources r JOIN cmi5_packages p ON p.id=r.package_id WHERE p.tenant=?) AS n FROM cmi5_packages WHERE tenant=?').get(p.tenant,p.tenant) as any;
       const expanded=[...inspected.files.values()].reduce((n,b)=>n+b.length,0);
@@ -68,7 +68,7 @@ export class CMI5Service {
     return boundedPage(rows.map(({manifest,...row})=>{const m:CMI5Manifest=JSON.parse(manifest); return {...row,profile:m.profile,title:m.course.title,...this.activityPage(m,0)};}),offset);
   }
   private activityPage(m:CMI5Manifest,offset:number) {
-    const page=boundedPage(m.aus.map(au=>({id:au.id,title:au.title,moveOn:au.moveOn,launchMethod:au.launchMethod})),offset,10);
+    const page=boundedPage(m.aus.map(au=>({id:au.id,title:au.title,moveOn:au.moveOn,launchMethod:au.launchMethod,playbackSupported:!au.remote})),offset,10);
     return {aus:page.items,auOffset:page.offset,nextAuOffset:page.nextOffset,auTotal:page.total};
   }
   activities(p:Principal,id:string,offset=0,author=false) {
@@ -90,7 +90,7 @@ export class CMI5Service {
       return {packageId:pkg.id,state};
     });
   }
-  export(p:Principal,id:string) {this.store.live(p,true); const pkg=this.package(p,id); return {bytes:Buffer.from(pkg.archive),filename:pkg.filename};}
+  export(p:Principal,id:string) {this.store.live(p,true); const pkg=this.package(p,id); return {bytes:Buffer.from(pkg.archive),filename:pkg.filename,mime:pkg.filename.endsWith('.xml') ? 'application/xml' : 'application/zip'};}
   private session(id:string, live=true) {
     const s=this.db.prepare(`SELECT s.*,r.tenant,r.learner,r.mode,r.actor,r.package_id,p.manifest,p.state AS package_state
       FROM cmi5_sessions s JOIN cmi5_registrations r ON r.id=s.registration_id JOIN cmi5_packages p ON p.id=r.package_id WHERE s.id=?`).get(id) as any;
@@ -110,6 +110,7 @@ export class CMI5Service {
     if(!['Normal','Browse','Review'].includes(a.mode))cmi5Invalid('explicit launch mode required');
     this.store.live(p,a.mode==='Browse'); const pkg=this.package(p,a.packageId), manifest:CMI5Manifest=JSON.parse(pkg.manifest), au=manifest.aus.find(v=>v.id===a.auId);
     if(!au) cmi5Invalid('manifest AU required');
+    if(au.remote)reject('FORBIDDEN','Remote AU launch requires reviewed origin configuration');
     return this.command(p,a,'human_cmi5_launch',{packageId:pkg.id,auId:au.id,registrationId:a.registrationId??null,mode:a.mode},false,()=>{
       const browser=this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND principal=? AND auth_version=? AND expires>?').get(browserSession,p.id,p.auth_version,Date.now());
       if(!browser)reject('UNAUTHORIZED','Live browser session required');

@@ -256,6 +256,13 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-187 supplements independent cmi5 support with immutable standalone XML
+and ZIP32/ZIP64 imports, mixed local/remote AU metadata, safe extension positions
+and typed export. ZIP64 fixtures pass an independent Python CRC/read check and
+the real runtime quotas. Remote execution, general LRS, official bindings and
+production/platform conformance remain subsequent work; original SCORM profiles
+are unchanged.
+
 Independent cmi5 follow-up #144 / ADR-186 adds `pear-cmi5-quartz-local/1`: reviewed immutable local-AU ZIP import/export, namespace-aware course/block/AU handling, encoded launch and protected LaunchData, single-use fetch/Basic session credentials, defined/allowed xAPI statements with durable UUID reconciliation, JSON State/ETags/preferences, registration/session lifecycle, five moveOn policies and scoped learner/admin results. AUs speak cmi5 directly; the SCORM adapters and restricted ADR-025 client profile remain separate. Results do not grant official Pear credit. [CMI5-ACCEPTANCE.md](CMI5-ACCEPTANCE.md) maps the independent checks and open requirements. Standalone XML/remote/commercial content, full XSD/LRS/cmi5 conformance, official bindings and production remain OPEN/BLOCKED; no external conformance or production gate is closed.
 
 S1–S8 (#134–#141) are merged into main `f7d30b45f968dbaf52199cb35021d7aee6cc5600`, tree `159d24bd1178633d82f15cc7ee34bcf89538bf7e`; [main acceptance 37675973833](https://github.com/and1truong/orchad/actions/runs/37675973833) passed all eight jobs. Integrated pre-merge evidence at the same tree includes 445 domain tests, 90 dev + 90 built journeys, actual unpacked Lime SCORM 1/1 and real Linux Tauri/WebKit SCORM 9/9. See ADR-075–082 and SCORM-SUPPORT-MATRIX.md.

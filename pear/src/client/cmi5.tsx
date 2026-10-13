@@ -42,12 +42,12 @@ export function CMI5Packages(p:{session:Session;busy:boolean;run:(fn:()=>Promise
     {error&&<p role="alert">{error}</p>}{status&&<p role="status">{status}</p>}
     {data&&!data.runtimeEnabled&&<p>cmi5 playback is unavailable.</p>}
     {p.author&&<><form onSubmit={e=>{e.preventDefault();void p.run(async()=>{
-      if(!file||file.size>32*1024*1024)throw Error('Choose a cmi5 ZIP up to 32 MiB');const ctx=await context(true);
+      if(!file||file.size>(file.name.endsWith('.xml') ? 1024*1024 : 32*1024*1024))throw Error('Choose a cmi5 ZIP up to 32 MiB or XML up to 1 MiB');const ctx=await context(true);
       const q=new URLSearchParams({filename:file.name,provenance,confirmed:String(reviewed),revision:String(ctx.revision),key:crypto.randomUUID()});
-      const response=await fetch('/api/cmi5/import?'+q,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/zip','X-CSRF-Token':p.session.csrf,'X-Pear-Epoch':p.session.sessionEpoch},body:file}),result=await response.json();
+      const response=await fetch('/api/cmi5/import?'+q,{method:'POST',credentials:'same-origin',headers:{'Content-Type':file.name.endsWith('.xml')?'application/xml':'application/zip','X-CSRF-Token':p.session.csrf,'X-Pear-Epoch':p.session.sessionEpoch},body:file}),result=await response.json();
       if(!response.ok)throw Error(result.error?.message??'Import failed');if(current()){setRefresh(n=>n+1);setStatus('Package imported into quarantine. Review the exact files before publishing.');}
     });}}><fieldset disabled={p.busy||!data?.runtimeEnabled}>
-      <label>cmi5 ZIP<input type="file" accept=".zip,application/zip" required onChange={e=>setFile(e.target.files?.[0]??null)}/></label>
+      <label>cmi5 ZIP or XML<input type="file" accept=".zip,.xml,application/zip,application/xml,text/xml" required onChange={e=>setFile(e.target.files?.[0]??null)}/></label>
       <label>cmi5 content rights and provenance<input required maxLength={500} value={provenance} onChange={e=>setProvenance(e.target.value)}/></label>
       <label><input type="checkbox" required checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/>I confirm cmi5 content rights and will review the exact package.</label>
       <button>Import cmi5 package</button>
@@ -57,8 +57,8 @@ export function CMI5Packages(p:{session:Session;busy:boolean;run:(fn:()=>Promise
       {p.author&&<><button disabled={p.busy||!data.runtimeEnabled||!reviewed||!reason.trim()||row.state!=='quarantined'} onClick={()=>{void review(row,'publish');}}>Publish reviewed cmi5 package</button>
         <button disabled={p.busy||!data.runtimeEnabled||!reviewed||!reason.trim()||row.state!=='published'} onClick={()=>{void review(row,'retire');}}>Retire cmi5 package</button>
         <button disabled={p.busy||!data.runtimeEnabled||!reviewed||!reason.trim()||row.state==='revoked'} onClick={()=>{void review(row,'revoke');}}>Revoke cmi5 package</button>
-        <button disabled={p.busy} onClick={()=>{void exportZip(row);}}>Export original cmi5 ZIP</button></>}
-      {row.state==='published'&&(auPages[row.id]??row).aus.map((au:any)=><button key={au.id} disabled={p.busy||!consent||!data.runtimeEnabled} onClick={()=>{void open(row,au);}}>{p.author?'Preview':'Start'} {au.title}</button>)}
+        <button disabled={p.busy} onClick={()=>{void exportZip(row);}}>Export original cmi5 package</button></>}
+      {row.state==='published'&&(auPages[row.id]??row).aus.map((au:any)=><button key={au.id} disabled={p.busy||!consent||!data.runtimeEnabled||au.playbackSupported===false} onClick={()=>{void open(row,au);}}>{p.author?'Preview':'Start'} {au.title}</button>)}
       {row.state==='published'&&row.auTotal>10&&<><button disabled={p.busy||(auPages[row.id]??row).auOffset===0} onClick={()=>{void activityPage(row,Math.max(0,(auPages[row.id]??row).auOffset-10));}}>Previous activities</button><button disabled={p.busy||(auPages[row.id]??row).nextAuOffset==null} onClick={()=>{void activityPage(row,(auPages[row.id]??row).nextAuOffset);}}>Next activities</button></>}
     </article>)}
     <button disabled={p.busy||offset===0} onClick={()=>setOffset(Math.max(0,offset-20))}>Previous cmi5 packages</button><button disabled={p.busy||data?.nextOffset==null} onClick={()=>setOffset(data.nextOffset)}>Next cmi5 packages</button>
