@@ -1,6 +1,7 @@
 import {createHash, randomBytes, randomUUID} from 'node:crypto';
 import type {DatabaseSync} from 'node:sqlite';
 import type {Principal} from '../shared/model.ts';
+import {cmi5WaiverReasons} from '../shared/cmi5.ts';
 import {parseUniqueJSON} from '../shared/json-unique.ts';
 import {SCORMEngineStore} from './scorm-engine-store.ts';
 import {packageLimits, packagePath} from './scorm-package-reader.ts';
@@ -138,6 +139,7 @@ export class CMI5Service {
       }
       const current=this.package(p,pkg.id).state;
       if(current!=='published' && !(registration && current==='retired'))reject('FORBIDDEN','Published or pinned retired cmi5 package required');
+      if(registration&&a.mode==='Normal'&&this.db.prepare("SELECT 1 FROM cmi5_statements WHERE registration_id=? AND au_id=? AND source='lms' AND verb='waived'").get(registration.id,au.id))reject('FORBIDDEN','Waived AU requires Review mode or a new registration');
       if(!registration) {
         if(Number((this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_registrations WHERE tenant=? AND learner=?').get(p.tenant,p.id) as any).n)>=200)cmi5Invalid('registration quota reached');
         registration={id:randomUUID()};
@@ -270,13 +272,14 @@ export class CMI5Service {
     });
   }
   private outcomes(registration:string,manifest:CMI5Manifest) {
-    const rows=this.db.prepare("SELECT au_id,verb,statement FROM cmi5_statements WHERE registration_id=? AND defined=1 AND source='au' ORDER BY timestamp,sequence").all(registration) as any[];
+    const rows=this.db.prepare("SELECT au_id,verb,statement FROM cmi5_statements WHERE registration_id=? AND defined=1 AND (source='au' OR source='lms' AND verb='waived') ORDER BY timestamp,sequence").all(registration) as any[];
     const groups=new Map<string,any[]>();for(const row of rows){const group=groups.get(row.au_id)??[];group.push(row);groups.set(row.au_id,group);}
     return manifest.aus.map(au=>{
       const evidence=groups.get(au.id)??[], completed=evidence.some(r=>r.verb==='completed'), passed=evidence.some(r=>r.verb==='passed');
-      const satisfied=au.moveOn==='NotApplicable'||au.moveOn==='Passed'&&passed||au.moveOn==='Completed'&&completed||au.moveOn==='CompletedAndPassed'&&completed&&passed||au.moveOn==='CompletedOrPassed'&&(completed||passed);
+      const waiver=evidence.find(r=>r.verb==='waived'),waived=!!waiver;
+      const satisfied=waived||au.moveOn==='NotApplicable'||au.moveOn==='Passed'&&passed||au.moveOn==='Completed'&&completed||au.moveOn==='CompletedAndPassed'&&completed&&passed||au.moveOn==='CompletedOrPassed'&&(completed||passed);
       const last=evidence.filter(r=>['passed','failed','terminated'].includes(r.verb)).at(-1), score=evidence.filter(r=>JSON.parse(r.statement).result?.score).at(-1);
-      return {id:au.id,title:au.title,moveOn:au.moveOn,completed,passed,satisfied,success:evidence.some(r=>r.verb==='failed')&&!passed?false:passed?true:null,score:score?JSON.parse(score.statement).result.score:null,duration:last?JSON.parse(last.statement).result?.duration:null};
+      return {id:au.id,title:au.title,moveOn:au.moveOn,completed,passed,satisfied,waived,waiverReason:waiver?JSON.parse(waiver.statement).result.extensions['https://w3id.org/xapi/cmi5/result/extensions/reason']:null,success:evidence.some(r=>r.verb==='failed')&&!passed?false:passed?true:null,score:score?JSON.parse(score.statement).result.score:null,duration:last?JSON.parse(last.statement).result?.duration:null};
     });
   }
   private satisfaction(s:any) {
@@ -376,12 +379,32 @@ export class CMI5Service {
     const s=this.authenticate(header);object(q,['activityId'],['activityId']);if(q.activityId!==s.au.activityId)reject('FORBIDDEN','Exact AU Activity required');
     return {objectType:'Activity',id:s.au.activityId,definition:{name:s.au.names,description:s.au.descriptions,...(s.au.activityType?{type:s.au.activityType}:{})}};
   }
+  waive(p:Principal,a:any) {
+    object(a,['registrationId','auId','reason','confirmed','key','revision'],['registrationId','auId','reason']);
+    if(typeof a.registrationId!=='string'||!uuid.test(a.registrationId)||!cmi5IRI(a.auId)||!cmi5WaiverReasons.includes(a.reason))cmi5Invalid('registration, AU and explicit waiver reason required');
+    return this.command(p,a,'human_cmi5_waiver',{registrationId:a.registrationId,auId:a.auId,reason:a.reason},true,()=>{
+      const report=this.report(p,a.registrationId,true);
+      if(report.mode!=='Normal'||!['published','retired'].includes(report.packageState))reject('FORBIDDEN','Normal registration on a reviewed package required');
+      const outcome=report.aus.find(au=>au.id===a.auId);if(!outcome)cmi5Invalid('exact registered AU required');
+      if(outcome.waived||outcome.satisfied)cmi5Invalid('AU is already waived or satisfied');
+      const r=this.db.prepare('SELECT * FROM cmi5_registrations WHERE id=?').get(a.registrationId) as any,learner=this.db.prepare('SELECT * FROM accounts WHERE id=? AND tenant=? AND active=1').get(r.learner,r.tenant) as any;
+      if(!learner)reject('FORBIDDEN','Active registration learner required');
+      for(const active of this.db.prepare("SELECT id FROM cmi5_sessions WHERE registration_id=? AND au_id=? AND status IN('launched','initialized')").all(r.id,a.auId) as any[])this.abandon(this.session(active.id,false));
+      const id=randomUUID(),now=new Date().toISOString(),data={contextTemplate:{extensions:{[cmi5Extension+'sessionid']:id},contextActivities:{grouping:[{id:a.auId}]}},launchMode:'Normal'};
+      // A dedicated expired LMS session satisfies Quartz 9.3.7 without minting
+      // a fetch/Basic capability or pretending that the learner launched an AU.
+      this.db.prepare("INSERT INTO cmi5_sessions(id,registration_id,au_id,auth_version,browser_session,fetch_hash,launch_data,status,created_at,expires,terminated_at) VALUES(?,?,?,?,?,?,?,'terminated',?,0,?)").run(id,r.id,a.auId,learner.auth_version,'','waived:'+id,JSON.stringify(data),now,Date.now());
+      const s=this.session(id,false);this.lms(s,'waived',{extensions:{'https://w3id.org/xapi/cmi5/result/extensions/reason':a.reason}});this.satisfaction(s);
+      this.db.prepare('UPDATE workspaces SET revision=revision+1 WHERE id=?').run(`learning:${r.tenant}:${r.learner}`);
+      return {...this.report(p,r.id,true),sessionId:id};
+    });
+  }
   report(p:Principal,registrationId:string,admin=false) {
     this.store.live(p,admin);const r=this.db.prepare(`SELECT r.*,p.manifest,p.state AS package_state FROM cmi5_registrations r JOIN cmi5_packages p ON p.id=r.package_id WHERE r.id=? AND r.tenant=? AND (?=1 OR r.learner=?)`).get(registrationId,p.tenant,admin?1:0,p.id) as any;
     if(!r)reject('FORBIDDEN','Authorized cmi5 registration required');const m:CMI5Manifest=JSON.parse(r.manifest), aus=this.outcomes(r.id,m);
-    const sessions=this.db.prepare('SELECT id,au_id,status,created_at,expires FROM cmi5_sessions WHERE registration_id=? ORDER BY created_at DESC,id LIMIT 20').all(r.id) as any[];
+    const sessions=this.db.prepare("SELECT id,au_id,status,created_at,expires,EXISTS(SELECT 1 FROM cmi5_statements WHERE session_id=cmi5_sessions.id AND source='lms' AND verb='waived') AS waiver FROM cmi5_sessions WHERE registration_id=? ORDER BY created_at DESC,id LIMIT 20").all(r.id) as any[];
     const statementCount=(this.db.prepare('SELECT COUNT(*) AS n FROM cmi5_statements WHERE registration_id=?').get(r.id) as any).n;
-    return {registrationId:r.id,packageId:r.package_id,title:m.course.title,mode:r.mode,packageState:r.package_state,aus,sessions,statementCount,satisfied:r.mode==='Normal'&&aus.every(a=>a.satisfied),officialLearningChanged:false};
+    return {registrationId:r.id,packageId:r.package_id,title:m.course.title,mode:r.mode,packageState:r.package_state,aus,sessions:sessions.map(row=>({...row})),statementCount,satisfied:r.mode==='Normal'&&aus.every(a=>a.satisfied),officialLearningChanged:false};
   }
   registrations(p:Principal,admin=false,offset=0) {
     this.store.live(p,admin);if(!Number.isSafeInteger(offset)||offset<0)cmi5Invalid('invalid registration page');

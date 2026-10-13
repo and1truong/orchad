@@ -19,6 +19,7 @@ export async function registerCMI5(app:FastifyInstance,service:CMI5Service,enabl
   app.get('/api/cmi5/registrations/:id',async(req,reply)=>{try{return service.report(principal(req),(req.params as any).id,(req.query as any).admin==='true');}catch(e){return error(e,reply);}});
   app.get('/api/cmi5/registrations/:id/statements',async(req,reply)=>{try{const {admin,...q}=req.query as any;return service.evidence(principal(req),(req.params as any).id,q,admin==='true');}catch(e){return error(e,reply);}});
   app.post('/api/cmi5/review',{preHandler:guard},async(req,reply)=>{try{return service.review(principal(req),req.body);}catch(e){return error(e,reply);}});
+  app.post('/api/cmi5/waive',{preHandler:guard},async(req,reply)=>{try{return service.waive(principal(req),req.body);}catch(e){return error(e,reply);}});
   app.post('/api/cmi5/launch',{preHandler:guard},async(req,reply)=>{try{return service.launch(principal(req),(req as any).session.token_hash,req.body);}catch(e){return error(e,reply);}});
   app.post('/api/cmi5/sessions/:id/close',{preHandler:guard},async(req,reply)=>{try{return service.close(principal(req),(req.params as any).id);}catch(e){return error(e,reply);}});
   app.get('/api/cmi5/packages/:id/export',async(req,reply)=>{try{const v=service.export(principal(req),(req.params as any).id);return reply.type(v.mime).header('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(v.filename)).send(v.bytes);}catch(e){return error(e,reply);}});

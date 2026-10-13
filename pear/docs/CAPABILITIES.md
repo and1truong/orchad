@@ -256,6 +256,12 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-191 adds human administrative waivers with explicit reason/confirmation,
+CAS/receipt/audit rollback, dedicated capability-free LMS sessions and durable
+learner reports. Waived AUs reopen in Review mode within the registration, and
+retain distinct reported completion/pass/score. This does not grant official
+credit or close external conformance/production gates.
+
 #144 / ADR-190 adds scoped Statement filters, stored-time ordering and snapshot
 pagination, exact/ids/canonical language-selected formats, validated Activity
 and interaction metadata and HTTP consistency headers. General document/query

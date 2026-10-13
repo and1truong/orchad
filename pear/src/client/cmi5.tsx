@@ -1,14 +1,18 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useId,useRef,useState} from 'react';
 import {request,type Session} from './api.ts';
+import {cmi5WaiverReasons} from '../shared/cmi5.ts';
 
 export function CMI5Packages(p:{session:Session;busy:boolean;run:(fn:()=>Promise<void>)=>Promise<boolean>;isCurrent:()=>boolean;tick:number;author?:boolean}) {
   const [data,setData]=useState<any>(),[registrations,setRegistrations]=useState<any>(),[report,setReport]=useState<any>(),[launch,setLaunch]=useState<any>();
   const [offset,setOffset]=useState(0),[recordOffset,setRecordOffset]=useState(0),[refresh,setRefresh]=useState(0),[file,setFile]=useState<File|null>(null);
   const [auPages,setAUPages]=useState<Record<string,any>>({});
   const [provenance,setProvenance]=useState(''),[reason,setReason]=useState(''),[reviewed,setReviewed]=useState(false),[consent,setConsent]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState('');
+  const [waiverReason,setWaiverReason]=useState(''),[waiverConfirmed,setWaiverConfirmed]=useState(false);
+  const waiverReasonId=useId();
   const alive=useRef(true);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   const current=()=>alive.current&&p.isCurrent();
+  useEffect(()=>{setWaiverReason('');setWaiverConfirmed(false);},[report?.registrationId]);
   useEffect(()=>{
     let active=true;
     void Promise.all([request<any>('/api/cmi5/packages?author='+!!p.author+'&offset='+offset,p.session),request<any>('/api/cmi5/registrations?admin='+!!p.author+'&offset='+recordOffset,p.session)])
@@ -22,7 +26,7 @@ export function CMI5Packages(p:{session:Session;busy:boolean;run:(fn:()=>Promise
   },[p.session,report?.registrationId,p.author]);
   async function context(author=false) {return request<any>('/api/context?documentId='+encodeURIComponent(author?'library:'+p.session.principal.tenant:`learning:${p.session.principal.tenant}:${p.session.principal.id}`),p.session);}
   async function open(row:any,au:any,registrationId?:string) {await p.run(async()=>{
-    const ctx=await context(),v=await request<any>('/api/cmi5/launch',p.session,{packageId:row.id,auId:au.id,mode:p.author?'Browse':'Normal',...(registrationId?{registrationId}:{}),confirmed:consent,revision:ctx.revision,key:crypto.randomUUID()});
+    const ctx=await context(),v=await request<any>('/api/cmi5/launch',p.session,{packageId:row.id,auId:au.id,mode:p.author?'Browse':au.waived?'Review':'Normal',...(registrationId?{registrationId}:{}),confirmed:consent,revision:ctx.revision,key:crypto.randomUUID()});
     const saved=await request<any>('/api/cmi5/registrations/'+v.registrationId,p.session);
     if(current()){setLaunch(v.url?v:undefined);setReport(saved);setRefresh(n=>n+1);setStatus(v.url?'Activity launched. Progress appears after the activity saves it.':'Launch recorded; reopen the saved registration to continue.');}
   });}
@@ -31,6 +35,10 @@ export function CMI5Packages(p:{session:Session;busy:boolean;run:(fn:()=>Promise
   });}
   async function activityPage(row:any,offset:number) {await p.run(async()=>{
     const page=await request<any>('/api/cmi5/packages/'+row.id+'/activities?author='+!!p.author+'&offset='+offset,p.session);if(current())setAUPages(old=>({...old,[row.id]:page}));
+  });}
+  async function waive(au:any) {await p.run(async()=>{
+    const ctx=await context(true),result=await request<any>('/api/cmi5/waive',p.session,{registrationId:report.registrationId,auId:au.id,reason:waiverReason,confirmed:waiverConfirmed,revision:ctx.revision,key:crypto.randomUUID()});
+    if(current()){setReport(result);setWaiverConfirmed(false);setWaiverReason('');setStatus('Waiver recorded. Reported completion and pass results are unchanged.');}
   });}
   async function exportZip(row:any) {await p.run(async()=>{
     const response=await fetch('/api/cmi5/packages/'+row.id+'/export',{credentials:'same-origin',headers:{'X-Pear-Epoch':p.session.sessionEpoch}});
@@ -66,9 +74,11 @@ export function CMI5Packages(p:{session:Session;busy:boolean;run:(fn:()=>Promise
     {registrations?.items.map((r:any)=><button key={r.id} disabled={p.busy} onClick={()=>{void p.run(async()=>{const v=await request<any>('/api/cmi5/registrations/'+r.id+'?admin='+!!p.author,p.session);if(current())setReport(v);});}}>{r.title} · {r.mode}{p.author?' · '+r.learner:''}</button>)}
     <button disabled={p.busy||recordOffset===0} onClick={()=>setRecordOffset(Math.max(0,recordOffset-20))}>Previous cmi5 registrations</button><button disabled={p.busy||registrations?.nextOffset==null} onClick={()=>setRecordOffset(registrations.nextOffset)}>Next cmi5 registrations</button>
     {report&&<div aria-label="cmi5 report"><h3>{report.title}</h3><p>Course satisfaction: {report.satisfied?'Satisfied':'Pending'} · {report.statementCount} recorded statements</p>
-      {report.aus.map((au:any)=><div key={au.id}><p>{au.title} · Completed: {String(au.completed)} · Passed: {String(au.passed)} · Satisfied: {String(au.satisfied)}{au.score?' · Score: '+JSON.stringify(au.score):''}{au.duration?' · Duration: '+au.duration:''}</p>
-        <button disabled={p.busy||!consent||!data?.runtimeEnabled||!['published','retired'].includes(report.packageState)||!registrations?.items.some((r:any)=>r.id===report.registrationId&&r.learner===p.session.principal.id)} onClick={()=>{void open({id:report.packageId},au,report.registrationId);}}>Resume {au.title}</button></div>)}
-      {report.sessions.map((s:any)=><p key={s.id}>Session {s.status}{s.expires<=Date.now()?' (expired)':''}</p>)}
+      {p.author&&report.mode==='Normal'&&<><label htmlFor={waiverReasonId}>cmi5 waiver reason</label><select id={waiverReasonId} value={waiverReason} disabled={p.busy} onChange={e=>{setWaiverReason(e.target.value);setWaiverConfirmed(false);}}><option value="">Choose a reason</option>{cmi5WaiverReasons.map(reason=><option key={reason}>{reason}</option>)}</select><label><input type="checkbox" disabled={p.busy} checked={waiverConfirmed} onChange={e=>setWaiverConfirmed(e.target.checked)}/>I confirm the alternative evidence for this cmi5 waiver.</label></>}
+      {report.aus.map((au:any)=><div key={au.id}><p>{au.title} · Completed: {String(au.completed)} · Passed: {String(au.passed)} · Satisfied: {String(au.satisfied)}{au.waived?' · Waived: '+au.waiverReason:''}{au.score?' · Score: '+JSON.stringify(au.score):''}{au.duration?' · Duration: '+au.duration:''}</p>
+        <button disabled={p.busy||!consent||!data?.runtimeEnabled||!['published','retired'].includes(report.packageState)||!registrations?.items.some((r:any)=>r.id===report.registrationId&&r.learner===p.session.principal.id)} onClick={()=>{void open({id:report.packageId},au,report.registrationId);}}>{au.waived?'Review':'Resume'} {au.title}</button>
+        {p.author&&report.mode==='Normal'&&<button disabled={p.busy||!data?.runtimeEnabled||!['published','retired'].includes(report.packageState)||au.satisfied||!waiverReason||!waiverConfirmed} onClick={()=>{void waive(au);}}>Waive {au.title}</button>}</div>)}
+      {report.sessions.map((s:any)=><p key={s.id}>{s.waiver?'LMS waiver session':'Session '+s.status}{!s.waiver&&s.expires<=Date.now()?' (expired)':''}</p>)}
     </div>}
     {launch&&<>{launch.launchMethod==='OwnWindow'?<a href={launch.url} target="_blank" rel="noopener noreferrer">Open cmi5 activity in a new window</a>:<iframe key={launch.sessionId} title="cmi5 activity" sandbox="allow-scripts allow-same-origin" src={launch.url} style={{width:'100%',height:'70vh',border:0}}/>}
       <p>Let the activity finish saving before ending the session. An unfinished session is recorded as interrupted.</p>

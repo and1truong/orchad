@@ -1,5 +1,11 @@
 # cmi5 acceptance — #144
 
+ADR-191 adds confirmed administrative AU waivers, dedicated capability-free LMS
+sessions, required reason evidence, atomic audit/receipt/revocation/rollup and a
+built admin/learner Review journey. Waivers remain distinct from AU completion,
+pass and official credit. Local evidence: 29 cmi5 cases, six built journeys and
+build/typecheck/vendor PASS. Official bindings and external gates remain open.
+
 ADR-190 adds stored-time Statement filters, default reverse/explicit ascending
 order, stable filtered snapshot pagination and exact/ids/canonical formats with
 Accept-Language. Activity/interaction/context metadata is validated before atomic
