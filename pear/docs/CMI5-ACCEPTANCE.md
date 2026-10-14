@@ -1,5 +1,14 @@
 # cmi5 acceptance — #144
 
+ADR-194 adds validated Agent/Group/StatementRef/SubStatement allowed objects,
+scoped recursive reference filtering and general ISO duration metadata. Outer
+cmi5 identity/context/lifecycle and defined AU/outcome rules remain enforced;
+nested results cannot grant credit. Local evidence: 47 cmi5 cases, seven built
+journeys and build/typecheck/vendor PASS. Schema-55 regression: all 1,135 existing
+Pear cases PASS, zero failed/cancelled/skipped. The remote browser exchanges a
+SubStatement plus raw attachment. Exhaustive corpus, MIME variants, licensed/
+native/platform, partner and production acceptance remain open.
+
 ADR-193 adds scoped raw multipart POST/PUT/GET attachments, SHA-256/384/512,
 immutable registration-bound bytes, JSON fileUrl metadata, quota/dedup/retry and
 atomic rollback. Local evidence: 43 cmi5 cases, seven built journeys (including
