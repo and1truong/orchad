@@ -1,4 +1,5 @@
 import {cmi5Invalid,cmi5IRI} from './cmi5-package.ts';
+export const xapiUUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function xapiObject(v:any,keys:string[],required:string[]=[]) {
   if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).some(k=>!keys.includes(k))||required.some(k=>!Object.hasOwn(v,k)))cmi5Invalid('unsupported or missing JSON property');
@@ -31,6 +32,19 @@ export function xapiActivity(v:any) {
     const ids=new Set();for(const component of d[key]){xapiObject(component,['id','description'],['id']);if(typeof component.id!=='string'||!component.id||component.id.length>256||ids.has(component.id))cmi5Invalid('unique bounded interaction component ID required');ids.add(component.id);if(component.description!==undefined)xapiLanguageMap(component.description);}
   }
 }
+export function xapiDuration(v:any) {
+  if(typeof v!=='string'||v.length>100||!/^P(?=\d|T\d)(?:\d{1,6}(?:[.,]\d{1,9})?W|(?:\d{1,6}(?:[.,]\d{1,9})?Y)?(?:\d{1,6}(?:[.,]\d{1,9})?M)?(?:\d{1,6}(?:[.,]\d{1,9})?D)?(?:T(?=\d)(?:\d{1,6}(?:[.,]\d{1,9})?H)?(?:\d{1,6}(?:[.,]\d{1,9})?M)?(?:\d{1,6}(?:[.,]\d{1,9})?S)?)?)$/.test(v)||/[.,]\d+[YMDHMS].*\d/.test(v))cmi5Invalid('bounded ISO 8601 duration required');
+}
+export function xapiResult(result:any,defined=false) {
+  xapiObject(result,['score','success','completion','duration','response','extensions']);
+  for(const key of ['success','completion'])if(result[key]!==undefined&&typeof result[key]!=='boolean')cmi5Invalid('Boolean result required');
+  if(result.duration!==undefined)xapiDuration(result.duration);
+  if(result.response!==undefined&&(typeof result.response!=='string'||result.response.length>4096))cmi5Invalid('bounded response required');
+  if(result.extensions!==undefined)xapiExtensions(result.extensions);
+  const progress=result.extensions?.['https://w3id.org/xapi/cmi5/result/extensions/progress'];if(progress!==undefined&&(!Number.isInteger(progress)||progress<0||progress>100))cmi5Invalid('progress must be 0–100');
+  if(result.score!==undefined){xapiObject(result.score,['scaled','raw','min','max']);const score=result.score;if(!Object.keys(score).length||Object.values(score).some(v=>typeof v!=='number'||!Number.isFinite(v))||score.scaled!==undefined&&(score.scaled<(defined?0:-1)||score.scaled>1)||['raw','min','max'].some(k=>score[k]!==undefined&&defined&&!Number.isInteger(score[k]))||score.raw!==undefined&&(defined&&(score.min===undefined||score.max===undefined)||score.min!==undefined&&score.raw<score.min||score.max!==undefined&&score.raw>score.max)||score.min!==undefined&&score.max!==undefined&&score.min>=score.max)cmi5Invalid('invalid score bounds');}
+  return result;
+}
 // xAPI document/query timestamps may carry an offset. cmi5 statements retain
 // their separate mandatory UTC/source-time/lifecycle validation.
 export function xapiQueryTime(v:unknown):string|undefined {
@@ -53,7 +67,7 @@ export function statementFormat(value:any,format:string,language?:string):any {
   function walk(v:any) {
     if(!v||typeof v!=='object')return;
     if(v.objectType==='Activity'||v.id&&v.definition){if(format==='ids')delete v.definition;else if(format==='canonical'&&v.definition){for(const key of ['name','description'])if(v.definition[key])v.definition[key]=map(v.definition[key]);for(const key of ['choices','scale','source','target','steps'])for(const c of v.definition[key]??[])if(c.description)c.description=map(c.description);}}
-    if(format==='ids'&&(v.objectType==='Agent'||v.account||v.mbox||v.mbox_sha1sum||v.openid)){delete v.name;}
+    if(format==='ids'&&(v.objectType==='Agent'||v.objectType==='Group'||v.account||v.mbox||v.mbox_sha1sum||v.openid)){delete v.name;if(v.objectType==='Group'&&(v.account||v.mbox||v.mbox_sha1sum||v.openid))delete v.member;}
     for(const [key,child] of Object.entries(v)){if(key==='extensions')continue;if(key==='verb'&&child&&typeof child==='object'){if(format==='ids')delete (child as any).display;else if(format==='canonical'&&(child as any).display)(child as any).display=map((child as any).display);}else if(Array.isArray(child))child.forEach(walk);else walk(child);}
   }
   if(format!=='exact')walk(copy);return copy;

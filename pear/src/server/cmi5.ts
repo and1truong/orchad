@@ -12,20 +12,20 @@ import {boundedPage, reject} from './errors.ts';
 import {cmi5Invalid, cmi5IRI, cmi5RemoteURL, inspectCMI5Package, type CMI5AU, type CMI5Manifest, type CMI5Node} from './cmi5-package.ts';
 import {cmi5Document,documentRead,documentETag} from './cmi5-documents.ts';
 import {validateAttachments,saveCMI5Attachments,encodeCMI5Multipart,type AttachmentParts} from './cmi5-attachments.ts';
-import {xapiObject as object,xapiActivity,xapiLanguageMap,xapiLanguage,xapiExtensions,xapiQueryTime,statementFormat} from './cmi5-xapi.ts';
+import {xapiObject as object,xapiLanguageMap,xapiUUID,xapiResult,xapiDuration as duration,xapiQueryTime,statementFormat} from './cmi5-xapi.ts';
+import {xapiStatementObject,xapiContext} from './cmi5-objects.ts';
 
 export const cmi5Category = 'https://w3id.org/xapi/cmi5/context/categories/cmi5';
 export const cmi5MoveCategory = 'https://w3id.org/xapi/cmi5/context/categories/moveon';
 export const cmi5Extension = 'https://w3id.org/xapi/cmi5/context/extensions/';
 const exp = 'http://adlnet.gov/expapi/verbs/', adl = 'https://w3id.org/xapi/adl/verbs/';
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuid = xapiUUID;
 const hash = (v: string | Buffer) => createHash('sha256').update(v).digest('hex');
 function stable(v: any): string {return Array.isArray(v) ? '[' + v.map(stable).join(',') + ']' : v && typeof v === 'object' ? '{' + Object.keys(v).sort().map(k => JSON.stringify(k)+':'+stable(v[k])).join(',') + '}' : JSON.stringify(v);}
 function timestamp(v: any) {
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(v) || !Number.isFinite(Date.parse(v)) || Date.parse(v)>Date.now()+300000 || Date.parse(v)<0) cmi5Invalid('valid UTC timestamp required');
   const normalized = new Date(v).toISOString(); if (normalized.slice(0,19) !== v.slice(0,19)) cmi5Invalid('invalid calendar date'); return normalized;
 }
-function duration(v: any) {if (typeof v !== 'string' || !/^P(?=\d|T\d)(?:\d{1,6}D)?(?:T(?=\d)(?:\d{1,6}H)?(?:\d{1,6}M)?(?:\d{1,6}(?:\.\d{1,3})?S)?)?$/.test(v)) cmi5Invalid('bounded day/time duration required');}
 
 export class CMI5Service {
   readonly store: SCORMEngineStore;
@@ -216,36 +216,24 @@ export class CMI5Service {
     this.lms(s,'abandoned',{duration:'PT'+Math.max(0,(Date.parse(last.t??s.created_at)-Date.parse(s.created_at))/1000)+'S'});
     this.db.prepare("UPDATE cmi5_sessions SET status='abandoned' WHERE id=?").run(s.id);
   }
-  private validate(s:any,input:any) {
+  private validate(s:any,input:any,references:Set<string>) {
     object(input,['id','actor','verb','object','context','result','timestamp','attachments'],['id','actor','verb','object','context','timestamp']);
     validateAttachments(input.attachments);
     if(typeof input.id!=='string'||!uuid.test(input.id)||Buffer.byteLength(JSON.stringify(input))>16*1024)cmi5Invalid('UUID and ≤16 KiB statement required');
     if(stable(input.actor)!==stable(JSON.parse(s.actor)))reject('FORBIDDEN','Exact launch actor required');
     object(input.verb,['id','display'],['id']); if(!cmi5IRI(input.verb.id))cmi5Invalid('verb IRI required');if(input.verb.display!==undefined)xapiLanguageMap(input.verb.display);
-    xapiActivity(input.object);
-    object(input.context,['registration','contextActivities','extensions','language','revision','platform'],['registration','contextActivities','extensions']);
-    if(input.context.language!==undefined&&!xapiLanguage(input.context.language))cmi5Invalid('BCP 47 context language required');
-    for(const key of ['revision','platform'])if(input.context[key]!==undefined&&(typeof input.context[key]!=='string'||input.context[key].length>500))cmi5Invalid('bounded context metadata required');
+    const scoped=(id:string)=>{if(!references.has(id)&&!this.db.prepare('SELECT 1 FROM cmi5_statements WHERE id=? AND registration_id=?').get(id,s.registration_id))reject('FORBIDDEN','Scoped StatementRef unavailable');};
+    xapiStatementObject(input.object,scoped);xapiContext(input.context,scoped);
     const c=input.context; if(c.registration!==s.registration_id||c.extensions?.[cmi5Extension+'sessionid']!==s.id)reject('FORBIDDEN','Exact registration/session required');
-    object(c.contextActivities,['parent','grouping','category','other']);
-    for(const values of Object.values(c.contextActivities) as any[]){if(!Array.isArray(values)||values.length>32)cmi5Invalid('bounded context activity lists required');values.forEach(xapiActivity);}
+    if(!c.contextActivities||!c.extensions)cmi5Invalid('context template activities/extensions required');
     if(!c.contextActivities.grouping?.some((v:any)=>v.id===s.au.id))reject('FORBIDDEN','Publisher grouping required');
-    xapiExtensions(c.extensions);
     const categories=c.contextActivities.category??[], defined=categories.some((v:any)=>v.id===cmi5Category), verb=input.verb.id.startsWith(exp)?input.verb.id.slice(exp.length):input.verb.id;
     if(input.verb.id===exp+'voided')reject('FORBIDDEN','AU credentials cannot void statements');
-    const result=input.result??{}; object(result,['score','success','completion','duration','response','extensions']);
-    for(const k of ['success','completion'])if(result[k]!==undefined&&typeof result[k]!=='boolean')cmi5Invalid('Boolean result required');
-    if(result.duration!==undefined)duration(result.duration);
-    if(result.response!==undefined&&(typeof result.response!=='string'||result.response.length>4096))cmi5Invalid('bounded response required');
-    if(result.extensions!==undefined)xapiExtensions(result.extensions);
-    const progress=result.extensions?.['https://w3id.org/xapi/cmi5/result/extensions/progress']; if(progress!==undefined&&(!Number.isInteger(progress)||progress<0||progress>100))cmi5Invalid('progress must be 0–100');
-    if(result.score!==undefined) {
-      object(result.score,['scaled','raw','min','max']); const score=result.score;
-      if(!Object.keys(score).length||Object.values(score).some(v=>typeof v!=='number'||!Number.isFinite(v))||score.scaled!==undefined&&(score.scaled<(defined?0:-1)||score.scaled>1)||['raw','min','max'].some(k=>score[k]!==undefined&&defined&&!Number.isInteger(score[k]))||score.raw!==undefined&&(defined&&(score.min===undefined||score.max===undefined)||score.min!==undefined&&score.raw<score.min||score.max!==undefined&&score.raw>score.max)||score.min!==undefined&&score.max!==undefined&&score.min>=score.max)cmi5Invalid('invalid score bounds');
-    }
+    const result=xapiResult(input.result??{},defined);
+    if((c.revision!==undefined||c.platform!==undefined)&&(input.object.objectType??'Activity')!=='Activity')cmi5Invalid('revision/platform require an Activity object');
     if(defined) {
       if(!['initialized','completed','passed','failed','terminated'].includes(verb)||input.verb.id!==exp+verb)cmi5Invalid('AU cannot issue LMS-only or unknown defined verbs');
-      if(input.object.id!==s.au.activityId)reject('FORBIDDEN','Exact AU activity required');
+      if((input.object.objectType??'Activity')!=='Activity'||input.object.id!==s.au.activityId)reject('FORBIDDEN','Exact AU activity required');
       if(s.data.launchMode!=='Normal'&&!['initialized','terminated'].includes(verb))cmi5Invalid('Browse/Review cannot report satisfaction');
       if(result.success!==(['passed','failed'].includes(verb)?verb==='passed':undefined)||result.completion!==(verb==='completed'?true:undefined)||result.score!==undefined&&!['passed','failed'].includes(verb))cmi5Invalid('defined verb/result mismatch');
       if(['completed','passed','failed','terminated'].includes(verb))duration(result.duration);
@@ -262,7 +250,9 @@ export class CMI5Service {
     return this.transaction(()=>{
       const s=this.authenticate(header,true), batch=Array.isArray(body)?body:[body];
       if(!batch.length||batch.length>20||Buffer.byteLength(JSON.stringify(batch))>64*1024)cmi5Invalid('1–20 bounded statements required');
-      const values=batch.map(v=>this.validate(s,v)), changed:string[]=[];
+      const references=new Set<string>(batch.map(v=>typeof v?.id==='string'?v.id.toLowerCase():''));
+      if(references.size!==batch.length)cmi5Invalid('duplicate statement ID in batch');
+      const values=batch.map(v=>this.validate(s,v,references)), changed:string[]=[];
       const added=saveCMI5Attachments(this.db,s,values.flatMap(v=>v.statement.attachments??[]),parts);
       for(const v of values) {
         const old=this.db.prepare('SELECT * FROM cmi5_statements WHERE id=?').get(v.statement.id) as any;
@@ -338,11 +328,14 @@ export class CMI5Service {
     }
     const where=['registration_id=?','sequence<=?','sequence>?'],args:any[]=[s.registration_id,ceiling,after];
     if(since){where.push('stored>?');args.push(since);}if(until){where.push('stored<=?');args.push(until);}
-    if(q.verb!==undefined){where.push("json_extract(statement,'$.verb.id')=?");args.push(q.verb);}
-    if(q.activity!==undefined){where.push("(json_extract(statement,'$.object.id')=?"+(related?" OR EXISTS(SELECT 1 FROM json_each(statement,'$.context.contextActivities') AS groups,json_each(groups.value) AS activity WHERE json_extract(activity.value,'$.id')=?)":"")+")");args.push(q.activity);if(related)args.push(q.activity);}
+    const ctes=["targets(id,target) AS MATERIALIZED (SELECT id,lower(json_extract(statement,'$.object.id')) FROM cmi5_statements WHERE registration_id=? AND json_extract(statement,'$.object.objectType')='StatementRef')"],filterArgs:any[]=[s.registration_id];
+    const matching=(name:string,condition:string,values:any[])=>{ctes.push(`${name}(id) AS (SELECT id FROM cmi5_statements WHERE registration_id=? AND (${condition}) UNION SELECT t.id FROM targets t JOIN ${name} matched ON t.target=matched.id)`);filterArgs.push(s.registration_id,...values);where.push(`id IN(SELECT id FROM ${name})`);};
+    if(q.verb!==undefined)matching('verbMatches',"json_extract(statement,'$.verb.id')=?",[q.verb]);
+    if(q.activity!==undefined){const conditions=["json_extract(statement,'$.object.id')=?"],values=[q.activity];if(related){conditions.push("json_extract(statement,'$.object.objectType')='SubStatement' AND json_extract(statement,'$.object.object.id')=?","EXISTS(SELECT 1 FROM json_each(statement,'$.context.contextActivities') AS groups,json_each(groups.value) AS activity WHERE json_extract(activity.value,'$.id')=?)","EXISTS(SELECT 1 FROM json_each(statement,'$.object.context.contextActivities') AS groups,json_each(groups.value) AS activity WHERE json_extract(activity.value,'$.id')=?)");values.push(q.activity,q.activity,q.activity);}matching('activityMatches',conditions.join(' OR '),values);}
     const direction=ascending?'ASC':'DESC',comparison=ascending?'>':'<';
     if(lastTime!==undefined){where.push(`(stored${comparison}? OR stored=? AND sequence${comparison}?)`);args.push(lastTime,lastTime,lastSequence);}
-    const rows=this.db.prepare(`SELECT * FROM cmi5_statements WHERE ${where.join(' AND ')} ORDER BY stored ${direction},sequence ${direction} LIMIT ?`).all(...args,limit+1) as any[];
+    const prefix=ctes.length>1?'WITH RECURSIVE '+ctes.join(',')+' ':'';
+    const rows=this.db.prepare(`${prefix}SELECT * FROM cmi5_statements WHERE ${where.join(' AND ')} ORDER BY stored ${direction},sequence ${direction} LIMIT ?`).all(...(prefix?filterArgs:[]),...args,limit+1) as any[];
     const page=rows.slice(0,limit),next=new URLSearchParams(q);next.delete('cursor');
     if(rows.length>limit){const last=page.at(-1);next.set('cursor',Buffer.from(JSON.stringify([filter,s.registration_id,ceiling,last.stored,last.sequence])).toString('base64url'));}
     return {statements:page.map(present),more:rows.length>limit?'/cmi5/xapi/statements?'+next:''};

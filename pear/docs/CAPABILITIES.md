@@ -256,6 +256,13 @@ ADR-073 adds live pinned/current audience checks before returning existing enrol
 
 ## G05/G10/G14/G18 SCORM engine expansion (#133)
 
+#144 / ADR-194 adds validated allowed Agent/Group/SubStatement/StatementRef
+objects, atomic scoped references, recursive per-filter Statement queries and
+ISO duration metadata. Exact/ids/canonical work inside nested objects; defined
+AU rules and official completion gates retain their existing authority. The
+remote browser combines a SubStatement with raw attachment transport. Exhaustive
+external standards/partner/platform/production evidence remains open.
+
 #144 / ADR-193 adds bounded raw multipart Statement attachments with verified
 SHA-2, exact binary bytes, registration-bound immutable storage, conditional
 JSON/fileUrl transport, deduplication and transactional quota/audit protection.
